@@ -26,9 +26,9 @@
       "product": "platform",
       "target_coordinate": "Oteryn/Oteryn-Platform",
       "current_coordinate": "blakinio/Oteryn-Platform",
-      "migration_state": "target_repository_exists_bootstrap_only_transfer_pending",
+      "migration_state": "target_coordinate_free_transfer_prepared_no_go",
       "authority_owner": "Platform provider",
-      "notes": "The organization target repository now exists but contains only migration bootstrap/backup scaffolding. The canonical Platform implementation remains at the source coordinate until the separately gated physical transfer and post-transfer verification complete."
+      "notes": "The bootstrap repository was preserved as Oteryn/Oteryn-Platform-Migration-Backup-20260818 (repository ID 1338405017), freeing the canonical target coordinate. The canonical Platform implementation remains at blakinio/Oteryn-Platform (repository ID 1305155726); physical owner transfer remains separately gated by live GHCR package linkage, repository-level runner cutover evidence, rollback feasibility and an authorized transfer-capable GitHub surface."
     },
     {
       "product": "atlas",
