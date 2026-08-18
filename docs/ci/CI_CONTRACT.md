@@ -24,8 +24,11 @@ Repository protection should require `meta-gate` on the exact pull-request head 
 - META authority is no longer `Oteryn/Oteryn` without an accepted architecture change;
 - a repository entry lacks product, current/target coordinate, migration state or authority owner;
 - the compatibility schema is malformed or changes JSON Schema generation unexpectedly;
-- product runtime manifests, raw map/client assets, database files, `.env`, or product package roots are committed into META;
-- patch whitespace validation fails.
+- a merged ecosystem release does not pin exact Game/Platform/Atlas repository coordinates and 40-hex commit SHAs;
+- a release artifact digest is not an immutable `sha256:<64-hex>` value;
+- a merged release contract is not explicitly `compatible`;
+- raw map/client assets, database files or `.env` are committed into META;
+- candidate-range whitespace validation fails.
 
 ## Trigger and runner policy
 
