@@ -17,18 +17,18 @@
     {
       "product": "game",
       "target_coordinate": "Oteryn/Oteryn-Game",
-      "current_coordinate": "blakinio/Oteryn-v2",
-      "migration_state": "pending_physical_migration",
+      "current_coordinate": "Oteryn/Oteryn-Game",
+      "migration_state": "active_after_history_preserving_migration",
       "authority_owner": "Game provider",
-      "notes": "Current coordinate is recorded from the accepted pre-META topology authority; this bootstrap does not inspect or mutate the Game repository."
+      "notes": "History-preserving migration from blakinio/Oteryn-v2 is complete; the source repository is retained as legacy/migration provenance while active Game development continues at the target coordinate."
     },
     {
       "product": "platform",
       "target_coordinate": "Oteryn/Oteryn-Platform",
       "current_coordinate": "blakinio/Oteryn-Platform",
-      "migration_state": "pending_physical_migration",
+      "migration_state": "target_repository_exists_bootstrap_only_transfer_pending",
       "authority_owner": "Platform provider",
-      "notes": "Portal, Identity, Accounts, GameAuth, Gateway and other Platform-owned web/application control-plane modules remain together."
+      "notes": "The organization target repository now exists but contains only migration bootstrap/backup scaffolding. The canonical Platform implementation remains at the source coordinate until the separately gated physical transfer and post-transfer verification complete."
     },
     {
       "product": "atlas",
@@ -40,6 +40,11 @@
     }
   ],
   "legacy_sources": [
+    {
+      "coordinate": "blakinio/Oteryn-v2",
+      "classification": "legacy_migration_source_after_game_history_copy",
+      "normative_target_authority": false
+    },
     {
       "coordinate": "blakinio/canary",
       "classification": "legacy_transition_reference",
