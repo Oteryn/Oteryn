@@ -1,0 +1,109 @@
+name: META CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: meta-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  meta-gate:
+    name: meta-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Check patch whitespace
+        run: git diff --check
+
+      - name: Validate META repository contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          required = [
+              Path('README.md'),
+              Path('AGENTS.md'),
+              Path('CONTRIBUTING.md'),
+              Path('SECURITY.md'),
+              Path('docs/architecture/adr/0001-ecosystem-topology-authority.md'),
+              Path('docs/ci/CI_CONTRACT.md'),
+              Path('docs/testing/ECOSYSTEM_TEST_STRATEGY.md'),
+              Path('docs/release/RELEASE_COORDINATION.md'),
+              Path('ecosystem/repositories.json'),
+              Path('ecosystem/compatibility.schema.json'),
+          ]
+          missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
+          if missing:
+              raise SystemExit(f'missing or empty required META files: {missing}')
+
+          json_files = sorted(Path('.').rglob('*.json'))
+          for path in json_files:
+              with path.open('r', encoding='utf-8') as handle:
+                  json.load(handle)
+
+          manifest = json.loads(Path('ecosystem/repositories.json').read_text(encoding='utf-8'))
+          if manifest.get('schema_version') != 1:
+              raise SystemExit('ecosystem/repositories.json schema_version must be 1')
+          authority = manifest.get('authority', {})
+          if authority.get('repository') != 'Oteryn/Oteryn':
+              raise SystemExit('META authority repository must be Oteryn/Oteryn')
+
+          repositories = manifest.get('repositories')
+          if not isinstance(repositories, list):
+              raise SystemExit('repositories must be an array')
+          coordinates = [entry.get('target_coordinate') for entry in repositories]
+          expected = {
+              'Oteryn/Oteryn',
+              'Oteryn/Oteryn-Game',
+              'Oteryn/Oteryn-Platform',
+              'Oteryn/Oteryn-Atlas',
+          }
+          if set(coordinates) != expected or len(coordinates) != len(expected):
+              raise SystemExit(f'unexpected or duplicate target repository set: {coordinates}')
+          for entry in repositories:
+              for key in ('product', 'target_coordinate', 'current_coordinate', 'migration_state', 'authority_owner'):
+                  if not isinstance(entry.get(key), str) or not entry[key].strip():
+                      raise SystemExit(f'missing {key!r} in repository entry: {entry}')
+
+          schema = json.loads(Path('ecosystem/compatibility.schema.json').read_text(encoding='utf-8'))
+          if schema.get('$schema') != 'https://json-schema.org/draft/2020-12/schema':
+              raise SystemExit('compatibility schema must use JSON Schema draft 2020-12')
+          if schema.get('type') != 'object':
+              raise SystemExit('compatibility schema root must be an object')
+
+          forbidden_names = {'.env', 'Cargo.toml', 'composer.json', 'package.json'}
+          forbidden_suffixes = {'.otbm', '.otb', '.spr', '.dat', '.sql', '.sqlite', '.db'}
+          violations = []
+          for path in Path('.').rglob('*'):
+              if not path.is_file() or '.git' in path.parts:
+                  continue
+              if path.name in forbidden_names or path.suffix.lower() in forbidden_suffixes:
+                  violations.append(str(path))
+          if violations:
+              raise SystemExit(f'product/runtime or sensitive files are forbidden in META: {violations}')
+
+          print(f'Validated {len(json_files)} JSON files and {len(repositories)} repository entries.')
+          PY
+
+      - name: Verify META boundary markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'thin ecosystem' AGENTS.md
+          grep -q 'META / coordination plane' README.md
+          grep -q 'meta-gate' docs/ci/CI_CONTRACT.md

@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Oteryn/Oteryn/blob/main/ecosystem/compatibility.schema.json",
+  "title": "Oteryn Ecosystem Compatibility Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "release_id",
+    "components",
+    "contracts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "release_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "game",
+        "platform",
+        "atlas"
+      ],
+      "properties": {
+        "game": {
+          "$ref": "#/$defs/component"
+        },
+        "platform": {
+          "$ref": "#/$defs/component"
+        },
+        "atlas": {
+          "$ref": "#/$defs/component"
+        }
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/contract"
+      }
+    }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit_sha"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^Oteryn/Oteryn(?:-Game|-Platform|-Atlas)?$"
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_digests": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "provider",
+        "consumer",
+        "status"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provider": {
+          "enum": [
+            "game",
+            "platform",
+            "atlas"
+          ]
+        },
+        "consumer": {
+          "enum": [
+            "game",
+            "platform",
+            "atlas"
+          ]
+        },
+        "status": {
+          "enum": [
+            "compatible",
+            "pending",
+            "unknown",
+            "conflict"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rollout_order": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "game",
+              "platform",
+              "atlas"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
