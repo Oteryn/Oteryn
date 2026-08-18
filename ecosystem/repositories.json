@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "authority": {
+    "repository": "Oteryn/Oteryn",
+    "topology_adr": "docs/architecture/adr/0001-ecosystem-topology-authority.md",
+    "effective_when": "ADR 0001 and this manifest are merged to main"
+  },
+  "repositories": [
+    {
+      "product": "meta",
+      "target_coordinate": "Oteryn/Oteryn",
+      "current_coordinate": "Oteryn/Oteryn",
+      "migration_state": "active_after_bootstrap_merge",
+      "authority_owner": "Oteryn META",
+      "notes": "Thin ecosystem coordination, topology, compatibility and release authority; no product runtime source."
+    },
+    {
+      "product": "game",
+      "target_coordinate": "Oteryn/Oteryn-Game",
+      "current_coordinate": "blakinio/Oteryn-v2",
+      "migration_state": "pending_physical_migration",
+      "authority_owner": "Game provider",
+      "notes": "Current coordinate is recorded from the accepted pre-META topology authority; this bootstrap does not inspect or mutate the Game repository."
+    },
+    {
+      "product": "platform",
+      "target_coordinate": "Oteryn/Oteryn-Platform",
+      "current_coordinate": "blakinio/Oteryn-Platform",
+      "migration_state": "pending_physical_migration",
+      "authority_owner": "Platform provider",
+      "notes": "Portal, Identity, Accounts, GameAuth, Gateway and other Platform-owned web/application control-plane modules remain together."
+    },
+    {
+      "product": "atlas",
+      "target_coordinate": "Oteryn/Oteryn-Atlas",
+      "current_coordinate": "Oteryn/Oteryn-Atlas",
+      "migration_state": "repository_exists_content_migration_pending",
+      "authority_owner": "Atlas provider",
+      "notes": "Repository existence is proven. Selective ownership separation/history extraction, publication and deployment are independently gated and are not implied complete."
+    }
+  ],
+  "legacy_sources": [
+    {
+      "coordinate": "blakinio/canary",
+      "classification": "legacy_transition_reference",
+      "normative_target_authority": false
+    },
+    {
+      "coordinate": "blakinio/otclient",
+      "classification": "legacy_migration_reference",
+      "normative_target_authority": false
+    },
+    {
+      "coordinate": "blakinio/Otheryn",
+      "classification": "legacy_source_pending_bounded_atlas_extraction",
+      "normative_target_authority": false
+    }
+  ],
+  "contract_rule": "Provider-owned schemas and runtime implementation remain canonical in provider repositories; META records coordinates, immutable identities and compatible combinations without normative duplication."
+}
