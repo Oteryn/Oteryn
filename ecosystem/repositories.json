@@ -3,46 +3,63 @@
   "authority": {
     "repository": "Oteryn/Oteryn",
     "topology_adr": "docs/architecture/adr/0001-ecosystem-topology-authority.md",
-    "effective_when": "ADR 0001 and this manifest are merged to main"
+    "governance_adr": "docs/architecture/adr/0002-organization-governance-operating-model.md",
+    "effective_when": "The applicable ADR and this manifest are merged to main"
   },
   "repositories": [
     {
       "product": "meta",
       "target_coordinate": "Oteryn/Oteryn",
       "current_coordinate": "Oteryn/Oteryn",
-      "migration_state": "active_after_bootstrap_merge",
+      "migration_state": "active",
       "authority_owner": "Oteryn META",
-      "notes": "Thin ecosystem coordination, topology, compatibility and release authority; no product runtime source."
+      "notes": "Thin ecosystem coordination, topology, compatibility, release composition and cross-repository governance authority; no product runtime source."
     },
     {
       "product": "game",
       "target_coordinate": "Oteryn/Oteryn-Game",
       "current_coordinate": "Oteryn/Oteryn-Game",
-      "migration_state": "active_after_history_preserving_migration",
+      "migration_state": "target_authoritative_source_retirement_pending",
+      "migration_verdict": "MIGRATION_COMPLETE=NO",
       "authority_owner": "Game provider",
-      "notes": "History-preserving migration from blakinio/Oteryn-v2 is complete; the source repository is retained as legacy/migration provenance while active Game development continues at the target coordinate."
+      "notes": "History continuity from blakinio/Oteryn-v2 is proven, but migration acceptance remains blocked until ordinary source-side product work is frozen/retired and source-only work, copied refs, stale mutable coordinates and terminal source disposition are reconciled."
     },
     {
       "product": "platform",
       "target_coordinate": "Oteryn/Oteryn-Platform",
-      "current_coordinate": "blakinio/Oteryn-Platform",
-      "migration_state": "target_coordinate_free_transfer_prepared_no_go",
+      "current_coordinate": "Oteryn/Oteryn-Platform",
+      "previous_coordinate": "blakinio/Oteryn-Platform",
+      "stable_repository_id": 1305155726,
+      "migration_state": "identity_transferred_post_transfer_revalidation_incomplete",
+      "migration_verdict": "MIGRATION_COMPLETE=NO",
       "authority_owner": "Platform provider",
-      "notes": "The bootstrap repository was preserved as Oteryn/Oteryn-Platform-Migration-Backup-20260818 (repository ID 1338405017), freeing the canonical target coordinate. The canonical Platform implementation remains at blakinio/Oteryn-Platform (repository ID 1305155726); physical owner transfer remains separately gated by live GHCR package linkage, repository-level runner cutover evidence, rollback feasibility and an authorized transfer-capable GitHub surface."
+      "notes": "Stable repository identity is transferred to Oteryn. Migration acceptance still requires completion or explicit disposition of runner, package/GHCR, deployment/environment, App/webhook/deploy-key and external owner/repo-sensitive identity validation, stale-coordinate cleanup, migration-only machinery retirement and temporary-backup terminal disposition."
     },
     {
       "product": "atlas",
       "target_coordinate": "Oteryn/Oteryn-Atlas",
       "current_coordinate": "Oteryn/Oteryn-Atlas",
-      "migration_state": "repository_exists_content_migration_pending",
+      "migration_state": "target_active_selective_extraction_incomplete",
+      "migration_verdict": "MIGRATION_COMPLETE=NO",
       "authority_owner": "Atlas provider",
-      "notes": "Repository existence is proven. Selective ownership separation/history extraction, publication and deployment are independently gated and are not implied complete."
+      "notes": "Target repository is authoritative for Atlas product work, but selective extraction remains incomplete until source-boundary provenance mapping, source-only work/branch disposition, protected-main/stable-gate proof and publication/provenance/rights decisions are closed."
+    }
+  ],
+  "administrative_repositories": [
+    {
+      "coordinate": "Oteryn/Oteryn-Platform-Migration-Backup-20260818",
+      "repository_id": 1338405017,
+      "classification": "TEMPORARY_MIGRATION",
+      "purpose": "Preserve the previous target-coordinate bootstrap state during the Platform owner-transfer transaction.",
+      "lifecycle_state": "terminal_disposition_required",
+      "terminal_gate": "Retain only until rollback/restore obligations and required migration evidence are resolved, then explicitly archive or delete under a separately authorized task.",
+      "normative_product_authority": false
     }
   ],
   "legacy_sources": [
     {
       "coordinate": "blakinio/Oteryn-v2",
-      "classification": "legacy_migration_source_after_game_history_copy",
+      "classification": "legacy_game_migration_source_retirement_pending",
       "normative_target_authority": false
     },
     {
@@ -57,9 +74,10 @@
     },
     {
       "coordinate": "blakinio/Otheryn",
-      "classification": "legacy_source_pending_bounded_atlas_extraction",
+      "classification": "legacy_parent_with_bounded_atlas_extraction_and_retirement_pending",
       "normative_target_authority": false
     }
   ],
+  "migration_completion_rule": "Repository presence or owner transfer is insufficient. MIGRATION_COMPLETE=YES requires mode-appropriate continuity, sole authority, source-work and stale-coordinate disposition, proven target merge enforcement, applicable non-Git identity/control-plane reconciliation, explicit source/transfer retirement, temporary-infrastructure disposition and preserved rollback/provenance. Proven blockers yield NO; missing required proof yields UNKNOWN.",
   "contract_rule": "Provider-owned schemas and runtime implementation remain canonical in provider repositories; META records coordinates, immutable identities and compatible combinations without normative duplication."
 }
