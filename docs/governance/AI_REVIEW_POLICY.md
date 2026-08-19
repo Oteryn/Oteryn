@@ -4,7 +4,7 @@ Status: enforcement-bootstrap candidate for Issue #14 / PR #15; base risk-tier p
 
 ## Objective
 
-External AI review is a scarce verification resource. Oteryn must spend it where semantic risk justifies it, not on every pull request, formatting change, evidence refresh, generated report, branch cleanup, or immutable Action pin refresh.
+External AI review is a scarce verification resource. Oteryn must spend it where semantic risk justifies it, not on every pull request, formatting change, bounded evidence refresh, or non-authoritative generated report.
 
 This policy separates deterministic validation from external AI review. Required CI, exact-diff self-review, repository scope checks, tests, static analysis, security scanning, and lifecycle closeout remain mandatory when applicable even when external AI review is not required.
 

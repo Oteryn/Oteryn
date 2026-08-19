@@ -410,6 +410,17 @@ def test_security_md_locations_are_r2() -> None:
         tier, _ = m.classify([path], patch("+policy"), policy)
         assert tier == "R2", path
 
+
+def test_enforcement_bootstrap_exception_is_exactly_pr15_single_use() -> None:
+    bootstrap = policy["enforcement_bootstrap_exception"]
+    assert bootstrap == {
+        "repository": "Oteryn/Oteryn",
+        "issue": 14,
+        "pull_request": 15,
+        "single_use": True,
+        "review_substitute": "independent_read_only_exact_head_agent_review",
+    }
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:

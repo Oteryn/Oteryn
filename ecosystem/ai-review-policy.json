@@ -235,5 +235,12 @@
     ".log",
     ".sha256",
     ".sum"
-  ]
+  ],
+  "enforcement_bootstrap_exception": {
+    "repository": "Oteryn/Oteryn",
+    "issue": 14,
+    "pull_request": 15,
+    "single_use": true,
+    "review_substitute": "independent_read_only_exact_head_agent_review"
+  }
 }
