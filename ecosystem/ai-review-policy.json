@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "policy_id": "oteryn-ai-review-risk-v1",
+  "lifecycle_authority": "Oteryn/Oteryn#12",
+  "bootstrap_exception_issue": 12,
+  "review_tiers": {
+    "R0": {
+      "external_review": "none",
+      "reviewer_class": null
+    },
+    "R1": {
+      "external_review": "required",
+      "reviewer_class": "fast"
+    },
+    "R2": {
+      "external_review": "required",
+      "reviewer_class": "deep"
+    }
+  },
+  "reviewer_preferences": {
+    "fast": [
+      "codex_spark",
+      "codex"
+    ],
+    "deep": [
+      "codex"
+    ]
+  },
+  "activation": {
+    "draft_must_be_false": true,
+    "required_ci_must_be_green": true,
+    "review_only_stable_fingerprint": true,
+    "max_primary_invocations_per_fingerprint": 1,
+    "quota_unavailable_result": "WAITING_REVIEW_QUOTA"
+  },
+  "review_neutral_globs": [
+    "docs/evidence/**",
+    "docs/agents/tasks/archive/**",
+    "docs/generated/**",
+    "artifacts/checksums/**"
+  ],
+  "standalone_r0_globs": [
+    "docs/evidence/**",
+    "docs/agents/tasks/archive/**",
+    "docs/generated/**",
+    "artifacts/checksums/**"
+  ],
+  "always_r2_globs": [
+    "AGENTS.md",
+    "**/AGENTS.md",
+    "**/AGENTS.override.md",
+    "SECURITY.md",
+    ".github/CODEOWNERS",
+    ".github/workflows/**",
+    "docs/architecture/adr/**",
+    "docs/contracts/**",
+    "docs/operations/**",
+    "docs/recovery/**",
+    "docs/agents/prompts/**",
+    "ecosystem/ai-review-policy.json",
+    "tools/governance/ai_review_policy.py",
+    "**/migrations/**",
+    "**/migration/**",
+    "**/deploy/**",
+    "**/deployment/**",
+    "**/security/**",
+    "**/auth/**"
+  ],
+  "r1_code_extensions": [
+    ".c",
+    ".cc",
+    ".cpp",
+    ".go",
+    ".js",
+    ".jsx",
+    ".php",
+    ".py",
+    ".rs",
+    ".sh",
+    ".sql",
+    ".ts",
+    ".tsx"
+  ],
+  "r2_added_line_markers": [
+    "authorization",
+    "authentication",
+    "permission",
+    "secret",
+    "credential",
+    "token",
+    "cryptograph",
+    "branch protection",
+    "ruleset",
+    "required check",
+    "production",
+    "deploy",
+    "rollback",
+    "restore",
+    "migration",
+    "delete",
+    "cross-repository",
+    "cross repository",
+    "entitlement",
+    "payment"
+  ],
+  "size_thresholds": {
+    "r1_changed_lines": 250,
+    "r2_changed_lines": 800
+  },
+  "special_r0_rules": {
+    "immutable_action_pin_only": true,
+    "exact_incorporated_branch_delete": true
+  },
+  "review_reuse": {
+    "reviewed_head_must_be_ancestor": true,
+    "same_tier_required": true,
+    "same_fingerprint_required": true,
+    "post_review_changes_must_be_review_neutral": true,
+    "final_required_ci_must_be_green": true,
+    "base_change_invalidates_fingerprint": true
+  }
+}

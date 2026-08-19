@@ -84,9 +84,18 @@ Absence of CI in this bootstrap repository is not equivalent to a CI pass; recor
 - Deny by default when authorization is ambiguous.
 - Production or destructive external mutations require separate explicit owner authority even if META documentation describes them.
 
-## Owner-funded AI
+## Owner-funded AI and review economy
 
-Do not invoke Codex, OpenAI API, paid/limited AI review services, or any mechanism that consumes the repository owner's personal AI quota, credits, tokens or subscription limits unless the owner explicitly authorizes that specific use for the current task. Tool availability or existing authentication is not permission to consume such resources.
+External AI review is governed by `docs/governance/AI_REVIEW_POLICY.md` and `ecosystem/ai-review-policy.json`. Do not spend Codex/Spark quota on every PR. Classify the final diff deterministically first.
+
+- `R0` requires deterministic validation and exact-diff self-review only; do not invoke external AI review.
+- `R1` uses one fast reviewer invocation per stable review fingerprint after required CI is green.
+- `R2` uses one deep reviewer invocation per stable review fingerprint after required CI is green.
+- Never invoke an external reviewer for Draft/WIP state or repeatedly poll/re-run a reviewer for an unchanged fingerprint.
+- A prior review may be reused only under the policy's exact fingerprint/ancestor/review-neutral rules.
+- Issue #12 and its bootstrap PR are the one-time no-external-review bootstrap for this policy. After bootstrap, changes to the review policy/classifier/authority mapping are `R2`.
+
+The repository owner has standing authorization for external AI consumption only when the merged risk policy requires `R1` or `R2` review and its invocation budget is respected. Other owner-funded AI/API use still requires explicit authorization for that task.
 
 ## Architecture handover
 

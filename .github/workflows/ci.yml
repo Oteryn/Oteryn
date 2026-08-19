@@ -160,6 +160,26 @@ jobs:
           )
           PY
 
+      - name: Validate AI review risk policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/governance/test_ai_review_policy.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          policy = json.loads(Path('ecosystem/ai-review-policy.json').read_text(encoding='utf-8'))
+          if policy.get('schema_version') != 1:
+              raise SystemExit('AI review policy schema_version must be 1')
+          if set(policy.get('review_tiers', {})) != {'R0', 'R1', 'R2'}:
+              raise SystemExit('AI review tiers must be exactly R0/R1/R2')
+          if policy['review_tiers']['R0']['external_review'] != 'none':
+              raise SystemExit('R0 must not consume external AI review')
+          if policy['review_tiers']['R2']['reviewer_class'] != 'deep':
+              raise SystemExit('R2 must require the deep reviewer class')
+          print('AI review policy contract PASS')
+          PY
+
       - name: Verify META boundary markers
         shell: bash
         run: |
