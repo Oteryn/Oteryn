@@ -64,7 +64,9 @@
     "**/deploy/**",
     "**/deployment/**",
     "**/security/**",
-    "**/auth/**"
+    "**/auth/**",
+    "docs/architecture/**",
+    "docs/agents/tasks/active/**"
   ],
   "r1_code_extensions": [
     ".c",
@@ -88,7 +90,8 @@
   "special_r0_rules": {
     "immutable_action_pin_only": true,
     "exact_incorporated_branch_delete": true,
-    "immutable_action_pin_same_major_only": true
+    "immutable_action_pin_same_major_only": true,
+    "lifecycle_metadata_only": true
   },
   "review_reuse": {
     "reviewed_head_must_be_ancestor": true,
@@ -135,5 +138,26 @@
     "pyproject.toml",
     "poetry.lock",
     "uv.lock"
+  ],
+  "r0_prose_extensions": [
+    ".md",
+    ".txt",
+    ".rst",
+    ".adoc"
+  ],
+  "r2_sensitive_dependency_markers": [
+    "google2fa",
+    "totp",
+    "oauth",
+    "openid",
+    "jwt",
+    "jsonwebtoken",
+    "cryptography",
+    "libsodium",
+    "argon2",
+    "bcrypt",
+    "password-hash",
+    "stripe",
+    "payment"
   ]
 }

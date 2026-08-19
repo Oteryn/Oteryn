@@ -27,11 +27,14 @@ Typical examples:
 
 R0 is not permission to weaken CI. Required deterministic checks must still pass on the final head.
 
+A narrow exception exists for an already-existing `docs/agents/tasks/active/**` packet when the diff changes only lifecycle-pointer metadata (`status`/`owner`/branch-to-origin fields and GitHub Issue lifecycle authority) without changing objectives, acceptance criteria, execution instructions, owned paths or permissions. Creating a new active task or changing executable task instructions is R2.
+
 ### R1 — fast external review
 
 Use the configured fast reviewer once for a stable review fingerprint.
 
-R1 is the default for ordinary executable code that can affect behavior but does not cross an R2 boundary: normal runtime logic, algorithms, ordinary refactors, testable internal API changes, non-sensitive tooling, and dependency manifest/lockfile updates. Dependency updates are not treated as prose merely because only a lockfile changed.
+R1 is the default for ordinary executable code that can affect behavior but does not cross an R2 boundary: normal runtime logic, algorithms, ordinary refactors, testable internal API changes, non-sensitive tooling, and dependency manifest/lockfile updates. Dependency updates are not treated as prose merely because only a lockfile changed. Security-sensitive dependency changes (for example MFA/auth/crypto/payment libraries matched by the policy) escalate to R2.
+
 
 Current reviewer preference is `Codex Spark` when available, with ordinary `Codex` as fallback. Provider/model names are configuration, not architectural authority.
 

@@ -97,6 +97,47 @@ def test_plain_readme_is_r0_but_not_review_neutral() -> None:
     assert not m.matches("README.md", policy["review_neutral_globs"])
 
 
+
+def test_lifecycle_metadata_only_is_r0() -> None:
+    p = patch(
+        "-status: active",
+        "+lifecycle_authority: GitHub Issue",
+        "+lifecycle_issue: 11",
+        "-branch: coord/example",
+        "+coordination_origin_branch: coord/example",
+        "+coordination_origin_branch_state: merged_and_deleted",
+        "-owner: autonomous worker",
+        "+> Lifecycle state, ownership, dependencies and acceptance are authoritative in GitHub Issue #11. This packet is technical/provenance detail only; do not maintain mutable lifecycle status here.",
+    )
+    assert m.lifecycle_metadata_only(["docs/agents/tasks/active/example.md"], p)
+    tier, reasons = m.classify(["docs/agents/tasks/active/example.md"], p, policy)
+    assert tier == "R0"
+    assert reasons == ["lifecycle_metadata_only"]
+
+
+def test_new_active_task_is_r2() -> None:
+    p = patch("+task_id: COORD", "+mode: coordination", "+implementation_authorized: false")
+    p = "new file mode 100644\n" + p
+    tier, _ = m.classify(["docs/agents/tasks/active/coord.md"], p, policy)
+    assert tier == "R2"
+
+
+def test_architecture_doc_is_r2() -> None:
+    tier, _ = m.classify(["docs/architecture/CONTRACT.md"], patch("+consumer authority"), policy)
+    assert tier == "R2"
+
+
+def test_prose_delete_word_does_not_force_r2() -> None:
+    tier, _ = m.classify(["README.md"], patch("+Delete the local cache if needed."), policy)
+    assert tier == "R0"
+
+
+def test_security_sensitive_dependency_is_r2() -> None:
+    tier, reasons = m.classify(["composer.lock"], patch('+"name": "pragmarx/google2fa"', '+"version": "9.1.0"'), policy)
+    assert tier == "R2"
+    assert reasons == ["security_sensitive_dependency:google2fa"]
+
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:

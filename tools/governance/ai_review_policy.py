@@ -52,6 +52,33 @@ def changed_content_lines(patch: str) -> list[str]:
     return out
 
 
+def lifecycle_metadata_only(paths: list[str], patch: str) -> bool:
+    if len(paths) != 1 or not matches(paths[0], ["docs/agents/tasks/active/**"]):
+        return False
+    if "new file mode" in patch or "deleted file mode" in patch:
+        return False
+    lines = [line.strip() for line in changed_content_lines(patch) if line.strip()]
+    if not lines:
+        return False
+    allowed_keys = {
+        "status",
+        "owner",
+        "branch",
+        "lifecycle_authority",
+        "lifecycle_issue",
+        "coordination_origin_branch",
+        "coordination_origin_branch_state",
+    }
+    for line in lines:
+        key = line.split(":", 1)[0].strip() if ":" in line else ""
+        if key in allowed_keys:
+            continue
+        if line.startswith("> Lifecycle state, ownership, dependencies and acceptance are authoritative in GitHub Issue #"):
+            continue
+        return False
+    return True
+
+
 def immutable_action_pin_only(paths: list[str], patch: str) -> bool:
     if not paths or not all(p.startswith(".github/workflows/") and p.endswith((".yml", ".yaml")) for p in paths):
         return False
@@ -81,6 +108,9 @@ def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]
     if immutable_action_pin_only(paths, patch) and policy["special_r0_rules"].get("immutable_action_pin_only"):
         return "R0", ["immutable_action_pin_only"]
 
+    if lifecycle_metadata_only(paths, patch) and policy["special_r0_rules"].get("lifecycle_metadata_only"):
+        return "R0", ["lifecycle_metadata_only"]
+
     if paths and all(matches(p, policy["standalone_r0_globs"]) for p in paths):
         return "R0", ["standalone_r0_paths_only"]
 
@@ -88,11 +118,14 @@ def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]
     if r2_paths:
         reasons.append("r2_path:" + ",".join(sorted(r2_paths)))
 
-    changed_text = "\n".join(lines).casefold()
-    marker_key = "r2_changed_line_markers" if "r2_changed_line_markers" in policy else "r2_added_line_markers"
-    markers = [marker for marker in policy[marker_key] if marker.casefold() in changed_text]
-    if markers:
-        reasons.append("r2_marker:" + ",".join(markers))
+    prose_extensions = set(policy.get("r0_prose_extensions", []))
+    prose_only = bool(paths) and all(PurePosixPath(path).suffix.lower() in prose_extensions for path in paths)
+    if not prose_only:
+        changed_text = "\n".join(lines).casefold()
+        marker_key = "r2_changed_line_markers" if "r2_changed_line_markers" in policy else "r2_added_line_markers"
+        markers = [marker for marker in policy[marker_key] if marker.casefold() in changed_text]
+        if markers:
+            reasons.append("r2_marker:" + ",".join(markers))
 
     if changed_line_count >= policy["size_thresholds"]["r2_changed_lines"]:
         reasons.append(f"r2_size:{changed_line_count}")
@@ -102,6 +135,13 @@ def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]
 
     dependency_files = [p for p in paths if matches(p, policy.get("r1_dependency_globs", []))]
     if dependency_files:
+        dependency_text = "\n".join(lines).casefold()
+        sensitive_dependencies = [
+            marker for marker in policy.get("r2_sensitive_dependency_markers", [])
+            if marker.casefold() in dependency_text
+        ]
+        if sensitive_dependencies:
+            return "R2", ["security_sensitive_dependency:" + ",".join(sensitive_dependencies)]
         return "R1", ["dependency_manifest_or_lockfile:" + ",".join(sorted(dependency_files))]
 
     code_extensions = set(policy["r1_code_extensions"])
