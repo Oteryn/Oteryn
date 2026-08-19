@@ -81,7 +81,23 @@
     ".ts",
     ".tsx"
   ],
-  "r2_added_line_markers": [
+  "size_thresholds": {
+    "r1_changed_lines": 250,
+    "r2_changed_lines": 800
+  },
+  "special_r0_rules": {
+    "immutable_action_pin_only": true,
+    "exact_incorporated_branch_delete": true
+  },
+  "review_reuse": {
+    "reviewed_head_must_be_ancestor": true,
+    "same_tier_required": true,
+    "same_fingerprint_required": true,
+    "post_review_changes_must_be_review_neutral": true,
+    "final_required_ci_must_be_green": true,
+    "base_change_invalidates_fingerprint": true
+  },
+  "r2_changed_line_markers": [
     "authorization",
     "authentication",
     "permission",
@@ -102,21 +118,5 @@
     "cross repository",
     "entitlement",
     "payment"
-  ],
-  "size_thresholds": {
-    "r1_changed_lines": 250,
-    "r2_changed_lines": 800
-  },
-  "special_r0_rules": {
-    "immutable_action_pin_only": true,
-    "exact_incorporated_branch_delete": true
-  },
-  "review_reuse": {
-    "reviewed_head_must_be_ancestor": true,
-    "same_tier_required": true,
-    "same_fingerprint_required": true,
-    "post_review_changes_must_be_review_neutral": true,
-    "final_required_ci_must_be_green": true,
-    "base_change_invalidates_fingerprint": true
-  }
+  ]
 }

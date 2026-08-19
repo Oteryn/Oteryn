@@ -112,3 +112,27 @@ After bootstrap merge, modifications to this policy, its classifier, its reviewe
 `Oteryn/Oteryn` owns the organization default and semantics. Game, Platform and Atlas may add stricter path rules or repository-specific R2 triggers, but may not downgrade an organization R2 trigger without an explicit META governance change.
 
 Product repositories should enforce the local classifier before invoking any external reviewer and should pass only the risk-bearing diff plus directly relevant context to the reviewer. Repository-wide search is reserved for R2 or a concrete finding that requires expansion.
+
+## Reusable enforcement action
+
+Product repositories consume the META-owned composite action at `.github/actions/ai-review-gate/action.yml` using a full 40-hex META commit SHA. The action classifies the caller repository, not META, so Game, Platform and Atlas share one versioned policy implementation instead of copying classifier logic.
+
+- `R0`: pass after deterministic checks; no external AI is requested.
+- `R1`/`R2` while Draft: report tier/fingerprint and pass so deterministic CI can stabilize without spending AI quota.
+- `R1`/`R2` when Ready: fail closed until a trusted structured PASS record matches the current fingerprint. A deep reviewer may satisfy a fast-review requirement; a fast reviewer never satisfies `R2`.
+
+A structured record is a maintainer attestation to an actually completed external review and points to its GitHub PR review/comment source:
+
+```text
+<!-- OTERYN_AI_REVIEW_V1 -->
+REVIEW_TIER: R1 | R2
+REVIEW_FINGERPRINT: <sha256>
+REVIEWED_HEAD: <40-hex SHA>
+REVIEWER_CLASS: fast | deep
+REVIEWER_ID: codex_spark | codex
+RESULT: PASS
+REVIEW_SOURCE_URL: https://github.com/<owner>/<repo>/pull/<n>#...
+FINDINGS: <integer or concise resolved summary>
+```
+
+For review reuse after review-neutral commits, `REVIEWED_HEAD` may be an ancestor of the final head only when the final fingerprint remains identical. The gate verifies both ancestry and fingerprint.

@@ -1,0 +1,84 @@
+name: Oteryn AI review gate
+description: Classify pull-request risk and require structured AI review evidence only for Ready R1/R2 changes.
+inputs:
+  base-sha:
+    description: Pull request base SHA.
+    required: true
+  head-sha:
+    description: Pull request head SHA.
+    required: true
+  draft:
+    description: Whether the pull request is still Draft.
+    required: true
+  repository:
+    description: owner/repo of the caller.
+    required: true
+  pr-number:
+    description: Pull request number.
+    required: true
+  github-token:
+    description: GITHUB_TOKEN with issues:read for structured review evidence.
+    required: true
+outputs:
+  tier:
+    description: R0, R1 or R2.
+    value: ${{ steps.classify.outputs.tier }}
+  fingerprint:
+    description: Stable risk-bearing review fingerprint.
+    value: ${{ steps.classify.outputs.fingerprint }}
+  reviewer-class:
+    description: none, fast or deep.
+    value: ${{ steps.classify.outputs.reviewer_class }}
+runs:
+  using: composite
+  steps:
+    - id: classify
+      name: Classify exact pull-request diff
+      shell: bash
+      env:
+        BASE_SHA: ${{ inputs.base-sha }}
+        HEAD_SHA: ${{ inputs.head-sha }}
+      run: |
+        set -euo pipefail
+        POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
+        RESULT="$RUNNER_TEMP/oteryn-ai-review-result.json"
+        python3 "$POLICY_ROOT/tools/governance/ai_review_policy.py" --repo-root "$GITHUB_WORKSPACE" --policy-file "$POLICY_ROOT/ecosystem/ai-review-policy.json" --base "$BASE_SHA" --head "$HEAD_SHA" > "$RESULT"
+        python3 - "$RESULT" "$GITHUB_OUTPUT" "$GITHUB_STEP_SUMMARY" <<'PY'
+        import json, sys
+        result = json.load(open(sys.argv[1], encoding='utf-8'))
+        reviewer = result['reviewer_class'] or 'none'
+        with open(sys.argv[2], 'a', encoding='utf-8') as out:
+            out.write(f"tier={result['tier']}\n")
+            out.write(f"fingerprint={result['review_fingerprint']}\n")
+            out.write(f"reviewer_class={reviewer}\n")
+        with open(sys.argv[3], 'a', encoding='utf-8') as summary:
+            summary.write("## Oteryn AI review classification\n\n")
+            summary.write(f"- tier: `{result['tier']}`\n")
+            summary.write(f"- reviewer class: `{reviewer}`\n")
+            summary.write(f"- fingerprint: `{result['review_fingerprint']}`\n")
+            summary.write(f"- reasons: `{'; '.join(result['reasons'])}`\n")
+        PY
+    - name: Accept R0 without external AI
+      if: ${{ steps.classify.outputs.tier == 'R0' }}
+      shell: bash
+      run: |
+        echo 'R0: deterministic validation only; external AI review is intentionally not required.'
+    - name: Defer external review while Draft
+      if: ${{ steps.classify.outputs.tier != 'R0' && inputs.draft == 'true' }}
+      shell: bash
+      run: |
+        echo 'Draft/WIP: external review is deferred to avoid quota spend before the risk-bearing diff is stable.'
+    - name: Verify structured external review evidence
+      if: ${{ steps.classify.outputs.tier != 'R0' && inputs.draft != 'true' }}
+      shell: bash
+      env:
+        REVIEW_TIER: ${{ steps.classify.outputs.tier }}
+        REVIEW_FINGERPRINT: ${{ steps.classify.outputs.fingerprint }}
+        HEAD_SHA: ${{ inputs.head-sha }}
+        REPOSITORY: ${{ inputs.repository }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: |
+        set -euo pipefail
+        POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
+        python3 "$POLICY_ROOT/tools/governance/verify_ai_review_evidence.py" --repo-root "$GITHUB_WORKSPACE" --policy-file "$POLICY_ROOT/ecosystem/ai-review-policy.json" --repository "$REPOSITORY" --pr-number "$PR_NUMBER" --tier "$REVIEW_TIER" --fingerprint "$REVIEW_FINGERPRINT" --head "$HEAD_SHA" --token "$GH_TOKEN"

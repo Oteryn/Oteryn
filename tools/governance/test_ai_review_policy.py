@@ -68,6 +68,11 @@ def test_sensitive_marker_escalates_to_r2() -> None:
     assert tier == "R2"
 
 
+def test_removed_sensitive_marker_escalates_to_r2() -> None:
+    tier, _ = m.classify(["src/example.py"], patch("-require_authorization()", "+continue_request()"), policy)
+    assert tier == "R2"
+
+
 def test_plain_readme_is_r0_but_not_review_neutral() -> None:
     tier, _ = m.classify(["README.md"], patch("+clarify usage"), policy)
     assert tier == "R0"
