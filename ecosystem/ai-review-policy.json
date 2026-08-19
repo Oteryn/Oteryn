@@ -99,7 +99,9 @@
     "same_fingerprint_required": true,
     "post_review_changes_must_be_review_neutral": true,
     "final_required_ci_must_be_green": true,
-    "base_change_invalidates_fingerprint": true
+    "unrelated_base_advance_preserves_fingerprint": true,
+    "risk_bearing_base_blob_change_invalidates_fingerprint": true,
+    "rebased_head_requires_ancestor_rule": true
   },
   "r2_changed_line_markers": [
     "authorization",

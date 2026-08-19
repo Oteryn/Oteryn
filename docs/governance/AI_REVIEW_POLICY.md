@@ -70,7 +70,7 @@ For one review fingerprint:
 
 ## Review fingerprint and no-re-review rule
 
-The review classifier computes `review_fingerprint` from the base revision plus the complete diff for all paths that are not explicitly review-neutral.
+The review classifier computes `review_fingerprint` from the complete risk-bearing diff plus the current base blob identity for every risk-bearing path. An unrelated advance of the base branch therefore does not spend another review, while a base change touching a reviewed path invalidates the fingerprint.
 
 A previous external review remains valid for a later final head only when all of the following are true:
 
@@ -82,7 +82,7 @@ A previous external review remains valid for a later final head only when all of
 
 This allows evidence/report/checksum refreshes after review without paying for another Codex invocation while preventing runtime, contract, workflow, policy, or ordinary documentation changes from hiding behind an older review.
 
-A rebase onto a different base invalidates the fingerprint unless a future deterministic policy proves base-equivalence safely.
+A base-branch advance outside risk-bearing paths preserves the fingerprint. A rebase still requires the reviewed-head ancestry rule; rebasing/recreating the reviewed commits therefore requires a fresh review even when the textual patch is equivalent.
 
 ## Review-neutral paths
 

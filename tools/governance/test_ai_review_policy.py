@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import importlib.util
+import subprocess
+import tempfile
 from pathlib import Path
 
 SCRIPT = Path(__file__).with_name("ai_review_policy.py")
@@ -136,6 +138,50 @@ def test_security_sensitive_dependency_is_r2() -> None:
     tier, reasons = m.classify(["composer.lock"], patch('+"name": "pragmarx/google2fa"', '+"version": "9.1.0"'), policy)
     assert tier == "R2"
     assert reasons == ["security_sensitive_dependency:google2fa"]
+
+
+
+def _git(repo: Path, *args: str) -> str:
+    return subprocess.check_output(["git", *args], cwd=repo, text=True).strip()
+
+
+def _fingerprint_repo() -> tuple[Path, str, str, str, str]:
+    repo = Path(tempfile.mkdtemp(prefix="oteryn-ai-fingerprint-"))
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "test@example.invalid")
+    _git(repo, "config", "user.name", "test")
+    (repo / "src").mkdir()
+    (repo / "src/app.py").write_text("value = 1\n", encoding="utf-8")
+    (repo / "README.md").write_text("base\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "base")
+    base1 = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "-b", "feature")
+    (repo / "src/app.py").write_text("value = 2\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "feature")
+    head = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "checkout", "master")
+    (repo / "README.md").write_text("base moved elsewhere\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "unrelated base advance")
+    base2 = _git(repo, "rev-parse", "HEAD")
+    (repo / "src/app.py").write_text("value = 3\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "risk-bearing base advance")
+    base3 = _git(repo, "rev-parse", "HEAD")
+    return repo, base1, base2, base3, head
+
+
+def test_unrelated_base_advance_preserves_fingerprint() -> None:
+    repo, base1, base2, _, head = _fingerprint_repo()
+    first, _, _ = m.fingerprint(repo, base1, head, ["src/app.py"], policy)
+    second, _, _ = m.fingerprint(repo, base2, head, ["src/app.py"], policy)
+    assert first == second
+
+
+def test_risk_bearing_base_advance_invalidates_fingerprint() -> None:
+    repo, base1, _, base3, head = _fingerprint_repo()
+    first, _, _ = m.fingerprint(repo, base1, head, ["src/app.py"], policy)
+    changed, _, _ = m.fingerprint(repo, base3, head, ["src/app.py"], policy)
+    assert first != changed
 
 
 def main() -> int:

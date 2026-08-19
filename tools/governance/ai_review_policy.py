@@ -152,11 +152,24 @@ def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]
     return "R0", ["non_sensitive_non_executable_change"]
 
 
+def blob_at(repo_root: str | Path, revision: str, path: str) -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", f"{revision}:{path}"],
+        cwd=Path(repo_root),
+        text=True,
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.stdout.strip() if result.returncode == 0 else "ABSENT"
+
+
 def fingerprint(repo_root: str | Path, base: str, head: str, paths: list[str], policy: dict) -> tuple[str, list[str], list[str]]:
     neutral = [p for p in paths if matches(p, policy["review_neutral_globs"])]
     bearing = [p for p in paths if p not in neutral]
     payload = {
-        "base": base,
+        "base_context_blobs": {path: blob_at(repo_root, base, path) for path in sorted(bearing)},
         "bearing_paths": sorted(bearing),
         "patch": patch_for(repo_root, base, head, sorted(bearing)) if bearing else "",
     }
