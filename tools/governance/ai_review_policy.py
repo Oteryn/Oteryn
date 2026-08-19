@@ -12,7 +12,7 @@ from pathlib import Path, PurePosixPath
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_POLICY = DEFAULT_ROOT / "ecosystem/ai-review-policy.json"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
-ACTION_USE = re.compile(r"^\s*uses:\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?)@([0-9a-f]{40})(?:\s+#.*)?$")
+ACTION_USE = re.compile(r"^\s*uses:\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)?)@([0-9a-f]{40})\s+#\s*v?(\d+)(?:\.\d+)*(?:\s.*)?$")
 
 
 def load_policy(path: str | Path | None = None) -> dict:
@@ -65,7 +65,12 @@ def immutable_action_pin_only(paths: list[str], patch: str) -> bool:
             return False
         matches_.append(match)
     identities = [match.group(1) for match in matches_]
-    return len(identities) % 2 == 0 and all(identities[i] == identities[i + 1] for i in range(0, len(identities), 2))
+    majors = [match.group(3) for match in matches_]
+    return (
+        len(identities) % 2 == 0
+        and all(identities[i] == identities[i + 1] for i in range(0, len(identities), 2))
+        and all(majors[i] == majors[i + 1] for i in range(0, len(majors), 2))
+    )
 
 
 def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]]:
@@ -94,6 +99,10 @@ def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]
 
     if reasons:
         return "R2", reasons
+
+    dependency_files = [p for p in paths if matches(p, policy.get("r1_dependency_globs", []))]
+    if dependency_files:
+        return "R1", ["dependency_manifest_or_lockfile:" + ",".join(sorted(dependency_files))]
 
     code_extensions = set(policy["r1_code_extensions"])
     code = [p for p in paths if PurePosixPath(p).suffix.lower() in code_extensions]

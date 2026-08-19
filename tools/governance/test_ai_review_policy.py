@@ -44,6 +44,24 @@ def test_immutable_action_pin_only_is_r0() -> None:
     assert reasons == ["immutable_action_pin_only"]
 
 
+def test_action_major_change_is_not_r0() -> None:
+    old = "a" * 40
+    new = "b" * 40
+    p = patch(
+        f"-      uses: actions/upload-artifact@{old} # v4",
+        f"+      uses: actions/upload-artifact@{new} # v7.0.1",
+    )
+    assert not m.immutable_action_pin_only([".github/workflows/ci.yml"], p)
+    tier, _ = m.classify([".github/workflows/ci.yml"], p, policy)
+    assert tier == "R2"
+
+
+def test_dependency_lockfile_is_r1() -> None:
+    tier, reasons = m.classify(["composer.lock"], patch('-"version": "1.0.0"', '+"version": "1.0.1"'), policy)
+    assert tier == "R1"
+    assert reasons[0].startswith("dependency_manifest_or_lockfile:")
+
+
 def test_pin_plus_permission_change_is_not_r0() -> None:
     old = "a" * 40
     new = "b" * 40

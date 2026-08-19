@@ -23,7 +23,7 @@ Typical examples:
 - generated reports/checksums whose source and validator are unchanged;
 - non-authoritative prose, spelling, formatting, and comment-only changes;
 - exact deletion of an unprotected branch proven fully represented by protected `main` by ancestry/tree/patch equivalence;
-- a Dependabot-style immutable GitHub Action pin refresh when the Action identity is unchanged, both old and new references are full 40-hex SHAs, and no trigger, permissions, inputs, environment, runner, shell, or job semantics change.
+- a Dependabot-style immutable GitHub Action pin refresh when the Action identity and annotated major version are unchanged, both old and new references are full 40-hex SHAs, and no trigger, permissions, inputs, environment, runner, shell, or job semantics change.
 
 R0 is not permission to weaken CI. Required deterministic checks must still pass on the final head.
 
@@ -31,7 +31,7 @@ R0 is not permission to weaken CI. Required deterministic checks must still pass
 
 Use the configured fast reviewer once for a stable review fingerprint.
 
-R1 is the default for ordinary executable code that can affect behavior but does not cross an R2 boundary: normal runtime logic, algorithms, ordinary refactors, testable internal API changes, and non-sensitive tooling.
+R1 is the default for ordinary executable code that can affect behavior but does not cross an R2 boundary: normal runtime logic, algorithms, ordinary refactors, testable internal API changes, non-sensitive tooling, and dependency manifest/lockfile updates. Dependency updates are not treated as prose merely because only a lockfile changed.
 
 Current reviewer preference is `Codex Spark` when available, with ordinary `Codex` as fallback. Provider/model names are configuration, not architectural authority.
 

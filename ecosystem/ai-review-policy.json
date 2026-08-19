@@ -87,7 +87,8 @@
   },
   "special_r0_rules": {
     "immutable_action_pin_only": true,
-    "exact_incorporated_branch_delete": true
+    "exact_incorporated_branch_delete": true,
+    "immutable_action_pin_same_major_only": true
   },
   "review_reuse": {
     "reviewed_head_must_be_ancestor": true,
@@ -118,5 +119,21 @@
     "cross repository",
     "entitlement",
     "payment"
+  ],
+  "r1_dependency_globs": [
+    "composer.json",
+    "composer.lock",
+    "package.json",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "Cargo.toml",
+    "Cargo.lock",
+    "go.mod",
+    "go.sum",
+    "requirements*.txt",
+    "pyproject.toml",
+    "poetry.lock",
+    "uv.lock"
   ]
 }
