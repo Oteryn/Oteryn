@@ -1,6 +1,6 @@
 # Oteryn risk-based AI review policy
 
-Status: proposed bootstrap policy for Issue #12.
+Status: enforcement-bootstrap candidate for Issue #14 / PR #15; base risk-tier policy was bootstrapped by Issue #12 / PR #13.
 
 ## Objective
 
@@ -18,18 +18,12 @@ R0 is appropriate when the change has no plausible runtime, security, authority,
 
 Typical examples:
 
-- evidence under `docs/evidence/**`;
-- archived task records under `docs/agents/tasks/archive/**`;
-- generated reports/checksums whose source and validator are unchanged;
-- non-authoritative prose, spelling, formatting, and comment-only changes;
-- exact deletion of an unprotected branch proven fully represented by protected `main` by ancestry/tree/patch equivalence;
-- a Dependabot-style immutable GitHub Action pin refresh when the Action identity and annotated major version are unchanged, both old and new references are full 40-hex SHAs, and no trigger, permissions, inputs, environment, runner, shell, or job semantics change.
+- bounded evidence/archive/generated/checksum data under configured R0 globs only when the file extension is explicitly listed as safe data and is not executable/configuration content;
+- non-authoritative prose, spelling, formatting, and comment-only changes outside protected governance paths.
 
-R0 is not permission to weaken CI. Required deterministic checks must still pass on the final head.
+R0 is not permission to weaken CI. Required deterministic checks must still pass on the final head. Rename/copy classification includes both source and destination paths, so moving a protected file cannot downgrade its risk tier or remove its base blob from the fingerprint.
 
-A Composer lockfile-only update may also be R0 when deterministic comparison proves that runtime `packages` and every non-`packages-dev` lockfile field are identical, exactly one non-sensitive `packages-dev` package changes, and its numeric semantic version increases within the same major/minor (patch-only). Minor/major, runtime, security-sensitive or structurally broader dependency changes remain R1/R2.
-
-A narrow exception exists for an already-existing `docs/agents/tasks/active/**` packet when the diff changes only lifecycle-pointer metadata (`status`/`owner`/branch-to-origin fields and GitHub Issue lifecycle authority) without changing objectives, acceptance criteria, execution instructions, owned paths or permissions. Creating a new active task or changing executable task instructions is R2.
+The Action-pin, active-task lifecycle and Composer dev-patch R0 optimizations are disabled fail-closed. Workflow/Action and active-task changes therefore remain R2; Composer manifest/lockfile changes are at least R1 and security-sensitive dependency changes are R2. They may only regain R0 status through a future R2 policy change backed by a stronger deterministic proof.
 
 ### R1 — fast external review
 
@@ -88,45 +82,11 @@ A base-branch advance outside risk-bearing paths preserves the fingerprint. A re
 
 ## Review-neutral paths
 
-Review-neutral is intentionally narrower than R0. The default organization policy permits only bounded evidence/archive/generated-result paths. Ordinary README, architecture, contract, governance, workflow and source changes are not review-neutral even if a standalone change could be R0.
+Review-neutral is intentionally narrower than R0. A path must match a configured review-neutral glob, use an explicitly safe data extension, and not be executable/configuration content. Both source and destination of renames/copies participate in this decision. Ordinary README, architecture, contract, governance, workflow and source changes are not review-neutral even if a standalone change could be R0.
 
 ## Structured review evidence
 
 An external review record must contain at least:
-
-```text
-REVIEW_TIER: R1 | R2
-REVIEW_FINGERPRINT: <sha256>
-REVIEWED_HEAD: <40-hex SHA>
-REVIEWER_CLASS: fast | deep
-REVIEWER: <provider/model or product reviewer identity>
-RESULT: PASS | FAIL | BLOCKED
-FINDINGS: <count and concrete references>
-```
-
-Do not treat free-form approval language without the fingerprint/head binding as a valid review gate.
-
-## Bootstrap rule
-
-Issue #12 and the PR that first installs this policy are the one-time bootstrap exception to automated evidence enforcement only. Bootstrap still requires an independent read-only exact-head agent review plus deterministic exact-head CI; owner self-review alone is insufficient. The independent bootstrap reviewer must not modify, push, or merge the reviewed PR.
-
-After bootstrap merge, modifications to this policy, its classifier, its reviewer mapping, or its authority boundaries are R2 and require deep external review.
-
-## Repository adoption
-
-`Oteryn/Oteryn` owns the organization default and semantics. Game, Platform and Atlas may add stricter path rules or repository-specific R2 triggers, but may not downgrade an organization R2 trigger without an explicit META governance change.
-
-Product repositories should enforce the local classifier before invoking any external reviewer and should pass only the risk-bearing diff plus directly relevant context to the reviewer. Repository-wide search is reserved for R2 or a concrete finding that requires expansion.
-
-## Reusable enforcement action
-
-Product repositories consume the META-owned composite action at `.github/actions/ai-review-gate/action.yml` using a full 40-hex META commit SHA. The action classifies the caller repository, not META, so Game, Platform and Atlas share one versioned policy implementation instead of copying classifier logic. Security-critical caller inputs (base/head SHA, Draft state, repository and PR number) must exactly match immutable GitHub pull-request event context before classification or evidence verification runs.
-
-- `R0`: pass after deterministic checks; no external AI is requested.
-- `R1`/`R2` while Draft: report tier/fingerprint and pass so deterministic CI can stabilize without spending AI quota.
-- `R1`/`R2` when Ready: fail closed until a trusted structured PASS record matches the current fingerprint. A deep reviewer may satisfy a fast-review requirement; a fast reviewer never satisfies `R2`.
-
-A structured record is only a maintainer pointer to an external review; it is not itself review authority. The gate fetches the exact GitHub PR review/comment object, requires a configured external reviewer login, rejects self-authored sources, and verifies that the external source body itself contains the matching PASS tier, fingerprint, reviewed head and reviewer class:
 
 ```text
 <!-- OTERYN_AI_REVIEW_V1 -->
@@ -136,8 +96,46 @@ REVIEWED_HEAD: <40-hex SHA>
 REVIEWER_CLASS: fast | deep
 REVIEWER_ID: codex_spark | codex
 RESULT: PASS
-REVIEW_SOURCE_URL: https://github.com/<owner>/<repo>/pull/<n>#...
-FINDINGS: <integer or concise resolved summary>
+REVIEW_SOURCE_URL: https://github.com/<owner>/<repo>/pull/<n>#pullrequestreview-<id>
+FINDINGS: 0
 ```
 
-For review reuse after review-neutral commits, `REVIEWED_HEAD` may be an ancestor of the final head only when the final fingerprint remains identical. The gate verifies both ancestry and fingerprint.
+Do not treat free-form approval language without the fingerprint/head binding as a valid review gate.
+
+## Bootstrap rule
+
+Issue #12 / PR #13 bootstrapped the risk-tier policy text. Issue #14 / PR #15 is the one-time enforcement-bootstrap transition that publishes the authenticated reusable gate. Because the trusted-base gate cannot enforce the PR that creates it, PR #15 may substitute a separate independent read-only exact-head agent review for automated Codex evidence. This exception is scoped to repository `Oteryn/Oteryn`, PR #15 only, requires deterministic exact-head CI plus no unresolved HIGH/CRITICAL findings, and cannot be reused by any later PR.
+
+Before PR #15 merges, `main` must already require pull requests and the existing `meta-gate` check with administrator enforcement. PR #15 installs the trusted-base `pull_request_target` gate; immediately after merge the required review check becomes `ai-review-gate`. No later modification to this policy, classifier, verifier, reviewer mapping, trusted workflow or authority boundaries may use the bootstrap exception; such changes are R2 and require authenticated deep external review.
+
+## Repository adoption
+
+`Oteryn/Oteryn` owns the organization default and semantics. Game, Platform and Atlas may add stricter path rules or repository-specific R2 triggers, but may not downgrade an organization R2 trigger without an explicit META governance change.
+
+Product repositories should enforce the local classifier before invoking any external reviewer and should pass only the risk-bearing diff plus directly relevant context to the reviewer. Repository-wide search is reserved for R2 or a concrete finding that requires expansion.
+
+## Reusable enforcement action
+
+Product repositories must invoke the META-owned composite action from a trusted `pull_request_target` wrapper and pin `.github/actions/ai-review-gate/action.yml` to a full 40-hex META commit SHA; candidate-controlled `pull_request` workflows are not enforcement authority. The action classifies the caller repository, not META, so Game, Platform and Atlas share one versioned policy implementation instead of copying classifier logic. Security-critical caller inputs (base/head SHA, Draft state, repository and PR number) must exactly match immutable GitHub pull-request event context before classification or evidence verification runs.
+
+META additionally owns `.github/workflows/governance-ai-review.yml`, triggered by `pull_request_target`. That workflow executes only the workflow/action/policy/verifier from the exact protected base SHA, checks out the candidate with credentials disabled as inert Git data, and never executes candidate scripts. Cross-repository PRs fail closed. This trusted-base check is the post-bootstrap merge authority for AI review evidence.
+
+- `R0`: pass after deterministic checks; no external AI is requested.
+- `R1`/`R2` while Draft: report tier/fingerprint and pass so deterministic CI can stabilize without spending AI quota.
+- `R1`/`R2` when Ready: fail closed until a trusted structured PASS record matches the current fingerprint. A deep reviewer may satisfy a fast-review requirement; a fast reviewer never satisfies `R2`.
+
+A structured record is only a maintainer pointer to an external review; it is not itself review authority. The gate accepts only an exact GitHub Pull Request Review object, requires the configured external reviewer login, rejects self-authored sources, requires the server-side review `commit_id` to equal `REVIEWED_HEAD`, requires review state `APPROVED` or `COMMENTED`, requires `FINDINGS: 0`, and verifies that the external review body itself contains the matching PASS tier, fingerprint, reviewed head, reviewer class and reviewer ID:
+
+```text
+<!-- OTERYN_AI_REVIEW_V1 -->
+REVIEW_TIER: R1 | R2
+REVIEW_FINGERPRINT: <sha256>
+REVIEWED_HEAD: <40-hex SHA>
+REVIEWER_CLASS: fast | deep
+REVIEWER_ID: codex_spark | codex
+RESULT: PASS
+REVIEW_SOURCE_URL: https://github.com/<owner>/<repo>/pull/<n>#pullrequestreview-<id>
+FINDINGS: 0
+```
+
+For review reuse after review-neutral commits, `REVIEWED_HEAD` may be an ancestor of the final head only when the final fingerprint remains identical. The gate verifies ancestry and fingerprint and traverses every intervening commit; each must be a single-parent commit touching only safe review-neutral data paths.

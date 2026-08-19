@@ -66,7 +66,13 @@
     "**/security/**",
     "**/auth/**",
     "docs/architecture/**",
-    "docs/agents/tasks/active/**"
+    "docs/agents/tasks/active/**",
+    "AGENTS.override.md",
+    "CODEOWNERS",
+    "docs/CODEOWNERS",
+    ".github/actions/**",
+    "docs/governance/**",
+    "tools/governance/**"
   ],
   "r1_code_extensions": [
     ".c",
@@ -88,11 +94,11 @@
     "r2_changed_lines": 800
   },
   "special_r0_rules": {
-    "immutable_action_pin_only": true,
-    "exact_incorporated_branch_delete": true,
-    "immutable_action_pin_same_major_only": true,
-    "lifecycle_metadata_only": true,
-    "composer_dev_patch_only": true
+    "immutable_action_pin_only": false,
+    "exact_incorporated_branch_delete": false,
+    "immutable_action_pin_same_major_only": false,
+    "lifecycle_metadata_only": false,
+    "composer_dev_patch_only": false
   },
   "review_reuse": {
     "reviewed_head_must_be_ancestor": true,
@@ -140,7 +146,21 @@
     "requirements*.txt",
     "pyproject.toml",
     "poetry.lock",
-    "uv.lock"
+    "uv.lock",
+    "**/composer.json",
+    "**/composer.lock",
+    "**/package.json",
+    "**/package-lock.json",
+    "**/pnpm-lock.yaml",
+    "**/yarn.lock",
+    "**/Cargo.toml",
+    "**/Cargo.lock",
+    "**/go.mod",
+    "**/go.sum",
+    "**/requirements*.txt",
+    "**/pyproject.toml",
+    "**/poetry.lock",
+    "**/uv.lock"
   ],
   "r0_prose_extensions": [
     ".md",
@@ -194,12 +214,22 @@
   },
   "reviewer_source_kinds": {
     "codex": [
-      "pull_request_review",
-      "issue_comment"
+      "pull_request_review"
     ],
     "codex_spark": [
-      "pull_request_review",
-      "issue_comment"
+      "pull_request_review"
     ]
-  }
+  },
+  "r0_safe_data_extensions": [
+    ".md",
+    ".txt",
+    ".rst",
+    ".adoc",
+    ".json",
+    ".csv",
+    ".tsv",
+    ".log",
+    ".sha256",
+    ".sum"
+  ]
 }
