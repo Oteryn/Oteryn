@@ -10,7 +10,7 @@ This repository is the thin **META / coordination plane** for the Oteryn ecosyst
 | --- | --- | --- |
 | META / ecosystem coordination | `Oteryn/Oteryn` | canonical authority active |
 | Game product | `Oteryn/Oteryn-Game` | authoritative migration remains pending from the existing Game source coordinate |
-| Web / application platform | `Oteryn/Oteryn-Platform` | migration pending from `blakinio/Oteryn-Platform` |
+| Web / application platform | `Oteryn/Oteryn-Platform` | stable repository ID `1305155726` |
 | Spatial / map product | `Oteryn/Oteryn-Atlas` | repository exists; content and lifecycle work remain independently gated |
 
 Provider-owned schemas, generated product artifacts and runtime implementation remain in their provider repositories. META may reference provider contracts by immutable coordinate/version/digest but must not duplicate provider ownership.
