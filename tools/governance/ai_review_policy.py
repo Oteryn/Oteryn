@@ -113,7 +113,8 @@ def safe_r0_path(path: str, patterns: list[str], policy: dict) -> bool:
 
 
 def git_metadata_risk(patch: str) -> bool:
-    risky_modes = ("100755", "120000")
+    # Executable, symlink and gitlink/submodule modes must never be review-neutral safe data.
+    risky_modes = ("100755", "120000", "160000")
     for line in patch.splitlines():
         if line.startswith(("old mode ", "new mode ", "new file mode ", "deleted file mode ")):
             if any(mode in line for mode in risky_modes):
@@ -177,7 +178,15 @@ def blob_at(repo_root: str | Path, revision: str, path: str) -> str:
 
 
 def fingerprint(repo_root: str | Path, base: str, head: str, paths: list[str], policy: dict) -> tuple[str, list[str], list[str]]:
-    neutral = [p for p in paths if safe_r0_path(p, policy["review_neutral_globs"], policy)]
+    neutral: list[str] = []
+    for path in paths:
+        if not safe_r0_path(path, policy["review_neutral_globs"], policy):
+            continue
+        # Path-only extension checks are insufficient for Git type/mode changes. Bind
+        # executable, symlink and gitlink metadata changes into the reviewed fingerprint.
+        if git_metadata_risk(patch_for(repo_root, base, head, [path])):
+            continue
+        neutral.append(path)
     bearing = [p for p in paths if p not in neutral]
     payload = {
         "base_context_blobs": {path: blob_at(repo_root, base, path) for path in sorted(bearing)},
