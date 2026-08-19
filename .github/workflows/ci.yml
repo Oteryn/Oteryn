@@ -51,6 +51,9 @@ jobs:
               Path('AGENTS.md'),
               Path('CONTRIBUTING.md'),
               Path('SECURITY.md'),
+              Path('.github/CODEOWNERS'),
+              Path('ecosystem/governance-desired-state.json'),
+              Path('tools/governance/audit_github_readonly.py'),
               Path('docs/architecture/adr/0001-ecosystem-topology-authority.md'),
               Path('docs/ci/CI_CONTRACT.md'),
               Path('docs/testing/ECOSYSTEM_TEST_STRATEGY.md'),
@@ -167,3 +170,6 @@ jobs:
           grep -q 'thin ecosystem' AGENTS.md
           grep -q 'META / coordination plane' README.md
           grep -q 'meta-gate' docs/ci/CI_CONTRACT.md
+
+      - name: Validate governance desired state offline
+        run: python3 tools/governance/audit_github_readonly.py --offline

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "authority": "docs/architecture/adr/0002-organization-governance-operating-model.md",
+  "permanent_repositories": [
+    {"repository":"Oteryn/Oteryn","repository_id":1338152366,"role":"META","required_gate":"meta-gate","gate_mode":"stable","main_protected":true,"squash_only":true,"delete_branch_on_merge":true,"security":{"secret_scanning":true,"push_protection":true,"dependabot_security_updates":true}},
+    {"repository":"Oteryn/Oteryn-Game","repository_id":1338291140,"role":"GAME","required_gate":"Merge gate / validate","target_gate":"game-gate","gate_mode":"transition","main_protected":true,"squash_only":true,"delete_branch_on_merge":true,"security":{"secret_scanning":true,"push_protection":true,"dependabot_security_updates":true}},
+    {"repository":"Oteryn/Oteryn-Platform","repository_id":1305155726,"role":"PLATFORM","required_checks":["classify-changes","test"],"target_gate":"platform-gate","gate_mode":"transition","main_protected":true,"squash_only":true,"delete_branch_on_merge":true,"security":{"secret_scanning":true,"push_protection":true,"dependabot_security_updates":true}},
+    {"repository":"Oteryn/Oteryn-Atlas","repository_id":1337995824,"role":"ATLAS","required_gate":"atlas-gate","gate_mode":"stable","main_protected":true,"squash_only":true,"delete_branch_on_merge":true,"security":{"secret_scanning":true,"push_protection":true,"dependabot_security_updates":true}}
+  ],
+  "administrative_repositories": [
+    {"repository":"Oteryn/Oteryn-Platform-Migration-Backup-20260818","repository_id":1338405017,"classification":"TEMPORARY_MIGRATION","terminal_gate":"archive only after rollback/provenance obligations and restore evidence are dispositioned"}
+  ],
+  "mutable_coordinate_policy": {
+    "forbidden": ["blakinio/Oteryn-Platform"],
+    "historical_reference_only": ["blakinio/Oteryn-v2","blakinio/Otheryn","Oteryn/Oteryn-Platform-Migration-Backup-20260818"]
+  }
+}
