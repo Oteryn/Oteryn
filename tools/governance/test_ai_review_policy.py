@@ -237,6 +237,60 @@ def test_composer_sensitive_dev_package_is_not_r0() -> None:
     assert not m.composer_dev_patch_only(repo, base, head, ["composer.lock"], policy)
 
 
+def test_action_added_only_is_not_r0() -> None:
+    patch="""diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+@@ -0,0 +1,2 @@
++      uses: actions/checkout@1111111111111111111111111111111111111111 # v4
++      uses: actions/checkout@2222222222222222222222222222222222222222 # v4
+"""
+    assert not m.immutable_action_pin_only(['.github/workflows/ci.yml'],patch)
+
+def test_action_deleted_only_is_not_r0() -> None:
+    patch="""diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+@@ -1,2 +0,0 @@
+-      uses: actions/checkout@1111111111111111111111111111111111111111 # v4
+-      uses: actions/checkout@2222222222222222222222222222222222222222 # v4
+"""
+    assert not m.immutable_action_pin_only(['.github/workflows/ci.yml'],patch)
+
+def test_unknown_executable_paths_fail_closed_to_r1() -> None:
+    for path in ['Dockerfile','Makefile','CMakeLists.txt','scripts/a.ps1','scripts/a.bat','scripts/a.cmd','scripts/a.lua','config/tool.toml']:
+        tier,_=m.classify([path],f'diff --git a/{path} b/{path}\n@@ -0,0 +1 @@\n+echo hi\n',m.load_policy())
+        assert tier != 'R0',path
+
+def test_lifecycle_value_injection_is_not_r0() -> None:
+    patch="""diff --git a/docs/agents/tasks/active/x.md b/docs/agents/tasks/active/x.md
+@@ -1 +1 @@
+-owner: agent
++owner: agent; execute-dangerous-command
+"""
+    assert not m.lifecycle_metadata_only(['docs/agents/tasks/active/x.md'],patch)
+
+def test_lifecycle_objective_change_is_not_r0() -> None:
+    patch="""diff --git a/docs/agents/tasks/active/x.md b/docs/agents/tasks/active/x.md
+@@ -4 +4 @@
+-Objective: read only
++Objective: mutate production
+"""
+    assert not m.lifecycle_metadata_only(['docs/agents/tasks/active/x.md'],patch)
+
+def test_composer_behavior_metadata_change_is_not_r0() -> None:
+    repo,base,head=_composer_repo()
+    after=json.loads(_git(repo,'show',f'{head}:composer.lock'))
+    after['packages-dev'][0]['autoload']={'psr-4':{'Injected\\\\':'src/'}}
+    (repo/'composer.lock').write_text(json.dumps(after,indent=2)+'\n',encoding='utf-8')
+    _git(repo,'commit','-am','metadata')
+    newer=_git(repo,'rev-parse','HEAD')
+    assert not m.composer_dev_patch_only(repo,base,newer,['composer.lock'],policy)
+
+def test_composite_action_binds_untrusted_inputs_to_github_context() -> None:
+    action=(Path(__file__).resolve().parents[2]/'.github/actions/ai-review-gate/action.yml').read_text(encoding='utf-8')
+    assert 'Bind caller inputs to immutable GitHub PR context' in action
+    for token in ['github.event.pull_request.base.sha','github.event.pull_request.head.sha','github.event.pull_request.draft','github.repository','github.event.pull_request.number']:
+        assert token in action
+    assert "caller inputs do not match trusted GitHub PR context" in action
+    assert 'steps.bind.outputs.head' in action and 'steps.bind.outputs.repository' in action and 'steps.bind.outputs.pr' in action
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:

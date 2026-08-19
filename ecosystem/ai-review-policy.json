@@ -162,5 +162,44 @@
     "password-hash",
     "stripe",
     "payment"
-  ]
+  ],
+  "r1_config_extensions": [
+    ".ps1",
+    ".bat",
+    ".cmd",
+    ".lua",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".conf",
+    ".env",
+    ".yaml",
+    ".yml"
+  ],
+  "r1_executable_filenames": [
+    "Dockerfile",
+    "Makefile",
+    "CMakeLists.txt",
+    "Justfile",
+    "Taskfile",
+    "Procfile"
+  ],
+  "reviewer_source_logins": {
+    "codex": [
+      "chatgpt-codex-connector[bot]"
+    ],
+    "codex_spark": [
+      "chatgpt-codex-connector[bot]"
+    ]
+  },
+  "reviewer_source_kinds": {
+    "codex": [
+      "pull_request_review",
+      "issue_comment"
+    ],
+    "codex_spark": [
+      "pull_request_review",
+      "issue_comment"
+    ]
+  }
 }

@@ -43,12 +43,16 @@ def patch_for(repo_root: str | Path, base: str, head: str, paths: list[str] | No
 
 
 def changed_content_lines(patch: str) -> list[str]:
-    out: list[str] = []
+    return [line[1:] for _, line in changed_signed_lines(patch)]
+
+
+def changed_signed_lines(patch: str) -> list[tuple[str, str]]:
+    out: list[tuple[str, str]] = []
     for line in patch.splitlines():
         if line.startswith(("+++", "---", "@@", "diff --git", "index ")):
             continue
         if line.startswith(("+", "-")):
-            out.append(line[1:])
+            out.append((line[0], line))
     return out
 
 
@@ -83,85 +87,69 @@ def semver_triplet(value: object) -> tuple[int, int, int] | None:
 def composer_dev_patch_only(repo_root: str | Path, base: str, head: str, paths: list[str], policy: dict) -> bool:
     if paths != ["composer.lock"]:
         return False
-    before = json_at(repo_root, base, "composer.lock")
-    after = json_at(repo_root, head, "composer.lock")
-    if before is None or after is None:
+    before=json_at(repo_root,base,"composer.lock"); after=json_at(repo_root,head,"composer.lock")
+    if before is None or after is None or before.get("packages") != after.get("packages"):
         return False
-    before_runtime = before.get("packages")
-    after_runtime = after.get("packages")
-    if before_runtime != after_runtime:
-        return False
-    before_dev = before.get("packages-dev")
-    after_dev = after.get("packages-dev")
-    if not isinstance(before_dev, list) or not isinstance(after_dev, list):
-        return False
-    before_by_name = {item.get("name"): item for item in before_dev if isinstance(item, dict) and isinstance(item.get("name"), str)}
-    after_by_name = {item.get("name"): item for item in after_dev if isinstance(item, dict) and isinstance(item.get("name"), str)}
-    if set(before_by_name) != set(after_by_name):
-        return False
-    changed = [name for name in sorted(before_by_name) if before_by_name[name] != after_by_name[name]]
-    if len(changed) != 1:
-        return False
-    package = changed[0]
-    if any(marker.casefold() in package.casefold() for marker in policy.get("r2_sensitive_dependency_markers", [])):
-        return False
-    old_version = semver_triplet(before_by_name[package].get("version"))
-    new_version = semver_triplet(after_by_name[package].get("version"))
-    if old_version is None or new_version is None:
-        return False
-    if old_version[:2] != new_version[:2] or new_version[2] <= old_version[2]:
-        return False
-    before_other = {key: value for key, value in before.items() if key != "packages-dev"}
-    after_other = {key: value for key, value in after.items() if key != "packages-dev"}
-    return before_other == after_other
+    bdev,adev=before.get("packages-dev"),after.get("packages-dev")
+    if not isinstance(bdev,list) or not isinstance(adev,list): return False
+    b={x.get("name"):x for x in bdev if isinstance(x,dict) and isinstance(x.get("name"),str)}
+    a={x.get("name"):x for x in adev if isinstance(x,dict) and isinstance(x.get("name"),str)}
+    if set(b)!=set(a): return False
+    changed=[n for n in sorted(b) if b[n]!=a[n]]
+    if len(changed)!=1: return False
+    name=changed[0]
+    if any(m.casefold() in name.casefold() for m in policy.get("r2_sensitive_dependency_markers",[])): return False
+    ov,nv=semver_triplet(b[name].get("version")),semver_triplet(a[name].get("version"))
+    if ov is None or nv is None or ov[:2]!=nv[:2] or nv[2]<=ov[2]: return False
+    def norm(obj):
+        x=json.loads(json.dumps(obj)); x["version"]="__VERSION__"
+        for k in ("dist","source"):
+            if isinstance(x.get(k),dict) and "reference" in x[k]: x[k]["reference"]="__REFERENCE__"
+        if "time" in x: x["time"]="__TIME__"
+        return x
+    if norm(b[name]) != norm(a[name]): return False
+    return {k:v for k,v in before.items() if k!="packages-dev"} == {k:v for k,v in after.items() if k!="packages-dev"}
 
 
 def lifecycle_metadata_only(paths: list[str], patch: str) -> bool:
-    if len(paths) != 1 or not matches(paths[0], ["docs/agents/tasks/active/**"]):
-        return False
-    if "new file mode" in patch or "deleted file mode" in patch:
-        return False
-    lines = [line.strip() for line in changed_content_lines(patch) if line.strip()]
-    if not lines:
-        return False
-    allowed_keys = {
-        "status",
-        "owner",
-        "branch",
-        "lifecycle_authority",
-        "lifecycle_issue",
-        "coordination_origin_branch",
-        "coordination_origin_branch_state",
-    }
-    for line in lines:
-        key = line.split(":", 1)[0].strip() if ":" in line else ""
-        if key in allowed_keys:
+    if len(paths)!=1 or not matches(paths[0],["docs/agents/tasks/active/**"]): return False
+    if "new file mode" in patch or "deleted file mode" in patch: return False
+    signed=[(sgn,line[1:].strip()) for sgn,line in changed_signed_lines(patch) if line[1:].strip()]
+    if not signed: return False
+    scalar={
+      "status": r"[A-Za-z0-9_.-]+",
+      "owner": r"[A-Za-z0-9_.@/-]+(?: [A-Za-z0-9_.@/-]+)*",
+      "branch": r"[A-Za-z0-9._/-]+",
+      "lifecycle_authority": r"GitHub Issue",
+      "lifecycle_issue": r"[1-9][0-9]*",
+      "coordination_origin_branch": r"[A-Za-z0-9._/-]+",
+      "coordination_origin_branch_state": r"[A-Za-z0-9_.-]+"}
+    note=re.compile(r"> Lifecycle state, ownership, dependencies and acceptance are authoritative in GitHub Issue #[1-9][0-9]*\. This packet is technical/provenance detail only; do not maintain mutable lifecycle status here\.")
+    for _,line in signed:
+        if line.startswith("> Lifecycle state"):
+            if not note.fullmatch(line): return False
             continue
-        if line.startswith("> Lifecycle state, ownership, dependencies and acceptance are authoritative in GitHub Issue #"):
-            continue
-        return False
+        if ":" not in line: return False
+        key,value=(x.strip() for x in line.split(":",1))
+        if key not in scalar or re.fullmatch(scalar[key],value) is None: return False
     return True
 
 
 def immutable_action_pin_only(paths: list[str], patch: str) -> bool:
-    if not paths or not all(p.startswith(".github/workflows/") and p.endswith((".yml", ".yaml")) for p in paths):
-        return False
-    lines = [line for line in changed_content_lines(patch) if line.strip()]
-    if not lines:
-        return False
-    matches_: list[re.Match[str]] = []
-    for line in lines:
-        match = ACTION_USE.match(line)
-        if not match:
-            return False
-        matches_.append(match)
-    identities = [match.group(1) for match in matches_]
-    majors = [match.group(3) for match in matches_]
-    return (
-        len(identities) % 2 == 0
-        and all(identities[i] == identities[i + 1] for i in range(0, len(identities), 2))
-        and all(majors[i] == majors[i + 1] for i in range(0, len(majors), 2))
-    )
+    if not paths or not all(p.startswith(".github/workflows/") and p.endswith((".yml",".yaml")) for p in paths): return False
+    signed=[(sgn,line[1:]) for sgn,line in changed_signed_lines(patch) if line[1:].strip()]
+    if not signed or len(signed)%2: return False
+    removed=[ACTION_USE.match(text) for sgn,text in signed if sgn=="-"]
+    added=[ACTION_USE.match(text) for sgn,text in signed if sgn=="+"]
+    if not removed or len(removed)!=len(added) or any(m is None for m in removed+added): return False
+    old=sorted((m.group(1),m.group(3),m.group(2)) for m in removed if m)
+    new=sorted((m.group(1),m.group(3),m.group(2)) for m in added if m)
+    return [(a,maj) for a,maj,_ in old] == [(a,maj) for a,maj,_ in new]
+
+
+def executable_or_config_path(path: str, policy: dict) -> bool:
+    p=PurePosixPath(path); name=p.name.casefold(); suffix=p.suffix.casefold()
+    return suffix in set(policy.get("r1_code_extensions",[])) or suffix in set(policy.get("r1_config_extensions",[])) or name in {x.casefold() for x in policy.get("r1_executable_filenames",[])}
 
 
 def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]]:
@@ -208,12 +196,13 @@ def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]
             return "R2", ["security_sensitive_dependency:" + ",".join(sensitive_dependencies)]
         return "R1", ["dependency_manifest_or_lockfile:" + ",".join(sorted(dependency_files))]
 
-    code_extensions = set(policy["r1_code_extensions"])
-    code = [p for p in paths if PurePosixPath(p).suffix.lower() in code_extensions]
-    if code or changed_line_count >= policy["size_thresholds"]["r1_changed_lines"]:
-        return "R1", ["ordinary_code_or_size"]
-
-    return "R0", ["non_sensitive_non_executable_change"]
+    executable=[p for p in paths if executable_or_config_path(p,policy)]
+    if executable or changed_line_count >= policy["size_thresholds"]["r1_changed_lines"]:
+        return "R1", ["ordinary_code_config_or_size"]
+    prose=set(policy.get("r0_prose_extensions",[]))
+    if any(PurePosixPath(p).suffix.casefold() not in prose for p in paths):
+        return "R1", ["unknown_non_prose_path"]
+    return "R0", ["non_sensitive_prose_change"]
 
 
 def blob_at(repo_root: str | Path, revision: str, path: str) -> str:

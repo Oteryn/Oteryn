@@ -108,7 +108,7 @@ Do not treat free-form approval language without the fingerprint/head binding as
 
 ## Bootstrap rule
 
-Issue #12 and the PR that first installs this policy are the one-time bootstrap exception: they may be merged with owner self-review plus deterministic exact-head CI and full-diff inspection, without consuming Codex/Spark. Requiring the not-yet-installed policy to review its own installation would create a circular dependency.
+Issue #12 and the PR that first installs this policy are the one-time bootstrap exception to automated evidence enforcement only. Bootstrap still requires an independent read-only exact-head agent review plus deterministic exact-head CI; owner self-review alone is insufficient. The independent bootstrap reviewer must not modify, push, or merge the reviewed PR.
 
 After bootstrap merge, modifications to this policy, its classifier, its reviewer mapping, or its authority boundaries are R2 and require deep external review.
 
@@ -120,13 +120,13 @@ Product repositories should enforce the local classifier before invoking any ext
 
 ## Reusable enforcement action
 
-Product repositories consume the META-owned composite action at `.github/actions/ai-review-gate/action.yml` using a full 40-hex META commit SHA. The action classifies the caller repository, not META, so Game, Platform and Atlas share one versioned policy implementation instead of copying classifier logic.
+Product repositories consume the META-owned composite action at `.github/actions/ai-review-gate/action.yml` using a full 40-hex META commit SHA. The action classifies the caller repository, not META, so Game, Platform and Atlas share one versioned policy implementation instead of copying classifier logic. Security-critical caller inputs (base/head SHA, Draft state, repository and PR number) must exactly match immutable GitHub pull-request event context before classification or evidence verification runs.
 
 - `R0`: pass after deterministic checks; no external AI is requested.
 - `R1`/`R2` while Draft: report tier/fingerprint and pass so deterministic CI can stabilize without spending AI quota.
 - `R1`/`R2` when Ready: fail closed until a trusted structured PASS record matches the current fingerprint. A deep reviewer may satisfy a fast-review requirement; a fast reviewer never satisfies `R2`.
 
-A structured record is a maintainer attestation to an actually completed external review and points to its GitHub PR review/comment source:
+A structured record is only a maintainer pointer to an external review; it is not itself review authority. The gate fetches the exact GitHub PR review/comment object, requires a configured external reviewer login, rejects self-authored sources, and verifies that the external source body itself contains the matching PASS tier, fingerprint, reviewed head and reviewer class:
 
 ```text
 <!-- OTERYN_AI_REVIEW_V1 -->
