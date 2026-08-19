@@ -72,7 +72,8 @@
     "docs/CODEOWNERS",
     ".github/actions/**",
     "docs/governance/**",
-    "tools/governance/**"
+    "tools/governance/**",
+    "**/SECURITY.md"
   ],
   "r1_code_extensions": [
     ".c",
@@ -194,7 +195,10 @@
     ".conf",
     ".env",
     ".yaml",
-    ".yml"
+    ".yml",
+    ".json",
+    ".xml",
+    ".properties"
   ],
   "r1_executable_filenames": [
     "Dockerfile",

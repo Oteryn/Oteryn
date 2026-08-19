@@ -397,6 +397,19 @@ def test_executable_or_symlink_mode_change_is_not_r0() -> None:
     assert tier == "R1"
     assert reasons == ["executable_or_symlink_mode_change"]
 
+
+def test_json_config_inside_evidence_is_not_r0_or_neutral() -> None:
+    path = "docs/evidence/config.json"
+    tier, _ = m.classify([path], patch('+{"enabled": true}'), policy)
+    assert tier == "R1"
+    assert not m.safe_r0_path(path, policy["review_neutral_globs"], policy)
+
+
+def test_security_md_locations_are_r2() -> None:
+    for path in ["SECURITY.md", ".github/SECURITY.md", "docs/SECURITY.md", "nested/SECURITY.md"]:
+        tier, _ = m.classify([path], patch("+policy"), policy)
+        assert tier == "R2", path
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:
