@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed — effective only after merge to `main`.
+Accepted upon merge to `main` — 2026-08-19.
 
 - Decision owner: Oteryn repository owner
 - Scope: organization governance, agent/Codex operating model, lifecycle authority, GitHub enforcement model, CI/security baseline, and migration-completion criteria for Game, Platform and Atlas
