@@ -52,6 +52,70 @@ def changed_content_lines(patch: str) -> list[str]:
     return out
 
 
+def json_at(repo_root: str | Path, revision: str, path: str) -> dict | None:
+    result = subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        cwd=Path(repo_root),
+        text=True,
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        value = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def semver_triplet(value: object) -> tuple[int, int, int] | None:
+    if not isinstance(value, str):
+        return None
+    match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)", value.strip())
+    if not match:
+        return None
+    return tuple(int(part) for part in match.groups())
+
+
+def composer_dev_patch_only(repo_root: str | Path, base: str, head: str, paths: list[str], policy: dict) -> bool:
+    if paths != ["composer.lock"]:
+        return False
+    before = json_at(repo_root, base, "composer.lock")
+    after = json_at(repo_root, head, "composer.lock")
+    if before is None or after is None:
+        return False
+    before_runtime = before.get("packages")
+    after_runtime = after.get("packages")
+    if before_runtime != after_runtime:
+        return False
+    before_dev = before.get("packages-dev")
+    after_dev = after.get("packages-dev")
+    if not isinstance(before_dev, list) or not isinstance(after_dev, list):
+        return False
+    before_by_name = {item.get("name"): item for item in before_dev if isinstance(item, dict) and isinstance(item.get("name"), str)}
+    after_by_name = {item.get("name"): item for item in after_dev if isinstance(item, dict) and isinstance(item.get("name"), str)}
+    if set(before_by_name) != set(after_by_name):
+        return False
+    changed = [name for name in sorted(before_by_name) if before_by_name[name] != after_by_name[name]]
+    if len(changed) != 1:
+        return False
+    package = changed[0]
+    if any(marker.casefold() in package.casefold() for marker in policy.get("r2_sensitive_dependency_markers", [])):
+        return False
+    old_version = semver_triplet(before_by_name[package].get("version"))
+    new_version = semver_triplet(after_by_name[package].get("version"))
+    if old_version is None or new_version is None:
+        return False
+    if old_version[:2] != new_version[:2] or new_version[2] <= old_version[2]:
+        return False
+    before_other = {key: value for key, value in before.items() if key != "packages-dev"}
+    after_other = {key: value for key, value in after.items() if key != "packages-dev"}
+    return before_other == after_other
+
+
 def lifecycle_metadata_only(paths: list[str], patch: str) -> bool:
     if len(paths) != 1 or not matches(paths[0], ["docs/agents/tasks/active/**"]):
         return False
@@ -185,7 +249,10 @@ def evaluate(base: str, head: str, repo_root: str | Path | None = None, policy_f
             raise ValueError(f"{label} must be a lowercase 40-hex SHA")
     paths = changed_paths(repository, base, head)
     patch = patch_for(repository, base, head)
-    tier, reasons = classify(paths, patch, policy)
+    if policy.get("special_r0_rules", {}).get("composer_dev_patch_only") and composer_dev_patch_only(repository, base, head, paths, policy):
+        tier, reasons = "R0", ["composer_dev_patch_only"]
+    else:
+        tier, reasons = classify(paths, patch, policy)
     digest, bearing, neutral = fingerprint(repository, base, head, paths, policy)
     return {
         "schema_version": 1,

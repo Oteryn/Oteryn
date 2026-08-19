@@ -27,6 +27,8 @@ Typical examples:
 
 R0 is not permission to weaken CI. Required deterministic checks must still pass on the final head.
 
+A Composer lockfile-only update may also be R0 when deterministic comparison proves that runtime `packages` and every non-`packages-dev` lockfile field are identical, exactly one non-sensitive `packages-dev` package changes, and its numeric semantic version increases within the same major/minor (patch-only). Minor/major, runtime, security-sensitive or structurally broader dependency changes remain R1/R2.
+
 A narrow exception exists for an already-existing `docs/agents/tasks/active/**` packet when the diff changes only lifecycle-pointer metadata (`status`/`owner`/branch-to-origin fields and GitHub Issue lifecycle authority) without changing objectives, acceptance criteria, execution instructions, owned paths or permissions. Creating a new active task or changing executable task instructions is R2.
 
 ### R1 — fast external review

@@ -1,7 +1,8 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 import tempfile
 from pathlib import Path
@@ -182,6 +183,58 @@ def test_risk_bearing_base_advance_invalidates_fingerprint() -> None:
     first, _, _ = m.fingerprint(repo, base1, head, ["src/app.py"], policy)
     changed, _, _ = m.fingerprint(repo, base3, head, ["src/app.py"], policy)
     assert first != changed
+
+
+
+def _composer_repo(*, runtime_change: bool = False, sensitive: bool = False, minor_change: bool = False) -> tuple[Path, str, str]:
+    repo = Path(tempfile.mkdtemp(prefix="oteryn-composer-risk-"))
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "test@example.invalid")
+    _git(repo, "config", "user.name", "test")
+    package = "vendor/google2fa-test" if sensitive else "phpunit/phpunit"
+    before = {
+        "_readme": ["generated"],
+        "content-hash": "same",
+        "packages": [{"name": "runtime/pkg", "version": "1.0.0"}],
+        "packages-dev": [{"name": package, "version": "13.3.0", "dist": {"reference": "a"}}],
+        "plugin-api-version": "2.6.0",
+    }
+    after = json.loads(json.dumps(before))
+    after["packages-dev"][0]["version"] = "13.4.0" if minor_change else "13.3.1"
+    after["packages-dev"][0]["dist"]["reference"] = "b"
+    if runtime_change:
+        after["packages"][0]["version"] = "1.0.1"
+    (repo / "composer.lock").write_text(json.dumps(before, indent=2) + "\n", encoding="utf-8")
+    _git(repo, "add", "composer.lock")
+    _git(repo, "commit", "-m", "base")
+    base = _git(repo, "rev-parse", "HEAD")
+    (repo / "composer.lock").write_text(json.dumps(after, indent=2) + "\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "bump")
+    head = _git(repo, "rev-parse", "HEAD")
+    return repo, base, head
+
+
+def test_composer_dev_patch_only_is_r0() -> None:
+    repo, base, head = _composer_repo()
+    assert m.composer_dev_patch_only(repo, base, head, ["composer.lock"], policy)
+    result = m.evaluate(base, head, repo, m.DEFAULT_POLICY)
+    assert result["tier"] == "R0"
+    assert result["reasons"] == ["composer_dev_patch_only"]
+
+
+def test_composer_runtime_change_is_not_r0() -> None:
+    repo, base, head = _composer_repo(runtime_change=True)
+    assert not m.composer_dev_patch_only(repo, base, head, ["composer.lock"], policy)
+
+
+def test_composer_minor_change_is_not_r0() -> None:
+    repo, base, head = _composer_repo(minor_change=True)
+    assert not m.composer_dev_patch_only(repo, base, head, ["composer.lock"], policy)
+
+
+def test_composer_sensitive_dev_package_is_not_r0() -> None:
+    repo, base, head = _composer_repo(sensitive=True)
+    assert not m.composer_dev_patch_only(repo, base, head, ["composer.lock"], policy)
 
 
 def main() -> int:

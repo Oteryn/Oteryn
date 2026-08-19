@@ -91,7 +91,8 @@
     "immutable_action_pin_only": true,
     "exact_incorporated_branch_delete": true,
     "immutable_action_pin_same_major_only": true,
-    "lifecycle_metadata_only": true
+    "lifecycle_metadata_only": true,
+    "composer_dev_patch_only": true
   },
   "review_reuse": {
     "reviewed_head_must_be_ancestor": true,
