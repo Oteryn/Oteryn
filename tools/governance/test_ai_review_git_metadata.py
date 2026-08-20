@@ -143,7 +143,7 @@ def test_unchanged_protected_source_copy_is_r2_and_source_is_bound() -> None:
 
 
 def test_risk_bearing_base_mode_advance_invalidates_fingerprint() -> None:
-    repo, base_one = make_repo()
+    repo, _ = make_repo()
     app = repo / "src/app.py"
     app.parent.mkdir(parents=True, exist_ok=True)
     app.write_text("value = 1\n", encoding="utf-8")
@@ -178,6 +178,33 @@ def test_unicode_risk_bearing_path_has_raw_tree_entry_and_fingerprint() -> None:
     entry = m.tree_entry_at(repo, base, "docs/governance/café.md")
     assert entry.startswith("100644:blob:"), entry
     assert len(result["review_fingerprint"]) == 64
+
+
+def test_pathspec_magic_filename_is_literal_and_base_drift_is_bound() -> None:
+    repo, _ = make_repo()
+    literal = ":(glob)*é.py"
+    path = repo / literal
+    path.write_text("value = 1\n", encoding="utf-8")
+    base_one = commit_all(repo, "add pathspec-magic file")
+
+    git(repo, "checkout", "-b", "feature")
+    path.write_text("value = 2\n", encoding="utf-8")
+    head = commit_all(repo, "feature edits literal magic path")
+
+    git(repo, "checkout", "master")
+    path.write_text("value = 3\n", encoding="utf-8")
+    base_two = commit_all(repo, "base advances literal magic path")
+
+    entry_one = m.tree_entry_at(repo, base_one, literal)
+    entry_two = m.tree_entry_at(repo, base_two, literal)
+    assert entry_one.startswith("100644:blob:"), entry_one
+    assert entry_two.startswith("100644:blob:"), entry_two
+    assert entry_one != entry_two
+
+    first, _, _ = m.fingerprint(repo, base_one, head, [literal], m.load_policy())
+    changed, _, _ = m.fingerprint(repo, base_two, head, [literal], m.load_policy())
+    assert first != changed
+    assert literal in m.patch_for(repo, base_one, head, [literal])
 
 
 def main() -> int:
