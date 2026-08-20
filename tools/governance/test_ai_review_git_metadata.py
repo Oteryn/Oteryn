@@ -17,6 +17,12 @@ def git(repo: Path, *args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=repo, text=True).strip()
 
 
+def commit(repo: Path, message: str) -> str:
+    git(repo, "add", "-A")
+    git(repo, "commit", "-m", message)
+    return git(repo, "rev-parse", "HEAD")
+
+
 def make_repo() -> tuple[Path, str]:
     repo = Path(tempfile.mkdtemp(prefix="oteryn-git-metadata-risk-"))
     git(repo, "init")
@@ -25,44 +31,90 @@ def make_repo() -> tuple[Path, str]:
     evidence = repo / "docs/evidence/run.md"
     evidence.parent.mkdir(parents=True, exist_ok=True)
     evidence.write_text("ok\n", encoding="utf-8")
-    git(repo, "add", ".")
-    git(repo, "commit", "-m", "base")
-    return repo, git(repo, "rev-parse", "HEAD")
+    base = commit(repo, "base")
+    return repo, base
+
+
+def assert_risk_bearing(repo: Path, base: str, head: str, path: str, tier: str = "R1") -> None:
+    result = m.evaluate(base, head, repo, m.DEFAULT_POLICY)
+    assert result["tier"] == tier, result
+    assert path in result["risk_bearing_paths"], result
+    assert path not in result["review_neutral_paths"], result
 
 
 def test_executable_mode_is_risk_bearing() -> None:
     repo, base = make_repo()
     git(repo, "update-index", "--chmod=+x", "docs/evidence/run.md")
-    git(repo, "commit", "-m", "make evidence executable")
-    head = git(repo, "rev-parse", "HEAD")
-    result = m.evaluate(base, head, repo, m.DEFAULT_POLICY)
-    assert result["tier"] == "R1"
-    assert "docs/evidence/run.md" in result["risk_bearing_paths"]
-    assert "docs/evidence/run.md" not in result["review_neutral_paths"]
+    head = commit(repo, "make evidence executable")
+    assert_risk_bearing(repo, base, head, "docs/evidence/run.md")
+
+
+def test_existing_executable_content_change_is_risk_bearing() -> None:
+    repo, _ = make_repo()
+    git(repo, "update-index", "--chmod=+x", "docs/evidence/run.md")
+    base = commit(repo, "make executable base")
+    (repo / "docs/evidence/run.md").write_text("changed\n", encoding="utf-8")
+    head = commit(repo, "change executable content")
+    patch = m.patch_for(repo, base, head)
+    assert " 100755" in patch
+    assert_risk_bearing(repo, base, head, "docs/evidence/run.md")
 
 
 def test_symlink_mode_is_risk_bearing() -> None:
     repo, base = make_repo()
     path = repo / "docs/evidence/link.md"
     path.symlink_to("../run.md")
-    git(repo, "add", "docs/evidence/link.md")
-    git(repo, "commit", "-m", "add evidence symlink")
-    head = git(repo, "rev-parse", "HEAD")
-    result = m.evaluate(base, head, repo, m.DEFAULT_POLICY)
-    assert result["tier"] == "R1"
-    assert "docs/evidence/link.md" in result["risk_bearing_paths"]
-    assert "docs/evidence/link.md" not in result["review_neutral_paths"]
+    head = commit(repo, "add evidence symlink")
+    assert_risk_bearing(repo, base, head, "docs/evidence/link.md")
+
+
+def test_existing_symlink_target_change_is_risk_bearing() -> None:
+    repo, _ = make_repo()
+    path = repo / "docs/evidence/link.md"
+    path.symlink_to("../run.md")
+    base = commit(repo, "add symlink base")
+    path.unlink()
+    path.symlink_to("../other.md")
+    head = commit(repo, "change symlink target")
+    patch = m.patch_for(repo, base, head)
+    assert " 120000" in patch
+    assert_risk_bearing(repo, base, head, "docs/evidence/link.md")
 
 
 def test_gitlink_mode_is_risk_bearing() -> None:
     repo, base = make_repo()
     git(repo, "update-index", "--add", "--cacheinfo", f"160000,{base},docs/evidence/submodule.md")
-    git(repo, "commit", "-m", "add evidence gitlink")
-    head = git(repo, "rev-parse", "HEAD")
+    head = commit(repo, "add evidence gitlink")
+    assert_risk_bearing(repo, base, head, "docs/evidence/submodule.md")
+
+
+def test_existing_gitlink_target_change_is_risk_bearing() -> None:
+    repo, first = make_repo()
+    (repo / "seed.txt").write_text("one\n", encoding="utf-8")
+    target_one = commit(repo, "target one")
+    git(repo, "update-index", "--add", "--cacheinfo", f"160000,{target_one},docs/evidence/submodule.md")
+    base = commit(repo, "gitlink base")
+    (repo / "seed.txt").write_text("two\n", encoding="utf-8")
+    target_two = commit(repo, "target two")
+    git(repo, "update-index", "--cacheinfo", f"160000,{target_two},docs/evidence/submodule.md")
+    head = commit(repo, "change gitlink target")
+    patch = m.patch_for(repo, base, head, ["docs/evidence/submodule.md"])
+    assert " 160000" in patch
+    assert_risk_bearing(repo, base, head, "docs/evidence/submodule.md")
+    assert first != target_two
+
+
+def test_required_check_contract_is_r2_even_for_prose_only_change() -> None:
+    repo, _ = make_repo()
+    contract = repo / "docs/ci/CI_CONTRACT.md"
+    contract.parent.mkdir(parents=True, exist_ok=True)
+    contract.write_text("stable gate\n", encoding="utf-8")
+    base = commit(repo, "add CI contract")
+    contract.write_text("stable gate wording changed\n", encoding="utf-8")
+    head = commit(repo, "change CI contract prose")
     result = m.evaluate(base, head, repo, m.DEFAULT_POLICY)
-    assert result["tier"] == "R1"
-    assert "docs/evidence/submodule.md" in result["risk_bearing_paths"]
-    assert "docs/evidence/submodule.md" not in result["review_neutral_paths"]
+    assert result["tier"] == "R2", result
+    assert "docs/ci/CI_CONTRACT.md" in result["risk_bearing_paths"], result
 
 
 def main() -> int:
