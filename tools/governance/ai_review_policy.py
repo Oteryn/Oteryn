@@ -192,22 +192,23 @@ def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]
 
 def tree_entry_at(repo_root: str | Path, revision: str, path: str) -> str:
     result = subprocess.run(
-        ["git", "ls-tree", revision, "--", path],
+        ["git", "ls-tree", "-z", revision, "--", path],
         cwd=Path(repo_root),
-        text=True,
-        encoding="utf-8",
         stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL,
         check=False,
     )
-    if result.returncode != 0 or not result.stdout.strip():
+    if result.returncode != 0 or not result.stdout:
         return "ABSENT"
-    lines = result.stdout.rstrip("\n").splitlines()
-    if len(lines) != 1:
+    records = result.stdout.split(b"\0")
+    if records and records[-1] == b"":
+        records.pop()
+    if len(records) != 1:
         raise RuntimeError(f"unexpected git ls-tree result for {path!r}")
-    metadata, _, returned_path = lines[0].partition("\t")
-    fields = metadata.split()
-    if returned_path != path or len(fields) != 3:
+    metadata, separator, returned_path_raw = records[0].partition(b"\t")
+    fields = metadata.decode("ascii", errors="strict").split()
+    returned_path = returned_path_raw.decode("utf-8", errors="surrogateescape")
+    if separator != b"\t" or returned_path != path or len(fields) != 3:
         raise RuntimeError(f"malformed git ls-tree result for {path!r}")
     mode, object_type, object_id = fields
     return f"{mode}:{object_type}:{object_id}"
@@ -217,8 +218,6 @@ def fingerprint(repo_root: str | Path, base: str, head: str, paths: list[str], p
     copy_present = has_copy_change(repo_root, base, head)
     neutral: list[str] = []
     for path in paths:
-        # Fail closed for copies: source and destination are jointly material to the
-        # resulting content, so both must remain in the authenticated fingerprint.
         if copy_present:
             continue
         if not safe_r0_path(path, policy["review_neutral_globs"], policy):
