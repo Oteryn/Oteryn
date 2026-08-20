@@ -35,7 +35,7 @@ def git(repo_root: str | Path, *args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=Path(repo_root), text=True, encoding="utf-8")
 
 
-def changed_paths(repo_root: str | Path, base: str, head: str) -> list[str]:
+def _name_status_fields(repo_root: str | Path, base: str, head: str) -> list[bytes]:
     result = subprocess.run(
         ["git", "diff", "--name-status", "-z", "-M", "-C", "--find-copies-harder", f"{base}...{head}"],
         cwd=Path(repo_root), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
@@ -45,6 +45,11 @@ def changed_paths(repo_root: str | Path, base: str, head: str) -> list[str]:
     fields = result.stdout.split(b"\0")
     if fields and fields[-1] == b"":
         fields.pop()
+    return fields
+
+
+def changed_paths(repo_root: str | Path, base: str, head: str) -> list[str]:
+    fields = _name_status_fields(repo_root, base, head)
     paths: set[str] = set()
     index = 0
     while index < len(fields):
@@ -57,6 +62,21 @@ def changed_paths(repo_root: str | Path, base: str, head: str) -> list[str]:
         paths.update(names)
         index += count
     return sorted(paths)
+
+
+def has_copy_change(repo_root: str | Path, base: str, head: str) -> bool:
+    fields = _name_status_fields(repo_root, base, head)
+    index = 0
+    while index < len(fields):
+        status = fields[index].decode("ascii", errors="strict")
+        index += 1
+        count = 2 if status.startswith(("R", "C")) else 1
+        if index + count > len(fields):
+            raise RuntimeError("malformed NUL-delimited git name-status output")
+        if status.startswith("C"):
+            return True
+        index += count
+    return False
 
 
 def patch_for(repo_root: str | Path, base: str, head: str, paths: list[str] | None = None) -> str:
@@ -182,10 +202,10 @@ def tree_entry_at(repo_root: str | Path, revision: str, path: str) -> str:
     )
     if result.returncode != 0 or not result.stdout.strip():
         return "ABSENT"
-    line = result.stdout.rstrip("\n").splitlines()
-    if len(line) != 1:
+    lines = result.stdout.rstrip("\n").splitlines()
+    if len(lines) != 1:
         raise RuntimeError(f"unexpected git ls-tree result for {path!r}")
-    metadata, _, returned_path = line[0].partition("\t")
+    metadata, _, returned_path = lines[0].partition("\t")
     fields = metadata.split()
     if returned_path != path or len(fields) != 3:
         raise RuntimeError(f"malformed git ls-tree result for {path!r}")
@@ -194,8 +214,13 @@ def tree_entry_at(repo_root: str | Path, revision: str, path: str) -> str:
 
 
 def fingerprint(repo_root: str | Path, base: str, head: str, paths: list[str], policy: dict) -> tuple[str, list[str], list[str]]:
+    copy_present = has_copy_change(repo_root, base, head)
     neutral: list[str] = []
     for path in paths:
+        # Fail closed for copies: source and destination are jointly material to the
+        # resulting content, so both must remain in the authenticated fingerprint.
+        if copy_present:
+            continue
         if not safe_r0_path(path, policy["review_neutral_globs"], policy):
             continue
         if git_metadata_risk(patch_for(repo_root, base, head, [path])):
