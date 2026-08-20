@@ -316,7 +316,7 @@ def _blocking_findings_exist(
 
 
 def _blocking_findings_for_current_generation(
-    *, reviews: list[dict], review_comments: list[dict], policy: dict,
+    *, comments: list[dict], reviews: list[dict], review_comments: list[dict], policy: dict,
     repo_root: str | Path, tier: str, head: str, repository: str, pr_number: int
 ) -> bool:
     required_class = policy["review_tiers"][tier]["reviewer_class"]
@@ -329,6 +329,43 @@ def _blocking_findings_for_current_generation(
         trusted_logins.update(_trusted_logins(policy, reviewer_id))
     if not trusted_logins:
         return True
+
+    eligible_requests: list[tuple[dict, set[str]]] = []
+    for request_comment in comments:
+        if request_comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
+            continue
+        if not _issue_comment_identity(request_comment, repository, pr_number):
+            continue
+        if (
+            not request_comment.get("created_at")
+            or request_comment.get("updated_at") != request_comment.get("created_at")
+        ):
+            continue
+        parsed = parse_request(str(request_comment.get("body") or ""))
+        if parsed is None or parsed["REVIEWER_CLASS"] not in allowed_classes:
+            continue
+        if not reviewer_allowed(policy, parsed["REVIEWER_CLASS"], parsed["REVIEWER_ID"]):
+            continue
+        reviewed_head = parsed["REVIEWED_HEAD"]
+        if not is_ancestor(repo_root, reviewed_head, head):
+            continue
+        if not post_review_commits_are_neutral(repo_root, reviewed_head, head, policy):
+            continue
+        request_logins = _trusted_logins(policy, parsed["REVIEWER_ID"])
+        if request_logins:
+            eligible_requests.append((request_comment, request_logins))
+
+    for comment in comments:
+        if not _issue_comment_identity(comment, repository, pr_number):
+            continue
+        if not BLOCKING_FINDING_RE.search(str(comment.get("body") or "")):
+            continue
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if any(
+            login in request_logins and _created_at(comment) > _created_at(request_comment)
+            for request_comment, request_logins in eligible_requests
+        ):
+            return True
 
     pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
     eligible_review_ids: set[int] = set()
@@ -541,6 +578,7 @@ def verify_records(
     if tier not in {"R1", "R2"} or not FULL_SHA.fullmatch(head):
         raise RuntimeError("invalid gate identity")
     if _blocking_findings_for_current_generation(
+        comments=comments,
         reviews=reviews or [],
         review_comments=review_comments or [],
         policy=policy,

@@ -73,13 +73,13 @@ def source(head: str, fp: str, **kw) -> dict:
 
 
 def run_verify(comment: dict, src: dict, repo: Path, final: str, *, tier="R2", fp="abc",
-               reviews: list[dict] | None = None,
+               comments: list[dict] | None = None, reviews: list[dict] | None = None,
                review_comments: list[dict] | None = None):
     original = m.fetch_review_source
     m.fetch_review_source = lambda repository, pr_number, source_url, token: ("pull_request_review", src)
     try:
         return m.verify_records(
-            [comment], policy=POLICY, repo_root=repo, tier=tier, fingerprint=fp,
+            [comment] if comments is None else comments, policy=POLICY, repo_root=repo, tier=tier, fingerprint=fp,
             head=final, repository="Oteryn/Test", pr_number=7, token="x",
             reviews=reviews or [], review_comments=review_comments or [],
         )
@@ -117,6 +117,18 @@ def test_legacy_pass_cannot_bypass_current_p1_inline_finding() -> None:
     expect_fail(lambda: run_verify(
         attestation(reviewed, "abc"), source(reviewed, "abc"), repo, final,
         reviews=[review], review_comments=[inline],
+    ))
+
+
+def test_legacy_pass_cannot_bypass_current_p1_top_level_finding() -> None:
+    repo, reviewed, final = make_repo()
+    legacy = attestation(reviewed, "abc")
+    request = issue_comment(10, request_body(reviewed), stamp="2026-08-20T10:00:00Z")
+    blocker = issue_comment(11, "[P1] Security boundary bypass",
+                            login="chatgpt-codex-connector[bot]", association="NONE",
+                            stamp="2026-08-20T10:01:00Z")
+    expect_fail(lambda: run_verify(
+        legacy, source(reviewed, "abc"), repo, final, comments=[legacy, request, blocker],
     ))
 
 
