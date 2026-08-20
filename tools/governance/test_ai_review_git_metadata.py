@@ -204,7 +204,9 @@ def test_pathspec_magic_filename_is_literal_and_base_drift_is_bound() -> None:
     first, _, _ = m.fingerprint(repo, base_one, head, [literal], m.load_policy())
     changed, _, _ = m.fingerprint(repo, base_two, head, [literal], m.load_policy())
     assert first != changed
-    assert literal in m.patch_for(repo, base_one, head, [literal])
+    patch = m.patch_for(repo, base_one, head, [literal])
+    assert "-value = 1" in patch, patch
+    assert "+value = 2" in patch, patch
 
 
 def main() -> int:
