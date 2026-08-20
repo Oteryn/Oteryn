@@ -50,6 +50,6 @@ A compatible ecosystem release may reference successful provider evidence by imm
 
 ## Branch protection target
 
-Once `meta-gate` has successfully run on `main`, configure the default branch so ordinary changes require a pull request and the `meta-gate` status check. Force-push and deletion of `main` should remain disabled. Review-count policy may be tightened independently when organization staffing makes mandatory reviewers practical.
+During PR #15 enforcement bootstrap, `main` is protected with pull requests required, zero mandatory human approvals for the one-maintainer model, strict `meta-gate` status, administrator enforcement, linear history, conversation resolution, and force-push/deletion disabled. PR #15 installs the trusted-base `ai-review-gate` check; immediately after that PR merges, branch protection must require `ai-review-gate` as the review authority (with deterministic `meta-gate` retained as applicable).
 
 Changing branch/ruleset settings is an administrative GitHub operation, not something this workflow attempts to perform with `GITHUB_TOKEN`.
