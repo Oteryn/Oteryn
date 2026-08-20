@@ -26,6 +26,8 @@ _original_verify_records = _core.verify_records
 _original_blocking_findings = _core._blocking_findings_for_current_generation
 _original_issue_comment_result = _core._verify_issue_comment_result
 _original_parse_clean_result = _core.parse_clean_result
+_original_fetch_review_source = _core.fetch_review_source
+_original_fetch_json = _core.fetch_json
 
 _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
 # Do not heuristically classify arbitrary bot prose as celebratory. Compatibility
@@ -204,10 +206,12 @@ def _conservative_pre_rollout_blocker_comments(
     comments: list[dict], *, policy: dict, repo_root: str | Path, head: str,
     repository: str, pr_number: int,
 ) -> list[dict]:
-    """Treat legacy request syntax as trusted only for blocker discovery.
+    """Preserve observable legacy request history only for blocker discovery.
 
-    This can only make the gate fail more often: it never supplies current PASS
-    authority or request identity.
+    An edited pre-rollout comment can no longer prove what its original body was.
+    If it predates rollout and has server edit metadata, synthesize request-like text
+    only for the fail-closed blocker scan. This can only add blockers; it cannot create
+    PASS authority or satisfy current request identity.
     """
     rollout_commit = _configured_rollout_commit(policy, repository)
     if rollout_commit is None or not _core.is_ancestor(repo_root, rollout_commit, head):
@@ -221,13 +225,18 @@ def _conservative_pre_rollout_blocker_comments(
         clone = deepcopy(comment)
         body = str(comment.get("body") or "")
         created = _strict_comment_time(comment)
-        if (
-            _request_command_present(body)
-            and _core._issue_comment_identity(comment, repository, pr_number)
-            and created is not None
-            and created < cutoff
+        same_pr = _core._issue_comment_identity(comment, repository, pr_number)
+        edited = (
+            bool(comment.get("created_at"))
+            and bool(comment.get("updated_at"))
+            and comment.get("updated_at") != comment.get("created_at")
+        )
+        if same_pr and created is not None and created < cutoff and (
+            _request_command_present(body) or edited
         ):
             clone["author_association"] = "COLLABORATOR"
+            if edited and not _request_command_present(body):
+                clone["body"] = "@codex review\n\nlegacy pre-rollout edited request candidate"
         normalized.append(clone)
     return normalized
 
@@ -248,6 +257,17 @@ def _compat_parse_clean_result(body: str) -> str | None:
 
     normalized = "\n".join([_CLEAN_PREFIX, *lines[1:]])
     return _original_parse_clean_result(normalized)
+
+
+def _compat_fetch_review_source(
+    repository: str, pr_number: int, source_url: str, token: str
+) -> tuple[str, dict]:
+    saved = _core.fetch_json
+    _core.fetch_json = globals().get("fetch_json", _original_fetch_json)
+    try:
+        return _original_fetch_review_source(repository, pr_number, source_url, token)
+    finally:
+        _core.fetch_json = saved
 
 
 def _compat_blocking_findings(*, comments: list[dict], **kwargs) -> bool:
@@ -275,7 +295,15 @@ def _compat_verify_records(comments: list[dict], **kwargs) -> dict:
         policy=kwargs["policy"], repo_root=kwargs["repo_root"], head=kwargs["head"],
         repository=kwargs["repository"], pr_number=kwargs["pr_number"],
     )
-    return _original_verify_records(normalized, **kwargs)
+    saved_source = _core.fetch_review_source
+    saved_json = _core.fetch_json
+    _core.fetch_review_source = globals().get("fetch_review_source", _compat_fetch_review_source)
+    _core.fetch_json = globals().get("fetch_json", _original_fetch_json)
+    try:
+        return _original_verify_records(normalized, **kwargs)
+    finally:
+        _core.fetch_review_source = saved_source
+        _core.fetch_json = saved_json
 
 
 _core.parse_clean_result = _compat_parse_clean_result
@@ -288,13 +316,15 @@ for _name in dir(_core):
     if not _name.startswith("__"):
         globals()[_name] = getattr(_core, _name)
 
-# Keep compatibility controls visible for regression tests and diagnostics.
+# Keep compatibility controls and test patch points visible.
 globals()["REQUEST_ANCHOR_ROLLOUT_COMMIT"] = REQUEST_ANCHOR_ROLLOUT_COMMIT
 globals()["_configured_rollout_commit"] = _configured_rollout_commit
 globals()["_request_anchor_rollout_time"] = _request_anchor_rollout_time
 globals()["_normalize_anchor_trust"] = _normalize_anchor_trust
 globals()["_filter_pre_rollout_unstructured_requests"] = _filter_pre_rollout_unstructured_requests
 globals()["_compat_parse_clean_result"] = _compat_parse_clean_result
+globals()["fetch_json"] = _original_fetch_json
+globals()["fetch_review_source"] = _compat_fetch_review_source
 
 
 if __name__ == "__main__":
