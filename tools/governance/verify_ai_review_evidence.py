@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import subprocess
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,6 +22,8 @@ if _spec is None or _spec.loader is None:
 _core = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_core)
 
+_original_verify_records = _core.verify_records
+_original_blocking_findings = _core._blocking_findings_for_current_generation
 _original_issue_comment_result = _core._verify_issue_comment_result
 _original_parse_clean_result = _core.parse_clean_result
 
@@ -62,6 +66,10 @@ def _strict_comment_time(comment: dict) -> datetime | None:
     return stamp.astimezone(timezone.utc)
 
 
+def _request_command_present(body: str) -> bool:
+    return any(line.strip().casefold() == "@codex review" for line in body.splitlines())
+
+
 def _configured_rollout_commit(policy: dict, repository: str) -> str | None:
     rollouts = policy.get("request_anchor_rollouts")
     if not isinstance(rollouts, dict):
@@ -72,42 +80,159 @@ def _configured_rollout_commit(policy: dict, repository: str) -> str | None:
     return value
 
 
+def _eligible_anchor_map(
+    *, reviews: list[dict], policy: dict, repo_root: str | Path,
+    head: str, repository: str, pr_number: int,
+) -> tuple[dict[int, dict[str, str]], dict[str, str]]:
+    by_comment: dict[int, dict[str, str]] = {}
+    trusted_authors: dict[str, str] = {}
+    for _, anchor in _core._eligible_request_anchors(
+        reviews=reviews,
+        policy=policy,
+        repo_root=repo_root,
+        head=head,
+        repository=repository,
+        pr_number=pr_number,
+    ):
+        if anchor["REQUEST_VALID"] != "true":
+            continue
+        association = anchor["REQUEST_AUTHOR_ASSOCIATION"]
+        if association not in _core.TRUSTED_ASSOCIATIONS:
+            raise RuntimeError("valid request anchor has an untrusted author association")
+        comment_id = int(anchor["REQUEST_COMMENT_ID"])
+        if comment_id in by_comment and by_comment[comment_id] != anchor:
+            raise RuntimeError("request anchor comment identity is ambiguous")
+        by_comment[comment_id] = anchor
+        author = anchor["REQUEST_AUTHOR"].casefold()
+        trusted_authors.setdefault(author, association)
+    return by_comment, trusted_authors
+
+
+def _anchor_matches_comment(anchor: dict[str, str], comment: dict) -> bool:
+    body = str(comment.get("body") or "")
+    login = str((comment.get("user") or {}).get("login", ""))
+    created_at = str(comment.get("created_at") or "")
+    parsed = _core.parse_request(body)
+    return (
+        parsed is not None
+        and str(comment.get("id") or "") == anchor["REQUEST_COMMENT_ID"]
+        and login == anchor["REQUEST_AUTHOR"]
+        and created_at == anchor["REQUEST_CREATED_AT"]
+        and str(comment.get("updated_at") or "") == created_at
+        and hashlib.sha256(body.encode("utf-8")).hexdigest() == anchor["REQUEST_BODY_SHA256"]
+        and all(anchor[key] == parsed[key] for key in _core.REQUEST_FIELDS)
+    )
+
+
+def _normalize_anchor_trust(
+    comments: list[dict], *, reviews: list[dict], policy: dict,
+    repo_root: str | Path, head: str, repository: str, pr_number: int,
+) -> list[dict]:
+    """Recover server-proven request trust when REST hides private org membership.
+
+    The issue-comment webhook records the authoritative association in an immutable
+    github-actions review anchor. Public/repository-scoped REST can later expose the
+    same organization member as CONTRIBUTOR. Only an exact anchor/comment match may
+    restore the request's association. Other comments by that already anchored author
+    are treated as trusted only for the core's fail-closed edit/blocker checks.
+    """
+    by_comment, trusted_authors = _eligible_anchor_map(
+        reviews=reviews, policy=policy, repo_root=repo_root, head=head,
+        repository=repository, pr_number=pr_number,
+    )
+    normalized: list[dict] = []
+    for comment in comments:
+        clone = deepcopy(comment)
+        try:
+            comment_id = int(comment.get("id") or 0)
+        except (TypeError, ValueError):
+            comment_id = 0
+        anchor = by_comment.get(comment_id)
+        if anchor is not None:
+            if _anchor_matches_comment(anchor, comment):
+                clone["author_association"] = anchor["REQUEST_AUTHOR_ASSOCIATION"]
+            normalized.append(clone)
+            continue
+
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if login in trusted_authors:
+            # Conservative only: this can add edit/blocking failures but cannot create
+            # a valid current request because current request identity still needs its
+            # own exact immutable anchor.
+            clone["author_association"] = trusted_authors[login]
+        normalized.append(clone)
+    return normalized
+
+
+def _pre_rollout_request_candidate(
+    comment: dict, *, cutoff: datetime, repository: str, pr_number: int,
+) -> bool:
+    body = str(comment.get("body") or "")
+    created = _strict_comment_time(comment)
+    return (
+        _request_command_present(body)
+        and _core._issue_comment_identity(comment, repository, pr_number)
+        and _core.REQUEST_MARKER not in body
+        and _core.parse_request(body) is None
+        and created is not None
+        and created < cutoff
+    )
+
+
 def _filter_pre_rollout_unstructured_requests(
     comments: list[dict], *, policy: dict, repo_root: str | Path, head: str,
     repository: str, pr_number: int,
 ) -> list[dict]:
-    # Use only a repository-specific rollout marker from the trusted policy.
-    # Unknown or malformed repository entries get no migration exception.
     rollout_commit = _configured_rollout_commit(policy, repository)
     if rollout_commit is None:
         return comments
-    # Fail closed unless that repository-specific rollout commit is in the reviewed DAG.
     if not _core.is_ancestor(repo_root, rollout_commit, head):
         return comments
     cutoff = _request_anchor_rollout_time(repo_root, rollout_commit)
     if cutoff is None:
         return comments
 
-    filtered: list[dict] = []
+    return [
+        comment for comment in comments
+        if not _pre_rollout_request_candidate(
+            comment, cutoff=cutoff, repository=repository, pr_number=pr_number
+        )
+    ]
+
+
+def _conservative_pre_rollout_blocker_comments(
+    comments: list[dict], *, policy: dict, repo_root: str | Path, head: str,
+    repository: str, pr_number: int,
+) -> list[dict]:
+    """Treat legacy request syntax as trusted only for blocker discovery.
+
+    This can only make the gate fail more often: it never supplies current PASS
+    authority or request identity.
+    """
+    rollout_commit = _configured_rollout_commit(policy, repository)
+    if rollout_commit is None or not _core.is_ancestor(repo_root, rollout_commit, head):
+        return comments
+    cutoff = _request_anchor_rollout_time(repo_root, rollout_commit)
+    if cutoff is None:
+        return comments
+
+    normalized: list[dict] = []
     for comment in comments:
+        clone = deepcopy(comment)
         body = str(comment.get("body") or "")
         created = _strict_comment_time(comment)
-        is_legacy_pre_rollout = (
-            _core._is_request_like(comment)
+        if (
+            _request_command_present(body)
             and _core._issue_comment_identity(comment, repository, pr_number)
-            and _core.REQUEST_MARKER not in body
-            and _core.parse_request(body) is None
             and created is not None
             and created < cutoff
-        )
-        if is_legacy_pre_rollout:
-            continue
-        filtered.append(comment)
-    return filtered
+        ):
+            clone["author_association"] = "COLLABORATOR"
+        normalized.append(clone)
+    return normalized
 
 
 def _compat_parse_clean_result(body: str) -> str | None:
-    # Preserve every already accepted exact shape first.
     exact = _original_parse_clean_result(body)
     if exact is not None:
         return exact
@@ -121,16 +246,20 @@ def _compat_parse_clean_result(body: str) -> str | None:
     if flair not in _ALLOWED_CLEAN_FLAIR:
         return None
 
-    # Strip only the exact allowlisted compatibility token. The preserved strict
-    # parser still owns every other part of the result envelope.
     normalized = "\n".join([_CLEAN_PREFIX, *lines[1:]])
     return _original_parse_clean_result(normalized)
 
 
+def _compat_blocking_findings(*, comments: list[dict], **kwargs) -> bool:
+    conservative = _conservative_pre_rollout_blocker_comments(
+        comments,
+        policy=kwargs["policy"], repo_root=kwargs["repo_root"], head=kwargs["head"],
+        repository=kwargs["repository"], pr_number=kwargs["pr_number"],
+    )
+    return _original_blocking_findings(comments=conservative, **kwargs)
+
+
 def _compat_issue_comment_result(comments: list[dict], **kwargs) -> dict:
-    # Migration compatibility is intentionally limited to request-generation
-    # ambiguity. The global blocker scan must retain the complete historical
-    # request set so later trusted P0/P1 findings can never be detached/erased.
     filtered = _filter_pre_rollout_unstructured_requests(
         comments,
         policy=kwargs["policy"], repo_root=kwargs["repo_root"], head=kwargs["head"],
@@ -139,10 +268,20 @@ def _compat_issue_comment_result(comments: list[dict], **kwargs) -> dict:
     return _original_issue_comment_result(filtered, **kwargs)
 
 
+def _compat_verify_records(comments: list[dict], **kwargs) -> dict:
+    normalized = _normalize_anchor_trust(
+        comments,
+        reviews=kwargs.get("reviews") or [],
+        policy=kwargs["policy"], repo_root=kwargs["repo_root"], head=kwargs["head"],
+        repository=kwargs["repository"], pr_number=kwargs["pr_number"],
+    )
+    return _original_verify_records(normalized, **kwargs)
+
+
 _core.parse_clean_result = _compat_parse_clean_result
+_core._blocking_findings_for_current_generation = _compat_blocking_findings
 _core._verify_issue_comment_result = _compat_issue_comment_result
-# Deliberately do NOT wrap/replace _blocking_findings_for_current_generation.
-# The preserved fail-closed core sees all historical requests and findings.
+_core.verify_records = _compat_verify_records
 
 # Re-export the established verifier API so existing tests/callers remain unchanged.
 for _name in dir(_core):
@@ -153,6 +292,7 @@ for _name in dir(_core):
 globals()["REQUEST_ANCHOR_ROLLOUT_COMMIT"] = REQUEST_ANCHOR_ROLLOUT_COMMIT
 globals()["_configured_rollout_commit"] = _configured_rollout_commit
 globals()["_request_anchor_rollout_time"] = _request_anchor_rollout_time
+globals()["_normalize_anchor_trust"] = _normalize_anchor_trust
 globals()["_filter_pre_rollout_unstructured_requests"] = _filter_pre_rollout_unstructured_requests
 globals()["_compat_parse_clean_result"] = _compat_parse_clean_result
 
