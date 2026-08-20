@@ -227,6 +227,9 @@
       "issue_comment_result"
     ]
   },
+  "review_request_anchor_logins": [
+    "github-actions[bot]"
+  ],
   "r0_safe_data_extensions": [
     ".md",
     ".txt",

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -13,6 +14,7 @@ import ai_review_policy as risk_policy
 
 MARKER = "<!-- OTERYN_AI_REVIEW_V1 -->"
 REQUEST_MARKER = "<!-- OTERYN_AI_REVIEW_REQUEST_V1 -->"
+REQUEST_ANCHOR_MARKER = "<!-- OTERYN_AI_REVIEW_REQUEST_ANCHOR_V1 -->"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 SHORT_SHA = re.compile(r"^[0-9a-f]{7,40}$")
@@ -27,6 +29,16 @@ REQUEST_FIELDS = {
     "REVIEWED_HEAD",
     "REVIEWER_CLASS",
     "REVIEWER_ID",
+}
+REQUEST_ANCHOR_FIELDS = {
+    "REQUEST_COMMENT_ID",
+    "REQUEST_AUTHOR",
+    "REQUEST_AUTHOR_ASSOCIATION",
+    "REQUEST_CREATED_AT",
+    "REQUEST_BODY_SHA256",
+    "REQUEST_VALID",
+    "DISPATCH_HEAD",
+    "BASE_SHA",
 }
 CLEAN_RESULT_RE = re.compile(
     r"^Codex Review: Didn't find any major issues\."
@@ -80,6 +92,40 @@ def parse_request(body: str) -> dict[str, str] | None:
     if fields["REVIEWER_CLASS"] not in {"fast", "deep"}:
         return None
     if not re.fullmatch(r"[a-z0-9_]+", fields["REVIEWER_ID"]):
+        return None
+    return fields
+
+
+def parse_request_anchor(body: str) -> dict[str, str] | None:
+    if body.count(REQUEST_ANCHOR_MARKER) != 1:
+        return None
+    fields: dict[str, str] = {}
+    for line in body.splitlines():
+        match = FIELD_RE.match(line.strip())
+        if not match:
+            continue
+        key = match.group(1)
+        if key in fields:
+            return None
+        fields[key] = match.group(2)
+    valid = fields.get("REQUEST_VALID")
+    expected = REQUEST_ANCHOR_FIELDS | (REQUEST_FIELDS if valid == "true" else set())
+    if set(fields) != expected or valid not in {"true", "false"}:
+        return None
+    if not fields["REQUEST_COMMENT_ID"].isdigit():
+        return None
+    if not re.fullmatch(r"[A-Z_]+", fields["REQUEST_AUTHOR_ASSOCIATION"]):
+        return None
+    if valid == "true" and fields["REQUEST_AUTHOR_ASSOCIATION"] not in TRUSTED_ASSOCIATIONS:
+        return None
+    if not SHA256.fullmatch(fields["REQUEST_BODY_SHA256"]):
+        return None
+    if not FULL_SHA.fullmatch(fields["DISPATCH_HEAD"]) or not FULL_SHA.fullmatch(fields["BASE_SHA"]):
+        return None
+    if valid == "true" and parse_request("\n".join([
+        "@codex review", REQUEST_MARKER,
+        *(f"{key}: {fields[key]}" for key in sorted(REQUEST_FIELDS)),
+    ])) is None:
         return None
     return fields
 
@@ -283,6 +329,64 @@ def _trusted_logins(policy: dict, reviewer_id: str) -> set[str]:
     }
 
 
+def _anchor_logins(policy: dict) -> set[str]:
+    return {
+        str(value).casefold()
+        for value in policy.get("review_request_anchor_logins", [])
+    }
+
+
+def _eligible_request_anchors(
+    *, reviews: list[dict], policy: dict, repo_root: str | Path,
+    head: str, repository: str, pr_number: int
+) -> list[tuple[dict, dict[str, str]]]:
+    anchor_logins = _anchor_logins(policy)
+    pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
+    anchors: list[tuple[dict, dict[str, str]]] = []
+    for review in reviews:
+        body = str(review.get("body") or "")
+        login = str((review.get("user") or {}).get("login", "")).casefold()
+        if REQUEST_ANCHOR_MARKER not in body or login not in anchor_logins:
+            continue
+        anchor = parse_request_anchor(body)
+        if anchor is None:
+            raise RuntimeError("trusted review-request anchor is malformed")
+        dispatch_head = anchor["DISPATCH_HEAD"]
+        if (
+            review.get("pull_request_url") != pull_url
+            or review.get("commit_id") != dispatch_head
+            or str(review.get("state") or "").upper() != "COMMENTED"
+        ):
+            raise RuntimeError("trusted review-request anchor identity is malformed")
+        if not is_ancestor(repo_root, dispatch_head, head):
+            continue
+        if not post_review_commits_are_neutral(repo_root, dispatch_head, head, policy):
+            continue
+        anchors.append((review, anchor))
+    return anchors
+
+
+def _validate_anchor_generation(
+    *, reviews: list[dict], policy: dict, repo_root: str | Path,
+    head: str, repository: str, pr_number: int
+) -> list[tuple[dict, dict[str, str]]]:
+    anchors = _eligible_request_anchors(
+        reviews=reviews,
+        policy=policy,
+        repo_root=repo_root,
+        head=head,
+        repository=repository,
+        pr_number=pr_number,
+    )
+    by_head: dict[str, list[tuple[dict, dict[str, str]]]] = {}
+    for item in anchors:
+        by_head.setdefault(item[1]["DISPATCH_HEAD"], []).append(item)
+    for items in by_head.values():
+        if len(items) != 1 or items[0][1]["REQUEST_VALID"] != "true":
+            raise RuntimeError("immutable Codex request-anchor generation is missing, invalid, or ambiguous")
+    return anchors
+
+
 def _blocking_findings_exist(
     *, reviews: list[dict], review_comments: list[dict], repository: str,
     pr_number: int, reviewed_head: str, trusted_logins: set[str]
@@ -456,6 +560,32 @@ def _verify_issue_comment_result(
         raise RuntimeError("reviewer has no configured trusted source login")
     if "issue_comment_result" not in policy.get("reviewer_source_kinds", {}).get(reviewer_id, []):
         raise RuntimeError("issue-comment result source is not enabled for reviewer")
+    anchors = [
+        item for item in _eligible_request_anchors(
+            reviews=reviews,
+            policy=policy,
+            repo_root=repo_root,
+            head=head,
+            repository=repository,
+            pr_number=pr_number,
+        )
+        if item[1]["DISPATCH_HEAD"] == reviewed_head
+    ]
+    if len(anchors) != 1:
+        raise RuntimeError("one immutable trusted request anchor is required")
+    anchor_review, anchor = anchors[0]
+    request_login = str((request_comment.get("user") or {}).get("login", ""))
+    request_body = str(request_comment.get("body") or "")
+    if (
+        anchor["REQUEST_VALID"] != "true"
+        or anchor["REQUEST_COMMENT_ID"] != str(request_comment.get("id"))
+        or anchor["REQUEST_AUTHOR"] != request_login
+        or anchor["REQUEST_AUTHOR_ASSOCIATION"] != request_comment.get("author_association")
+        or anchor["REQUEST_CREATED_AT"] != request_comment.get("created_at")
+        or anchor["REQUEST_BODY_SHA256"] != hashlib.sha256(request_body.encode("utf-8")).hexdigest()
+        or any(anchor[key] != request[key] for key in REQUEST_FIELDS)
+    ):
+        raise RuntimeError("trusted request anchor does not match the exact request comment")
     for other_comment in request_like:
         if other_comment.get("id") == request_comment.get("id"):
             continue
@@ -517,6 +647,8 @@ def _verify_issue_comment_result(
     return {
         "review_request_id": request_comment.get("id"),
         "review_request_url": request_comment.get("html_url"),
+        "review_request_anchor_id": anchor_review.get("id"),
+        "review_request_anchor_url": anchor_review.get("html_url"),
         "reviewed_head": reviewed_head,
         "reviewer_id": reviewer_id,
         "review_source_url": result.get("html_url"),
@@ -621,6 +753,14 @@ def verify_records(
             raise RuntimeError("trusted inline review comment edit metadata is missing")
         if updated_at != created_at:
             raise RuntimeError("edited trusted inline review comments invalidate external review evidence")
+    _validate_anchor_generation(
+        reviews=reviews or [],
+        policy=policy,
+        repo_root=repo_root,
+        head=head,
+        repository=repository,
+        pr_number=pr_number,
+    )
     if _blocking_findings_for_current_generation(
         comments=comments,
         reviews=reviews or [],

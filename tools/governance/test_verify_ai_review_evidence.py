@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import subprocess
 import tempfile
@@ -325,6 +326,39 @@ def issue_comment(comment_id: int, text: str, *, login: str = "blakinio",
     }
 
 
+def request_anchor(comment: dict, dispatch_head: str, *, valid: bool | None = None,
+                   review_id: int | None = None) -> dict:
+    parsed = m.parse_request(str(comment.get("body") or ""))
+    is_valid = (
+        parsed is not None and comment.get("author_association") in m.TRUSTED_ASSOCIATIONS
+        if valid is None else valid
+    )
+    lines = [
+        m.REQUEST_ANCHOR_MARKER,
+        f"REQUEST_COMMENT_ID: {comment['id']}",
+        f"REQUEST_AUTHOR: {(comment.get('user') or {}).get('login')}",
+        f"REQUEST_AUTHOR_ASSOCIATION: {comment.get('author_association')}",
+        f"REQUEST_CREATED_AT: {comment.get('created_at')}",
+        f"REQUEST_BODY_SHA256: {hashlib.sha256(str(comment.get('body') or '').encode('utf-8')).hexdigest()}",
+        f"REQUEST_VALID: {'true' if is_valid else 'false'}",
+        f"DISPATCH_HEAD: {dispatch_head}",
+        f"BASE_SHA: {'a' * 40}",
+    ]
+    if is_valid:
+        assert parsed is not None
+        lines.extend(f"{key}: {parsed[key]}" for key in sorted(m.REQUEST_FIELDS))
+    anchor_id = review_id if review_id is not None else 5000 + int(comment["id"])
+    return {
+        "id": anchor_id,
+        "body": "\n".join(lines),
+        "commit_id": dispatch_head,
+        "state": "COMMENTED",
+        "user": {"login": "github-actions[bot]"},
+        "pull_request_url": "https://api.github.com/repos/Oteryn/Test/pulls/7",
+        "html_url": f"https://github.com/Oteryn/Test/pull/7#pullrequestreview-{anchor_id}",
+    }
+
+
 def codex_result(comment_id: int, prefix: str, *,
                  login: str = "chatgpt-codex-connector[bot]",
                  stamp: str = "2026-08-20T10:01:00Z",
@@ -369,10 +403,17 @@ def run_issue(comments: list[dict], repo: Path, final: str, *, fp: str = ISSUE_F
     original = m.fetch_review_source
     m.fetch_review_source = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("missing"))
     try:
+        anchors = [
+            request_anchor(comment, m.parse_request(str(comment.get("body") or ""))["REVIEWED_HEAD"]
+                           if m.parse_request(str(comment.get("body") or "")) else final)
+            for comment in comments
+            if m._is_request_like(comment)
+            and m._issue_comment_identity(comment, "Oteryn/Test", 7)
+        ]
         return m.verify_records(
             comments, policy=POLICY, repo_root=repo, tier=tier, fingerprint=fp,
             head=final, repository="Oteryn/Test", pr_number=7, token="x",
-            reviews=reviews or [], review_comments=review_comments or [],
+            reviews=anchors + (reviews or []), review_comments=review_comments or [],
         )
     finally:
         m.fetch_review_source = original
@@ -509,6 +550,23 @@ def test_issue_comment_malformed_earlier_request_makes_generation_ambiguous() ->
         codex_result(11, final[:10], stamp="2026-08-20T10:01:00Z"),
     ]
     expect_fail(lambda: run_issue(comments, repo, final))
+
+
+def test_deleted_competing_request_anchor_makes_generation_ambiguous() -> None:
+    repo, _, final = make_repo()
+    deleted_request = issue_comment(
+        9,
+        request_body(final, "e" * 64, tier="R1", klass="fast", reviewer="codex_spark"),
+        stamp="2026-08-20T09:59:00Z",
+    )
+    surviving_request = issue_comment(10, request_body(final), stamp="2026-08-20T10:00:00Z")
+    comments = [surviving_request, codex_result(11, final[:10], stamp="2026-08-20T10:01:00Z")]
+    expect_fail(lambda: run_issue(
+        comments,
+        repo,
+        final,
+        reviews=[request_anchor(deleted_request, final)],
+    ))
 
 
 def test_issue_comment_request_after_result_fails() -> None:

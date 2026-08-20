@@ -1,0 +1,155 @@
+name: META trusted AI review request registry
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: write
+
+concurrency:
+  group: meta-ai-review-request-${{ github.event.comment.id }}
+  cancel-in-progress: false
+
+jobs:
+  record-review-request:
+    if: >-
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '@codex review')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record immutable request anchor
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_ASSOCIATION: ${{ github.event.comment.author_association }}
+          COMMENT_CREATED_AT: ${{ github.event.comment.created_at }}
+          COMMENT_UPDATED_AT: ${{ github.event.comment.updated_at }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import urllib.request
+
+          marker = "<!-- OTERYN_AI_REVIEW_REQUEST_V1 -->"
+          anchor_marker = "<!-- OTERYN_AI_REVIEW_REQUEST_ANCHOR_V1 -->"
+          field_re = re.compile(r"^([A-Z0-9_]+):\s*(.+?)\s*$")
+          required = {
+              "REVIEW_TIER", "REVIEW_FINGERPRINT", "REVIEWED_HEAD",
+              "REVIEWER_CLASS", "REVIEWER_ID",
+          }
+
+          repository = os.environ["REPOSITORY"]
+          pr_number = int(os.environ["PR_NUMBER"])
+          comment_id = int(os.environ["COMMENT_ID"])
+          body = os.environ["COMMENT_BODY"]
+          token = os.environ["GH_TOKEN"]
+          request_command_count = sum(
+              line.strip() == "@codex review" for line in body.splitlines()
+          )
+          if request_command_count == 0:
+              print("comment contains no exact Codex review command")
+              raise SystemExit(0)
+
+          def api(url, *, method="GET", payload=None):
+              data = None if payload is None else json.dumps(payload).encode("utf-8")
+              request = urllib.request.Request(
+                  url, data=data, method=method,
+                  headers={
+                      "Accept": "application/vnd.github+json",
+                      "Authorization": f"Bearer {token}",
+                      "Content-Type": "application/json",
+                      "X-GitHub-Api-Version": "2022-11-28",
+                      "User-Agent": "oteryn-ai-review-request-registry",
+                  },
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          pr = api(f"https://api.github.com/repos/{repository}/pulls/{pr_number}")
+          dispatch_head = str((pr.get("head") or {}).get("sha") or "")
+          base_sha = str((pr.get("base") or {}).get("sha") or "")
+          if not re.fullmatch(r"[0-9a-f]{40}", dispatch_head):
+              raise SystemExit("live PR head is missing or malformed")
+          if not re.fullmatch(r"[0-9a-f]{40}", base_sha):
+              raise SystemExit("live PR base is missing or malformed")
+
+          fields = {}
+          duplicate = False
+          for line in body.splitlines():
+              match = field_re.match(line.strip())
+              if not match:
+                  continue
+              key = match.group(1)
+              if key in fields:
+                  duplicate = True
+              fields[key] = match.group(2)
+          exact_command = request_command_count == 1
+          valid = (
+              body.count(marker) == 1
+              and exact_command
+              and not duplicate
+              and set(fields) == required
+              and fields.get("REVIEW_TIER") in {"R1", "R2"}
+              and re.fullmatch(r"[0-9a-f]{64}", fields.get("REVIEW_FINGERPRINT", "")) is not None
+              and fields.get("REVIEWED_HEAD") == dispatch_head
+              and fields.get("REVIEWER_CLASS") in {"fast", "deep"}
+              and re.fullmatch(r"[a-z0-9_]+", fields.get("REVIEWER_ID", "")) is not None
+              and os.environ["COMMENT_ASSOCIATION"] in {"OWNER", "MEMBER", "COLLABORATOR"}
+              and os.environ["COMMENT_CREATED_AT"] == os.environ["COMMENT_UPDATED_AT"]
+          )
+
+          lines = [
+              anchor_marker,
+              f"REQUEST_COMMENT_ID: {comment_id}",
+              f"REQUEST_AUTHOR: {os.environ['COMMENT_AUTHOR']}",
+              f"REQUEST_AUTHOR_ASSOCIATION: {os.environ['COMMENT_ASSOCIATION']}",
+              f"REQUEST_CREATED_AT: {os.environ['COMMENT_CREATED_AT']}",
+              f"REQUEST_BODY_SHA256: {hashlib.sha256(body.encode('utf-8')).hexdigest()}",
+              f"REQUEST_VALID: {'true' if valid else 'false'}",
+              f"DISPATCH_HEAD: {dispatch_head}",
+              f"BASE_SHA: {base_sha}",
+          ]
+          if valid:
+              lines.extend(f"{key}: {fields[key]}" for key in sorted(required))
+          anchor_body = "\n".join(lines)
+
+          reviews = []
+          page = 1
+          while True:
+              batch = api(
+                  f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews?per_page=100&page={page}"
+              )
+              if not isinstance(batch, list):
+                  raise SystemExit("review list response is malformed")
+              reviews.extend(batch)
+              if len(batch) < 100:
+                  break
+              page += 1
+          needle = f"REQUEST_COMMENT_ID: {comment_id}"
+          existing = [review for review in reviews if anchor_marker in str(review.get("body") or "") and needle in str(review.get("body") or "")]
+          if existing:
+              if len(existing) != 1 or existing[0].get("body") != anchor_body:
+                  raise SystemExit("request anchor collision or mismatch")
+              print(f"request anchor already recorded: {existing[0].get('id')}")
+              raise SystemExit(0)
+
+          created = api(
+              f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews",
+              method="POST",
+              payload={"body": anchor_body, "commit_id": dispatch_head, "event": "COMMENT"},
+          )
+          if created.get("body") != anchor_body or created.get("commit_id") != dispatch_head:
+              raise SystemExit("created request anchor identity mismatch")
+          print(f"recorded immutable request anchor: {created.get('id')}")
+          PY

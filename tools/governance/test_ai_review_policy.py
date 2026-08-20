@@ -362,6 +362,21 @@ def test_trusted_base_workflow_never_executes_candidate_code() -> None:
     assert "requires trusted pull_request_target context" in action
 
 
+def test_request_registry_is_default_branch_only_and_never_checks_out_candidate() -> None:
+    root = Path(__file__).resolve().parents[2]
+    workflow = (root / ".github/workflows/governance-ai-review-request.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "issue_comment:" in workflow
+    assert "pull-requests: write" in workflow
+    assert "actions/checkout" not in workflow
+    assert "OTERYN_AI_REVIEW_REQUEST_ANCHOR_V1" in workflow
+    assert "REQUEST_COMMENT_ID" in workflow
+    assert "REQUEST_BODY_SHA256" in workflow
+    assert "event\": \"COMMENT" in workflow
+    assert policy["review_request_anchor_logins"] == ["github-actions[bot]"]
+
+
 def test_external_source_kinds_are_server_bound_review_or_codex_result() -> None:
     for reviewer in ("codex", "codex_spark"):
         assert policy["reviewer_source_kinds"][reviewer] == [
