@@ -1,7 +1,7 @@
 # Oteryn organization recovery and break-glass contract
 
-Status date: 2026-08-20  
-Lifecycle authority: GitHub Issue #10  
+Status date: 2026-08-20
+Lifecycle authority: GitHub Issue #10
 Governance authority: `docs/architecture/adr/0002-organization-governance-operating-model.md`
 
 This is an organization-level recovery contract. Provider repositories remain authoritative for provider-specific databases, deployments, applications and production recovery. A canonical GitHub repository is primary storage, not a backup by definition. `UNKNOWN` is intentional where current evidence does not prove a recovery property.
