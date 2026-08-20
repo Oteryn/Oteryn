@@ -165,6 +165,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/governance/test_ai_review_policy.py
+          python3 tools/governance/test_ai_review_git_metadata.py
+          python3 tools/governance/test_verify_ai_review_evidence.py
           python3 - <<'PY'
           import json
           from pathlib import Path
@@ -179,6 +181,20 @@ jobs:
               raise SystemExit('R2 must require the deep reviewer class')
           print('AI review policy contract PASS')
           PY
+
+      - name: Emit exact pull-request AI review classification
+        if: ${{ github.event_name == 'pull_request' }}
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          python3 tools/governance/ai_review_policy.py \
+            --repo-root . \
+            --policy-file ecosystem/ai-review-policy.json \
+            --base "$BASE_SHA" \
+            --head "$HEAD_SHA"
 
       - name: Verify META boundary markers
         shell: bash

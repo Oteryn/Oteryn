@@ -1,0 +1,127 @@
+name: Oteryn AI review gate
+description: Classify exact PR risk and require authenticated external AI review only for Ready R1/R2 changes.
+inputs:
+  base-sha:
+    description: Expected pull request base SHA; must match GitHub event context.
+    required: true
+  head-sha:
+    description: Expected pull request head SHA; must match GitHub event context.
+    required: true
+  draft:
+    description: Expected Draft state; must match GitHub event context.
+    required: true
+  repository:
+    description: Expected owner/repo; must match GitHub context.
+    required: true
+  pr-number:
+    description: Expected pull request number; must match GitHub event context.
+    required: true
+  github-token:
+    description: GITHUB_TOKEN with pull-requests:read and issues:read.
+    required: true
+  repo-root:
+    description: Candidate git repository path relative to GITHUB_WORKSPACE.
+    required: false
+    default: .
+outputs:
+  tier:
+    description: R0, R1 or R2.
+    value: ${{ steps.classify.outputs.tier }}
+  fingerprint:
+    description: Stable risk-bearing review fingerprint.
+    value: ${{ steps.classify.outputs.fingerprint }}
+  reviewer-class:
+    description: none, fast or deep.
+    value: ${{ steps.classify.outputs.reviewer_class }}
+runs:
+  using: composite
+  steps:
+    - id: bind
+      name: Bind caller inputs to immutable GitHub PR context
+      shell: bash
+      env:
+        INPUT_BASE: ${{ inputs.base-sha }}
+        INPUT_HEAD: ${{ inputs.head-sha }}
+        INPUT_DRAFT: ${{ inputs.draft }}
+        INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_PR: ${{ inputs.pr-number }}
+        EVENT_NAME: ${{ github.event_name }}
+        EVENT_BASE: ${{ github.event.pull_request.base.sha }}
+        EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+        EVENT_DRAFT: ${{ github.event.pull_request.draft }}
+        EVENT_REPOSITORY: ${{ github.repository }}
+        EVENT_PR: ${{ github.event.pull_request.number }}
+      run: |
+        set -euo pipefail
+        python3 - "$GITHUB_OUTPUT" <<'PY'
+        import os, re, sys
+        expected={'base':os.environ['EVENT_BASE'],'head':os.environ['EVENT_HEAD'],'draft':os.environ['EVENT_DRAFT'].lower(),'repository':os.environ['EVENT_REPOSITORY'],'pr':os.environ['EVENT_PR']}
+        actual={'base':os.environ['INPUT_BASE'],'head':os.environ['INPUT_HEAD'],'draft':os.environ['INPUT_DRAFT'].lower(),'repository':os.environ['INPUT_REPOSITORY'],'pr':os.environ['INPUT_PR']}
+        if os.environ['EVENT_NAME'] != 'pull_request_target':
+            raise SystemExit('AI review gate requires trusted pull_request_target context')
+        if not re.fullmatch(r'[0-9a-f]{40}',expected['base']) or not re.fullmatch(r'[0-9a-f]{40}',expected['head']):
+            raise SystemExit('GitHub PR event is missing exact base/head SHA')
+        if expected != actual:
+            raise SystemExit(f'caller inputs do not match trusted GitHub PR context: expected={expected!r}')
+        with open(sys.argv[1],'a',encoding='utf-8') as out:
+            for key,value in expected.items(): out.write(f'{key}={value}\n')
+        PY
+    - id: classify
+      name: Classify exact pull-request diff
+      shell: bash
+      env:
+        BASE_SHA: ${{ steps.bind.outputs.base }}
+        HEAD_SHA: ${{ steps.bind.outputs.head }}
+        REPO_ROOT_INPUT: ${{ inputs.repo-root }}
+      run: |
+        set -euo pipefail
+        POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
+        RESULT="$RUNNER_TEMP/oteryn-ai-review-result.json"
+        CANDIDATE_ROOT="$GITHUB_WORKSPACE/$REPO_ROOT_INPUT"
+        git -C "$CANDIDATE_ROOT" cat-file -e "${BASE_SHA}^{commit}"
+        git -C "$CANDIDATE_ROOT" cat-file -e "${HEAD_SHA}^{commit}"
+        python3 "$POLICY_ROOT/tools/governance/ai_review_policy.py" --repo-root "$CANDIDATE_ROOT" --policy-file "$POLICY_ROOT/ecosystem/ai-review-policy.json" --base "$BASE_SHA" --head "$HEAD_SHA" > "$RESULT"
+        python3 - "$RESULT" "$GITHUB_OUTPUT" "$GITHUB_STEP_SUMMARY" <<'PY'
+        import json, sys
+        result=json.load(open(sys.argv[1],encoding='utf-8')); reviewer=result['reviewer_class'] or 'none'
+        with open(sys.argv[2],'a',encoding='utf-8') as out:
+            out.write(f"tier={result['tier']}\n"); out.write(f"fingerprint={result['review_fingerprint']}\n"); out.write(f"reviewer_class={reviewer}\n")
+        with open(sys.argv[3],'a',encoding='utf-8') as summary:
+            summary.write("## Oteryn AI review classification\n\n")
+            summary.write(f"- tier: `{result['tier']}`\n- reviewer class: `{reviewer}`\n- fingerprint: `{result['review_fingerprint']}`\n")
+            summary.write(f"- reasons: `{'; '.join(result['reasons'])}`\n")
+        PY
+    - name: Accept R0 without external AI
+      if: ${{ steps.classify.outputs.tier == 'R0' }}
+      shell: bash
+      run: |
+        echo 'R0: deterministic validation only; external AI review is intentionally not required.'
+    - name: Defer external review while Draft
+      if: ${{ steps.classify.outputs.tier != 'R0' && steps.bind.outputs.draft == 'true' }}
+      shell: bash
+      run: |
+        echo 'Draft/WIP: external review is deferred until the risk-bearing diff is stable.'
+    - name: Verify authenticated external review evidence
+      if: ${{ steps.classify.outputs.tier != 'R0' && steps.bind.outputs.draft != 'true' }}
+      shell: bash
+      env:
+        REVIEW_TIER: ${{ steps.classify.outputs.tier }}
+        REVIEW_FINGERPRINT: ${{ steps.classify.outputs.fingerprint }}
+        HEAD_SHA: ${{ steps.bind.outputs.head }}
+        REPOSITORY: ${{ steps.bind.outputs.repository }}
+        PR_NUMBER: ${{ steps.bind.outputs.pr }}
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO_ROOT_INPUT: ${{ inputs.repo-root }}
+      run: |
+        set -euo pipefail
+        POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
+        CANDIDATE_ROOT="$GITHUB_WORKSPACE/$REPO_ROOT_INPUT"
+        python3 "$POLICY_ROOT/tools/governance/verify_ai_review_evidence.py" \
+          --repo-root "$CANDIDATE_ROOT" \
+          --policy-file "$POLICY_ROOT/ecosystem/ai-review-policy.json" \
+          --repository "$REPOSITORY" \
+          --pr-number "$PR_NUMBER" \
+          --tier "$REVIEW_TIER" \
+          --fingerprint "$REVIEW_FINGERPRINT" \
+          --head "$HEAD_SHA" \
+          --token "$GH_TOKEN"
