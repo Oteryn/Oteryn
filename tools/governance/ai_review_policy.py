@@ -35,6 +35,10 @@ def git(repo_root: str | Path, *args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=Path(repo_root), text=True, encoding="utf-8")
 
 
+def _literal_pathspec(path: str) -> str:
+    return f":(literal){path}"
+
+
 def _name_status_fields(repo_root: str | Path, base: str, head: str) -> list[bytes]:
     result = subprocess.run(
         ["git", "diff", "--name-status", "-z", "-M", "-C", "--find-copies-harder", f"{base}...{head}"],
@@ -82,7 +86,7 @@ def has_copy_change(repo_root: str | Path, base: str, head: str) -> bool:
 def patch_for(repo_root: str | Path, base: str, head: str, paths: list[str] | None = None) -> str:
     cmd = ["diff", "--no-ext-diff", "--unified=0", f"{base}...{head}"]
     if paths:
-        cmd += ["--", *paths]
+        cmd += ["--", *[_literal_pathspec(path) for path in paths]]
     return git(repo_root, *cmd)
 
 
@@ -192,13 +196,15 @@ def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]
 
 def tree_entry_at(repo_root: str | Path, revision: str, path: str) -> str:
     result = subprocess.run(
-        ["git", "ls-tree", "-z", revision, "--", path],
+        ["git", "ls-tree", "-z", revision, "--", _literal_pathspec(path)],
         cwd=Path(repo_root),
         stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
         check=False,
     )
-    if result.returncode != 0 or not result.stdout:
+    if result.returncode != 0:
+        raise RuntimeError(f"git ls-tree failed for {path!r}")
+    if not result.stdout:
         return "ABSENT"
     records = result.stdout.split(b"\0")
     if records and records[-1] == b"":
