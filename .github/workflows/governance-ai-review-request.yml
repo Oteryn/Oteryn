@@ -137,7 +137,11 @@ jobs:
                   break
               page += 1
           needle = f"REQUEST_COMMENT_ID: {comment_id}"
-          existing = [review for review in reviews if anchor_marker in str(review.get("body") or "") and needle in str(review.get("body") or "")]
+          existing = [
+              review for review in reviews
+              if anchor_marker in str(review.get("body") or "")
+              and needle in str(review.get("body") or "").splitlines()
+          ]
           if existing:
               if len(existing) != 1 or existing[0].get("body") != anchor_body:
                   raise SystemExit("request anchor collision or mismatch")

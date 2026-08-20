@@ -458,6 +458,23 @@ def _blocking_findings_for_current_generation(
         if request_logins:
             eligible_requests.append((request_comment, request_logins))
 
+    for _, anchor in _eligible_request_anchors(
+        reviews=reviews,
+        policy=policy,
+        repo_root=repo_root,
+        head=head,
+        repository=repository,
+        pr_number=pr_number,
+    ):
+        if anchor["REQUEST_VALID"] != "true":
+            continue
+        request_logins = _trusted_logins(policy, anchor["REVIEWER_ID"])
+        if request_logins:
+            eligible_requests.append(({
+                "created_at": anchor["REQUEST_CREATED_AT"],
+                "id": anchor["REQUEST_COMMENT_ID"],
+            }, request_logins))
+
     for comment in comments:
         if not _issue_comment_identity(comment, repository, pr_number):
             continue

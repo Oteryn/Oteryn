@@ -569,6 +569,32 @@ def test_deleted_competing_request_anchor_makes_generation_ambiguous() -> None:
     ))
 
 
+def test_deleted_request_anchor_retains_top_level_p1_across_legacy_fallback() -> None:
+    repo, _, final = make_repo()
+    legacy = attestation(final, ISSUE_FP)
+    deleted_request = issue_comment(
+        9,
+        request_body(final, ISSUE_FP),
+        stamp="2026-08-20T10:00:00Z",
+    )
+    blocker = issue_comment(
+        11,
+        "[P1] Security boundary bypass",
+        login="chatgpt-codex-connector[bot]",
+        association="NONE",
+        stamp="2026-08-20T10:01:00Z",
+    )
+    expect_fail(lambda: run_verify(
+        legacy,
+        source(final, ISSUE_FP),
+        repo,
+        final,
+        comments=[legacy, blocker],
+        reviews=[request_anchor(deleted_request, final)],
+        fp=ISSUE_FP,
+    ))
+
+
 def test_issue_comment_request_after_result_fails() -> None:
     repo, _, final = make_repo()
     comments = [codex_result(11, final[:10], stamp="2026-08-20T10:00:00Z"),
