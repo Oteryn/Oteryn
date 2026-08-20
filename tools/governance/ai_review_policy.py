@@ -37,7 +37,7 @@ def git(repo_root: str | Path, *args: str) -> str:
 
 def changed_paths(repo_root: str | Path, base: str, head: str) -> list[str]:
     result = subprocess.run(
-        ["git", "diff", "--name-status", "-z", "-M", "-C", f"{base}...{head}"],
+        ["git", "diff", "--name-status", "-z", "-M", "-C", "--find-copies-harder", f"{base}...{head}"],
         cwd=Path(repo_root), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False,
     )
     if result.returncode != 0:
@@ -81,23 +81,26 @@ def changed_signed_lines(patch: str) -> list[tuple[str, str]]:
 
 
 def composer_dev_patch_only(*args, **kwargs) -> bool:
-    # Disabled fail-closed: this optimization may not bypass review until a stronger proof exists.
     return False
 
 
 def lifecycle_metadata_only(*args, **kwargs) -> bool:
-    # Disabled fail-closed: this optimization may not bypass review until a stronger proof exists.
     return False
 
 
 def immutable_action_pin_only(*args, **kwargs) -> bool:
-    # Disabled fail-closed: this optimization may not bypass review until a stronger proof exists.
     return False
 
 
 def executable_or_config_path(path: str, policy: dict) -> bool:
-    p=PurePosixPath(path); name=p.name.casefold(); suffix=p.suffix.casefold()
-    return suffix in set(policy.get("r1_code_extensions",[])) or suffix in set(policy.get("r1_config_extensions",[])) or name in {x.casefold() for x in policy.get("r1_executable_filenames",[])}
+    p = PurePosixPath(path)
+    name = p.name.casefold()
+    suffix = p.suffix.casefold()
+    return (
+        suffix in set(policy.get("r1_code_extensions", []))
+        or suffix in set(policy.get("r1_config_extensions", []))
+        or name in {x.casefold() for x in policy.get("r1_executable_filenames", [])}
+    )
 
 
 def safe_r0_path(path: str, patterns: list[str], policy: dict) -> bool:
@@ -113,9 +116,6 @@ def safe_r0_path(path: str, patterns: list[str], policy: dict) -> bool:
 
 
 def git_metadata_risk(patch: str) -> bool:
-    # Executable, symlink and gitlink/submodule modes must never be review-neutral safe data.
-    # A content-only update to an already-risky path does not emit old/new-mode headers;
-    # ordinary Git diffs instead encode the unchanged mode on the `index` line. Inspect both.
     risky_modes = {"100755", "120000", "160000"}
     for line in patch.splitlines():
         if line.startswith(("old mode ", "new mode ", "new file mode ", "deleted file mode ")):
@@ -170,9 +170,9 @@ def classify(paths: list[str], patch: str, policy: dict) -> tuple[str, list[str]
     return "R0", ["non_sensitive_prose_change"]
 
 
-def blob_at(repo_root: str | Path, revision: str, path: str) -> str:
+def tree_entry_at(repo_root: str | Path, revision: str, path: str) -> str:
     result = subprocess.run(
-        ["git", "rev-parse", f"{revision}:{path}"],
+        ["git", "ls-tree", revision, "--", path],
         cwd=Path(repo_root),
         text=True,
         encoding="utf-8",
@@ -180,7 +180,17 @@ def blob_at(repo_root: str | Path, revision: str, path: str) -> str:
         stderr=subprocess.DEVNULL,
         check=False,
     )
-    return result.stdout.strip() if result.returncode == 0 else "ABSENT"
+    if result.returncode != 0 or not result.stdout.strip():
+        return "ABSENT"
+    line = result.stdout.rstrip("\n").splitlines()
+    if len(line) != 1:
+        raise RuntimeError(f"unexpected git ls-tree result for {path!r}")
+    metadata, _, returned_path = line[0].partition("\t")
+    fields = metadata.split()
+    if returned_path != path or len(fields) != 3:
+        raise RuntimeError(f"malformed git ls-tree result for {path!r}")
+    mode, object_type, object_id = fields
+    return f"{mode}:{object_type}:{object_id}"
 
 
 def fingerprint(repo_root: str | Path, base: str, head: str, paths: list[str], policy: dict) -> tuple[str, list[str], list[str]]:
@@ -188,14 +198,12 @@ def fingerprint(repo_root: str | Path, base: str, head: str, paths: list[str], p
     for path in paths:
         if not safe_r0_path(path, policy["review_neutral_globs"], policy):
             continue
-        # Path-only extension checks are insufficient for Git type/mode changes. Bind
-        # executable, symlink and gitlink metadata/content changes into the reviewed fingerprint.
         if git_metadata_risk(patch_for(repo_root, base, head, [path])):
             continue
         neutral.append(path)
     bearing = [p for p in paths if p not in neutral]
     payload = {
-        "base_context_blobs": {path: blob_at(repo_root, base, path) for path in sorted(bearing)},
+        "base_context_tree_entries": {path: tree_entry_at(repo_root, base, path) for path in sorted(bearing)},
         "bearing_paths": sorted(bearing),
         "patch": patch_for(repo_root, base, head, sorted(bearing)) if bearing else "",
     }
