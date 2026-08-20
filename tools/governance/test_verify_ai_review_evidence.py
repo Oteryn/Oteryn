@@ -136,6 +136,24 @@ def test_legacy_pass_cannot_bypass_current_p1_top_level_finding() -> None:
     ))
 
 
+def test_legacy_pass_cannot_bypass_p1_after_lower_tier_request() -> None:
+    repo, reviewed, final = make_repo()
+    legacy = attestation(reviewed, "abc")
+    request = issue_comment(
+        10,
+        request_body(reviewed, tier="R1", klass="fast", reviewer="codex_spark"),
+        stamp="2026-08-20T10:00:00Z",
+    )
+    blocker = issue_comment(
+        11, "[P1] Security boundary bypass",
+        login="chatgpt-codex-connector[bot]", association="NONE",
+        stamp="2026-08-20T10:01:00Z",
+    )
+    expect_fail(lambda: run_verify(
+        legacy, source(reviewed, "abc"), repo, final, comments=[legacy, request, blocker],
+    ))
+
+
 def test_legacy_pass_cannot_bypass_p1_after_edited_request() -> None:
     repo, reviewed, final = make_repo()
     legacy = attestation(reviewed, "abc")

@@ -319,10 +319,8 @@ def _blocking_findings_for_current_generation(
     *, comments: list[dict], reviews: list[dict], review_comments: list[dict], policy: dict,
     repo_root: str | Path, tier: str, head: str, repository: str, pr_number: int
 ) -> bool:
-    required_class = policy["review_tiers"][tier]["reviewer_class"]
-    allowed_classes = {required_class} if required_class == "deep" else {"fast", "deep"}
     reviewer_ids: set[str] = set()
-    for reviewer_class in allowed_classes:
+    for reviewer_class in ("fast", "deep"):
         reviewer_ids.update(policy.get("reviewer_preferences", {}).get(reviewer_class, []))
     trusted_logins: set[str] = set()
     for reviewer_id in reviewer_ids:
@@ -342,7 +340,7 @@ def _blocking_findings_for_current_generation(
             eligible_requests.append((request_comment, trusted_logins))
             continue
         parsed = parse_request(str(request_comment.get("body") or ""))
-        if parsed is None or parsed["REVIEWER_CLASS"] not in allowed_classes:
+        if parsed is None:
             continue
         if not reviewer_allowed(policy, parsed["REVIEWER_CLASS"], parsed["REVIEWER_ID"]):
             continue
