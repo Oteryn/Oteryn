@@ -609,6 +609,16 @@ def verify_records(
             raise RuntimeError("trusted PR comment edit metadata is missing")
         if updated_at != created_at:
             raise RuntimeError("edited trusted PR comments invalidate external review evidence")
+    for comment in review_comments or []:
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if login not in trusted_reviewer_logins:
+            continue
+        created_at = str(comment.get("created_at") or "")
+        updated_at = str(comment.get("updated_at") or "")
+        if not created_at or not updated_at:
+            raise RuntimeError("trusted inline review comment edit metadata is missing")
+        if updated_at != created_at:
+            raise RuntimeError("edited trusted inline review comments invalidate external review evidence")
     if _blocking_findings_for_current_generation(
         comments=comments,
         reviews=reviews or [],
