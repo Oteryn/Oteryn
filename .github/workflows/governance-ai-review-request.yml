@@ -5,6 +5,7 @@ on:
     types: [created]
 
 permissions:
+  actions: read
   contents: read
   issues: read
   pull-requests: write
@@ -17,7 +18,8 @@ jobs:
   record-review-request:
     if: >-
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '@codex review')
+      contains(github.event.comment.body, '@codex review') &&
+      contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-latest
     steps:
       - name: Record immutable request anchor
@@ -76,13 +78,35 @@ jobs:
               with urllib.request.urlopen(request, timeout=30) as response:
                   return json.load(response)
 
-          pr = api(f"https://api.github.com/repos/{repository}/pulls/{pr_number}")
-          dispatch_head = str((pr.get("head") or {}).get("sha") or "")
-          base_sha = str((pr.get("base") or {}).get("sha") or "")
+          candidates = []
+          page = 1
+          while True:
+              response = api(
+                  f"https://api.github.com/repos/{repository}/actions/runs"
+                  f"?event=pull_request&per_page=100&page={page}"
+              )
+              batch = response.get("workflow_runs") if isinstance(response, dict) else None
+              if not isinstance(batch, list):
+                  raise SystemExit("workflow-run list response is malformed")
+              for run in batch:
+                  linked_prs = run.get("pull_requests") or []
+                  if (
+                      str(run.get("created_at") or "") <= os.environ["COMMENT_CREATED_AT"]
+                      and any(int(item.get("number") or 0) == pr_number for item in linked_prs)
+                  ):
+                      candidates.append(run)
+              if len(batch) < 100:
+                  break
+              page += 1
+          if not candidates:
+              raise SystemExit("no immutable pull-request run predates the review request")
+          generation_run = max(
+              candidates,
+              key=lambda item: (str(item.get("created_at") or ""), int(item.get("id") or 0)),
+          )
+          dispatch_head = str(generation_run.get("head_sha") or "")
           if not re.fullmatch(r"[0-9a-f]{40}", dispatch_head):
-              raise SystemExit("live PR head is missing or malformed")
-          if not re.fullmatch(r"[0-9a-f]{40}", base_sha):
-              raise SystemExit("live PR base is missing or malformed")
+              raise SystemExit("request-generation head is missing or malformed")
 
           fields = {}
           duplicate = False
@@ -94,6 +118,17 @@ jobs:
               if key in fields:
                   duplicate = True
               fields[key] = match.group(2)
+          requested_head = fields.get("REVIEWED_HEAD", "")
+          if not duplicate and re.fullmatch(r"[0-9a-f]{40}", requested_head):
+              matching_runs = [run for run in candidates if run.get("head_sha") == requested_head]
+              if matching_runs:
+                  generation_run = max(
+                      matching_runs,
+                      key=lambda item: (
+                          str(item.get("created_at") or ""), int(item.get("id") or 0)
+                      ),
+                  )
+                  dispatch_head = requested_head
           exact_command = request_command_count == 1
           valid = (
               body.count(marker) == 1
@@ -118,7 +153,7 @@ jobs:
               f"REQUEST_BODY_SHA256: {hashlib.sha256(body.encode('utf-8')).hexdigest()}",
               f"REQUEST_VALID: {'true' if valid else 'false'}",
               f"DISPATCH_HEAD: {dispatch_head}",
-              f"BASE_SHA: {base_sha}",
+              f"GENERATION_RUN_ID: {generation_run['id']}",
           ]
           if valid:
               lines.extend(f"{key}: {fields[key]}" for key in sorted(required))

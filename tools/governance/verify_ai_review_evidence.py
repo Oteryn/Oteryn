@@ -38,7 +38,7 @@ REQUEST_ANCHOR_FIELDS = {
     "REQUEST_BODY_SHA256",
     "REQUEST_VALID",
     "DISPATCH_HEAD",
-    "BASE_SHA",
+    "GENERATION_RUN_ID",
 }
 CLEAN_RESULT_RE = re.compile(
     r"^Codex Review: Didn't find any major issues\."
@@ -120,7 +120,9 @@ def parse_request_anchor(body: str) -> dict[str, str] | None:
         return None
     if not SHA256.fullmatch(fields["REQUEST_BODY_SHA256"]):
         return None
-    if not FULL_SHA.fullmatch(fields["DISPATCH_HEAD"]) or not FULL_SHA.fullmatch(fields["BASE_SHA"]):
+    if not FULL_SHA.fullmatch(fields["DISPATCH_HEAD"]):
+        return None
+    if not fields["GENERATION_RUN_ID"].isdigit():
         return None
     if valid == "true" and parse_request("\n".join([
         "@codex review", REQUEST_MARKER,
@@ -770,7 +772,7 @@ def verify_records(
             raise RuntimeError("trusted inline review comment edit metadata is missing")
         if updated_at != created_at:
             raise RuntimeError("edited trusted inline review comments invalidate external review evidence")
-    _validate_anchor_generation(
+    request_anchors = _validate_anchor_generation(
         reviews=reviews or [],
         policy=policy,
         repo_root=repo_root,
@@ -806,6 +808,11 @@ def verify_records(
         )
     except RuntimeError as exc:
         errors.append(str(exc))
+    if request_anchors:
+        raise RuntimeError(
+            "an immutable issue-comment review generation exists and cannot fall back to legacy evidence: "
+            + "; ".join(errors)
+        )
     try:
         return _verify_legacy_records(
             comments,

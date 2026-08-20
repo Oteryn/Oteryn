@@ -342,7 +342,7 @@ def request_anchor(comment: dict, dispatch_head: str, *, valid: bool | None = No
         f"REQUEST_BODY_SHA256: {hashlib.sha256(str(comment.get('body') or '').encode('utf-8')).hexdigest()}",
         f"REQUEST_VALID: {'true' if is_valid else 'false'}",
         f"DISPATCH_HEAD: {dispatch_head}",
-        f"BASE_SHA: {'a' * 40}",
+        "GENERATION_RUN_ID: 12345",
     ]
     if is_valid:
         assert parsed is not None
@@ -569,7 +569,7 @@ def test_deleted_competing_request_anchor_makes_generation_ambiguous() -> None:
     ))
 
 
-def test_deleted_request_anchor_retains_top_level_p1_across_legacy_fallback() -> None:
+def test_anchored_generation_cannot_fall_back_after_result_or_finding_deletion() -> None:
     repo, _, final = make_repo()
     legacy = attestation(final, ISSUE_FP)
     deleted_request = issue_comment(
@@ -577,19 +577,12 @@ def test_deleted_request_anchor_retains_top_level_p1_across_legacy_fallback() ->
         request_body(final, ISSUE_FP),
         stamp="2026-08-20T10:00:00Z",
     )
-    blocker = issue_comment(
-        11,
-        "[P1] Security boundary bypass",
-        login="chatgpt-codex-connector[bot]",
-        association="NONE",
-        stamp="2026-08-20T10:01:00Z",
-    )
     expect_fail(lambda: run_verify(
         legacy,
         source(final, ISSUE_FP),
         repo,
         final,
-        comments=[legacy, blocker],
+        comments=[legacy],
         reviews=[request_anchor(deleted_request, final)],
         fp=ISSUE_FP,
     ))
