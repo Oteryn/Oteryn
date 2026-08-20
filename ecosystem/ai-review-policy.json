@@ -219,12 +219,17 @@
   },
   "reviewer_source_kinds": {
     "codex": [
-      "pull_request_review"
+      "pull_request_review",
+      "issue_comment_result"
     ],
     "codex_spark": [
-      "pull_request_review"
+      "pull_request_review",
+      "issue_comment_result"
     ]
   },
+  "review_request_anchor_logins": [
+    "github-actions[bot]"
+  ],
   "r0_safe_data_extensions": [
     ".md",
     ".txt",
