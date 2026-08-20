@@ -3,7 +3,29 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from test_verify_ai_review_evidence_core import *
+import test_verify_ai_review_evidence_core as core_tests
+
+
+class _VerifierTestProxy:
+    """Keep legacy test monkeypatches synchronized with the preserved core."""
+
+    def __init__(self, module) -> None:
+        object.__setattr__(self, "_module", module)
+
+    def __getattr__(self, name: str):
+        return getattr(object.__getattribute__(self, "_module"), name)
+
+    def __setattr__(self, name: str, value) -> None:
+        module = object.__getattribute__(self, "_module")
+        setattr(module, name, value)
+        core = getattr(module, "_core", None)
+        if core is not None and hasattr(core, name):
+            setattr(core, name, value)
+
+
+m = _VerifierTestProxy(core_tests.m)
+core_tests.m = m
+POLICY = core_tests.POLICY
 
 
 def _iso(stamp) -> str:
@@ -16,34 +38,34 @@ def _verify_with_only_current_anchor(comments, repo, final, current_request):
         policy=POLICY,
         repo_root=repo,
         tier="R2",
-        fingerprint=ISSUE_FP,
+        fingerprint=core_tests.ISSUE_FP,
         head=final,
         repository="Oteryn/Test",
         pr_number=7,
         token="x",
-        reviews=[request_anchor(current_request, final)],
+        reviews=[core_tests.request_anchor(current_request, final)],
         review_comments=[],
     )
 
 
 def test_pre_registry_unstructured_request_does_not_poison_post_rollout_head() -> None:
-    repo, rollout, final = make_repo()
+    repo, rollout, final = core_tests.make_repo()
     original_rollout = m.REQUEST_ANCHOR_ROLLOUT_COMMIT
     m.REQUEST_ANCHOR_ROLLOUT_COMMIT = rollout
     try:
         cutoff = m._request_anchor_rollout_time(repo)
         assert cutoff is not None
-        historical = issue_comment(
+        historical = core_tests.issue_comment(
             9,
             "@codex review\n\nlegacy request created before immutable anchors existed",
             stamp=_iso(cutoff - timedelta(seconds=2)),
         )
-        current = issue_comment(
+        current = core_tests.issue_comment(
             10,
-            request_body(final),
+            core_tests.request_body(final),
             stamp=_iso(cutoff + timedelta(seconds=1)),
         )
-        result = codex_result(
+        result = core_tests.codex_result(
             11,
             final[:10],
             stamp=_iso(cutoff + timedelta(seconds=2)),
@@ -56,28 +78,28 @@ def test_pre_registry_unstructured_request_does_not_poison_post_rollout_head() -
 
 
 def test_post_registry_unanchored_malformed_request_remains_ambiguous() -> None:
-    repo, rollout, final = make_repo()
+    repo, rollout, final = core_tests.make_repo()
     original_rollout = m.REQUEST_ANCHOR_ROLLOUT_COMMIT
     m.REQUEST_ANCHOR_ROLLOUT_COMMIT = rollout
     try:
         cutoff = m._request_anchor_rollout_time(repo)
         assert cutoff is not None
-        malformed = issue_comment(
+        malformed = core_tests.issue_comment(
             9,
             "@codex review\n\nmalformed request after registry rollout",
             stamp=_iso(cutoff + timedelta(seconds=1)),
         )
-        current = issue_comment(
+        current = core_tests.issue_comment(
             10,
-            request_body(final),
+            core_tests.request_body(final),
             stamp=_iso(cutoff + timedelta(seconds=2)),
         )
-        result = codex_result(
+        result = core_tests.codex_result(
             11,
             final[:10],
             stamp=_iso(cutoff + timedelta(seconds=3)),
         )
-        expect_fail(lambda: _verify_with_only_current_anchor(
+        core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
             [malformed, current, result], repo, final, current
         ))
     finally:
@@ -85,7 +107,15 @@ def test_post_registry_unanchored_malformed_request_remains_ambiguous() -> None:
 
 
 def main() -> int:
-    tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
+    inherited = [
+        value for name, value in sorted(vars(core_tests).items())
+        if name.startswith("test_") and callable(value)
+    ]
+    local = [
+        value for name, value in sorted(globals().items())
+        if name.startswith("test_") and callable(value)
+    ]
+    tests = inherited + local
     for test in tests:
         test()
         print("PASS", test.__name__)

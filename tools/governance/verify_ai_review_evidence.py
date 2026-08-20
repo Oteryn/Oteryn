@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import importlib.util
 import subprocess
-import sys
-import types
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -111,19 +109,6 @@ for _name in dir(_core):
 globals()["REQUEST_ANCHOR_ROLLOUT_COMMIT"] = REQUEST_ANCHOR_ROLLOUT_COMMIT
 globals()["_request_anchor_rollout_time"] = _request_anchor_rollout_time
 globals()["_filter_pre_rollout_unstructured_requests"] = _filter_pre_rollout_unstructured_requests
-
-
-class _VerifierProxyModule(types.ModuleType):
-    """Propagate caller/test monkeypatches to the preserved verifier core."""
-
-    def __setattr__(self, name: str, value) -> None:
-        super().__setattr__(name, value)
-        core = self.__dict__.get("_core")
-        if core is not None and hasattr(core, name):
-            setattr(core, name, value)
-
-
-sys.modules[__name__].__class__ = _VerifierProxyModule
 
 
 if __name__ == "__main__":
