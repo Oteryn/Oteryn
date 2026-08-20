@@ -219,10 +219,12 @@
   },
   "reviewer_source_kinds": {
     "codex": [
-      "pull_request_review"
+      "pull_request_review",
+      "issue_comment_result"
     ],
     "codex_spark": [
-      "pull_request_review"
+      "pull_request_review",
+      "issue_comment_result"
     ]
   },
   "r0_safe_data_extensions": [

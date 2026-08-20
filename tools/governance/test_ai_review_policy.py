@@ -362,9 +362,11 @@ def test_trusted_base_workflow_never_executes_candidate_code() -> None:
     assert "requires trusted pull_request_target context" in action
 
 
-def test_external_source_kind_is_server_bound_pr_review_only() -> None:
+def test_external_source_kinds_are_server_bound_review_or_codex_result() -> None:
     for reviewer in ("codex", "codex_spark"):
-        assert policy["reviewer_source_kinds"][reviewer] == ["pull_request_review"]
+        assert policy["reviewer_source_kinds"][reviewer] == [
+            "pull_request_review", "issue_comment_result"
+        ]
 
 
 def test_leading_double_star_patterns_also_cover_repository_root() -> None:

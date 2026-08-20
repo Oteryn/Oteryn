@@ -6,17 +6,34 @@ import json
 import re
 import subprocess
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 import ai_review_policy as risk_policy
 
 MARKER = "<!-- OTERYN_AI_REVIEW_V1 -->"
+REQUEST_MARKER = "<!-- OTERYN_AI_REVIEW_REQUEST_V1 -->"
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+SHORT_SHA = re.compile(r"^[0-9a-f]{7,40}$")
 FIELD_RE = re.compile(r"^([A-Z0-9_]+):\s*(.+?)\s*$")
 TRUSTED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 SOURCE_URL_RE = re.compile(
     r"^https://github\.com/([^/]+/[^/]+)/pull/([1-9][0-9]*)#pullrequestreview-([1-9][0-9]*)$"
 )
+REQUEST_FIELDS = {
+    "REVIEW_TIER",
+    "REVIEW_FINGERPRINT",
+    "REVIEWED_HEAD",
+    "REVIEWER_CLASS",
+    "REVIEWER_ID",
+}
+CLEAN_RESULT_RE = re.compile(
+    r"^Codex Review: Didn't find any major issues\."
+    r"(?: What shall we delve into next\?)?\s*\n+"
+    r"\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`\s*$"
+)
+BLOCKING_FINDING_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?(P0|P1)\b")
 
 
 def parse_record(body: str) -> dict[str, str] | None:
@@ -34,6 +51,74 @@ def parse_record(body: str) -> dict[str, str] | None:
     return fields
 
 
+def parse_request(body: str) -> dict[str, str] | None:
+    if body.count(REQUEST_MARKER) != 1:
+        return None
+    if sum(1 for line in body.splitlines() if line.strip() == "@codex review") != 1:
+        return None
+    fields: dict[str, str] = {}
+    for line in body.splitlines():
+        match = FIELD_RE.match(line.strip())
+        if not match:
+            continue
+        key = match.group(1)
+        if key in fields:
+            return None
+        fields[key] = match.group(2)
+    if set(fields) != REQUEST_FIELDS:
+        return None
+    if fields["REVIEW_TIER"] not in {"R1", "R2"}:
+        return None
+    if not SHA256.fullmatch(fields["REVIEW_FINGERPRINT"]):
+        return None
+    if not FULL_SHA.fullmatch(fields["REVIEWED_HEAD"]):
+        return None
+    if fields["REVIEWER_CLASS"] not in {"fast", "deep"}:
+        return None
+    if not re.fullmatch(r"[a-z0-9_]+", fields["REVIEWER_ID"]):
+        return None
+    return fields
+
+
+def parse_clean_result(body: str) -> str | None:
+    match = CLEAN_RESULT_RE.fullmatch((body or "").strip())
+    return match.group(1) if match else None
+
+
+def _created_at(value: dict) -> tuple[datetime, int]:
+    raw = str(value.get("created_at") or "")
+    try:
+        stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        stamp = datetime.min.replace(tzinfo=timezone.utc)
+    try:
+        object_id = int(value.get("id") or 0)
+    except (TypeError, ValueError):
+        object_id = 0
+    return stamp, object_id
+
+
+def _is_request_like(comment: dict) -> bool:
+    if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
+        return False
+    return any(line.strip() == "@codex review" for line in str(comment.get("body") or "").splitlines())
+
+
+def _is_result_like(comment: dict) -> bool:
+    body = str(comment.get("body") or "")
+    return body.lstrip().startswith("Codex Review:") or "**Reviewed commit:**" in body
+
+
+def _issue_comment_identity(comment: dict, repository: str, pr_number: int) -> bool:
+    expected_issue = f"https://api.github.com/repos/{repository}/issues/{pr_number}"
+    expected_html = f"https://github.com/{repository}/pull/{pr_number}#issuecomment-"
+    return (
+        comment.get("issue_url") == expected_issue
+        and str(comment.get("html_url") or "").startswith(expected_html)
+        and str(comment.get("html_url") or "")[len(expected_html):].isdigit()
+    )
+
+
 def is_ancestor(repo_root: str | Path, older: str, newer: str) -> bool:
     if not FULL_SHA.fullmatch(older) or not FULL_SHA.fullmatch(newer):
         return False
@@ -45,6 +130,26 @@ def is_ancestor(repo_root: str | Path, older: str, newer: str) -> bool:
         check=False,
     )
     return result.returncode == 0
+
+
+def resolve_reviewed_prefix(repo_root: str | Path, prefix: str) -> str | None:
+    if not SHORT_SHA.fullmatch(prefix):
+        return None
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", f"{prefix}^{{commit}}"],
+        cwd=Path(repo_root),
+        text=True,
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    resolved = result.stdout.strip()
+    if not FULL_SHA.fullmatch(resolved) or not resolved.startswith(prefix):
+        return None
+    return resolved
 
 
 def reviewer_allowed(policy: dict, reviewer_class: str, reviewer_id: str) -> bool:
@@ -107,6 +212,30 @@ def fetch_json(url: str, token: str) -> dict:
     return value
 
 
+def _fetch_paginated(url: str, token: str) -> list[dict]:
+    values: list[dict] = []
+    page = 1
+    while True:
+        separator = "&" if "?" in url else "?"
+        request = urllib.request.Request(
+            f"{url}{separator}per_page=100&page={page}",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {token}",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "oteryn-ai-review-gate",
+            },
+        )
+        with urllib.request.urlopen(request, timeout=30) as response:
+            batch = json.load(response)
+        if not isinstance(batch, list) or any(not isinstance(item, dict) for item in batch):
+            raise RuntimeError("GitHub list response is malformed")
+        values.extend(batch)
+        if len(batch) < 100:
+            return values
+        page += 1
+
+
 def fetch_review_source(
     repository: str, pr_number: int, source_url: str, token: str
 ) -> tuple[str, dict]:
@@ -119,7 +248,8 @@ def fetch_review_source(
     )
     if obj.get("html_url") != source_url:
         raise RuntimeError("pull-request-review source identity mismatch")
-    if not str(obj.get("pull_request_url", "")).endswith(f"/pulls/{pr_number}"):
+    expected_pr = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
+    if obj.get("pull_request_url") != expected_pr:
         raise RuntimeError("pull-request-review PR identity mismatch")
     return "pull_request_review", obj
 
@@ -142,7 +272,146 @@ def source_attests(
     )
 
 
-def verify_records(
+def _trusted_logins(policy: dict, reviewer_id: str) -> set[str]:
+    return {
+        value.casefold()
+        for value in policy.get("reviewer_source_logins", {}).get(reviewer_id, [])
+    }
+
+
+def _blocking_findings_exist(
+    *, reviews: list[dict], review_comments: list[dict], repository: str,
+    pr_number: int, reviewed_head: str, trusted_logins: set[str]
+) -> bool:
+    pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
+    matching_reviews: set[int] = set()
+    for review in reviews:
+        login = str((review.get("user") or {}).get("login", "")).casefold()
+        if (
+            login in trusted_logins
+            and review.get("commit_id") == reviewed_head
+            and review.get("pull_request_url") == pull_url
+        ):
+            try:
+                matching_reviews.add(int(review.get("id")))
+            except (TypeError, ValueError):
+                return True
+            if BLOCKING_FINDING_RE.search(str(review.get("body") or "")):
+                return True
+    for comment in review_comments:
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if login not in trusted_logins or comment.get("pull_request_url") != pull_url:
+            continue
+        try:
+            review_id = int(comment.get("pull_request_review_id"))
+        except (TypeError, ValueError):
+            continue
+        if review_id in matching_reviews and BLOCKING_FINDING_RE.search(str(comment.get("body") or "")):
+            return True
+    return False
+
+
+def _verify_issue_comment_result(
+    comments: list[dict], *, reviews: list[dict], review_comments: list[dict],
+    policy: dict, repo_root: str | Path, tier: str, fingerprint: str, head: str,
+    repository: str, pr_number: int
+) -> dict:
+    required_class = policy["review_tiers"][tier]["reviewer_class"]
+    request_like = sorted((c for c in comments if _is_request_like(c)), key=_created_at)
+    if not request_like:
+        raise RuntimeError("no Codex review request is present")
+
+    latest_request_comment = request_like[-1]
+    if not _issue_comment_identity(latest_request_comment, repository, pr_number):
+        raise RuntimeError("latest Codex request does not belong to this repository and PR")
+    request = parse_request(str(latest_request_comment.get("body") or ""))
+    if request is None:
+        raise RuntimeError("latest Codex request is not one exact structured request")
+
+    matching_requests: list[tuple[dict, dict[str, str]]] = []
+    for comment in request_like:
+        if not _issue_comment_identity(comment, repository, pr_number):
+            continue
+        parsed = parse_request(str(comment.get("body") or ""))
+        if parsed is None:
+            continue
+        request_class = parsed["REVIEWER_CLASS"]
+        allowed_classes = {required_class} if required_class == "deep" else {"fast", "deep"}
+        if (
+            parsed["REVIEW_TIER"] == tier
+            and parsed["REVIEW_FINGERPRINT"] == fingerprint
+            and request_class in allowed_classes
+            and reviewer_allowed(policy, request_class, parsed["REVIEWER_ID"])
+            and is_ancestor(repo_root, parsed["REVIEWED_HEAD"], head)
+            and post_review_commits_are_neutral(repo_root, parsed["REVIEWED_HEAD"], head, policy)
+        ):
+            matching_requests.append((comment, parsed))
+    if len(matching_requests) != 1:
+        raise RuntimeError("Codex request/result generation is missing or ambiguous")
+    request_comment, request = matching_requests[0]
+    if request_comment.get("id") != latest_request_comment.get("id"):
+        raise RuntimeError("a newer Codex request supersedes the matching generation")
+
+    reviewer_id = request["REVIEWER_ID"]
+    request_class = request["REVIEWER_CLASS"]
+    reviewed_head = request["REVIEWED_HEAD"]
+    trusted_logins = _trusted_logins(policy, reviewer_id)
+    if not trusted_logins:
+        raise RuntimeError("reviewer has no configured trusted source login")
+    if "issue_comment_result" not in policy.get("reviewer_source_kinds", {}).get(reviewer_id, []):
+        raise RuntimeError("issue-comment result source is not enabled for reviewer")
+    if any(
+        _created_at(comment) > _created_at(request_comment)
+        and str((comment.get("user") or {}).get("login", "")).casefold() in trusted_logins
+        and BLOCKING_FINDING_RE.search(str(comment.get("body") or ""))
+        for comment in comments
+    ):
+        raise RuntimeError("P0/P1 Codex finding exists in the issue-comment generation")
+
+    result_like = [
+        comment for comment in comments
+        if _created_at(comment) > _created_at(request_comment) and _is_result_like(comment)
+    ]
+    trusted_results = [
+        comment for comment in result_like
+        if str((comment.get("user") or {}).get("login", "")).casefold() in trusted_logins
+    ]
+    if len(trusted_results) != 1:
+        raise RuntimeError("trusted Codex result is missing or ambiguous")
+    result = trusted_results[0]
+    if not _issue_comment_identity(result, repository, pr_number):
+        raise RuntimeError("Codex result does not belong to this repository and PR")
+    if _created_at(result) <= _created_at(request_comment):
+        raise RuntimeError("Codex result does not follow its request")
+    prefix = parse_clean_result(str(result.get("body") or ""))
+    if prefix is None:
+        raise RuntimeError("Codex result is not the accepted clean-result shape")
+    resolved = resolve_reviewed_prefix(repo_root, prefix)
+    if resolved is None or resolved != reviewed_head:
+        raise RuntimeError("Codex reviewed-commit prefix does not uniquely match the requested head")
+    if _blocking_findings_exist(
+        reviews=reviews,
+        review_comments=review_comments,
+        repository=repository,
+        pr_number=pr_number,
+        reviewed_head=reviewed_head,
+        trusted_logins=trusted_logins,
+    ):
+        raise RuntimeError("P0/P1 Codex finding exists for the reviewed generation")
+
+    return {
+        "review_request_id": request_comment.get("id"),
+        "review_request_url": request_comment.get("html_url"),
+        "reviewed_head": reviewed_head,
+        "reviewer_id": reviewer_id,
+        "review_source_url": result.get("html_url"),
+        "review_source_author": str((result.get("user") or {}).get("login", "")).casefold(),
+        "review_source_kind": "issue_comment_result",
+        "review_source_commit_id": resolved,
+    }
+
+
+def _verify_legacy_records(
     comments: list[dict], *, policy: dict, repo_root: str | Path, tier: str,
     fingerprint: str, head: str, repository: str, pr_number: int, token: str
 ) -> dict:
@@ -174,10 +443,7 @@ def verify_records(
             continue
         source_login = str((source.get("user") or {}).get("login", "")).casefold()
         attestor_login = str((comment.get("user") or {}).get("login", "")).casefold()
-        trusted = {
-            value.casefold()
-            for value in policy.get("reviewer_source_logins", {}).get(reviewer_id, [])
-        }
+        trusted = _trusted_logins(policy, reviewer_id)
         if not source_login or source_login == attestor_login or source_login not in trusted:
             continue
         if source_kind not in policy.get("reviewer_source_kinds", {}).get(reviewer_id, []):
@@ -204,32 +470,68 @@ def verify_records(
             "review_source_kind": source_kind,
             "review_source_commit_id": source.get("commit_id"),
         }
+    raise RuntimeError("no authenticated legacy external PASS review matches")
+
+
+def verify_records(
+    comments: list[dict], *, policy: dict, repo_root: str | Path, tier: str,
+    fingerprint: str, head: str, repository: str, pr_number: int, token: str,
+    reviews: list[dict] | None = None, review_comments: list[dict] | None = None
+) -> dict:
+    if tier not in {"R1", "R2"} or not FULL_SHA.fullmatch(head):
+        raise RuntimeError("invalid gate identity")
+    errors: list[str] = []
+    try:
+        return _verify_issue_comment_result(
+            comments,
+            reviews=reviews or [],
+            review_comments=review_comments or [],
+            policy=policy,
+            repo_root=repo_root,
+            tier=tier,
+            fingerprint=fingerprint,
+            head=head,
+            repository=repository,
+            pr_number=pr_number,
+        )
+    except RuntimeError as exc:
+        errors.append(str(exc))
+    try:
+        return _verify_legacy_records(
+            comments,
+            policy=policy,
+            repo_root=repo_root,
+            tier=tier,
+            fingerprint=fingerprint,
+            head=head,
+            repository=repository,
+            pr_number=pr_number,
+            token=token,
+        )
+    except RuntimeError as exc:
+        errors.append(str(exc))
     raise RuntimeError(
-        "no authenticated external PASS review matches tier/fingerprint/head and neutral post-review history"
+        "no authenticated external PASS review matches tier/fingerprint/head and neutral post-review history: "
+        + "; ".join(errors)
     )
 
 
 def fetch_comments(repository: str, pr_number: int, token: str) -> list[dict]:
-    comments: list[dict] = []
-    page = 1
-    while True:
-        url = f"https://api.github.com/repos/{repository}/issues/{pr_number}/comments?per_page=100&page={page}"
-        request = urllib.request.Request(
-            url,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {token}",
-                "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "oteryn-ai-review-gate",
-            },
-        )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            batch = json.load(response)
-        comments.extend(batch)
-        if len(batch) < 100:
-            break
-        page += 1
-    return comments
+    return _fetch_paginated(
+        f"https://api.github.com/repos/{repository}/issues/{pr_number}/comments", token
+    )
+
+
+def fetch_reviews(repository: str, pr_number: int, token: str) -> list[dict]:
+    return _fetch_paginated(
+        f"https://api.github.com/repos/{repository}/pulls/{pr_number}/reviews", token
+    )
+
+
+def fetch_review_comments(repository: str, pr_number: int, token: str) -> list[dict]:
+    return _fetch_paginated(
+        f"https://api.github.com/repos/{repository}/pulls/{pr_number}/comments", token
+    )
 
 
 def main() -> int:
@@ -254,6 +556,8 @@ def main() -> int:
         repository=args.repository,
         pr_number=args.pr_number,
         token=args.token,
+        reviews=fetch_reviews(args.repository, args.pr_number, args.token),
+        review_comments=fetch_review_comments(args.repository, args.pr_number, args.token),
     )
     print(json.dumps(match, sort_keys=True))
     return 0
