@@ -114,10 +114,16 @@ def safe_r0_path(path: str, patterns: list[str], policy: dict) -> bool:
 
 def git_metadata_risk(patch: str) -> bool:
     # Executable, symlink and gitlink/submodule modes must never be review-neutral safe data.
-    risky_modes = ("100755", "120000", "160000")
+    # A content-only update to an already-risky path does not emit old/new-mode headers;
+    # ordinary Git diffs instead encode the unchanged mode on the `index` line. Inspect both.
+    risky_modes = {"100755", "120000", "160000"}
     for line in patch.splitlines():
         if line.startswith(("old mode ", "new mode ", "new file mode ", "deleted file mode ")):
             if any(mode in line for mode in risky_modes):
+                return True
+        if line.startswith("index "):
+            fields = line.split()
+            if len(fields) >= 3 and fields[-1] in risky_modes:
                 return True
     return False
 
@@ -183,7 +189,7 @@ def fingerprint(repo_root: str | Path, base: str, head: str, paths: list[str], p
         if not safe_r0_path(path, policy["review_neutral_globs"], policy):
             continue
         # Path-only extension checks are insufficient for Git type/mode changes. Bind
-        # executable, symlink and gitlink metadata changes into the reviewed fingerprint.
+        # executable, symlink and gitlink metadata/content changes into the reviewed fingerprint.
         if git_metadata_risk(patch_for(repo_root, base, head, [path])):
             continue
         neutral.append(path)
