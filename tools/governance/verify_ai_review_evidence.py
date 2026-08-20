@@ -332,14 +332,14 @@ def _blocking_findings_for_current_generation(
 
     eligible_requests: list[tuple[dict, set[str]]] = []
     for request_comment in comments:
-        if request_comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
+        if not _is_request_like(request_comment):
             continue
         if not _issue_comment_identity(request_comment, repository, pr_number):
             continue
-        if (
-            not request_comment.get("created_at")
-            or request_comment.get("updated_at") != request_comment.get("created_at")
-        ):
+        if not request_comment.get("created_at"):
+            continue
+        if request_comment.get("updated_at") != request_comment.get("created_at"):
+            eligible_requests.append((request_comment, trusted_logins))
             continue
         parsed = parse_request(str(request_comment.get("body") or ""))
         if parsed is None or parsed["REVIEWER_CLASS"] not in allowed_classes:
