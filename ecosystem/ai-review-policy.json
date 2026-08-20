@@ -52,6 +52,7 @@
     "SECURITY.md",
     ".github/CODEOWNERS",
     ".github/workflows/**",
+    "docs/ci/CI_CONTRACT.md",
     "docs/architecture/adr/**",
     "docs/contracts/**",
     "docs/operations/**",
