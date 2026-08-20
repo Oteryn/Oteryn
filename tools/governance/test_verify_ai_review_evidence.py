@@ -72,12 +72,17 @@ def source(head: str, fp: str, **kw) -> dict:
     }
 
 
-def run_verify(comment: dict, src: dict, repo: Path, final: str, *, tier="R2", fp="abc"):
+def run_verify(comment: dict, src: dict, repo: Path, final: str, *, tier="R2", fp="abc",
+               reviews: list[dict] | None = None,
+               review_comments: list[dict] | None = None):
     original = m.fetch_review_source
     m.fetch_review_source = lambda repository, pr_number, source_url, token: ("pull_request_review", src)
     try:
-        return m.verify_records([comment], policy=POLICY, repo_root=repo, tier=tier, fingerprint=fp,
-                                head=final, repository="Oteryn/Test", pr_number=7, token="x")
+        return m.verify_records(
+            [comment], policy=POLICY, repo_root=repo, tier=tier, fingerprint=fp,
+            head=final, repository="Oteryn/Test", pr_number=7, token="x",
+            reviews=reviews or [], review_comments=review_comments or [],
+        )
     finally:
         m.fetch_review_source = original
 
@@ -94,6 +99,25 @@ def test_matching_authenticated_source_passes() -> None:
     found = run_verify(attestation(reviewed, "abc"), source(reviewed, "abc"), repo, final)
     assert found["review_source_author"] == "chatgpt-codex-connector[bot]"
     assert found["review_source_commit_id"] == reviewed
+
+
+def test_legacy_pass_cannot_bypass_current_p1_inline_finding() -> None:
+    repo, reviewed, final = make_repo()
+    review = {
+        "id": 777, "commit_id": reviewed, "body": "",
+        "user": {"login": "chatgpt-codex-connector[bot]"},
+        "pull_request_url": "https://api.github.com/repos/Oteryn/Test/pulls/7",
+    }
+    inline = {
+        "id": 778, "pull_request_review_id": 777,
+        "body": "[P1] Security boundary bypass",
+        "user": {"login": "chatgpt-codex-connector[bot]"},
+        "pull_request_url": "https://api.github.com/repos/Oteryn/Test/pulls/7",
+    }
+    expect_fail(lambda: run_verify(
+        attestation(reviewed, "abc"), source(reviewed, "abc"), repo, final,
+        reviews=[review], review_comments=[inline],
+    ))
 
 
 def test_self_authored_external_source_fails() -> None:

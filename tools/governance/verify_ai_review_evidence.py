@@ -315,6 +315,55 @@ def _blocking_findings_exist(
     return False
 
 
+def _blocking_findings_for_current_generation(
+    *, reviews: list[dict], review_comments: list[dict], policy: dict,
+    repo_root: str | Path, tier: str, head: str, repository: str, pr_number: int
+) -> bool:
+    required_class = policy["review_tiers"][tier]["reviewer_class"]
+    allowed_classes = {required_class} if required_class == "deep" else {"fast", "deep"}
+    reviewer_ids: set[str] = set()
+    for reviewer_class in allowed_classes:
+        reviewer_ids.update(policy.get("reviewer_preferences", {}).get(reviewer_class, []))
+    trusted_logins: set[str] = set()
+    for reviewer_id in reviewer_ids:
+        trusted_logins.update(_trusted_logins(policy, reviewer_id))
+    if not trusted_logins:
+        return True
+
+    pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
+    eligible_review_ids: set[int] = set()
+    for review in reviews:
+        login = str((review.get("user") or {}).get("login", "")).casefold()
+        reviewed_head = str(review.get("commit_id") or "")
+        if login not in trusted_logins or review.get("pull_request_url") != pull_url:
+            continue
+        if not FULL_SHA.fullmatch(reviewed_head):
+            continue
+        if not is_ancestor(repo_root, reviewed_head, head):
+            continue
+        if not post_review_commits_are_neutral(repo_root, reviewed_head, head, policy):
+            continue
+        try:
+            review_id = int(review.get("id"))
+        except (TypeError, ValueError):
+            return True
+        eligible_review_ids.add(review_id)
+        if BLOCKING_FINDING_RE.search(str(review.get("body") or "")):
+            return True
+
+    for comment in review_comments:
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if login not in trusted_logins or comment.get("pull_request_url") != pull_url:
+            continue
+        try:
+            review_id = int(comment.get("pull_request_review_id"))
+        except (TypeError, ValueError):
+            continue
+        if review_id in eligible_review_ids and BLOCKING_FINDING_RE.search(str(comment.get("body") or "")):
+            return True
+    return False
+
+
 def _verify_issue_comment_result(
     comments: list[dict], *, reviews: list[dict], review_comments: list[dict],
     policy: dict, repo_root: str | Path, tier: str, fingerprint: str, head: str,
@@ -491,6 +540,17 @@ def verify_records(
 ) -> dict:
     if tier not in {"R1", "R2"} or not FULL_SHA.fullmatch(head):
         raise RuntimeError("invalid gate identity")
+    if _blocking_findings_for_current_generation(
+        reviews=reviews or [],
+        review_comments=review_comments or [],
+        policy=policy,
+        repo_root=repo_root,
+        tier=tier,
+        head=head,
+        repository=repository,
+        pr_number=pr_number,
+    ):
+        raise RuntimeError("P0/P1 Codex finding blocks every review-evidence envelope")
     errors: list[str] = []
     try:
         return _verify_issue_comment_result(
