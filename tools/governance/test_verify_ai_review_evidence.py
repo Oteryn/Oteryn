@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import subprocess
+import sys
 from copy import deepcopy
 from datetime import timedelta
+from pathlib import Path
 
 import test_verify_ai_review_evidence_core as core_tests
 
@@ -162,6 +165,43 @@ def test_pre_registry_request_retains_later_p1_for_global_blocking_scan() -> Non
     ))
 
 
+def test_edited_pre_registry_hidden_member_retains_later_p1() -> None:
+    repo, rollout, final = core_tests.make_repo()
+    cutoff = m._request_anchor_rollout_time(repo, rollout)
+    assert cutoff is not None
+    policy = _policy_with_rollout("Oteryn/Test", rollout)
+    edited_historical = core_tests.issue_comment(
+        8,
+        "edited legacy note with request text removed",
+        login="different-hidden-member",
+        association="CONTRIBUTOR",
+        stamp=_iso(cutoff - timedelta(seconds=4)),
+        updated_stamp=_iso(cutoff - timedelta(seconds=1)),
+    )
+    blocker = core_tests.issue_comment(
+        9,
+        "[P1] Historical security boundary remains broken",
+        login="chatgpt-codex-connector[bot]",
+        association="NONE",
+        stamp=_iso(cutoff - timedelta(seconds=2)),
+    )
+    current = core_tests.issue_comment(
+        10,
+        core_tests.request_body(final),
+        association="CONTRIBUTOR",
+        stamp=_iso(cutoff + timedelta(seconds=1)),
+    )
+    result = core_tests.codex_result(
+        11,
+        final[:10],
+        stamp=_iso(cutoff + timedelta(seconds=2)),
+    )
+    core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
+        [edited_historical, blocker, current, result], repo, final, current,
+        policy=policy, anchor=_server_anchor(current, final),
+    ))
+
+
 def test_repository_without_rollout_marker_keeps_legacy_request_ambiguous() -> None:
     repo, rollout, final = core_tests.make_repo()
     cutoff = m._request_anchor_rollout_time(repo, rollout)
@@ -294,6 +334,22 @@ def test_anchored_author_unrelated_edit_still_fails_closed() -> None:
         [note, current, result], repo, final, current,
         anchor=_server_anchor(current, final),
     ))
+
+
+def test_preserved_core_suite_passes_standalone() -> None:
+    script = Path(core_tests.__file__).resolve()
+    completed = subprocess.run(
+        [sys.executable, str(script)],
+        cwd=script.parent,
+        text=True,
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=180,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout
+    assert "ai review evidence tests PASS:" in completed.stdout
 
 
 def test_live_codex_clean_flair_variants_pass() -> None:
