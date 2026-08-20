@@ -105,7 +105,11 @@ def _created_at(value: dict) -> tuple[datetime, int]:
 def _is_request_like(comment: dict) -> bool:
     if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
         return False
-    return any(line.strip() == "@codex review" for line in str(comment.get("body") or "").splitlines())
+    body = str(comment.get("body") or "")
+    return (
+        REQUEST_MARKER in body
+        or any(line.strip() == "@codex review" for line in body.splitlines())
+    )
 
 
 def _is_result_like(comment: dict) -> bool:
@@ -121,6 +125,38 @@ def _issue_comment_identity(comment: dict, repository: str, pr_number: int) -> b
         and str(comment.get("html_url") or "").startswith(expected_html)
         and str(comment.get("html_url") or "")[len(expected_html):].isdigit()
     )
+
+
+def _historical_request_records(
+    comment: dict, *, comment_edit_histories: dict[int, list[dict]],
+    repository: str, pr_number: int
+) -> list[tuple[tuple[datetime, int], dict[str, str]]]:
+    if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
+        return []
+    if not _issue_comment_identity(comment, repository, pr_number):
+        return []
+    created_at = comment.get("created_at")
+    if not created_at or comment.get("updated_at") == created_at:
+        return []
+    try:
+        comment_id = int(comment.get("id"))
+    except (TypeError, ValueError):
+        raise RuntimeError("edited trusted comment has no stable numeric identity")
+    snapshots = comment_edit_histories.get(comment_id)
+    if snapshots is None:
+        raise RuntimeError("edited trusted comment history is unavailable")
+    records: list[tuple[tuple[datetime, int], dict[str, str]]] = []
+    for snapshot in snapshots:
+        body = snapshot.get("body")
+        edited_at = snapshot.get("edited_at")
+        if not isinstance(body, str) or not isinstance(edited_at, str) or not edited_at:
+            raise RuntimeError("edited trusted comment history is malformed")
+        parsed = parse_request(body)
+        if parsed is None:
+            continue
+        effective_time = _created_at({"created_at": edited_at, "id": comment_id})
+        records.append((effective_time, parsed))
+    return records
 
 
 def is_ancestor(repo_root: str | Path, older: str, newer: str) -> bool:
@@ -214,6 +250,29 @@ def fetch_json(url: str, token: str) -> dict:
     if not isinstance(value, dict):
         raise RuntimeError("review source response is not an object")
     return value
+
+
+def fetch_graphql(query: str, variables: dict, token: str) -> dict:
+    request = urllib.request.Request(
+        "https://api.github.com/graphql",
+        data=json.dumps({"query": query, "variables": variables}).encode("utf-8"),
+        method="POST",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+            "User-Agent": "oteryn-ai-review-gate",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        value = json.load(response)
+    if not isinstance(value, dict) or value.get("errors"):
+        raise RuntimeError("GitHub GraphQL response is malformed or contains errors")
+    data = value.get("data")
+    if not isinstance(data, dict):
+        raise RuntimeError("GitHub GraphQL response has no data object")
+    return data
 
 
 def _fetch_paginated(url: str, token: str) -> list[dict]:
@@ -316,7 +375,8 @@ def _blocking_findings_exist(
 
 
 def _blocking_findings_for_current_generation(
-    *, comments: list[dict], reviews: list[dict], review_comments: list[dict], policy: dict,
+    *, comments: list[dict], comment_edit_histories: dict[int, list[dict]],
+    reviews: list[dict], review_comments: list[dict], policy: dict,
     repo_root: str | Path, tier: str, head: str, repository: str, pr_number: int
 ) -> bool:
     required_class = policy["review_tiers"][tier]["reviewer_class"]
@@ -330,16 +390,32 @@ def _blocking_findings_for_current_generation(
     if not trusted_logins:
         return True
 
-    eligible_requests: list[tuple[dict, set[str]]] = []
+    eligible_requests: list[tuple[tuple[datetime, int], set[str]]] = []
     for request_comment in comments:
-        if not _is_request_like(request_comment):
-            continue
         if not _issue_comment_identity(request_comment, repository, pr_number):
             continue
         if not request_comment.get("created_at"):
             continue
         if request_comment.get("updated_at") != request_comment.get("created_at"):
-            eligible_requests.append((request_comment, trusted_logins))
+            historical = _historical_request_records(
+                request_comment, comment_edit_histories=comment_edit_histories,
+                repository=repository, pr_number=pr_number
+            )
+            for request_time, parsed in historical:
+                if parsed["REVIEWER_CLASS"] not in allowed_classes:
+                    continue
+                if not reviewer_allowed(policy, parsed["REVIEWER_CLASS"], parsed["REVIEWER_ID"]):
+                    continue
+                reviewed_head = parsed["REVIEWED_HEAD"]
+                if not is_ancestor(repo_root, reviewed_head, head):
+                    continue
+                if not post_review_commits_are_neutral(repo_root, reviewed_head, head, policy):
+                    continue
+                request_logins = _trusted_logins(policy, parsed["REVIEWER_ID"])
+                if request_logins:
+                    eligible_requests.append((request_time, request_logins))
+            continue
+        if not _is_request_like(request_comment):
             continue
         parsed = parse_request(str(request_comment.get("body") or ""))
         if parsed is None or parsed["REVIEWER_CLASS"] not in allowed_classes:
@@ -353,7 +429,7 @@ def _blocking_findings_for_current_generation(
             continue
         request_logins = _trusted_logins(policy, parsed["REVIEWER_ID"])
         if request_logins:
-            eligible_requests.append((request_comment, request_logins))
+            eligible_requests.append((_created_at(request_comment), request_logins))
 
     for comment in comments:
         if not _issue_comment_identity(comment, repository, pr_number):
@@ -362,8 +438,8 @@ def _blocking_findings_for_current_generation(
             continue
         login = str((comment.get("user") or {}).get("login", "")).casefold()
         if any(
-            login in request_logins and _created_at(comment) > _created_at(request_comment)
-            for request_comment, request_logins in eligible_requests
+            login in request_logins and _created_at(comment) > request_time
+            for request_time, request_logins in eligible_requests
         ):
             return True
 
@@ -402,7 +478,8 @@ def _blocking_findings_for_current_generation(
 
 
 def _verify_issue_comment_result(
-    comments: list[dict], *, reviews: list[dict], review_comments: list[dict],
+    comments: list[dict], *, comment_edit_histories: dict[int, list[dict]],
+    reviews: list[dict], review_comments: list[dict],
     policy: dict, repo_root: str | Path, tier: str, fingerprint: str, head: str,
     repository: str, pr_number: int
 ) -> dict:
@@ -457,6 +534,21 @@ def _verify_issue_comment_result(
         raise RuntimeError("reviewer has no configured trusted source login")
     if "issue_comment_result" not in policy.get("reviewer_source_kinds", {}).get(reviewer_id, []):
         raise RuntimeError("issue-comment result source is not enabled for reviewer")
+    for other_comment in comments:
+        if other_comment.get("id") == request_comment.get("id"):
+            continue
+        for _, other in _historical_request_records(
+            other_comment, comment_edit_histories=comment_edit_histories,
+            repository=repository, pr_number=pr_number
+        ):
+            if other["REVIEWED_HEAD"] != reviewed_head:
+                continue
+            if not reviewer_allowed(policy, other["REVIEWER_CLASS"], other["REVIEWER_ID"]):
+                continue
+            if trusted_logins & _trusted_logins(policy, other["REVIEWER_ID"]):
+                raise RuntimeError(
+                    "edited same-head Codex request leaves an ambiguous trusted-source generation"
+                )
     for other_comment in request_like:
         if other_comment.get("id") == request_comment.get("id"):
             continue
@@ -590,12 +682,14 @@ def _verify_legacy_records(
 def verify_records(
     comments: list[dict], *, policy: dict, repo_root: str | Path, tier: str,
     fingerprint: str, head: str, repository: str, pr_number: int, token: str,
+    comment_edit_histories: dict[int, list[dict]] | None = None,
     reviews: list[dict] | None = None, review_comments: list[dict] | None = None
 ) -> dict:
     if tier not in {"R1", "R2"} or not FULL_SHA.fullmatch(head):
         raise RuntimeError("invalid gate identity")
     if _blocking_findings_for_current_generation(
         comments=comments,
+        comment_edit_histories=comment_edit_histories or {},
         reviews=reviews or [],
         review_comments=review_comments or [],
         policy=policy,
@@ -610,6 +704,7 @@ def verify_records(
     try:
         return _verify_issue_comment_result(
             comments,
+            comment_edit_histories=comment_edit_histories or {},
             reviews=reviews or [],
             review_comments=review_comments or [],
             policy=policy,
@@ -660,6 +755,92 @@ def fetch_review_comments(repository: str, pr_number: int, token: str) -> list[d
     )
 
 
+COMMENT_EDIT_HISTORY_QUERY = r"""
+query($id: ID!) {
+  node(id: $id) {
+    ... on IssueComment {
+      databaseId
+      url
+      body
+      createdAt
+      updatedAt
+      includesCreatedEdit
+      issue { number repository { nameWithOwner } }
+      userContentEdits(first: 100) {
+        nodes { diff editedAt editor { login } }
+        pageInfo { hasNextPage }
+      }
+    }
+  }
+}
+"""
+
+
+def fetch_comment_edit_history(
+    repository: str, pr_number: int, comment: dict, token: str
+) -> list[dict]:
+    node_id = str(comment.get("node_id") or "")
+    if not node_id:
+        raise RuntimeError("edited trusted comment has no immutable node identity")
+    data = fetch_graphql(COMMENT_EDIT_HISTORY_QUERY, {"id": node_id}, token)
+    node = data.get("node")
+    if not isinstance(node, dict):
+        raise RuntimeError("edited trusted comment history node is missing")
+    try:
+        expected_id = int(comment.get("id"))
+    except (TypeError, ValueError):
+        raise RuntimeError("edited trusted comment has no stable numeric identity")
+    issue = node.get("issue") or {}
+    node_repo = (issue.get("repository") or {}).get("nameWithOwner")
+    if (
+        node.get("databaseId") != expected_id
+        or node.get("url") != comment.get("html_url")
+        or issue.get("number") != pr_number
+        or node_repo != repository
+        or node.get("createdAt") != comment.get("created_at")
+        or node.get("updatedAt") != comment.get("updated_at")
+        or node.get("body") != comment.get("body")
+        or node.get("includesCreatedEdit") is not True
+    ):
+        raise RuntimeError("edited trusted comment history identity mismatch")
+    connection = node.get("userContentEdits")
+    if not isinstance(connection, dict) or (connection.get("pageInfo") or {}).get("hasNextPage"):
+        raise RuntimeError("edited trusted comment history is missing or truncated")
+    nodes = connection.get("nodes")
+    if not isinstance(nodes, list) or not nodes:
+        raise RuntimeError("edited trusted comment history contains no snapshots")
+    snapshots: list[dict] = []
+    for item in nodes:
+        if not isinstance(item, dict):
+            raise RuntimeError("edited trusted comment history snapshot is malformed")
+        body = item.get("diff")
+        edited_at = item.get("editedAt")
+        if not isinstance(body, str) or not isinstance(edited_at, str) or not edited_at:
+            raise RuntimeError("edited trusted comment history snapshot is malformed")
+        snapshots.append({"body": body, "edited_at": edited_at})
+    if not any(snapshot["body"] == comment.get("body") for snapshot in snapshots):
+        raise RuntimeError("edited trusted comment history does not contain current body")
+    return snapshots
+
+
+def fetch_edited_comment_histories(
+    comments: list[dict], repository: str, pr_number: int, token: str
+) -> dict[int, list[dict]]:
+    result: dict[int, list[dict]] = {}
+    for comment in comments:
+        if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
+            continue
+        created_at = comment.get("created_at")
+        if not created_at or comment.get("updated_at") == created_at:
+            continue
+        try:
+            comment_id = int(comment.get("id"))
+        except (TypeError, ValueError):
+            raise RuntimeError("edited trusted comment has no stable numeric identity")
+        result[comment_id] = fetch_comment_edit_history(repository, pr_number, comment, token)
+    return result
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", required=True)
@@ -672,8 +853,12 @@ def main() -> int:
     parser.add_argument("--token", required=True)
     args = parser.parse_args()
     policy = json.loads(Path(args.policy_file).read_text(encoding="utf-8"))
+    comments = fetch_comments(args.repository, args.pr_number, args.token)
+    comment_edit_histories = fetch_edited_comment_histories(
+        comments, args.repository, args.pr_number, args.token
+    )
     match = verify_records(
-        fetch_comments(args.repository, args.pr_number, args.token),
+        comments,
         policy=policy,
         repo_root=args.repo_root,
         tier=args.tier,
@@ -682,6 +867,7 @@ def main() -> int:
         repository=args.repository,
         pr_number=args.pr_number,
         token=args.token,
+        comment_edit_histories=comment_edit_histories,
         reviews=fetch_reviews(args.repository, args.pr_number, args.token),
         review_comments=fetch_review_comments(args.repository, args.pr_number, args.token),
     )
