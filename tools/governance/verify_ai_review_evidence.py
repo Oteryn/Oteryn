@@ -31,7 +31,8 @@ REQUEST_FIELDS = {
 CLEAN_RESULT_RE = re.compile(
     r"^Codex Review: Didn't find any major issues\."
     r"(?: What shall we delve into next\?)?\s*\n+"
-    r"\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`\s*$"
+    r"\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`"
+    r"(?:\s*\n+<details>[\s\S]*</details>)?\s*$"
 )
 BLOCKING_FINDING_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?(P0|P1)\b")
 

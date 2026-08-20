@@ -229,7 +229,10 @@ def codex_result(comment_id: int, prefix: str, *,
                  text: str | None = None) -> dict:
     body_text = text if text is not None else (
         "Codex Review: Didn't find any major issues. What shall we delve into next?\n\n"
-        f"**Reviewed commit:** `{prefix}`"
+        f"**Reviewed commit:** `{prefix}`\n\n"
+        "<details> <summary>?? About Codex in GitHub</summary>\n"
+        "standard Codex review wrapper\n"
+        "</details>"
     )
     return issue_comment(
         comment_id, body_text, login=login, association="NONE", stamp=stamp,
@@ -422,6 +425,16 @@ def test_issue_comment_malformed_request_fails() -> None:
 def test_issue_comment_malformed_result_fails() -> None:
     repo, _, final = make_repo()
     malformed = "Codex Review: Didn't find any major issues.\n\n**Reviewed commit:** `not-a-sha`"
+    comments = [issue_comment(10, request_body(final)), codex_result(11, final[:10], text=malformed)]
+    expect_fail(lambda: run_issue(comments, repo, final))
+
+
+def test_issue_comment_unexpected_result_tail_fails() -> None:
+    repo, _, final = make_repo()
+    malformed = (
+        "Codex Review: Didn't find any major issues.\n\n"
+        f"**Reviewed commit:** `{final[:10]}`\n\nuntrusted-shaped trailing prose"
+    )
     comments = [issue_comment(10, request_body(final)), codex_result(11, final[:10], text=malformed)]
     expect_fail(lambda: run_issue(comments, repo, final))
 
