@@ -552,6 +552,23 @@ def test_issue_comment_malformed_earlier_request_makes_generation_ambiguous() ->
     expect_fail(lambda: run_issue(comments, repo, final))
 
 
+def test_non_standalone_codex_mention_anchor_makes_generation_ambiguous() -> None:
+    repo, _, final = make_repo()
+    prose_request = issue_comment(
+        9,
+        "Please run @codex review against this head.",
+        stamp="2026-08-20T09:59:00Z",
+    )
+    valid_request = issue_comment(10, request_body(final), stamp="2026-08-20T10:00:00Z")
+    comments = [valid_request, codex_result(11, final[:10], stamp="2026-08-20T10:01:00Z")]
+    expect_fail(lambda: run_issue(
+        comments,
+        repo,
+        final,
+        reviews=[request_anchor(prose_request, final)],
+    ))
+
+
 def test_deleted_competing_request_anchor_makes_generation_ambiguous() -> None:
     repo, _, final = make_repo()
     deleted_request = issue_comment(
