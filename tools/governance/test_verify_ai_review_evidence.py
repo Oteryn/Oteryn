@@ -39,7 +39,15 @@ def _policy_with_rollout(repository: str, rollout: str) -> dict:
     return policy
 
 
-def _verify_with_only_current_anchor(comments, repo, final, current_request, *, policy=None):
+def _server_anchor(comment: dict, final: str, *, association: str = "MEMBER") -> dict:
+    server_comment = deepcopy(comment)
+    server_comment["author_association"] = association
+    return core_tests.request_anchor(server_comment, final)
+
+
+def _verify_with_only_current_anchor(
+    comments, repo, final, current_request, *, policy=None, anchor=None
+):
     return m.verify_records(
         comments,
         policy=policy or POLICY,
@@ -50,7 +58,7 @@ def _verify_with_only_current_anchor(comments, repo, final, current_request, *, 
         repository="Oteryn/Test",
         pr_number=7,
         token="x",
-        reviews=[core_tests.request_anchor(current_request, final)],
+        reviews=[anchor or core_tests.request_anchor(current_request, final)],
         review_comments=[],
     )
 
@@ -71,11 +79,13 @@ def test_pre_registry_unstructured_request_does_not_poison_post_rollout_head() -
     historical = core_tests.issue_comment(
         9,
         "@codex review\n\nlegacy request created before immutable anchors existed",
+        association="CONTRIBUTOR",
         stamp=_iso(cutoff - timedelta(seconds=2)),
     )
     current = core_tests.issue_comment(
         10,
         core_tests.request_body(final),
+        association="CONTRIBUTOR",
         stamp=_iso(cutoff + timedelta(seconds=1)),
     )
     result = core_tests.codex_result(
@@ -84,7 +94,8 @@ def test_pre_registry_unstructured_request_does_not_poison_post_rollout_head() -
         stamp=_iso(cutoff + timedelta(seconds=2)),
     )
     found = _verify_with_only_current_anchor(
-        [historical, current, result], repo, final, current, policy=policy
+        [historical, current, result], repo, final, current,
+        policy=policy, anchor=_server_anchor(current, final),
     )
     assert found["review_source_kind"] == "issue_comment_result"
     assert found["review_source_commit_id"] == final
@@ -119,25 +130,35 @@ def test_pre_registry_request_retains_later_p1_for_global_blocking_scan() -> Non
     repo, rollout, final = core_tests.make_repo()
     cutoff = m._request_anchor_rollout_time(repo, rollout)
     assert cutoff is not None
-    legacy = core_tests.attestation(rollout, "abc")
+    policy = _policy_with_rollout("Oteryn/Test", rollout)
     historical = core_tests.issue_comment(
         9,
         "@codex review\n\nlegacy request created before immutable anchors existed",
-        stamp=_iso(cutoff - timedelta(seconds=2)),
+        login="legacy-member",
+        association="CONTRIBUTOR",
+        stamp=_iso(cutoff - timedelta(seconds=3)),
     )
     blocker = core_tests.issue_comment(
         10,
         "[P1] Security boundary remains broken",
         login="chatgpt-codex-connector[bot]",
         association="NONE",
+        stamp=_iso(cutoff - timedelta(seconds=2)),
+    )
+    current = core_tests.issue_comment(
+        11,
+        core_tests.request_body(final),
+        association="CONTRIBUTOR",
         stamp=_iso(cutoff + timedelta(seconds=1)),
     )
-    core_tests.expect_fail(lambda: core_tests.run_verify(
-        legacy,
-        core_tests.source(rollout, "abc"),
-        repo,
-        final,
-        comments=[legacy, historical, blocker],
+    result = core_tests.codex_result(
+        12,
+        final[:10],
+        stamp=_iso(cutoff + timedelta(seconds=2)),
+    )
+    core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
+        [historical, blocker, current, result], repo, final, current,
+        policy=policy, anchor=_server_anchor(current, final),
     ))
 
 
@@ -148,16 +169,21 @@ def test_repository_without_rollout_marker_keeps_legacy_request_ambiguous() -> N
     historical = core_tests.issue_comment(
         9,
         "@codex review\n\nlegacy-looking request with no repository rollout proof",
+        association="CONTRIBUTOR",
         stamp=_iso(cutoff - timedelta(seconds=2)),
     )
     current = core_tests.issue_comment(
-        10, core_tests.request_body(final), stamp=_iso(cutoff + timedelta(seconds=1)),
+        10,
+        core_tests.request_body(final),
+        association="CONTRIBUTOR",
+        stamp=_iso(cutoff + timedelta(seconds=1)),
     )
     result = core_tests.codex_result(
         11, final[:10], stamp=_iso(cutoff + timedelta(seconds=2)),
     )
     core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
-        [historical, current, result], repo, final, current, policy=deepcopy(POLICY)
+        [historical, current, result], repo, final, current,
+        policy=deepcopy(POLICY), anchor=_server_anchor(current, final),
     ))
 
 
@@ -179,6 +205,94 @@ def test_malformed_rollout_marker_keeps_legacy_request_ambiguous() -> None:
     policy = _policy_with_rollout("Oteryn/Test", "not-a-sha")
     core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
         [historical, current, result], repo, final, current, policy=policy
+    ))
+
+
+def test_immutable_anchor_restores_hidden_member_request_trust() -> None:
+    repo, _, final = core_tests.make_repo()
+    current = core_tests.issue_comment(
+        10,
+        core_tests.request_body(final),
+        association="CONTRIBUTOR",
+        stamp="2026-08-20T10:00:00Z",
+    )
+    result = core_tests.codex_result(
+        11, final[:10], stamp="2026-08-20T10:01:00Z",
+    )
+    found = _verify_with_only_current_anchor(
+        [current, result], repo, final, current,
+        anchor=_server_anchor(current, final),
+    )
+    assert found["review_request_id"] == 10
+    assert found["review_source_commit_id"] == final
+
+
+def test_hidden_member_request_without_anchor_fails_closed() -> None:
+    repo, _, final = core_tests.make_repo()
+    current = core_tests.issue_comment(
+        10,
+        core_tests.request_body(final),
+        association="CONTRIBUTOR",
+        stamp="2026-08-20T10:00:00Z",
+    )
+    result = core_tests.codex_result(
+        11, final[:10], stamp="2026-08-20T10:01:00Z",
+    )
+    core_tests.expect_fail(lambda: m.verify_records(
+        [current, result],
+        policy=POLICY,
+        repo_root=repo,
+        tier="R2",
+        fingerprint=core_tests.ISSUE_FP,
+        head=final,
+        repository="Oteryn/Test",
+        pr_number=7,
+        token="x",
+        reviews=[],
+        review_comments=[],
+    ))
+
+
+def test_anchor_body_mismatch_does_not_restore_hidden_member_trust() -> None:
+    repo, _, final = core_tests.make_repo()
+    current = core_tests.issue_comment(
+        10,
+        core_tests.request_body(final),
+        association="CONTRIBUTOR",
+        stamp="2026-08-20T10:00:00Z",
+    )
+    anchor = _server_anchor(current, final)
+    current = deepcopy(current)
+    current["body"] += "\nextra unanchored text"
+    result = core_tests.codex_result(
+        11, final[:10], stamp="2026-08-20T10:01:00Z",
+    )
+    core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
+        [current, result], repo, final, current, anchor=anchor
+    ))
+
+
+def test_anchored_author_unrelated_edit_still_fails_closed() -> None:
+    repo, _, final = core_tests.make_repo()
+    note = core_tests.issue_comment(
+        9,
+        "maintainer note",
+        association="CONTRIBUTOR",
+        stamp="2026-08-20T09:59:00Z",
+        updated_stamp="2026-08-20T10:02:00Z",
+    )
+    current = core_tests.issue_comment(
+        10,
+        core_tests.request_body(final),
+        association="CONTRIBUTOR",
+        stamp="2026-08-20T10:00:00Z",
+    )
+    result = core_tests.codex_result(
+        11, final[:10], stamp="2026-08-20T10:01:00Z",
+    )
+    core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
+        [note, current, result], repo, final, current,
+        anchor=_server_anchor(current, final),
     ))
 
 
