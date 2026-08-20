@@ -465,9 +465,11 @@ def _verify_issue_comment_result(
             not other_comment.get("created_at")
             or other_comment.get("updated_at") != other_comment.get("created_at")
         ):
-            continue
+            raise RuntimeError("another Codex request has ambiguous immutable metadata")
         other = parse_request(str(other_comment.get("body") or ""))
-        if other is None or other["REVIEWED_HEAD"] != reviewed_head:
+        if other is None:
+            raise RuntimeError("another Codex request is malformed and makes the generation ambiguous")
+        if other["REVIEWED_HEAD"] != reviewed_head:
             continue
         if not reviewer_allowed(policy, other["REVIEWER_CLASS"], other["REVIEWER_ID"]):
             continue

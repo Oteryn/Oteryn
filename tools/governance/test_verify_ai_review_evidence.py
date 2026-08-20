@@ -351,11 +351,15 @@ def codex_review(review_id: int, head: str, *, body_text: str = "") -> dict:
     }
 
 
-def codex_inline(review_id: int, text: str) -> dict:
+def codex_inline(review_id: int, text: str, *,
+                 stamp: str = "2026-08-20T10:01:00Z",
+                 updated_stamp: str | None = None) -> dict:
     return {
         "id": review_id + 1000, "pull_request_review_id": review_id,
         "body": text, "user": {"login": "chatgpt-codex-connector[bot]"},
         "pull_request_url": "https://api.github.com/repos/Oteryn/Test/pulls/7",
+        "created_at": stamp,
+        "updated_at": stamp if updated_stamp is None else updated_stamp,
     }
 
 
@@ -496,6 +500,17 @@ def test_issue_comment_delayed_fast_result_cannot_satisfy_deep_same_head() -> No
     expect_fail(lambda: run_issue(comments, repo, final))
 
 
+def test_issue_comment_malformed_earlier_request_makes_generation_ambiguous() -> None:
+    repo, _, final = make_repo()
+    comments = [
+        issue_comment(9, "@codex review\n\nmalformed request metadata",
+                      stamp="2026-08-20T09:59:00Z"),
+        issue_comment(10, request_body(final), stamp="2026-08-20T10:00:00Z"),
+        codex_result(11, final[:10], stamp="2026-08-20T10:01:00Z"),
+    ]
+    expect_fail(lambda: run_issue(comments, repo, final))
+
+
 def test_issue_comment_request_after_result_fails() -> None:
     repo, _, final = make_repo()
     comments = [codex_result(11, final[:10], stamp="2026-08-20T10:00:00Z"),
@@ -525,6 +540,18 @@ def test_issue_comment_p1_inline_finding_fails() -> None:
     repo, _, final = make_repo()
     reviews = [codex_review(90, final)]
     inline = [codex_inline(90, "P1 Badge security issue")]
+    expect_fail(lambda: run_issue(valid_issue_pair(repo, final), repo, final,
+                                  reviews=reviews, review_comments=inline))
+
+
+def test_edited_trusted_inline_comment_fails_closed() -> None:
+    repo, _, final = make_repo()
+    reviews = [codex_review(90, final)]
+    inline = [codex_inline(
+        90,
+        "ordinary inline review comment",
+        updated_stamp="2026-08-20T10:02:00Z",
+    )]
     expect_fail(lambda: run_issue(valid_issue_pair(repo, final), repo, final,
                                   reviews=reviews, review_comments=inline))
 
