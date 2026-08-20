@@ -457,6 +457,23 @@ def _verify_issue_comment_result(
         raise RuntimeError("reviewer has no configured trusted source login")
     if "issue_comment_result" not in policy.get("reviewer_source_kinds", {}).get(reviewer_id, []):
         raise RuntimeError("issue-comment result source is not enabled for reviewer")
+    for other_comment in request_like:
+        if other_comment.get("id") == request_comment.get("id"):
+            continue
+        if not _issue_comment_identity(other_comment, repository, pr_number):
+            continue
+        if (
+            not other_comment.get("created_at")
+            or other_comment.get("updated_at") != other_comment.get("created_at")
+        ):
+            continue
+        other = parse_request(str(other_comment.get("body") or ""))
+        if other is None or other["REVIEWED_HEAD"] != reviewed_head:
+            continue
+        if not reviewer_allowed(policy, other["REVIEWER_CLASS"], other["REVIEWER_ID"]):
+            continue
+        if trusted_logins & _trusted_logins(policy, other["REVIEWER_ID"]):
+            raise RuntimeError("same-head Codex requests share an ambiguous trusted source identity")
     if any(
         _created_at(comment) > _created_at(request_comment)
         and str((comment.get("user") or {}).get("login", "")).casefold() in trusted_logins

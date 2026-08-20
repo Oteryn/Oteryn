@@ -386,6 +386,27 @@ def test_issue_comment_edited_request_fails() -> None:
     expect_fail(lambda: run_issue(comments, repo, final))
 
 
+def test_issue_comment_delayed_older_fingerprint_same_head_fails() -> None:
+    repo, _, final = make_repo()
+    comments = [
+        issue_comment(10, request_body(final, "e" * 64), stamp="2026-08-20T10:00:00Z"),
+        issue_comment(11, request_body(final), stamp="2026-08-20T10:01:00Z"),
+        codex_result(12, final[:10], stamp="2026-08-20T10:02:00Z"),
+    ]
+    expect_fail(lambda: run_issue(comments, repo, final))
+
+
+def test_issue_comment_delayed_fast_result_cannot_satisfy_deep_same_head() -> None:
+    repo, _, final = make_repo()
+    comments = [
+        issue_comment(10, request_body(final, "e" * 64, tier="R1", klass="fast", reviewer="codex_spark"),
+                      stamp="2026-08-20T10:00:00Z"),
+        issue_comment(11, request_body(final), stamp="2026-08-20T10:01:00Z"),
+        codex_result(12, final[:10], stamp="2026-08-20T10:02:00Z"),
+    ]
+    expect_fail(lambda: run_issue(comments, repo, final))
+
+
 def test_issue_comment_request_after_result_fails() -> None:
     repo, _, final = make_repo()
     comments = [codex_result(11, final[:10], stamp="2026-08-20T10:00:00Z"),
