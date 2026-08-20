@@ -10,6 +10,9 @@ from pathlib import Path
 # A request created before this commit cannot have targeted a descendant commit
 # that did not exist yet. Post-rollout unanchored/malformed requests still fail closed.
 REQUEST_ANCHOR_ROLLOUT_COMMIT = "dbed59b9cfab1e8a66ac9e0a5056053718980ce3"
+# Compatibility is repository-scoped. Repositories without a proven rollout marker
+# retain every request-like comment and therefore fail closed.
+REQUEST_ANCHOR_ROLLOUTS = {"oteryn/oteryn": REQUEST_ANCHOR_ROLLOUT_COMMIT}
 
 _CORE_PATH = Path(__file__).with_name("verify_ai_review_evidence_core.py")
 _spec = importlib.util.spec_from_file_location("verify_ai_review_evidence_core", _CORE_PATH)
@@ -24,12 +27,17 @@ _original_parse_clean_result = _core.parse_clean_result
 _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
 # Do not heuristically classify arbitrary bot prose as celebratory. Compatibility
 # is intentionally limited to exact observed Codex clean-result variants.
-_ALLOWED_CLEAN_FLAIR = {"Swish!", "Hooray!", "Chef's kiss.", "Breezy!"}
+_ALLOWED_CLEAN_FLAIR = {
+    "Swish!", "Hooray!", "Chef's kiss.", "Breezy!", "Nice work!",
+    ":rocket:", "More of your lovely PRs please.",
+}
 
 
-def _request_anchor_rollout_time(repo_root: str | Path) -> datetime | None:
+def _request_anchor_rollout_time(
+    repo_root: str | Path, rollout_commit: str = REQUEST_ANCHOR_ROLLOUT_COMMIT,
+) -> datetime | None:
     result = subprocess.run(
-        ["git", "show", "-s", "--format=%cI", REQUEST_ANCHOR_ROLLOUT_COMMIT],
+        ["git", "show", "-s", "--format=%cI", rollout_commit],
         cwd=Path(repo_root), text=True, encoding="utf-8",
         stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
     )
@@ -59,10 +67,15 @@ def _filter_pre_rollout_unstructured_requests(
     comments: list[dict], *, repo_root: str | Path, head: str,
     repository: str, pr_number: int,
 ) -> list[dict]:
-    # Fail closed unless the exact rollout commit is present in this reviewed history.
-    if not _core.is_ancestor(repo_root, REQUEST_ANCHOR_ROLLOUT_COMMIT, head):
+    # Use only a repository-specific rollout marker whose provenance is recorded in
+    # trusted policy code. Unknown repositories get no migration exception.
+    rollout_commit = REQUEST_ANCHOR_ROLLOUTS.get(repository.casefold())
+    if rollout_commit is None:
         return comments
-    cutoff = _request_anchor_rollout_time(repo_root)
+    # Fail closed unless that repository-specific rollout commit is in the reviewed DAG.
+    if not _core.is_ancestor(repo_root, rollout_commit, head):
+        return comments
+    cutoff = _request_anchor_rollout_time(repo_root, rollout_commit)
     if cutoff is None:
         return comments
 
@@ -129,6 +142,7 @@ for _name in dir(_core):
 
 # Keep compatibility controls visible for regression tests and diagnostics.
 globals()["REQUEST_ANCHOR_ROLLOUT_COMMIT"] = REQUEST_ANCHOR_ROLLOUT_COMMIT
+globals()["REQUEST_ANCHOR_ROLLOUTS"] = REQUEST_ANCHOR_ROLLOUTS
 globals()["_request_anchor_rollout_time"] = _request_anchor_rollout_time
 globals()["_filter_pre_rollout_unstructured_requests"] = _filter_pre_rollout_unstructured_requests
 globals()["_compat_parse_clean_result"] = _compat_parse_clean_result

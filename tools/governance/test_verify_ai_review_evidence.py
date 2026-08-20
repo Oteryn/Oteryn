@@ -58,10 +58,10 @@ def _live_clean_text(head: str, flair: str) -> str:
 
 def test_pre_registry_unstructured_request_does_not_poison_post_rollout_head() -> None:
     repo, rollout, final = core_tests.make_repo()
-    original_rollout = m.REQUEST_ANCHOR_ROLLOUT_COMMIT
-    m.REQUEST_ANCHOR_ROLLOUT_COMMIT = rollout
+    original_rollouts = dict(m.REQUEST_ANCHOR_ROLLOUTS)
+    m.REQUEST_ANCHOR_ROLLOUTS["oteryn/test"] = rollout
     try:
-        cutoff = m._request_anchor_rollout_time(repo)
+        cutoff = m._request_anchor_rollout_time(repo, rollout)
         assert cutoff is not None
         historical = core_tests.issue_comment(
             9,
@@ -82,15 +82,16 @@ def test_pre_registry_unstructured_request_does_not_poison_post_rollout_head() -
         assert found["review_source_kind"] == "issue_comment_result"
         assert found["review_source_commit_id"] == final
     finally:
-        m.REQUEST_ANCHOR_ROLLOUT_COMMIT = original_rollout
+        m.REQUEST_ANCHOR_ROLLOUTS.clear()
+        m.REQUEST_ANCHOR_ROLLOUTS.update(original_rollouts)
 
 
 def test_post_registry_unanchored_malformed_request_remains_ambiguous() -> None:
     repo, rollout, final = core_tests.make_repo()
-    original_rollout = m.REQUEST_ANCHOR_ROLLOUT_COMMIT
-    m.REQUEST_ANCHOR_ROLLOUT_COMMIT = rollout
+    original_rollouts = dict(m.REQUEST_ANCHOR_ROLLOUTS)
+    m.REQUEST_ANCHOR_ROLLOUTS["oteryn/test"] = rollout
     try:
-        cutoff = m._request_anchor_rollout_time(repo)
+        cutoff = m._request_anchor_rollout_time(repo, rollout)
         assert cutoff is not None
         malformed = core_tests.issue_comment(
             9,
@@ -111,15 +112,16 @@ def test_post_registry_unanchored_malformed_request_remains_ambiguous() -> None:
             [malformed, current, result], repo, final, current
         ))
     finally:
-        m.REQUEST_ANCHOR_ROLLOUT_COMMIT = original_rollout
+        m.REQUEST_ANCHOR_ROLLOUTS.clear()
+        m.REQUEST_ANCHOR_ROLLOUTS.update(original_rollouts)
 
 
 def test_pre_registry_request_retains_later_p1_for_global_blocking_scan() -> None:
     repo, rollout, final = core_tests.make_repo()
-    original_rollout = m.REQUEST_ANCHOR_ROLLOUT_COMMIT
-    m.REQUEST_ANCHOR_ROLLOUT_COMMIT = rollout
+    original_rollouts = dict(m.REQUEST_ANCHOR_ROLLOUTS)
+    m.REQUEST_ANCHOR_ROLLOUTS["oteryn/test"] = rollout
     try:
-        cutoff = m._request_anchor_rollout_time(repo)
+        cutoff = m._request_anchor_rollout_time(repo, rollout)
         assert cutoff is not None
         legacy = core_tests.attestation(rollout, "abc")
         historical = core_tests.issue_comment(
@@ -142,11 +144,41 @@ def test_pre_registry_request_retains_later_p1_for_global_blocking_scan() -> Non
             comments=[legacy, historical, blocker],
         ))
     finally:
-        m.REQUEST_ANCHOR_ROLLOUT_COMMIT = original_rollout
+        m.REQUEST_ANCHOR_ROLLOUTS.clear()
+        m.REQUEST_ANCHOR_ROLLOUTS.update(original_rollouts)
+
+
+def test_repository_without_rollout_marker_keeps_legacy_request_ambiguous() -> None:
+    repo, rollout, final = core_tests.make_repo()
+    cutoff = m._request_anchor_rollout_time(repo, rollout)
+    assert cutoff is not None
+    historical = core_tests.issue_comment(
+        9,
+        "@codex review\n\nlegacy-looking request with no repository rollout proof",
+        stamp=_iso(cutoff - timedelta(seconds=2)),
+    )
+    current = core_tests.issue_comment(
+        10, core_tests.request_body(final), stamp=_iso(cutoff + timedelta(seconds=1)),
+    )
+    result = core_tests.codex_result(
+        11, final[:10], stamp=_iso(cutoff + timedelta(seconds=2)),
+    )
+    original_rollouts = dict(m.REQUEST_ANCHOR_ROLLOUTS)
+    m.REQUEST_ANCHOR_ROLLOUTS.pop("oteryn/test", None)
+    try:
+        core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
+            [historical, current, result], repo, final, current
+        ))
+    finally:
+        m.REQUEST_ANCHOR_ROLLOUTS.clear()
+        m.REQUEST_ANCHOR_ROLLOUTS.update(original_rollouts)
 
 
 def test_live_codex_clean_flair_variants_pass() -> None:
-    for flair in ("Swish!", "Hooray!", "Chef's kiss.", "Breezy!"):
+    for flair in (
+        "Swish!", "Hooray!", "Chef's kiss.", "Breezy!", "Nice work!",
+        ":rocket:", "More of your lovely PRs please.",
+    ):
         repo, _, final = core_tests.make_repo()
         current = core_tests.issue_comment(
             10,
