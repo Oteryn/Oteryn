@@ -24,7 +24,7 @@ _original_parse_clean_result = _core.parse_clean_result
 _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
 # Do not heuristically classify arbitrary bot prose as celebratory. Compatibility
 # is intentionally limited to exact observed Codex clean-result variants.
-_ALLOWED_CLEAN_FLAIR = {"Swish!", "Hooray!", "Chef's kiss."}
+_ALLOWED_CLEAN_FLAIR = {"Swish!", "Hooray!", "Chef's kiss.", "Breezy!"}
 
 
 def _request_anchor_rollout_time(repo_root: str | Path) -> datetime | None:

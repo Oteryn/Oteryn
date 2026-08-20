@@ -146,7 +146,7 @@ def test_pre_registry_request_retains_later_p1_for_global_blocking_scan() -> Non
 
 
 def test_live_codex_clean_flair_variants_pass() -> None:
-    for flair in ("Swish!", "Hooray!", "Chef's kiss."):
+    for flair in ("Swish!", "Hooray!", "Chef's kiss.", "Breezy!"):
         repo, _, final = core_tests.make_repo()
         current = core_tests.issue_comment(
             10,
