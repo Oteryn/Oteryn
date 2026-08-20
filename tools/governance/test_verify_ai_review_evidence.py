@@ -154,6 +154,23 @@ def test_legacy_pass_cannot_bypass_p1_after_lower_tier_request() -> None:
     ))
 
 
+def test_legacy_pass_cannot_bypass_p1_after_malformed_unedited_request() -> None:
+    repo, reviewed, final = make_repo()
+    legacy = attestation(reviewed, "abc")
+    request = issue_comment(
+        10, "@codex review\n\nmalformed request metadata",
+        stamp="2026-08-20T10:00:00Z",
+    )
+    blocker = issue_comment(
+        11, "[P1] Security boundary bypass",
+        login="chatgpt-codex-connector[bot]", association="NONE",
+        stamp="2026-08-20T10:01:00Z",
+    )
+    expect_fail(lambda: run_verify(
+        legacy, source(reviewed, "abc"), repo, final, comments=[legacy, request, blocker],
+    ))
+
+
 def test_legacy_pass_cannot_bypass_p1_after_edited_request() -> None:
     repo, reviewed, final = make_repo()
     legacy = attestation(reviewed, "abc")
@@ -425,6 +442,14 @@ def test_issue_comment_wrong_reviewer_class_fails() -> None:
     repo, _, final = make_repo()
     comments = [issue_comment(10, request_body(final, klass="fast")), codex_result(11, final[:10])]
     expect_fail(lambda: run_issue(comments, repo, final))
+
+
+def test_issue_comment_edited_trusted_bot_result_fails() -> None:
+    repo, _, final = make_repo()
+    request = issue_comment(10, request_body(final))
+    result = codex_result(11, final[:10])
+    result["updated_at"] = "2026-08-20T10:02:00Z"
+    expect_fail(lambda: run_issue([request, result], repo, final))
 
 
 def test_issue_comment_edited_request_fails() -> None:

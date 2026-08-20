@@ -340,9 +340,10 @@ def _blocking_findings_for_current_generation(
             eligible_requests.append((request_comment, trusted_logins))
             continue
         parsed = parse_request(str(request_comment.get("body") or ""))
-        if parsed is None:
-            continue
-        if not reviewer_allowed(policy, parsed["REVIEWER_CLASS"], parsed["REVIEWER_ID"]):
+        if parsed is None or not reviewer_allowed(
+            policy, parsed["REVIEWER_CLASS"], parsed["REVIEWER_ID"]
+        ):
+            eligible_requests.append((request_comment, trusted_logins))
             continue
         reviewed_head = parsed["REVIEWED_HEAD"]
         if not is_ancestor(repo_root, reviewed_head, head):
@@ -592,8 +593,15 @@ def verify_records(
 ) -> dict:
     if tier not in {"R1", "R2"} or not FULL_SHA.fullmatch(head):
         raise RuntimeError("invalid gate identity")
+    trusted_reviewer_logins: set[str] = set()
+    for reviewer_logins in policy.get("reviewer_source_logins", {}).values():
+        trusted_reviewer_logins.update(str(login).casefold() for login in reviewer_logins)
     for comment in comments:
-        if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if (
+            comment.get("author_association") not in TRUSTED_ASSOCIATIONS
+            and login not in trusted_reviewer_logins
+        ):
             continue
         created_at = str(comment.get("created_at") or "")
         updated_at = str(comment.get("updated_at") or "")
