@@ -125,6 +125,45 @@ def test_required_check_contract_is_r2_even_for_prose_only_change() -> None:
     assert "docs/ci/CI_CONTRACT.md" in result["risk_bearing_paths"], result
 
 
+def test_unchanged_protected_source_copy_is_r2_and_source_is_bound() -> None:
+    repo, _ = make_repo()
+    source = repo / "docs/governance/source.md"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("protected authority\n", encoding="utf-8")
+    base = commit_all(repo, "add protected source")
+    destination = repo / "docs/evidence/copied.md"
+    destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    head = commit_all(repo, "copy protected source into evidence")
+    result = m.evaluate(base, head, repo, m.DEFAULT_POLICY)
+    assert result["tier"] == "R2", result
+    assert "docs/governance/source.md" in result["changed_paths"], result
+    assert "docs/governance/source.md" in result["risk_bearing_paths"], result
+    assert "docs/evidence/copied.md" in result["risk_bearing_paths"], result
+    assert result["review_neutral_paths"] == [], result
+
+
+def test_risk_bearing_base_mode_advance_invalidates_fingerprint() -> None:
+    repo, base_one = make_repo()
+    app = repo / "src/app.py"
+    app.parent.mkdir(parents=True, exist_ok=True)
+    app.write_text("value = 1\n", encoding="utf-8")
+    base_one = commit_all(repo, "add risk-bearing app")
+
+    git(repo, "checkout", "-b", "feature")
+    app.write_text("value = 2\n", encoding="utf-8")
+    head = commit_all(repo, "feature content")
+
+    git(repo, "checkout", "master")
+    git(repo, "update-index", "--chmod=+x", "src/app.py")
+    base_two = commit_index(repo, "base mode advance")
+
+    first, _, _ = m.fingerprint(repo, base_one, head, ["src/app.py"], m.load_policy())
+    changed, _, _ = m.fingerprint(repo, base_two, head, ["src/app.py"], m.load_policy())
+    assert first != changed
+    assert m.tree_entry_at(repo, base_one, "src/app.py").startswith("100644:blob:")
+    assert m.tree_entry_at(repo, base_two, "src/app.py").startswith("100755:blob:")
+
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:
