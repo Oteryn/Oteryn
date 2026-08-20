@@ -48,6 +48,14 @@ def _verify_with_only_current_anchor(comments, repo, final, current_request):
     )
 
 
+def _live_clean_text(head: str, flair: str) -> str:
+    return (
+        f"Codex Review: Didn't find any major issues. {flair}\n\n"
+        f"**Reviewed commit:** `{head[:10]}`\n\n"
+        "<details>live Codex wrapper</details>"
+    )
+
+
 def test_pre_registry_unstructured_request_does_not_poison_post_rollout_head() -> None:
     repo, rollout, final = core_tests.make_repo()
     original_rollout = m.REQUEST_ANCHOR_ROLLOUT_COMMIT
@@ -104,6 +112,43 @@ def test_post_registry_unanchored_malformed_request_remains_ambiguous() -> None:
         ))
     finally:
         m.REQUEST_ANCHOR_ROLLOUT_COMMIT = original_rollout
+
+
+def test_live_codex_clean_flair_variants_pass() -> None:
+    for flair in ("Swish!", "Hooray!", "Chef's kiss."):
+        repo, _, final = core_tests.make_repo()
+        current = core_tests.issue_comment(
+            10,
+            core_tests.request_body(final),
+            stamp="2026-08-20T10:00:00Z",
+        )
+        result = core_tests.codex_result(
+            11,
+            final[:10],
+            stamp="2026-08-20T10:01:00Z",
+            text=_live_clean_text(final, flair),
+        )
+        found = _verify_with_only_current_anchor([current, result], repo, final, current)
+        assert found["review_source_kind"] == "issue_comment_result"
+        assert found["review_source_commit_id"] == final
+
+
+def test_clean_flair_with_risk_language_fails_closed() -> None:
+    repo, _, final = core_tests.make_repo()
+    current = core_tests.issue_comment(
+        10,
+        core_tests.request_body(final),
+        stamp="2026-08-20T10:00:00Z",
+    )
+    result = core_tests.codex_result(
+        11,
+        final[:10],
+        stamp="2026-08-20T10:01:00Z",
+        text=_live_clean_text(final, "However P1 security finding."),
+    )
+    core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
+        [current, result], repo, final, current
+    ))
 
 
 def main() -> int:

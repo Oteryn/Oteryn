@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,14 @@ _spec.loader.exec_module(_core)
 
 _original_issue_comment_result = _core._verify_issue_comment_result
 _original_blocking_findings = _core._blocking_findings_for_current_generation
+_original_parse_clean_result = _core.parse_clean_result
+
+_CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
+_SAFE_CLEAN_FLAIR = re.compile(r"^[A-Za-z][A-Za-z' ,.!?-]{0,79}$")
+_UNSAFE_CLEAN_FLAIR_TERMS = (
+    "p0", "p1", "security", "vulnerability", "finding", "issue", "concern",
+    "risk", "error", "fail", "warning", "however", "but", "except", "problem",
+)
 
 
 def _request_anchor_rollout_time(repo_root: str | Path) -> datetime | None:
@@ -79,6 +88,32 @@ def _filter_pre_rollout_unstructured_requests(
     return filtered
 
 
+def _compat_parse_clean_result(body: str) -> str | None:
+    # Preserve every already accepted exact shape first.
+    exact = _original_parse_clean_result(body)
+    if exact is not None:
+        return exact
+
+    text = (body or "").strip()
+    lines = text.splitlines()
+    if not lines or not lines[0].startswith(_CLEAN_PREFIX + " "):
+        return None
+
+    # Live Codex may append a short celebratory one-line flourish before the
+    # reviewed-commit line (e.g. Swish!, Hooray!, Chef's kiss.). Accept only a
+    # tightly bounded prose fragment and reject risk/finding language. The rest
+    # of the envelope is then revalidated by the unchanged strict core parser.
+    flair = lines[0][len(_CLEAN_PREFIX) + 1:]
+    if _SAFE_CLEAN_FLAIR.fullmatch(flair) is None:
+        return None
+    words = {word for word in re.findall(r"[a-z0-9]+", flair.casefold())}
+    if any(term in words for term in _UNSAFE_CLEAN_FLAIR_TERMS):
+        return None
+
+    normalized = "\n".join([_CLEAN_PREFIX, *lines[1:]])
+    return _original_parse_clean_result(normalized)
+
+
 def _compat_issue_comment_result(comments: list[dict], **kwargs) -> dict:
     filtered = _filter_pre_rollout_unstructured_requests(
         comments,
@@ -97,6 +132,7 @@ def _compat_blocking_findings_for_current_generation(*, comments: list[dict], **
     return _original_blocking_findings(comments=filtered, **kwargs)
 
 
+_core.parse_clean_result = _compat_parse_clean_result
 _core._verify_issue_comment_result = _compat_issue_comment_result
 _core._blocking_findings_for_current_generation = _compat_blocking_findings_for_current_generation
 
@@ -109,6 +145,7 @@ for _name in dir(_core):
 globals()["REQUEST_ANCHOR_ROLLOUT_COMMIT"] = REQUEST_ANCHOR_ROLLOUT_COMMIT
 globals()["_request_anchor_rollout_time"] = _request_anchor_rollout_time
 globals()["_filter_pre_rollout_unstructured_requests"] = _filter_pre_rollout_unstructured_requests
+globals()["_compat_parse_clean_result"] = _compat_parse_clean_result
 
 
 if __name__ == "__main__":
