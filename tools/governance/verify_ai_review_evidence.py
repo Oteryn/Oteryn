@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import importlib.util
-import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,11 +23,9 @@ _original_blocking_findings = _core._blocking_findings_for_current_generation
 _original_parse_clean_result = _core.parse_clean_result
 
 _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
-_SAFE_CLEAN_FLAIR = re.compile(r"^[A-Za-z][A-Za-z' ,.!?-]{0,79}$")
-_UNSAFE_CLEAN_FLAIR_TERMS = (
-    "p0", "p1", "security", "vulnerability", "finding", "issue", "concern",
-    "risk", "error", "fail", "warning", "however", "but", "except", "problem",
-)
+# Do not heuristically classify arbitrary bot prose as celebratory. Compatibility
+# is intentionally limited to exact observed Codex clean-result variants.
+_ALLOWED_CLEAN_FLAIR = {"Swish!", "Hooray!", "Chef's kiss."}
 
 
 def _request_anchor_rollout_time(repo_root: str | Path) -> datetime | None:
@@ -99,17 +96,12 @@ def _compat_parse_clean_result(body: str) -> str | None:
     if not lines or not lines[0].startswith(_CLEAN_PREFIX + " "):
         return None
 
-    # Live Codex may append a short celebratory one-line flourish before the
-    # reviewed-commit line (e.g. Swish!, Hooray!, Chef's kiss.). Accept only a
-    # tightly bounded prose fragment and reject risk/finding language. The rest
-    # of the envelope is then revalidated by the unchanged strict core parser.
     flair = lines[0][len(_CLEAN_PREFIX) + 1:]
-    if _SAFE_CLEAN_FLAIR.fullmatch(flair) is None:
-        return None
-    words = {word for word in re.findall(r"[a-z0-9]+", flair.casefold())}
-    if any(term in words for term in _UNSAFE_CLEAN_FLAIR_TERMS):
+    if flair not in _ALLOWED_CLEAN_FLAIR:
         return None
 
+    # Strip only the exact allowlisted compatibility token. The preserved strict
+    # parser still owns every other part of the result envelope.
     normalized = "\n".join([_CLEAN_PREFIX, *lines[1:]])
     return _original_parse_clean_result(normalized)
 

@@ -133,22 +133,28 @@ def test_live_codex_clean_flair_variants_pass() -> None:
         assert found["review_source_commit_id"] == final
 
 
-def test_clean_flair_with_risk_language_fails_closed() -> None:
-    repo, _, final = core_tests.make_repo()
-    current = core_tests.issue_comment(
-        10,
-        core_tests.request_body(final),
-        stamp="2026-08-20T10:00:00Z",
-    )
-    result = core_tests.codex_result(
-        11,
-        final[:10],
-        stamp="2026-08-20T10:01:00Z",
-        text=_live_clean_text(final, "However P1 security finding."),
-    )
-    core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
-        [current, result], repo, final, current
-    ))
+def test_unobserved_or_contradictory_clean_flair_fails_closed() -> None:
+    for flair in (
+        "However P1 security finding.",
+        "Major issues remain!",
+        "There are serious risks.",
+        "Looks mostly fine!",
+    ):
+        repo, _, final = core_tests.make_repo()
+        current = core_tests.issue_comment(
+            10,
+            core_tests.request_body(final),
+            stamp="2026-08-20T10:00:00Z",
+        )
+        result = core_tests.codex_result(
+            11,
+            final[:10],
+            stamp="2026-08-20T10:01:00Z",
+            text=_live_clean_text(final, flair),
+        )
+        core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
+            [current, result], repo, final, current
+        ))
 
 
 def main() -> int:
