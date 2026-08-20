@@ -19,7 +19,6 @@ _core = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_core)
 
 _original_issue_comment_result = _core._verify_issue_comment_result
-_original_blocking_findings = _core._blocking_findings_for_current_generation
 _original_parse_clean_result = _core.parse_clean_result
 
 _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
@@ -107,6 +106,9 @@ def _compat_parse_clean_result(body: str) -> str | None:
 
 
 def _compat_issue_comment_result(comments: list[dict], **kwargs) -> dict:
+    # Migration compatibility is intentionally limited to request-generation
+    # ambiguity. The global blocker scan must retain the complete historical
+    # request set so later trusted P0/P1 findings can never be detached/erased.
     filtered = _filter_pre_rollout_unstructured_requests(
         comments,
         repo_root=kwargs["repo_root"], head=kwargs["head"],
@@ -115,18 +117,10 @@ def _compat_issue_comment_result(comments: list[dict], **kwargs) -> dict:
     return _original_issue_comment_result(filtered, **kwargs)
 
 
-def _compat_blocking_findings_for_current_generation(*, comments: list[dict], **kwargs) -> bool:
-    filtered = _filter_pre_rollout_unstructured_requests(
-        comments,
-        repo_root=kwargs["repo_root"], head=kwargs["head"],
-        repository=kwargs["repository"], pr_number=kwargs["pr_number"],
-    )
-    return _original_blocking_findings(comments=filtered, **kwargs)
-
-
 _core.parse_clean_result = _compat_parse_clean_result
 _core._verify_issue_comment_result = _compat_issue_comment_result
-_core._blocking_findings_for_current_generation = _compat_blocking_findings_for_current_generation
+# Deliberately do NOT wrap/replace _blocking_findings_for_current_generation.
+# The preserved fail-closed core sees all historical requests and findings.
 
 # Re-export the established verifier API so existing tests/callers remain unchanged.
 for _name in dir(_core):

@@ -114,6 +114,37 @@ def test_post_registry_unanchored_malformed_request_remains_ambiguous() -> None:
         m.REQUEST_ANCHOR_ROLLOUT_COMMIT = original_rollout
 
 
+def test_pre_registry_request_retains_later_p1_for_global_blocking_scan() -> None:
+    repo, rollout, final = core_tests.make_repo()
+    original_rollout = m.REQUEST_ANCHOR_ROLLOUT_COMMIT
+    m.REQUEST_ANCHOR_ROLLOUT_COMMIT = rollout
+    try:
+        cutoff = m._request_anchor_rollout_time(repo)
+        assert cutoff is not None
+        legacy = core_tests.attestation(rollout, "abc")
+        historical = core_tests.issue_comment(
+            9,
+            "@codex review\n\nlegacy request created before immutable anchors existed",
+            stamp=_iso(cutoff - timedelta(seconds=2)),
+        )
+        blocker = core_tests.issue_comment(
+            10,
+            "[P1] Security boundary remains broken",
+            login="chatgpt-codex-connector[bot]",
+            association="NONE",
+            stamp=_iso(cutoff + timedelta(seconds=1)),
+        )
+        core_tests.expect_fail(lambda: core_tests.run_verify(
+            legacy,
+            core_tests.source(rollout, "abc"),
+            repo,
+            final,
+            comments=[legacy, historical, blocker],
+        ))
+    finally:
+        m.REQUEST_ANCHOR_ROLLOUT_COMMIT = original_rollout
+
+
 def test_live_codex_clean_flair_variants_pass() -> None:
     for flair in ("Swish!", "Hooray!", "Chef's kiss."):
         repo, _, final = core_tests.make_repo()
