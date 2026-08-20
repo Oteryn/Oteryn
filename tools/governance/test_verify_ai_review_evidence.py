@@ -55,7 +55,11 @@ def body(head: str, fp: str, *, tier="R2", klass="deep", reviewer="codex",
 def attestation(head: str, fp: str, **kw) -> dict:
     association = kw.pop("association", "OWNER")
     attestor = kw.pop("attestor", "blakinio")
-    return {"id": 1, "author_association": association, "user": {"login": attestor}, "body": body(head, fp, **kw)}
+    stamp = "2026-08-20T09:00:00Z"
+    return {
+        "id": 1, "author_association": association, "user": {"login": attestor},
+        "body": body(head, fp, **kw), "created_at": stamp, "updated_at": stamp,
+    }
 
 
 def source(head: str, fp: str, **kw) -> dict:
@@ -73,9 +77,7 @@ def source(head: str, fp: str, **kw) -> dict:
 
 
 def run_verify(comment: dict, src: dict, repo: Path, final: str, *, tier="R2", fp="abc",
-               comments: list[dict] | None = None,
-               comment_edit_histories: dict[int, list[dict]] | None = None,
-               reviews: list[dict] | None = None,
+               comments: list[dict] | None = None, reviews: list[dict] | None = None,
                review_comments: list[dict] | None = None):
     original = m.fetch_review_source
     m.fetch_review_source = lambda repository, pr_number, source_url, token: ("pull_request_review", src)
@@ -83,7 +85,6 @@ def run_verify(comment: dict, src: dict, repo: Path, final: str, *, tier="R2", f
         return m.verify_records(
             [comment] if comments is None else comments, policy=POLICY, repo_root=repo, tier=tier, fingerprint=fp,
             head=final, repository="Oteryn/Test", pr_number=7, token="x",
-            comment_edit_histories=comment_edit_histories or {},
             reviews=reviews or [], review_comments=review_comments or [],
         )
     finally:
@@ -138,34 +139,26 @@ def test_legacy_pass_cannot_bypass_current_p1_top_level_finding() -> None:
 def test_legacy_pass_cannot_bypass_p1_after_edited_request() -> None:
     repo, reviewed, final = make_repo()
     legacy = attestation(reviewed, "abc")
-    original = request_body(reviewed)
-    request = issue_comment(10, original, stamp="2026-08-20T10:00:00Z",
+    request = issue_comment(10, request_body(reviewed), stamp="2026-08-20T10:00:00Z",
                             updated_stamp="2026-08-20T10:02:00Z")
     blocker = issue_comment(11, "[P1] Security boundary bypass",
                             login="chatgpt-codex-connector[bot]", association="NONE",
                             stamp="2026-08-20T10:01:00Z")
-    histories = edit_history(10, (original, "2026-08-20T10:00:00Z"),
-                             (original, "2026-08-20T10:02:00Z"))
     expect_fail(lambda: run_verify(
         legacy, source(reviewed, "abc"), repo, final, comments=[legacy, request, blocker],
-        comment_edit_histories=histories,
     ))
 
 
-def test_legacy_pass_cannot_bypass_p1_after_request_body_removed() -> None:
+def test_legacy_pass_cannot_bypass_p1_after_malformed_edited_request() -> None:
     repo, reviewed, final = make_repo()
     legacy = attestation(reviewed, "abc")
-    original = request_body(reviewed)
-    request = issue_comment(10, "ordinary text after edit",
+    request = issue_comment(10, "@codex review\n\nmalformed after edit",
                             stamp="2026-08-20T10:00:00Z", updated_stamp="2026-08-20T10:02:00Z")
     blocker = issue_comment(11, "[P1] Security boundary bypass",
                             login="chatgpt-codex-connector[bot]", association="NONE",
                             stamp="2026-08-20T10:01:00Z")
-    histories = edit_history(10, (original, "2026-08-20T10:00:00Z"),
-                             ("ordinary text after edit", "2026-08-20T10:02:00Z"))
     expect_fail(lambda: run_verify(
         legacy, source(reviewed, "abc"), repo, final, comments=[legacy, request, blocker],
-        comment_edit_histories=histories,
     ))
 
 
@@ -289,21 +282,11 @@ def issue_comment(comment_id: int, text: str, *, login: str = "blakinio",
                   updated_stamp: str | None = None,
                   repository: str = "Oteryn/Test", pr: int = 7) -> dict:
     return {
-        "id": comment_id, "node_id": f"IC_TEST_{comment_id}",
-        "body": text, "created_at": stamp,
+        "id": comment_id, "body": text, "created_at": stamp,
         "updated_at": stamp if updated_stamp is None else updated_stamp,
         "author_association": association, "user": {"login": login},
         "issue_url": f"https://api.github.com/repos/{repository}/issues/{pr}",
         "html_url": f"https://github.com/{repository}/pull/{pr}#issuecomment-{comment_id}",
-    }
-
-
-def edit_history(comment_id: int, *versions: tuple[str, str]) -> dict[int, list[dict]]:
-    return {
-        comment_id: [
-            {"body": body, "edited_at": edited_at}
-            for body, edited_at in versions
-        ]
     }
 
 
@@ -342,9 +325,7 @@ def codex_inline(review_id: int, text: str) -> dict:
 
 
 def run_issue(comments: list[dict], repo: Path, final: str, *, fp: str = ISSUE_FP,
-              tier: str = "R2",
-              comment_edit_histories: dict[int, list[dict]] | None = None,
-              reviews: list[dict] | None = None,
+              tier: str = "R2", reviews: list[dict] | None = None,
               review_comments: list[dict] | None = None) -> dict:
     original = m.fetch_review_source
     m.fetch_review_source = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("missing"))
@@ -352,7 +333,6 @@ def run_issue(comments: list[dict], repo: Path, final: str, *, fp: str = ISSUE_F
         return m.verify_records(
             comments, policy=POLICY, repo_root=repo, tier=tier, fingerprint=fp,
             head=final, repository="Oteryn/Test", pr_number=7, token="x",
-            comment_edit_histories=comment_edit_histories or {},
             reviews=reviews or [], review_comments=review_comments or [],
         )
     finally:
@@ -436,6 +416,22 @@ def test_issue_comment_edited_request_fails() -> None:
     expect_fail(lambda: run_issue(comments, repo, final))
 
 
+def test_issue_comment_edited_request_body_removed_fails_closed() -> None:
+    repo, _, final = make_repo()
+    edited = issue_comment(9, "ordinary text after request removal",
+                           stamp="2026-08-20T09:00:00Z", updated_stamp="2026-08-20T09:01:00Z")
+    comments = [edited, issue_comment(10, request_body(final)), codex_result(11, final[:10])]
+    expect_fail(lambda: run_issue(comments, repo, final))
+
+
+def test_issue_comment_unrelated_trusted_edit_fails_closed() -> None:
+    repo, _, final = make_repo()
+    edited = issue_comment(9, "ordinary edited prose",
+                           stamp="2026-08-20T09:00:00Z", updated_stamp="2026-08-20T09:01:00Z")
+    comments = [edited, issue_comment(10, request_body(final)), codex_result(11, final[:10])]
+    expect_fail(lambda: run_issue(comments, repo, final))
+
+
 def test_issue_comment_delayed_older_fingerprint_same_head_fails() -> None:
     repo, _, final = make_repo()
     comments = [
@@ -454,59 +450,6 @@ def test_issue_comment_delayed_fast_result_cannot_satisfy_deep_same_head() -> No
         issue_comment(11, request_body(final), stamp="2026-08-20T10:01:00Z"),
         codex_result(12, final[:10], stamp="2026-08-20T10:02:00Z"),
     ]
-    expect_fail(lambda: run_issue(comments, repo, final))
-
-
-def test_issue_comment_edited_same_head_request_remains_ambiguous() -> None:
-    repo, _, final = make_repo()
-    old_request = request_body(final, "e" * 64, tier="R1", klass="fast", reviewer="codex_spark")
-    edited = issue_comment(10, old_request, stamp="2026-08-20T10:00:00Z",
-                           updated_stamp="2026-08-20T10:00:30Z")
-    comments = [
-        edited,
-        issue_comment(11, request_body(final), stamp="2026-08-20T10:01:00Z"),
-        codex_result(12, final[:10], stamp="2026-08-20T10:02:00Z"),
-    ]
-    histories = edit_history(10, (old_request, "2026-08-20T10:00:00Z"),
-                             (old_request, "2026-08-20T10:00:30Z"))
-    expect_fail(lambda: run_issue(
-        comments, repo, final, comment_edit_histories=histories
-    ))
-
-
-def test_issue_comment_removed_request_body_remains_ambiguous() -> None:
-    repo, _, final = make_repo()
-    old_request = request_body(final, "e" * 64, tier="R1", klass="fast", reviewer="codex_spark")
-    edited = issue_comment(10, "ordinary text after edit", stamp="2026-08-20T10:00:00Z",
-                           updated_stamp="2026-08-20T10:00:30Z")
-    comments = [
-        edited,
-        issue_comment(11, request_body(final), stamp="2026-08-20T10:01:00Z"),
-        codex_result(12, final[:10], stamp="2026-08-20T10:02:00Z"),
-    ]
-    histories = edit_history(10, (old_request, "2026-08-20T10:00:00Z"),
-                             ("ordinary text after edit", "2026-08-20T10:00:30Z"))
-    expect_fail(lambda: run_issue(
-        comments, repo, final, comment_edit_histories=histories
-    ))
-
-
-def test_issue_comment_unrelated_edit_history_does_not_poison_pass() -> None:
-    repo, _, final = make_repo()
-    edited = issue_comment(9, "ordinary edited prose", stamp="2026-08-20T09:00:00Z",
-                           updated_stamp="2026-08-20T09:01:00Z")
-    comments = [edited, issue_comment(10, request_body(final)), codex_result(11, final[:10])]
-    histories = edit_history(9, ("ordinary original prose", "2026-08-20T09:00:00Z"),
-                             ("ordinary edited prose", "2026-08-20T09:01:00Z"))
-    found = run_issue(comments, repo, final, comment_edit_histories=histories)
-    assert found["review_source_kind"] == "issue_comment_result"
-
-
-def test_issue_comment_missing_edited_history_fails_closed() -> None:
-    repo, _, final = make_repo()
-    edited = issue_comment(9, "ordinary edited prose", stamp="2026-08-20T09:00:00Z",
-                           updated_stamp="2026-08-20T09:01:00Z")
-    comments = [edited, issue_comment(10, request_body(final)), codex_result(11, final[:10])]
     expect_fail(lambda: run_issue(comments, repo, final))
 
 
@@ -697,79 +640,6 @@ def test_issue_comment_p1_top_level_bot_finding_fails() -> None:
                               association="NONE", stamp="2026-08-20T10:00:30Z"),
                 codex_result(12, final[:10], stamp="2026-08-20T10:01:00Z")]
     expect_fail(lambda: run_issue(comments, repo, final))
-
-def test_fetch_comment_edit_history_binds_server_identity() -> None:
-    comment = issue_comment(77, "ordinary edited text", stamp="2026-08-20T10:00:00Z",
-                            updated_stamp="2026-08-20T10:01:00Z")
-    original = m.fetch_graphql
-    m.fetch_graphql = lambda query, variables, token: {
-        "node": {
-            "databaseId": 77,
-            "url": comment["html_url"],
-            "body": comment["body"],
-            "createdAt": comment["created_at"],
-            "updatedAt": comment["updated_at"],
-            "includesCreatedEdit": True,
-            "issue": {"number": 7, "repository": {"nameWithOwner": "Oteryn/Test"}},
-            "userContentEdits": {
-                "nodes": [
-                    {"diff": comment["body"], "editedAt": "2026-08-20T10:01:00Z",
-                     "editor": {"login": "blakinio"}},
-                    {"diff": "original text", "editedAt": "2026-08-20T10:00:00Z",
-                     "editor": {"login": "blakinio"}},
-                ],
-                "pageInfo": {"hasNextPage": False},
-            },
-        }
-    }
-    try:
-        history = m.fetch_comment_edit_history("Oteryn/Test", 7, comment, "x")
-        assert {item["body"] for item in history} == {"ordinary edited text", "original text"}
-    finally:
-        m.fetch_graphql = original
-
-
-def test_fetch_comment_edit_history_rejects_cross_repository_node() -> None:
-    comment = issue_comment(78, "ordinary edited text", stamp="2026-08-20T10:00:00Z",
-                            updated_stamp="2026-08-20T10:01:00Z")
-    original = m.fetch_graphql
-    m.fetch_graphql = lambda query, variables, token: {
-        "node": {
-            "databaseId": 78, "url": comment["html_url"], "body": comment["body"],
-            "createdAt": comment["created_at"], "updatedAt": comment["updated_at"],
-            "includesCreatedEdit": True,
-            "issue": {"number": 7, "repository": {"nameWithOwner": "Other/Repo"}},
-            "userContentEdits": {"nodes": [{"diff": comment["body"],
-                "editedAt": "2026-08-20T10:01:00Z", "editor": {"login": "blakinio"}}],
-                "pageInfo": {"hasNextPage": False}},
-        }
-    }
-    try:
-        expect_fail(lambda: m.fetch_comment_edit_history("Oteryn/Test", 7, comment, "x"))
-    finally:
-        m.fetch_graphql = original
-
-
-def test_fetch_comment_edit_history_rejects_truncation() -> None:
-    comment = issue_comment(79, "ordinary edited text", stamp="2026-08-20T10:00:00Z",
-                            updated_stamp="2026-08-20T10:01:00Z")
-    original = m.fetch_graphql
-    m.fetch_graphql = lambda query, variables, token: {
-        "node": {
-            "databaseId": 79, "url": comment["html_url"], "body": comment["body"],
-            "createdAt": comment["created_at"], "updatedAt": comment["updated_at"],
-            "includesCreatedEdit": True,
-            "issue": {"number": 7, "repository": {"nameWithOwner": "Oteryn/Test"}},
-            "userContentEdits": {"nodes": [{"diff": comment["body"],
-                "editedAt": "2026-08-20T10:01:00Z", "editor": {"login": "blakinio"}}],
-                "pageInfo": {"hasNextPage": True}},
-        }
-    }
-    try:
-        expect_fail(lambda: m.fetch_comment_edit_history("Oteryn/Test", 7, comment, "x"))
-    finally:
-        m.fetch_graphql = original
-
 
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
