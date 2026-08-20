@@ -34,7 +34,10 @@ CLEAN_RESULT_RE = re.compile(
     r"\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`"
     r"(?:\s*\n+<details>[\s\S]*</details>)?\s*$"
 )
-BLOCKING_FINDING_RE = re.compile(r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?(P0|P1)\b")
+BLOCKING_FINDING_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?"
+    r"(?:\[(?:P0|P1)\]|(?:P0|P1)\b|(?:<sub>){1,2}!\[(?:P0|P1) Badge\])"
+)
 
 
 def parse_record(body: str) -> dict[str, str] | None:
@@ -328,6 +331,11 @@ def _verify_issue_comment_result(
     request = parse_request(str(latest_request_comment.get("body") or ""))
     if request is None:
         raise RuntimeError("latest Codex request is not one exact structured request")
+    if (
+        not latest_request_comment.get("created_at")
+        or latest_request_comment.get("updated_at") != latest_request_comment.get("created_at")
+    ):
+        raise RuntimeError("latest Codex request was edited after creation")
 
     matching_requests: list[tuple[dict, dict[str, str]]] = []
     for comment in request_like:
@@ -335,6 +343,8 @@ def _verify_issue_comment_result(
             continue
         parsed = parse_request(str(comment.get("body") or ""))
         if parsed is None:
+            continue
+        if not comment.get("created_at") or comment.get("updated_at") != comment.get("created_at"):
             continue
         request_class = parsed["REVIEWER_CLASS"]
         allowed_classes = {required_class} if required_class == "deep" else {"fast", "deep"}

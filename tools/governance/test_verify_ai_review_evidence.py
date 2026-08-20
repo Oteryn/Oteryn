@@ -213,9 +213,11 @@ def request_body(head: str, fp: str = ISSUE_FP, *, tier: str = "R2",
 
 def issue_comment(comment_id: int, text: str, *, login: str = "blakinio",
                   association: str = "OWNER", stamp: str = "2026-08-20T10:00:00Z",
+                  updated_stamp: str | None = None,
                   repository: str = "Oteryn/Test", pr: int = 7) -> dict:
     return {
         "id": comment_id, "body": text, "created_at": stamp,
+        "updated_at": stamp if updated_stamp is None else updated_stamp,
         "author_association": association, "user": {"login": login},
         "issue_url": f"https://api.github.com/repos/{repository}/issues/{pr}",
         "html_url": f"https://github.com/{repository}/pull/{pr}#issuecomment-{comment_id}",
@@ -341,6 +343,13 @@ def test_issue_comment_wrong_reviewer_class_fails() -> None:
     expect_fail(lambda: run_issue(comments, repo, final))
 
 
+def test_issue_comment_edited_request_fails() -> None:
+    repo, _, final = make_repo()
+    request = issue_comment(10, request_body(final), updated_stamp="2026-08-20T10:02:00Z")
+    comments = [request, codex_result(11, final[:10], stamp="2026-08-20T10:01:00Z")]
+    expect_fail(lambda: run_issue(comments, repo, final))
+
+
 def test_issue_comment_request_after_result_fails() -> None:
     repo, _, final = make_repo()
     comments = [codex_result(11, final[:10], stamp="2026-08-20T10:00:00Z"),
@@ -370,6 +379,22 @@ def test_issue_comment_p1_inline_finding_fails() -> None:
     repo, _, final = make_repo()
     reviews = [codex_review(90, final)]
     inline = [codex_inline(90, "P1 Badge security issue")]
+    expect_fail(lambda: run_issue(valid_issue_pair(repo, final), repo, final,
+                                  reviews=reviews, review_comments=inline))
+
+
+def test_issue_comment_bracketed_p1_inline_finding_fails() -> None:
+    repo, _, final = make_repo()
+    reviews = [codex_review(92, final)]
+    inline = [codex_inline(92, "[P1] Security boundary bypass")]
+    expect_fail(lambda: run_issue(valid_issue_pair(repo, final), repo, final,
+                                  reviews=reviews, review_comments=inline))
+
+
+def test_issue_comment_standard_badge_p1_inline_finding_fails() -> None:
+    repo, _, final = make_repo()
+    reviews = [codex_review(93, final)]
+    inline = [codex_inline(93, "**<sub><sub>![P1 Badge](https://img.shields.io/badge/P1-orange?style=flat)</sub></sub>  Security boundary bypass**")]
     expect_fail(lambda: run_issue(valid_issue_pair(repo, final), repo, final,
                                   reviews=reviews, review_comments=inline))
 
