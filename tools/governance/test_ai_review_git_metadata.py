@@ -164,6 +164,22 @@ def test_risk_bearing_base_mode_advance_invalidates_fingerprint() -> None:
     assert m.tree_entry_at(repo, base_two, "src/app.py").startswith("100755:blob:")
 
 
+def test_unicode_risk_bearing_path_has_raw_tree_entry_and_fingerprint() -> None:
+    repo, _ = make_repo()
+    path = repo / "docs/governance/café.md"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("authority one\n", encoding="utf-8")
+    base = commit_all(repo, "add unicode governance path")
+    path.write_text("authority two\n", encoding="utf-8")
+    head = commit_all(repo, "edit unicode governance path")
+    result = m.evaluate(base, head, repo, m.DEFAULT_POLICY)
+    assert result["tier"] == "R2", result
+    assert "docs/governance/café.md" in result["risk_bearing_paths"], result
+    entry = m.tree_entry_at(repo, base, "docs/governance/café.md")
+    assert entry.startswith("100644:blob:"), entry
+    assert len(result["review_fingerprint"]) == 64
+
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:
