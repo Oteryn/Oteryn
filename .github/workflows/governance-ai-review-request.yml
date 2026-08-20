@@ -18,7 +18,6 @@ jobs:
   record-review-request:
     if: >-
       github.event.issue.pull_request &&
-      contains(github.event.comment.body, '@codex review') &&
       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     runs-on: ubuntu-latest
     steps:
@@ -56,8 +55,11 @@ jobs:
           comment_id = int(os.environ["COMMENT_ID"])
           body = os.environ["COMMENT_BODY"]
           token = os.environ["GH_TOKEN"]
+          if "@codex review" not in body.casefold():
+              print("comment does not invoke Codex review")
+              raise SystemExit(0)
           request_command_count = sum(
-              line.strip() == "@codex review" for line in body.splitlines()
+              line.strip().casefold() == "@codex review" for line in body.splitlines()
           )
 
           def api(url, *, method="GET", payload=None):

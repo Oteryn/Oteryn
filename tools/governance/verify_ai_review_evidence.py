@@ -70,7 +70,7 @@ def parse_record(body: str) -> dict[str, str] | None:
 def parse_request(body: str) -> dict[str, str] | None:
     if body.count(REQUEST_MARKER) != 1:
         return None
-    if sum(1 for line in body.splitlines() if line.strip() == "@codex review") != 1:
+    if sum(1 for line in body.splitlines() if line.strip().casefold() == "@codex review") != 1:
         return None
     fields: dict[str, str] = {}
     for line in body.splitlines():
@@ -153,7 +153,10 @@ def _created_at(value: dict) -> tuple[datetime, int]:
 def _is_request_like(comment: dict) -> bool:
     if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
         return False
-    return any(line.strip() == "@codex review" for line in str(comment.get("body") or "").splitlines())
+    return any(
+        line.strip().casefold() == "@codex review"
+        for line in str(comment.get("body") or "").splitlines()
+    )
 
 
 def _is_result_like(comment: dict) -> bool:

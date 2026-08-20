@@ -374,6 +374,8 @@ def test_request_registry_is_default_branch_only_and_never_checks_out_candidate(
     assert "REQUEST_COMMENT_ID" in workflow
     assert "REQUEST_BODY_SHA256" in workflow
     assert "event\": \"COMMENT" in workflow
+    assert '"@codex review" not in body.casefold()' in workflow
+    assert 'line.strip().casefold() == "@codex review"' in workflow
     assert policy["review_request_anchor_logins"] == ["github-actions[bot]"]
 
 
