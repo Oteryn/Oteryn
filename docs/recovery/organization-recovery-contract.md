@@ -35,7 +35,7 @@ This is an organization-level recovery contract. Provider repositories remain au
 - `RESTORE_PROCEDURE`:
   1. initialize an isolated scratch directory, for example `WORKDIR="$(mktemp -d)"`, then download the six assets from Release `platform-transfer-cut-2026-08-18` into `"$WORKDIR"`;
   2. verify asset basenames against the exact SHA-256 identities below and GitHub Release digest readback;
-  3. run `tar -tzf Oteryn-Platform-mirror.git.tar.gz`;
+  3. run `tar -tzf "$WORKDIR/Oteryn-Platform-mirror.git.tar.gz"`;
   4. clone `Oteryn-Platform-full.bundle` into a new isolated repository, for example `git clone "$WORKDIR/Oteryn-Platform-full.bundle" "$WORKDIR/restored-platform"`;
   5. run `git -C "$WORKDIR/restored-platform" fsck --full` and `git -C "$WORKDIR/restored-platform" bundle verify "$WORKDIR/Oteryn-Platform-full.bundle"`;
   6. compare restored heads/tags against `source-refs.txt` by exact object ID;
