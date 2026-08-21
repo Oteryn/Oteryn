@@ -106,7 +106,8 @@ def test_post_registry_unanchored_malformed_request_remains_ambiguous() -> None:
     cutoff = m._request_anchor_rollout_time(repo, rollout)
     assert cutoff is not None
     malformed = core_tests.issue_comment(
-        9, "@codex review\n\nmalformed request after registry rollout",
+        9,
+        "@codex review\n\nmalformed request after registry rollout",
         stamp=_iso(cutoff + timedelta(seconds=1)),
     )
     current = core_tests.issue_comment(
@@ -124,7 +125,8 @@ def test_pre_registry_request_retains_later_p1_for_global_blocking_scan() -> Non
     assert cutoff is not None
     policy = _policy_with_rollout("Oteryn/Test", rollout)
     historical = core_tests.issue_comment(
-        9, "@codex review\n\nlegacy request created before immutable anchors existed",
+        9,
+        "@codex review\n\nlegacy request created before immutable anchors existed",
         login="legacy-member", association="CONTRIBUTOR",
         stamp=_iso(cutoff - timedelta(seconds=3)),
     )
@@ -275,6 +277,38 @@ def test_untrusted_inflight_p1_text_before_first_anchor_does_not_block() -> None
     assert found["review_source_kind"] == "issue_comment_result"
 
 
+def test_no_anchor_keeps_legacy_window_open_for_trusted_p1() -> None:
+    repo, rollout, final = core_tests.make_repo()
+    cutoff = m._request_anchor_rollout_time(repo, rollout)
+    assert cutoff is not None
+    policy = _policy_with_rollout("Oteryn/Test", rollout)
+    blocker = core_tests.issue_comment(
+        9, "[P1] In-flight legacy review with no immutable anchor yet",
+        login="chatgpt-codex-connector[bot]", association="NONE",
+        stamp=_iso(cutoff + timedelta(minutes=5)),
+    )
+    assert m._legacy_trusted_blocking_finding_exists(
+        [blocker], reviews=[], policy=policy, repo_root=repo, head=final,
+        repository="Oteryn/Test", pr_number=7,
+    ) is True
+
+
+def test_no_anchor_untrusted_p1_text_does_not_block() -> None:
+    repo, rollout, final = core_tests.make_repo()
+    cutoff = m._request_anchor_rollout_time(repo, rollout)
+    assert cutoff is not None
+    policy = _policy_with_rollout("Oteryn/Test", rollout)
+    noise = core_tests.issue_comment(
+        9, "[P1] Untrusted text while no immutable anchor exists",
+        login="evil-bot", association="NONE",
+        stamp=_iso(cutoff + timedelta(minutes=5)),
+    )
+    assert m._legacy_trusted_blocking_finding_exists(
+        [noise], reviews=[], policy=policy, repo_root=repo, head=final,
+        repository="Oteryn/Test", pr_number=7,
+    ) is False
+
+
 def test_older_valid_anchor_defines_boundary_after_non_neutral_repair() -> None:
     repo, rollout, final = core_tests.make_repo(non_neutral_after_review=True)
     cutoff = m._request_anchor_rollout_time(repo, rollout)
@@ -329,7 +363,9 @@ def test_malformed_rollout_marker_keeps_legacy_request_ambiguous() -> None:
         9, "@codex review\n\nlegacy-looking request with malformed rollout proof",
         stamp=_iso(cutoff - timedelta(seconds=2)),
     )
-    current = core_tests.issue_comment(10, core_tests.request_body(final), stamp=_iso(cutoff + timedelta(seconds=1)))
+    current = core_tests.issue_comment(
+        10, core_tests.request_body(final), stamp=_iso(cutoff + timedelta(seconds=1)),
+    )
     result = core_tests.codex_result(11, final[:10], stamp=_iso(cutoff + timedelta(seconds=2)))
     policy = _policy_with_rollout("Oteryn/Test", "not-a-sha")
     core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
@@ -340,7 +376,8 @@ def test_malformed_rollout_marker_keeps_legacy_request_ambiguous() -> None:
 def test_immutable_anchor_restores_hidden_member_request_trust() -> None:
     repo, _, final = core_tests.make_repo()
     current = core_tests.issue_comment(
-        10, core_tests.request_body(final), association="CONTRIBUTOR", stamp="2026-08-20T10:00:00Z",
+        10, core_tests.request_body(final), association="CONTRIBUTOR",
+        stamp="2026-08-20T10:00:00Z",
     )
     result = core_tests.codex_result(11, final[:10], stamp="2026-08-20T10:01:00Z")
     found = _verify_with_only_current_anchor(
@@ -353,7 +390,8 @@ def test_immutable_anchor_restores_hidden_member_request_trust() -> None:
 def test_hidden_member_request_without_anchor_fails_closed() -> None:
     repo, _, final = core_tests.make_repo()
     current = core_tests.issue_comment(
-        10, core_tests.request_body(final), association="CONTRIBUTOR", stamp="2026-08-20T10:00:00Z",
+        10, core_tests.request_body(final), association="CONTRIBUTOR",
+        stamp="2026-08-20T10:00:00Z",
     )
     result = core_tests.codex_result(11, final[:10], stamp="2026-08-20T10:01:00Z")
     core_tests.expect_fail(lambda: m.verify_records(
@@ -366,7 +404,8 @@ def test_hidden_member_request_without_anchor_fails_closed() -> None:
 def test_anchor_body_mismatch_does_not_restore_hidden_member_trust() -> None:
     repo, _, final = core_tests.make_repo()
     current = core_tests.issue_comment(
-        10, core_tests.request_body(final), association="CONTRIBUTOR", stamp="2026-08-20T10:00:00Z",
+        10, core_tests.request_body(final), association="CONTRIBUTOR",
+        stamp="2026-08-20T10:00:00Z",
     )
     anchor = _server_anchor(current, final)
     current = deepcopy(current)
@@ -384,7 +423,8 @@ def test_anchored_author_unrelated_edit_still_fails_closed() -> None:
         stamp="2026-08-20T09:59:00Z", updated_stamp="2026-08-20T10:02:00Z",
     )
     current = core_tests.issue_comment(
-        10, core_tests.request_body(final), association="CONTRIBUTOR", stamp="2026-08-20T10:00:00Z",
+        10, core_tests.request_body(final), association="CONTRIBUTOR",
+        stamp="2026-08-20T10:00:00Z",
     )
     result = core_tests.codex_result(11, final[:10], stamp="2026-08-20T10:01:00Z")
     core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
@@ -408,7 +448,9 @@ def test_live_codex_clean_flair_variants_pass() -> None:
         ":rocket:", "More of your lovely PRs please.",
     ):
         repo, _, final = core_tests.make_repo()
-        current = core_tests.issue_comment(10, core_tests.request_body(final), stamp="2026-08-20T10:00:00Z")
+        current = core_tests.issue_comment(
+            10, core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
+        )
         result = core_tests.codex_result(
             11, final[:10], stamp="2026-08-20T10:01:00Z", text=_live_clean_text(final, flair),
         )
@@ -423,7 +465,9 @@ def test_unobserved_or_contradictory_clean_flair_fails_closed() -> None:
         "There are serious risks.", "Looks mostly fine!",
     ):
         repo, _, final = core_tests.make_repo()
-        current = core_tests.issue_comment(10, core_tests.request_body(final), stamp="2026-08-20T10:00:00Z")
+        current = core_tests.issue_comment(
+            10, core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
+        )
         result = core_tests.codex_result(
             11, final[:10], stamp="2026-08-20T10:01:00Z", text=_live_clean_text(final, flair),
         )
