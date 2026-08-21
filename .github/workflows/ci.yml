@@ -169,6 +169,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/governance/audit_github_readonly.py --offline
+          python3 tools/governance/test_audit_github_readonly.py
 
       - name: Validate AI review risk policy
         shell: bash
