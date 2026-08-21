@@ -52,7 +52,7 @@
       "classification": "TEMPORARY_MIGRATION",
       "purpose": "Preserve the previous target-coordinate bootstrap state during the Platform owner-transfer transaction.",
       "lifecycle_state": "ARCHIVED_READ_ONLY",
-      "terminal_gate": "SATISFIED: durable transfer-cut Release and restore evidence are retained; repository is archived read-only and deletion is not required.",
+      "terminal_gate": "PARTIAL: durable transfer-cut Release and restore evidence are retained and the repository is archived read-only, but current backup recurrence and full organization recovery/control-plane authority remain unproven in the recovery contract.",
       "normative_product_authority": false
     }
   ],
