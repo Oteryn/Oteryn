@@ -265,7 +265,11 @@ def _normalize_request_ambiguity_trust(
     for comment in comments:
         clone = deepcopy(comment)
         login = str((comment.get("user") or {}).get("login", "")).casefold()
-        if _request_command_present(str(comment.get("body") or "")) and login in trusted_authors:
+        if (
+            _request_command_present(str(comment.get("body") or ""))
+            and comment.get("author_association") not in _core.TRUSTED_ASSOCIATIONS
+            and login in trusted_authors
+        ):
             clone["author_association"] = trusted_authors[login]
         normalized.append(clone)
     return normalized
