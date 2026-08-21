@@ -21,7 +21,7 @@ This is an organization-level recovery contract. Provider repositories remain au
 - `LAST_RESTORE_TEST`: `UNKNOWN` for a backup covering the current heads of all four permanent repositories.
 - `RESTORE_VALIDATION`: `UNKNOWN`.
 
-`blakinio/Oteryn-v2` and bounded `blakinio/Otheryn` history are migration/reference provenance, not complete backups of later target-only history. The former Game migration source `blakinio/Oteryn-v2` is archived read-only after successful target reconciliation.
+`blakinio/Oteryn-v2` and bounded `blakinio/Otheryn` history are migration/reference provenance, not complete backups of later target-only history. The current machine-readable inventory still classifies the former Game migration source as retirement-pending; its final archival/source-retirement state is therefore `UNKNOWN` in this recovery contract until the manifest and live proof are reconciled.
 
 ### Platform transfer-cut Git-history artifact
 
@@ -36,8 +36,8 @@ This is an organization-level recovery contract. Provider repositories remain au
   1. download the six assets from Release `platform-transfer-cut-2026-08-18` into an isolated scratch directory;
   2. verify asset basenames against the exact SHA-256 identities below and GitHub Release digest readback;
   3. run `tar -tzf Oteryn-Platform-mirror.git.tar.gz`;
-  4. clone `Oteryn-Platform-full.bundle` into a new isolated repository;
-  5. run `git fsck --full` and `git bundle verify Oteryn-Platform-full.bundle`;
+  4. clone `Oteryn-Platform-full.bundle` into a new isolated repository, for example `git clone "$WORKDIR/Oteryn-Platform-full.bundle" "$WORKDIR/restored-platform"`;
+  5. run `git -C "$WORKDIR/restored-platform" fsck --full` and `git -C "$WORKDIR/restored-platform" bundle verify "$WORKDIR/Oteryn-Platform-full.bundle"`;
   6. compare restored heads/tags against `source-refs.txt` by exact object ID;
   7. require restored `refs/heads/main=c567da9d9ae444110262774f8febf5a5abab2a90` before treating the cut as valid recovery evidence;
   8. never overwrite canonical `Oteryn/Oteryn-Platform` from this historical cut without a separately authorized recovery incident.
@@ -57,7 +57,7 @@ Exact durable asset identities:
 
 Historical defect resolution: the original `SHA256SUMS.txt` embeds absolute GitHub-runner paths. The defect is preserved as provenance rather than rewritten. The durable procedure validates by asset basename using the explicit identities above and Release digest readback, so the portability defect no longer blocks recovery. The historical manifest's `head_push_rc=1` remains evidence of a failed temporary reseed attempt, not proof of target seeding.
 
-Terminal gate for `Oteryn/Oteryn-Platform-Migration-Backup-20260818`: **SATISFIED — ARCHIVED_READ_ONLY**. Provider transfer acceptance, retention/provenance disposition and a durable checksum-portability procedure are proven. The one-off seed workflow was removed before archival. Deletion is not required and would unnecessarily destroy provenance.
+Terminal gate for `Oteryn/Oteryn-Platform-Migration-Backup-20260818`: **PARTIAL — ARCHIVED_READ_ONLY OBSERVED, MANIFEST RECONCILIATION PENDING**. Provider transfer acceptance, retention/provenance disposition and a durable checksum-portability procedure are recorded, but the current canonical inventory still says `terminal_disposition_required`. This contract does not override that machine-readable state. Reconcile the manifest against live repository evidence before declaring the terminal gate satisfied. The one-off seed workflow was removed before archival; deletion is not presumed required.
 
 ### Platform production data
 
