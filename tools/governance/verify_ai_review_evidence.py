@@ -242,6 +242,47 @@ def _conservative_pre_rollout_blocker_comments(
     return normalized
 
 
+def _pre_rollout_trusted_blocking_finding_exists(
+    comments: list[dict], *, policy: dict, repo_root: str | Path, head: str,
+    repository: str, pr_number: int,
+) -> bool:
+    """Fail closed on surviving pre-rollout P0/P1 even if its request was deleted.
+
+    The request registry did not exist before rollout, so a deleted initiating request
+    cannot be reconstructed from REST. A surviving blocking finding from a configured
+    trusted external reviewer is therefore retained as a blocker. This path can only
+    add FAIL; it never creates review identity or PASS evidence.
+    """
+    rollout_commit = _configured_rollout_commit(policy, repository)
+    if rollout_commit is None or not _core.is_ancestor(repo_root, rollout_commit, head):
+        return False
+    cutoff = _request_anchor_rollout_time(repo_root, rollout_commit)
+    if cutoff is None:
+        return False
+
+    reviewer_ids: set[str] = set()
+    for reviewer_class in ("fast", "deep"):
+        reviewer_ids.update(policy.get("reviewer_preferences", {}).get(reviewer_class, []))
+    trusted_logins: set[str] = set()
+    for reviewer_id in reviewer_ids:
+        trusted_logins.update(_core._trusted_logins(policy, reviewer_id))
+    if not trusted_logins:
+        return True
+
+    for comment in comments:
+        created = _strict_comment_time(comment)
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if (
+            _core._issue_comment_identity(comment, repository, pr_number)
+            and created is not None
+            and created < cutoff
+            and login in trusted_logins
+            and _core.BLOCKING_FINDING_RE.search(str(comment.get("body") or ""))
+        ):
+            return True
+    return False
+
+
 def _compat_parse_clean_result(body: str) -> str | None:
     exact = _original_parse_clean_result(body)
     if exact is not None:
@@ -272,6 +313,12 @@ def _compat_fetch_review_source(
 
 
 def _compat_blocking_findings(*, comments: list[dict], **kwargs) -> bool:
+    if _pre_rollout_trusted_blocking_finding_exists(
+        comments,
+        policy=kwargs["policy"], repo_root=kwargs["repo_root"], head=kwargs["head"],
+        repository=kwargs["repository"], pr_number=kwargs["pr_number"],
+    ):
+        return True
     conservative = _conservative_pre_rollout_blocker_comments(
         comments,
         policy=kwargs["policy"], repo_root=kwargs["repo_root"], head=kwargs["head"],
@@ -328,6 +375,7 @@ globals()["_configured_rollout_commit"] = _configured_rollout_commit
 globals()["_request_anchor_rollout_time"] = _request_anchor_rollout_time
 globals()["_normalize_anchor_trust"] = _normalize_anchor_trust
 globals()["_filter_pre_rollout_unstructured_requests"] = _filter_pre_rollout_unstructured_requests
+globals()["_pre_rollout_trusted_blocking_finding_exists"] = _pre_rollout_trusted_blocking_finding_exists
 globals()["_compat_parse_clean_result"] = _compat_parse_clean_result
 globals()["fetch_json"] = _original_fetch_json
 globals()["fetch_review_source"] = _compat_fetch_review_source
