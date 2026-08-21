@@ -146,9 +146,8 @@ def _identity_valid_request_anchors(
 def _eligible_anchor_map(
     *, reviews: list[dict], policy: dict, repo_root: str | Path,
     head: str, repository: str, pr_number: int,
-) -> tuple[dict[int, dict[str, str]], dict[str, str]]:
+) -> dict[int, dict[str, str]]:
     by_comment: dict[int, dict[str, str]] = {}
-    trusted_authors: dict[str, str] = {}
     for _, anchor in _core._eligible_request_anchors(
         reviews=reviews, policy=policy, repo_root=repo_root, head=head,
         repository=repository, pr_number=pr_number,
@@ -162,17 +161,7 @@ def _eligible_anchor_map(
         if comment_id in by_comment and by_comment[comment_id] != anchor:
             raise RuntimeError("request anchor comment identity is ambiguous")
         by_comment[comment_id] = anchor
-
-    # Association trust is identity history, not current-review PASS authority.
-    # Keep stale/non-neutral anchors out of by_comment while retaining their
-    # server-bound author association for fail-closed edit detection. A user
-    # may legitimately move between trusted GitHub associations over time.
-    for anchor in _identity_valid_request_anchors(
-        reviews=reviews, policy=policy, repository=repository, pr_number=pr_number,
-    ):
-        author = anchor["REQUEST_AUTHOR"].casefold()
-        trusted_authors.setdefault(author, anchor["REQUEST_AUTHOR_ASSOCIATION"])
-    return by_comment, trusted_authors
+    return by_comment
 
 
 def _all_valid_request_anchor_orders(
@@ -207,11 +196,48 @@ def _anchor_matches_comment(anchor: dict[str, str], comment: dict) -> bool:
     )
 
 
+def _historical_anchor_trusted_edit_exists(
+    comments: list[dict], *, reviews: list[dict], policy: dict,
+    repository: str, pr_number: int,
+) -> bool:
+    """Use historical anchor identity only to add fail-closed edit detection, never PASS authority."""
+    anchors = _identity_valid_request_anchors(
+        reviews=reviews, policy=policy, repository=repository, pr_number=pr_number,
+    )
+    trusted_authors = {anchor["REQUEST_AUTHOR"].casefold() for anchor in anchors}
+    by_id: dict[int, dict] = {}
+    for comment in comments:
+        try:
+            comment_id = int(comment.get("id") or 0)
+        except (TypeError, ValueError):
+            continue
+        if comment_id > 0:
+            by_id[comment_id] = comment
+
+    for anchor in anchors:
+        comment = by_id.get(int(anchor["REQUEST_COMMENT_ID"]))
+        if comment is not None and not _anchor_matches_comment(anchor, comment):
+            return True
+
+    for comment in comments:
+        if not _core._issue_comment_identity(comment, repository, pr_number):
+            continue
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if login not in trusted_authors:
+            continue
+        created_at = str(comment.get("created_at") or "")
+        updated_at = str(comment.get("updated_at") or "")
+        if created_at and updated_at and updated_at != created_at:
+            return True
+    return False
+
+
 def _normalize_anchor_trust(
     comments: list[dict], *, reviews: list[dict], policy: dict,
     repo_root: str | Path, head: str, repository: str, pr_number: int,
 ) -> list[dict]:
-    by_comment, trusted_authors = _eligible_anchor_map(
+    """Restore association only for an exact current-eligible immutable request anchor."""
+    by_comment = _eligible_anchor_map(
         reviews=reviews, policy=policy, repo_root=repo_root, head=head,
         repository=repository, pr_number=pr_number,
     )
@@ -223,14 +249,8 @@ def _normalize_anchor_trust(
         except (TypeError, ValueError):
             comment_id = 0
         anchor = by_comment.get(comment_id)
-        if anchor is not None:
-            if _anchor_matches_comment(anchor, comment):
-                clone["author_association"] = anchor["REQUEST_AUTHOR_ASSOCIATION"]
-            normalized.append(clone)
-            continue
-        login = str((comment.get("user") or {}).get("login", "")).casefold()
-        if login in trusted_authors:
-            clone["author_association"] = trusted_authors[login]
+        if anchor is not None and _anchor_matches_comment(anchor, comment):
+            clone["author_association"] = anchor["REQUEST_AUTHOR_ASSOCIATION"]
         normalized.append(clone)
     return normalized
 
@@ -391,8 +411,14 @@ def _compat_issue_comment_result(comments: list[dict], **kwargs) -> dict:
 
 
 def _compat_verify_records(comments: list[dict], **kwargs) -> dict:
+    reviews = kwargs.get("reviews") or []
+    if _historical_anchor_trusted_edit_exists(
+        comments, reviews=reviews, policy=kwargs["policy"],
+        repository=kwargs["repository"], pr_number=kwargs["pr_number"],
+    ):
+        raise RuntimeError("trusted maintainer comment or immutable request anchor was edited")
     normalized = _normalize_anchor_trust(
-        comments, reviews=kwargs.get("reviews") or [], policy=kwargs["policy"],
+        comments, reviews=reviews, policy=kwargs["policy"],
         repo_root=kwargs["repo_root"], head=kwargs["head"],
         repository=kwargs["repository"], pr_number=kwargs["pr_number"],
     )
