@@ -27,7 +27,7 @@ _original_resolve_reviewed_prefix = _core.resolve_reviewed_prefix
 
 _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
 _ALLOWED_CLEAN_FLAIR = {
-    "Swish!", "Hooray!", "Chef's kiss.", "Breezy!", "Nice work!",
+    "Swish!", "Hooray!", "Chef's kiss.", "Breezy!", "Nice work!", "Bravo.",
     ":rocket:", "More of your lovely PRs please.",
 }
 
