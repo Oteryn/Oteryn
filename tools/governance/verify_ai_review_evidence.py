@@ -8,12 +8,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Exact protected-main commit that first made immutable request anchors available.
-# A request created before this commit cannot have targeted a descendant commit
-# that did not exist yet. Post-rollout unanchored/malformed requests still fail closed.
 REQUEST_ANCHOR_ROLLOUT_COMMIT = "dbed59b9cfab1e8a66ac9e0a5056053718980ce3"
-# Compatibility is repository-scoped and declared in the trusted machine-readable policy.
-# Repositories without a proven rollout marker retain every request-like comment.
 
 _CORE_PATH = Path(__file__).with_name("verify_ai_review_evidence_core.py")
 _spec = importlib.util.spec_from_file_location("verify_ai_review_evidence_core", _CORE_PATH)
@@ -192,7 +187,6 @@ def _normalize_anchor_trust(
     comments: list[dict], *, reviews: list[dict], policy: dict,
     repo_root: str | Path, head: str, repository: str, pr_number: int,
 ) -> list[dict]:
-    """Recover server-proven request trust when REST hides private org membership."""
     by_comment, trusted_authors = _eligible_anchor_map(
         reviews=reviews, policy=policy, repo_root=repo_root, head=head,
         repository=repository, pr_number=pr_number,
@@ -299,7 +293,7 @@ def _legacy_trusted_blocking_finding_exists(
         )
         if order[0] >= cutoff
     ]
-    legacy_window_end: tuple[datetime, int] = min(anchor_orders) if anchor_orders else (cutoff, 0)
+    legacy_window_end: tuple[datetime, int] | None = min(anchor_orders) if anchor_orders else None
 
     reviewer_ids: set[str] = set()
     for reviewer_class in ("fast", "deep"):
@@ -316,7 +310,7 @@ def _legacy_trusted_blocking_finding_exists(
         if (
             _core._issue_comment_identity(comment, repository, pr_number)
             and order is not None
-            and order < legacy_window_end
+            and (legacy_window_end is None or order < legacy_window_end)
             and login in trusted_logins
             and _core.BLOCKING_FINDING_RE.search(str(comment.get("body") or ""))
         ):
