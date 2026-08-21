@@ -19,7 +19,7 @@ Lifecycle authority remains GitHub Issue #32. This report is a durable technical
 | Atlas | `oteryn-synology-atlas` | `atlas-runners` | `2.336.0` | running; immutable GHCR digest |
 | Game | `oteryn-synology-game` | `game-runners` | `2.336.0` | running; immutable GHCR digest |
 
-The observed new image identity is `ghcr.io/oteryn/oteryn-deploy-runner@sha256:f0c452798a17df09006a12d437e83a72d681dcd338ef22ed01fca329d1bbab8d`. The GitHub checkpoint records distinct local registration/config/work state and the evidence date. These are implementation-observation facts only; they do not independently prove group policy or successful routing.
+The observed new image identity is `ghcr.io/oteryn/oteryn-deploy-runner@sha256:f0c452798a17df09006a12d437e83a72d681dcd338ef22ed01fca329d1bbab8d`. The exact evidence checkpoint is [Oteryn/Oteryn Issue #32 comment 5374400776](https://github.com/Oteryn/Oteryn/issues/32#issuecomment-5374400776), recorded 2026-08-21. It records distinct local registration/config/work state and the evidence date. These are implementation-observation facts only; they do not independently prove group policy or successful routing.
 
 ## Boundary model
 
