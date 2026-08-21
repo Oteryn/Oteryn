@@ -1,15 +1,15 @@
-# Oteryn Organization Runner Topology Audit — 2026-08-21 (live implementation checkpoint)
+# Oteryn Organization Runner Topology Audit — 2026-08-21 (terminal evidence checkpoint)
 
 Audit owner: `Oteryn/Oteryn#32`
 Audit contract context: `OTERYN-ORG-AUDIT-v3.10`
 Evidence date: 2026-08-21
-Scope: META governance evidence and read-only runtime observation. Product-repository mutation is out of scope.
+Scope: META governance evidence and read-only runtime/GitHub observation. Product-repository mutation is out of scope.
 
-## Technical observation
+## Authority and lifecycle
 
-Separate Platform, Atlas and Game organization runner registrations/groups were observed as implemented and running, while secure effective routing and repository restriction are not yet proven.
+GitHub Issue #32 is the sole lifecycle authority for the runner-topology migration. This report is a durable technical observation only; it intentionally does not carry a mutable lifecycle status and does not declare the migration complete.
 
-Lifecycle authority remains GitHub Issue #32. This report is a durable technical observation, not a second lifecycle tracker or a declaration that the migration is complete.
+Primary durable implementation checkpoint: [Issue #32 comment 5374400776](https://github.com/Oteryn/Oteryn/issues/32#issuecomment-5374400776). Organization-control-plane limitation checkpoint: [Issue #34 comment 5374532953](https://github.com/Oteryn/Oteryn/issues/34#issuecomment-5374532953).
 
 ## Observed runner implementation
 
@@ -19,41 +19,63 @@ Lifecycle authority remains GitHub Issue #32. This report is a durable technical
 | Atlas | `oteryn-synology-atlas` | `atlas-runners` | `2.336.0` | running; immutable GHCR digest |
 | Game | `oteryn-synology-game` | `game-runners` | `2.336.0` | running; immutable GHCR digest |
 
-The observed new image identity is `ghcr.io/oteryn/oteryn-deploy-runner@sha256:f0c452798a17df09006a12d437e83a72d681dcd338ef22ed01fca329d1bbab8d`. The exact evidence checkpoint is [Oteryn/Oteryn Issue #32 comment 5374400776](https://github.com/Oteryn/Oteryn/issues/32#issuecomment-5374400776), recorded 2026-08-21. It records distinct local registration/config/work state and the evidence date. These are implementation-observation facts only; they do not independently prove group policy or successful routing.
+The observed replacement image identity is `ghcr.io/oteryn/oteryn-deploy-runner@sha256:f0c452798a17df09006a12d437e83a72d681dcd338ef22ed01fca329d1bbab8d`. The Issue #32 checkpoint records distinct registration/config/work state and runner agent IDs `44`/`45`/`46` in pools `3`/`4`/`5`. These facts prove provisioning/identity only; they do not independently prove selected-repository restrictions or successful provider workloads.
 
-## Boundary model
+A direct read-only Synology compose/runtime inspection during this audit also observed distinct intended capability shapes: Platform has Platform state plus Docker-host access; Atlas has Docker-host access without the Platform staging-state mount; Game runs as `1001:1001` without a Docker socket. That observation is useful least-privilege evidence, but it is not a substitute for GitHub runner-group policy readback or a successful workload.
 
-| Repository | Default execution | Local ownership target | Current evidence state |
-| --- | --- | --- | --- |
-| `Oteryn/Oteryn` | GitHub-hosted | none proven | DONE |
-| `Oteryn/Oteryn-Platform` | GitHub-hosted where locality is unnecessary | Platform staging/control-plane | PARTIAL — new runner provisioned |
-| `Oteryn/Oteryn-Atlas` | GitHub-hosted where locality is unnecessary | Atlas local preview/state/E2E/cutover | PARTIAL — new runner provisioned |
-| `Oteryn/Oteryn-Game` | GitHub-hosted where locality is unnecessary | Game local runtime/integration | PARTIAL — new runner provisioned |
+## GitHub workflow/job evidence
 
-A named runner group is not by itself proof of repository isolation. The requisite GitHub organization control-plane readback for selected repositories, labels and membership was unavailable to this audit surface. Therefore every group restriction is `UNKNOWN` rather than assumed.
+| Provider | Exact observed evidence | Result | What it proves | What it does not prove |
+| --- | --- | --- | --- | --- |
+| Platform | Actions run `32524055762`, job `96902275070` | FAILURE | scheduling reached `oteryn-synology-platform` through `platform-runners` / `oteryn-platform` | no successful replacement workload |
+| Platform legacy | Actions run `32524055889` | SUCCESS | legacy `oteryn-synology-staging` path still works/exists | does not satisfy replacement acceptance |
+| Atlas | Actions run `32524604830`, job `96903885449` | FAILURE | scheduling reached `oteryn-synology-atlas`; runner identity, Docker/local capability, FullWorld build/publication/live checks were exercised | final browser E2E failed on an obsolete semantic-query assertion |
+| Atlas repair | merged Atlas PR #46, main `1e0f021fc7a723de807e86d53a26dd0564a5ef23` | merged | removes the obsolete browser assertion that caused the cited run failure | no post-merge successful dedicated Atlas run is presently evidenced here |
+| Game | no qualifying dedicated local Actions job found | NOT PROVEN | nothing beyond provisioning | workflow routing and successful runtime/integration remain unproven |
 
-## Legacy/rollback state
+The Atlas main workflow `.github/workflows/synology-live-acceptance.yml` selects `group: atlas-runners` and `labels: oteryn-atlas`, so Atlas source routing is present. Platform owner-local replacement routing exists in its current migration work, but the observed dedicated replacement job failed. No qualifying Game-owned workflow/job using `game-runners` + `oteryn-game` was found in the read-only evidence reviewed here.
 
-The older `oteryn-synology-staging` registration/container remains an intentional bootstrap/rollback candidate. It is associated with a mutable pre-transfer image and legacy source coordinate. Legacy Atlas/Game containers are also still observable. None may be deleted or treated as retired until exact replacement jobs, workflow routing, group restrictions and rollback disposition are proven.
+## Control-plane isolation
+
+A named group/label is not a security boundary by itself. The authenticated execution token available to this audit has repository/workflow/read-org scopes but not organization-administration permission; organization runner-group selected-repository membership readback returned an authorization failure. The connector surface likewise exposes no organization runner-group membership action.
+
+Therefore the following remain `UNKNOWN` and are not inferred from labels:
+
+- `platform-runners` selected repositories equal exactly `Oteryn/Oteryn-Platform`;
+- `atlas-runners` selected repositories equal exactly `Oteryn/Oteryn-Atlas`;
+- `game-runners` selected repositories equal exactly `Oteryn/Oteryn-Game`;
+- no cross-provider repository can schedule onto another provider group.
+
+## Legacy / supply-chain state
+
+The replacement containers are pinned to the immutable Oteryn GHCR digest above. The legacy `oteryn-synology-staging` container/registration remains present and uses the mutable pre-transfer coordinate/image `ghcr.io/blakinio/oteryn-deploy-runner:main`. It MUST NOT be retired until all replacement routes, successful workloads and control-plane restrictions are proven. Consequently legacy mutable-image retirement is `NOT DONE`, not silently converted to DONE.
+
+The replacement runtime digest itself is proven immutable. Independent full build/base-image provenance, including the complete immutable base chain, is not established by the available organization-level evidence and remains `UNKNOWN`.
 
 ## Findings
 
 | ID | Severity | State | Evidence-backed conclusion |
 | --- | --- | --- | --- |
-| RUNNER-001 | HIGH | PARTIAL | New workloads use an immutable digest; legacy mutable image path remains. |
-| RUNNER-002 | MEDIUM | UNKNOWN | Immutable tag resolution is observed, but independent build/base-image provenance is not established here. |
-| RUNNER-003 | INFO | DONE | New registrations report Actions Runner `2.336.0`. |
-| RUNNER-004 | INFO | UNKNOWN | Group names exist; selected-repository restriction and effective labels require GitHub control-plane readback. |
-| RUNNER-005 | HIGH | PARTIAL | Atlas runner provisioned; no post-cutover Atlas-owned preview/deploy/E2E job proves Platform cross-use has ceased. |
-| RUNNER-006 | MEDIUM | PARTIAL | Game runner provisioned; no post-cutover Game-owned local job proves Platform cross-use has ceased. |
-| RUNNER-007 | INFO | UNKNOWN | Privileged-runner exposure to arbitrary PR code has not been revalidated against live workflow routing. |
+| RUNNER-001 | HIGH | PARTIAL | Replacement containers use one immutable Oteryn digest; legacy mutable `blakinio/...:main` remains pending safe retirement. |
+| RUNNER-002 | MEDIUM | UNKNOWN | Replacement digest is immutable, but complete reviewed build/base provenance is not independently established here. |
+| RUNNER-003 | INFO | DONE | Three replacement registrations and distinct workload identities are durably evidenced. |
+| RUNNER-004 | HIGH | UNKNOWN | Selected-repository runner-group isolation cannot be read back with available authenticated authority. |
+| RUNNER-005 | HIGH | PARTIAL | Platform replacement scheduling is proven, successful replacement workload is not. |
+| RUNNER-006 | HIGH | PARTIAL | Atlas dedicated routing/scheduling/capability are proven and PR #46 repaired the observed E2E mismatch; a post-repair successful dedicated run is not evidenced. |
+| RUNNER-007 | HIGH | NOT DONE | No qualifying Game-owned local runtime/integration job is proven. |
+| RUNNER-008 | HIGH | NOT DONE | Legacy staging registration/routing/image is not retired because prerequisite replacement proof is incomplete. |
+| RUNNER-009 | MEDIUM | UNKNOWN | Cross-provider effective group access cannot be proven without organization runner-group membership readback. |
 
-## Required evidence for Issue #32 closure
+## Acceptance matrix for Issue #32
 
-1. Organization-owner readback of each runner group: exact member runners, selected repositories and labels.
-2. One successful exact-head Platform job, Atlas job and Game job showing the intended registration/provider.
-3. Workflow/source evidence that Atlas preview/deploy/E2E and Game local integration no longer run via Platform.
-4. Least-privilege capability and mount review of all three new runner containers.
-5. A reviewed rollback/retirement record before removing legacy mutable runners or their state.
+| Gate | Verdict | Evidence / blocker |
+| --- | --- | --- |
+| A. Control-plane isolation | UNKNOWN | exact selected-repository membership cannot be read with current organization permission surface |
+| B. Workflow routing | PARTIAL | Atlas source routing present; Platform replacement work exists but successful replacement is absent; Game local routing not proven |
+| C. Live execution — Platform | NOT DONE | dedicated job `96902275070` failed |
+| C. Live execution — Atlas | PARTIAL | dedicated job exercised required local capability but failed final E2E; post-#46 PASS not evidenced |
+| C. Live execution — Game | NOT DONE | no qualifying dedicated local job found |
+| D. Legacy retirement | NOT DONE | deliberately retained because A/B/C are incomplete |
+| E. Supply chain | PARTIAL | replacement digest immutable; mutable legacy image and full base provenance remain unresolved |
 
-Until all five are proven, the technical evidence is incomplete. The authoritative lifecycle state and any closure decision remain in GitHub Issue #32.
+Issue #32 and parent implementation Issue #34 must remain open until their acceptance criteria are genuinely satisfied. The runner evidence work in this PR is terminal as a truthful audit record even though the underlying runner migration is not terminally complete.
