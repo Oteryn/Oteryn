@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import re
 import types
 from pathlib import Path
 
@@ -17,35 +16,17 @@ for _name in dir(_v1):
         globals()[_name] = getattr(_v1, _name)
 
 _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
-_BENIGN_CLEAN_FLAIR_RE = re.compile(r"^[A-Za-z][A-Za-z0-9' ,.!?-]{0,95}$")
-_CONTRADICTORY_CLEAN_FLAIR_RE = re.compile(
-    r"(?i)\b(?:p0|p1|p2|issue|issues|finding|findings|problem|problems|bug|bugs|"
-    r"risk|risks|security|vulnerab(?:ility|ilities)|however|but|except|warning|"
-    r"warnings|concern|concerns|must|should|need|needs|fix|fixes|fail|fails|"
-    r"failing|error|errors|broken|breaks|not|mostly|major|flaw|flaws|remain|remains)\b"
-)
+_OBSERVED_CLEAN_FLAIR = "Already looking forward to the next diff."
 
 
 def _compat_parse_clean_result(body: str) -> str | None:
-    """Accept bounded cosmetic Codex flair without weakening clean-result semantics.
-
-    The authenticated, immutable Codex result must still begin with the canonical
-    clean assertion and retain the exact Reviewed commit shape. Known historical
-    variants remain handled by v1; previously unseen suffixes are accepted only as
-    bounded plain-text flair and fail closed on finding/problem language.
-    """
+    """Accept only the newly observed exact cosmetic Codex clean-result suffix."""
     exact = _v1._compat_parse_clean_result(body)
     if exact is not None:
         return exact
     text = (body or "").strip()
     lines = text.splitlines()
-    if not lines or not lines[0].startswith(_CLEAN_PREFIX + " "):
-        return None
-    flair = lines[0][len(_CLEAN_PREFIX) + 1:]
-    if (
-        not _BENIGN_CLEAN_FLAIR_RE.fullmatch(flair)
-        or _CONTRADICTORY_CLEAN_FLAIR_RE.search(flair)
-    ):
+    if not lines or lines[0] != f"{_CLEAN_PREFIX} {_OBSERVED_CLEAN_FLAIR}":
         return None
     normalized = "\n".join([_CLEAN_PREFIX, *lines[1:]])
     return _v1._original_parse_clean_result(normalized)
