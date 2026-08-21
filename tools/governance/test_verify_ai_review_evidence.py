@@ -231,28 +231,57 @@ def test_deleted_pre_registry_request_retains_surviving_p1() -> None:
     ))
 
 
-def test_untrusted_pre_registry_blocking_text_without_request_does_not_block() -> None:
+def test_inflight_legacy_finding_after_rollout_blocks_before_first_valid_anchor() -> None:
+    repo, rollout, final = core_tests.make_repo()
+    cutoff = m._request_anchor_rollout_time(repo, rollout)
+    assert cutoff is not None
+    policy = _policy_with_rollout("Oteryn/Test", rollout)
+    blocker = core_tests.issue_comment(
+        9,
+        "[P1] In-flight legacy review completed after registry rollout",
+        login="chatgpt-codex-connector[bot]",
+        association="NONE",
+        stamp=_iso(cutoff + timedelta(seconds=1)),
+    )
+    current = core_tests.issue_comment(
+        10,
+        core_tests.request_body(final),
+        association="CONTRIBUTOR",
+        stamp=_iso(cutoff + timedelta(seconds=2)),
+    )
+    result = core_tests.codex_result(
+        11,
+        final[:10],
+        stamp=_iso(cutoff + timedelta(seconds=3)),
+    )
+    core_tests.expect_fail(lambda: _verify_with_only_current_anchor(
+        [blocker, current, result], repo, final, current,
+        policy=policy, anchor=_server_anchor(current, final),
+    ))
+
+
+def test_untrusted_inflight_p1_text_before_first_anchor_does_not_block() -> None:
     repo, rollout, final = core_tests.make_repo()
     cutoff = m._request_anchor_rollout_time(repo, rollout)
     assert cutoff is not None
     policy = _policy_with_rollout("Oteryn/Test", rollout)
     noise = core_tests.issue_comment(
         9,
-        "[P1] Untrusted historical text",
+        "[P1] Untrusted in-flight-looking historical text",
         login="evil-bot",
         association="NONE",
-        stamp=_iso(cutoff - timedelta(seconds=2)),
+        stamp=_iso(cutoff + timedelta(seconds=1)),
     )
     current = core_tests.issue_comment(
         10,
         core_tests.request_body(final),
         association="CONTRIBUTOR",
-        stamp=_iso(cutoff + timedelta(seconds=1)),
+        stamp=_iso(cutoff + timedelta(seconds=2)),
     )
     result = core_tests.codex_result(
         11,
         final[:10],
-        stamp=_iso(cutoff + timedelta(seconds=2)),
+        stamp=_iso(cutoff + timedelta(seconds=3)),
     )
     found = _verify_with_only_current_anchor(
         [noise, current, result], repo, final, current,
