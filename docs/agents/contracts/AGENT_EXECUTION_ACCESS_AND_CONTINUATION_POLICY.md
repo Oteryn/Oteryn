@@ -54,7 +54,7 @@ When instructed to continue, finish, complete or proceed autonomously, an agent 
 2. continue from the current state;
 3. perform safe reversible actions only within existing authorization;
 4. avoid restarting completed work;
-5. stop only for missing permissions, safety boundaries, irreversible owner decisions or contradictory authority sources.
+5. stop only after verified completion, for missing permissions, safety boundaries, irreversible owner decisions, contradictory authority sources, or when a missing capability leaves no further useful authorized work that can be completed or prepared.
 
 Autonomous continuation never converts capability into permission and never overrides an explicit authorization, safety or repository-policy boundary.
 
@@ -95,7 +95,7 @@ Previous handoffs are evidence to verify, not authority.
 
 ## Agent handoff verification
 
-Continuation agents MUST verify current HEAD, branches, PRs, CI, protection rules, ownership and evidence artifacts.
+Continuation agents MUST verify current HEAD, branches, PRs, CI, protection rules, ownership and evidence artifacts when each item is applicable and material to the task and can be inspected within current authorization. Explicitly record `NOT_APPLICABLE` for items that do not apply. Unavailable non-material state may be reported as `UNKNOWN` and is not by itself a blocker.
 
 ## Completion reporting
 
@@ -103,7 +103,7 @@ Reports MUST separate:
 
 - FACT: directly verified;
 - UNKNOWN: unavailable information;
-- BLOCKER: specific missing capability, permission, policy restriction or unresolved required condition.
+- BLOCKER: specific missing capability, permission, policy restriction or unresolved applicable required condition.
 
 Unknown is not automatically a blocker. Agents MUST NOT claim DONE without verification.
 
