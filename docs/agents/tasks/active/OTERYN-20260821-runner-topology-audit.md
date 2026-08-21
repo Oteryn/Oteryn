@@ -3,61 +3,60 @@
 Issue: #32
 Repository: Oteryn/Oteryn
 Status: VALIDATING
-Mode: read-only audit; no runner mutation
+Mode: audit + migration design; no destructive runner mutation
 
 ## Objective
 
-Establish exact current and desired GitHub Actions runner topology for Oteryn/Oteryn, Oteryn-Game, Oteryn-Platform and Oteryn-Atlas, including Synology execution boundaries, bootstrap feasibility, runner scope, groups, labels, version compatibility, isolation, routing and rollback.
+Establish exact current and desired GitHub Actions runner topology for Oteryn/Oteryn, Oteryn-Game, Oteryn-Platform and Oteryn-Atlas, including Synology execution boundaries, workload ownership, runner scope, labels, isolation, routing and rollback.
 
-## Verdict
+## Corrected verdict
 
-`KEEP_REPOSITORY_SCOPED_PLATFORM_RUNNER`
+`SEPARATE_REPOSITORY_SCOPED_LOCAL_RUNNERS_BY_WORKLOAD_OWNER`
 
-Current desired state:
+The earlier interim conclusion was invalid because it inferred local-runner need only from where `runs-on` appears. Live source proves Platform's `oteryn-staging` runner currently executes Atlas-owned and Game-owned local work.
 
-- `Oteryn/Oteryn`: GitHub-hosted only.
-- `Oteryn/Oteryn-Game`: GitHub-hosted only.
-- `Oteryn/Oteryn-Platform`: GitHub-hosted by default; keep the existing repository-scoped `oteryn-synology-staging` for trusted Synology/staging operations only.
-- `Oteryn/Oteryn-Atlas`: GitHub-hosted only.
+Desired state:
+
+- `Oteryn/Oteryn`: GitHub-hosted; no current local runtime requirement.
+- `Oteryn/Oteryn-Platform`: GitHub-hosted by default + repo-scoped `oteryn-platform` for Platform staging/control-plane.
+- `Oteryn/Oteryn-Atlas`: GitHub-hosted by default + repo-scoped `oteryn-atlas` for FullWorld local state, LAN preview, live Chromium E2E and cutover/rollback.
+- `Oteryn/Oteryn-Game`: GitHub-hosted for non-local builds/exports/tests + repo-scoped `oteryn-game` for Game-owned local runtime/integration work.
 - archived Platform migration backup: no runner.
 
-Do not create Game/Atlas self-hosted runners now. Do not migrate the current privileged Platform runner to organization scope merely for symmetry.
-
-Canonical META report candidate:
+Canonical report:
 `docs/governance/audits/OTERYN-ORG-RUNNER-TOPOLOGY-AUDIT-20260821.md`
 
-## Verified evidence
+## Corrected evidence
 
 Platform live evidence is owned by `Oteryn/Oteryn-Platform#1194` / PR #1198.
 
-- trusted-main run `32454899481`, job `96690198992`: runner `oteryn-synology-staging`, Actions Runner `2.336.0`;
-- bounded live probe run `32460223728`, job `96705516889`: Linux/X64, container user `0:0`, state running, restart always, Docker client `29.6.2`, server `24.0.2`, Compose `5.3.1`;
-- read-write runner mounts include `/runner`, `/work`, `/var/run/docker.sock` and staging state;
-- live image is `ghcr.io/blakinio/oteryn-deploy-runner:main` at image ID `sha256:bad8dc119e39553f5a9d958834562a44add4978e16f9a46df7c89507c06c24b8`;
-- current Platform registration source is repository-shaped and uses `--no-default-labels` with custom label `oteryn-staging`;
-- no retained `oteryn-staging`/`self-hosted` routing was found in META, Game or Atlas;
-- permanent Platform pull-request code is not routed onto the privileged Synology runner.
+- live runner `oteryn-synology-staging`, Actions Runner `2.336.0`, root container, RW Docker socket and Platform staging-state access;
+- Platform `repair-synology-autostart.yml` runs on that runner and fetches exact Atlas/Game revisions;
+- it runs the Game-owned creature producer, builds Atlas indices, operates persistent Atlas revision roots, controls `oteryn-atlas-fullworld-preview`, serves `192.168.1.2:8097`, and performs Atlas live cutover/rollback + real Chromium E2E;
+- Platform Synology Compose also runs the local `canary` Game runtime;
+- Atlas authority says Platform may coordinate contracts but is not an Atlas runtime data source;
+- Game authority says Game owns native runtime and Game-owned export contracts.
 
-The temporary read-only probe changes were removed before Platform evidence closeout. No runner registration, Docker resource, staging runtime, secret or protected setting was changed by the audit.
+Therefore absence of direct `self-hosted` selectors in Atlas/Game is a current topology/coupling symptom, not proof of no local requirement.
 
 ## Findings
 
-- `RUNNER-001` HIGH: mutable pre-transfer live runner image coordinate. Tracked by `Oteryn/Oteryn-Platform#1199`.
-- `RUNNER-002` MEDIUM: runner Dockerfile base uses mutable `ghcr.io/actions/actions-runner:latest`. Tracked by #1199.
-- `RUNNER-003` PASS: live runner `2.336.0` satisfies the current Node.js 24 runner-version prerequisite.
-- `RUNNER-004` PASS: `--no-default-labels` + `oteryn-staging` isolates generic self-hosted routing.
-- `RUNNER-005` PASS: no retained self-hosted routing in META/Game/Atlas.
-- `RUNNER-006` PASS: permanent Platform PR paths do not execute on the privileged Synology runner.
+- `RUNNER-001` HIGH: mutable pre-transfer live runner image; Platform #1199.
+- `RUNNER-002` MEDIUM: mutable actions-runner base; Platform #1199.
+- `RUNNER-003` PASS: runner version is current enough for Node.js 24 actions.
+- `RUNNER-004` PASS: current custom-label-only routing avoids generic self-hosted selection.
+- `RUNNER-005` HIGH: Atlas-owned local runtime/deploy/E2E currently executes through Platform runner.
+- `RUNNER-006` MEDIUM: Game-owned local producer/runtime integration is mixed into Platform execution boundary.
+- `RUNNER-007` PASS: permanent arbitrary PR code is not currently routed to privileged Synology execution.
+
+## Migration rule
+
+Keep the working `oteryn-staging` runner as bootstrap/rollback until replacements are proven. Create Atlas first, then Game, then narrow the existing Platform runner to Platform-only ownership. Use separate registration/config/work volumes and least-privilege mounts per repo; do not copy Platform staging-state access to Atlas/Game by default.
 
 ## Current closeout dependencies
 
-- META PR #30 is still open and owns active AI-review gate hardening. PR #33 must remain Draft until that governance dependency is terminal and then pass the normal protected path.
-- Platform evidence PR #1198 is Draft. Its own CI is green; Agent Governance remains red only because the already-merged Atlas deployment task for PR #1192 has stale lifecycle state. That cleanup is already owned by Platform #1191 / PR #1193. No bypass is authorized.
-
-## Safety
-
-Do not modify, remove, re-register, broaden or replace the working runner as part of this audit. The topology audit concludes that no scope migration is needed. Runner image/provenance hardening is a separate Platform task (#1199) and must preserve working registration/config and rollback state.
+META PR #30 still owns active AI-review-gate hardening. PR #33 remains Draft until that dependency is terminal and normal protected gates can run. Platform evidence PR #1198 is also Draft pending unrelated Platform lifecycle cleanup #1191/#1193. No bypass is authorized.
 
 ## Next action
 
-After META #30 and Platform #1191/#1193 are terminal, refresh PR #33 and Platform PR #1198 onto their current mains, run exact-head required checks/reviews, merge normally, archive task records and close Issues #32/#1194. The technical topology verdict itself is complete.
+After governance/lifecycle dependencies are terminal, refresh PR #33 and #1198, pass exact-head gates, merge the corrected audit, then execute the runner-split migration as a governed implementation slice with rollback.
