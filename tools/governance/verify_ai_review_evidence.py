@@ -51,9 +51,27 @@ def _compat_parse_clean_result(body: str) -> str | None:
     return _v1._original_parse_clean_result(normalized)
 
 
+def _compat_verify_records_v2(comments: list[dict], **kwargs) -> dict:
+    """Preserve the v1 entrypoint's injectable network/revision hooks."""
+    saved = {
+        name: getattr(_v1, name)
+        for name in ("fetch_review_source", "fetch_json", "resolve_reviewed_prefix")
+    }
+    for name, fallback in saved.items():
+        setattr(_v1, name, globals().get(name, fallback))
+    try:
+        return _v1._compat_verify_records(comments, **kwargs)
+    finally:
+        for name, value in saved.items():
+            setattr(_v1, name, value)
+
+
 _v1._core.parse_clean_result = _compat_parse_clean_result
+_v1._core.verify_records = _compat_verify_records_v2
 globals()["_core"] = _v1._core
 globals()["_compat_parse_clean_result"] = _compat_parse_clean_result
+globals()["_compat_verify_records_v2"] = _compat_verify_records_v2
+globals()["verify_records"] = _compat_verify_records_v2
 
 
 if __name__ == "__main__":
