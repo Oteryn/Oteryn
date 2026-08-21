@@ -5,11 +5,11 @@ Audit contract context: `OTERYN-ORG-AUDIT-v3.10`
 Evidence date: 2026-08-21
 Scope: META governance evidence and read-only runtime observation. Product-repository mutation is out of scope.
 
-## Verdict
+## Technical observation
 
-`PARTIAL — separate Platform, Atlas and Game organization runner registrations/groups are implemented and running; secure effective routing and repository restriction are not yet proven.`
+Separate Platform, Atlas and Game organization runner registrations/groups were observed as implemented and running, while secure effective routing and repository restriction are not yet proven.
 
-This replaces the pre-implementation conclusion in PR #33. It is not a declaration that the migration is complete.
+Lifecycle authority remains GitHub Issue #32. This report is a durable technical observation, not a second lifecycle tracker or a declaration that the migration is complete.
 
 ## Observed runner implementation
 
@@ -19,7 +19,7 @@ This replaces the pre-implementation conclusion in PR #33. It is not a declarati
 | Atlas | `oteryn-synology-atlas` | `atlas-runners` | `2.336.0` | running; immutable GHCR digest |
 | Game | `oteryn-synology-game` | `game-runners` | `2.336.0` | running; immutable GHCR digest |
 
-The observed new image identity is `ghcr.io/oteryn/oteryn-deploy-runner@sha256:f0c452798a17df09006a12d437e83a72d681dcd338ef22ed01fca329d1bbab8d`. The observation also shows distinct local registration/config/work state. These facts satisfy implementation existence, runner identity, and mutable-tag remediation for the new runner path.
+The observed new image identity is `ghcr.io/oteryn/oteryn-deploy-runner@sha256:f0c452798a17df09006a12d437e83a72d681dcd338ef22ed01fca329d1bbab8d`. The GitHub checkpoint records distinct local registration/config/work state and the evidence date. These are implementation-observation facts only; they do not independently prove group policy or successful routing.
 
 ## Boundary model
 
@@ -48,7 +48,7 @@ The older `oteryn-synology-staging` registration/container remains an intentiona
 | RUNNER-006 | MEDIUM | PARTIAL | Game runner provisioned; no post-cutover Game-owned local job proves Platform cross-use has ceased. |
 | RUNNER-007 | INFO | UNKNOWN | Privileged-runner exposure to arbitrary PR code has not been revalidated against live workflow routing. |
 
-## Required evidence to close
+## Required evidence for Issue #32 closure
 
 1. Organization-owner readback of each runner group: exact member runners, selected repositories and labels.
 2. One successful exact-head Platform job, Atlas job and Game job showing the intended registration/provider.
@@ -56,4 +56,4 @@ The older `oteryn-synology-staging` registration/container remains an intentiona
 4. Least-privilege capability and mount review of all three new runner containers.
 5. A reviewed rollback/retirement record before removing legacy mutable runners or their state.
 
-Until all five are proven, runner governance is **PARTIAL** and migration completion is **NOT DONE**.
+Until all five are proven, the technical evidence is incomplete. The authoritative lifecycle state and any closure decision remain in GitHub Issue #32.
