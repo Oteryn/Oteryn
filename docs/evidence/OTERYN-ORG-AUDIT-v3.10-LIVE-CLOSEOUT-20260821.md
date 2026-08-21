@@ -1,7 +1,7 @@
 # Oteryn organization audit v3.10 — live closeout snapshot
 
-**Alias:** `OTERYN-ORG-AUDIT-v3.10`  
-**Snapshot base:** `Oteryn/Oteryn@17d2db170aaa8afe535b56863287548fccac6da0`  
+**Alias:** `OTERYN-ORG-AUDIT-v3.10`
+**Snapshot base:** `Oteryn/Oteryn@17d2db170aaa8afe535b56863287548fccac6da0`
 **Scope:** META coordination evidence only. Product repositories were inspected read-only.
 
 ## Terminal state
