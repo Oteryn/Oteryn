@@ -51,6 +51,18 @@ def _compat_parse_clean_result(body: str) -> str | None:
     return _v1._original_parse_clean_result(normalized)
 
 
+def _compat_fetch_review_source_v2(
+    repository: str, pr_number: int, source_url: str, token: str
+) -> tuple[str, dict]:
+    """Preserve the v1 entrypoint's injectable fetch_json hook for direct calls."""
+    saved = _v1.fetch_json
+    _v1.fetch_json = globals().get("fetch_json", saved)
+    try:
+        return _v1._compat_fetch_review_source(repository, pr_number, source_url, token)
+    finally:
+        _v1.fetch_json = saved
+
+
 def _compat_verify_records_v2(comments: list[dict], **kwargs) -> dict:
     """Preserve the v1 entrypoint's injectable network/revision hooks."""
     saved = {
@@ -70,7 +82,9 @@ _v1._core.parse_clean_result = _compat_parse_clean_result
 _v1._core.verify_records = _compat_verify_records_v2
 globals()["_core"] = _v1._core
 globals()["_compat_parse_clean_result"] = _compat_parse_clean_result
+globals()["_compat_fetch_review_source_v2"] = _compat_fetch_review_source_v2
 globals()["_compat_verify_records_v2"] = _compat_verify_records_v2
+globals()["fetch_review_source"] = _compat_fetch_review_source_v2
 globals()["verify_records"] = _compat_verify_records_v2
 
 
