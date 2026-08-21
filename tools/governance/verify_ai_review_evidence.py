@@ -69,6 +69,16 @@ def _strict_comment_time(comment: dict) -> datetime | None:
     return stamp.astimezone(timezone.utc)
 
 
+def _strict_timestamp(raw: str) -> datetime | None:
+    try:
+        stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except (AttributeError, ValueError):
+        return None
+    if stamp.tzinfo is None:
+        return None
+    return stamp.astimezone(timezone.utc)
+
+
 def _request_command_present(body: str) -> bool:
     return any(line.strip().casefold() == "@codex review" for line in body.splitlines())
 
@@ -131,14 +141,7 @@ def _normalize_anchor_trust(
     comments: list[dict], *, reviews: list[dict], policy: dict,
     repo_root: str | Path, head: str, repository: str, pr_number: int,
 ) -> list[dict]:
-    """Recover server-proven request trust when REST hides private org membership.
-
-    The issue-comment webhook records the authoritative association in an immutable
-    github-actions review anchor. Public/repository-scoped REST can later expose the
-    same organization member as CONTRIBUTOR. Only an exact anchor/comment match may
-    restore the request's association. Other comments by that already anchored author
-    are treated as trusted only for the core's fail-closed edit/blocker checks.
-    """
+    """Recover server-proven request trust when REST hides private org membership."""
     by_comment, trusted_authors = _eligible_anchor_map(
         reviews=reviews, policy=policy, repo_root=repo_root, head=head,
         repository=repository, pr_number=pr_number,
@@ -207,13 +210,7 @@ def _conservative_pre_rollout_blocker_comments(
     comments: list[dict], *, policy: dict, repo_root: str | Path, head: str,
     repository: str, pr_number: int,
 ) -> list[dict]:
-    """Preserve observable legacy request history only for blocker discovery.
-
-    An edited pre-rollout comment can no longer prove what its original body was.
-    If it predates rollout and has server edit metadata, synthesize request-like text
-    only for the fail-closed blocker scan. This can only add blockers; it cannot create
-    PASS authority or satisfy current request identity.
-    """
+    """Preserve observable legacy request history only for blocker discovery."""
     rollout_commit = _configured_rollout_commit(policy, repository)
     if rollout_commit is None or not _core.is_ancestor(repo_root, rollout_commit, head):
         return comments
@@ -242,16 +239,17 @@ def _conservative_pre_rollout_blocker_comments(
     return normalized
 
 
-def _pre_rollout_trusted_blocking_finding_exists(
-    comments: list[dict], *, policy: dict, repo_root: str | Path, head: str,
-    repository: str, pr_number: int,
+def _legacy_trusted_blocking_finding_exists(
+    comments: list[dict], *, reviews: list[dict], policy: dict,
+    repo_root: str | Path, head: str, repository: str, pr_number: int,
 ) -> bool:
-    """Fail closed on surviving pre-rollout P0/P1 even if its request was deleted.
+    """Fail closed on surviving legacy P0/P1 even if its request was deleted.
 
-    The request registry did not exist before rollout, so a deleted initiating request
-    cannot be reconstructed from REST. A surviving blocking finding from a configured
-    trusted external reviewer is therefore retained as a blocker. This path can only
-    add FAIL; it never creates review identity or PASS evidence.
+    A request launched before registry rollout can complete asynchronously after the
+    rollout commit. The first valid immutable post-rollout request anchor is therefore
+    the deterministic upper boundary of the legacy in-flight window. A trusted P0/P1
+    before that boundary remains blocking even if its initiating request disappeared
+    from REST. This path only adds FAIL; it never creates review identity or PASS.
     """
     rollout_commit = _configured_rollout_commit(policy, repository)
     if rollout_commit is None or not _core.is_ancestor(repo_root, rollout_commit, head):
@@ -259,6 +257,22 @@ def _pre_rollout_trusted_blocking_finding_exists(
     cutoff = _request_anchor_rollout_time(repo_root, rollout_commit)
     if cutoff is None:
         return False
+
+    post_rollout_anchor_times: list[datetime] = []
+    for _, anchor in _core._eligible_request_anchors(
+        reviews=reviews,
+        policy=policy,
+        repo_root=repo_root,
+        head=head,
+        repository=repository,
+        pr_number=pr_number,
+    ):
+        if anchor["REQUEST_VALID"] != "true":
+            continue
+        request_time = _strict_timestamp(anchor["REQUEST_CREATED_AT"])
+        if request_time is not None and request_time >= cutoff:
+            post_rollout_anchor_times.append(request_time)
+    legacy_window_end = min(post_rollout_anchor_times) if post_rollout_anchor_times else cutoff
 
     reviewer_ids: set[str] = set()
     for reviewer_class in ("fast", "deep"):
@@ -275,7 +289,7 @@ def _pre_rollout_trusted_blocking_finding_exists(
         if (
             _core._issue_comment_identity(comment, repository, pr_number)
             and created is not None
-            and created < cutoff
+            and created < legacy_window_end
             and login in trusted_logins
             and _core.BLOCKING_FINDING_RE.search(str(comment.get("body") or ""))
         ):
@@ -313,8 +327,9 @@ def _compat_fetch_review_source(
 
 
 def _compat_blocking_findings(*, comments: list[dict], **kwargs) -> bool:
-    if _pre_rollout_trusted_blocking_finding_exists(
+    if _legacy_trusted_blocking_finding_exists(
         comments,
+        reviews=kwargs["reviews"],
         policy=kwargs["policy"], repo_root=kwargs["repo_root"], head=kwargs["head"],
         repository=kwargs["repository"], pr_number=kwargs["pr_number"],
     ):
@@ -364,18 +379,16 @@ _core._blocking_findings_for_current_generation = _compat_blocking_findings
 _core._verify_issue_comment_result = _compat_issue_comment_result
 _core.verify_records = _compat_verify_records
 
-# Re-export the established verifier API so existing tests/callers remain unchanged.
 for _name in dir(_core):
     if not _name.startswith("__"):
         globals()[_name] = getattr(_core, _name)
 
-# Keep compatibility controls and test patch points visible.
 globals()["REQUEST_ANCHOR_ROLLOUT_COMMIT"] = REQUEST_ANCHOR_ROLLOUT_COMMIT
 globals()["_configured_rollout_commit"] = _configured_rollout_commit
 globals()["_request_anchor_rollout_time"] = _request_anchor_rollout_time
 globals()["_normalize_anchor_trust"] = _normalize_anchor_trust
 globals()["_filter_pre_rollout_unstructured_requests"] = _filter_pre_rollout_unstructured_requests
-globals()["_pre_rollout_trusted_blocking_finding_exists"] = _pre_rollout_trusted_blocking_finding_exists
+globals()["_legacy_trusted_blocking_finding_exists"] = _legacy_trusted_blocking_finding_exists
 globals()["_compat_parse_clean_result"] = _compat_parse_clean_result
 globals()["fetch_json"] = _original_fetch_json
 globals()["fetch_review_source"] = _compat_fetch_review_source
