@@ -2,8 +2,15 @@
 from __future__ import annotations
 
 import re
+import types
+from pathlib import Path
 
-import verify_ai_review_evidence_compat_v1 as _v1
+_ENTRYPOINT = Path(__file__).resolve()
+_COMPAT_PATH = _ENTRYPOINT.with_name("verify_ai_review_evidence_compat_v1.py")
+_v1 = types.ModuleType("verify_ai_review_evidence_compat_v1_runtime")
+_v1.__file__ = str(_ENTRYPOINT)
+_v1.__package__ = None
+exec(compile(_COMPAT_PATH.read_bytes(), str(_ENTRYPOINT), "exec"), _v1.__dict__)
 
 for _name in dir(_v1):
     if not _name.startswith("__"):
@@ -20,10 +27,10 @@ _CONTRADICTORY_CLEAN_FLAIR_RE = re.compile(
 
 
 def _compat_parse_clean_result(body: str) -> str | None:
-    """Accept cosmetic one-line Codex flair without weakening clean-result semantics.
+    """Accept bounded cosmetic Codex flair without weakening clean-result semantics.
 
     The authenticated, immutable Codex result must still begin with the canonical
-    clean assertion and retain the exact Reviewed commit shape.  Known historical
+    clean assertion and retain the exact Reviewed commit shape. Known historical
     variants remain handled by v1; previously unseen suffixes are accepted only as
     bounded plain-text flair and fail closed on finding/problem language.
     """
