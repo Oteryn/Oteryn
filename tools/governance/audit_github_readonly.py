@@ -7,6 +7,7 @@ it never mutates settings. A caller must provide GH_TOKEN or GITHUB_TOKEN.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 import sys
@@ -61,6 +62,10 @@ def load_desired() -> dict:
         if item.get("gate_mode") not in {"stable", "transition"}:
             raise SystemExit(f"invalid gate_mode: {item}")
         expected_checks(item)
+        if item.get("gate_mode") == "transition":
+            target = item.get("target_gate")
+            if not isinstance(target, str) or not target:
+                raise SystemExit(f"transition repository lacks target_gate: {item}")
     admins = data.get("administrative_repositories")
     if not isinstance(admins, list):
         raise SystemExit("administrative_repositories must be an array")
@@ -70,6 +75,35 @@ def load_desired() -> dict:
         if item.get("terminal_state") == "ARCHIVED_READ_ONLY" and item.get("archived") is not True:
             raise SystemExit(f"archived terminal state must require archived=true: {item}")
     return data
+
+
+def _ref_pattern_matches(pattern: str, *, branch: str, default_branch: str) -> bool:
+    ref = f"refs/heads/{branch}"
+    if pattern == "~ALL":
+        return True
+    if pattern == "~DEFAULT_BRANCH":
+        return branch == default_branch
+    return fnmatch.fnmatchcase(ref, pattern)
+
+
+def ruleset_applies_to_branch(detail: dict, *, branch: str, default_branch: str) -> bool:
+    """Return true only when an active branch ruleset applies to this branch."""
+    if detail.get("enforcement") != "active" or detail.get("target") != "branch":
+        return False
+    ref_name = (detail.get("conditions") or {}).get("ref_name") or {}
+    includes = ref_name.get("include") or []
+    excludes = ref_name.get("exclude") or []
+    if includes and not any(
+        _ref_pattern_matches(pattern, branch=branch, default_branch=default_branch)
+        for pattern in includes
+    ):
+        return False
+    if any(
+        _ref_pattern_matches(pattern, branch=branch, default_branch=default_branch)
+        for pattern in excludes
+    ):
+        return False
+    return True
 
 
 class Audit:
@@ -101,13 +135,15 @@ class Audit:
         if not condition:
             self.errors.append(message)
 
-    def required_contexts(self, repo: str) -> set[str]:
+    def required_contexts(self, repo: str, *, branch: str = "main", default_branch: str = "main") -> set[str]:
         contexts: set[str] = set()
         rulesets = self.api(f"/repos/{repo}/rulesets") or []
         for summary in rulesets:
             if summary.get("enforcement") != "active":
                 continue
             detail = self.api(f"/repos/{repo}/rulesets/{summary['id']}")
+            if not ruleset_applies_to_branch(detail, branch=branch, default_branch=default_branch):
+                continue
             for rule in detail.get("rules", []):
                 if rule.get("type") != "required_status_checks":
                     continue
@@ -116,7 +152,7 @@ class Audit:
                     if context:
                         contexts.add(context)
         protection = self.api(
-            f"/repos/{repo}/branches/main/protection/required_status_checks",
+            f"/repos/{repo}/branches/{urllib.parse.quote(branch, safe='')}/protection/required_status_checks",
             allow_404=True,
         )
         if protection:
@@ -125,22 +161,34 @@ class Audit:
         return contexts
 
     def representative_check_names(self, repo: str, expected: set[str]) -> set[str]:
-        pulls = self.api(f"/repos/{repo}/pulls?state=all&sort=updated&direction=desc&per_page=20") or []
-        observed: set[str] = set()
+        """Prove current emission from main or one current internal PR, never stale history/union."""
+        branch = self.api(f"/repos/{repo}/branches/main") or {}
+        main_sha = ((branch.get("commit") or {}).get("sha") or "").strip()
+        if not main_sha:
+            return set()
+        main_runs = self.api(f"/repos/{repo}/commits/{main_sha}/check-runs?per_page=100") or {}
+        main_names = {run.get("name") for run in main_runs.get("check_runs", []) if run.get("name")}
+        if expected <= main_names:
+            return main_names
+
+        best = main_names
+        pulls = self.api(f"/repos/{repo}/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20") or []
         for pr in pulls:
             head = pr.get("head", {})
+            base = pr.get("base", {})
             head_repo = (head.get("repo") or {}).get("full_name")
-            if head_repo != repo:
+            if head_repo != repo or base.get("ref") != "main" or base.get("sha") != main_sha:
                 continue
             sha = head.get("sha")
             if not sha:
                 continue
             runs = self.api(f"/repos/{repo}/commits/{sha}/check-runs?per_page=100") or {}
             names = {run.get("name") for run in runs.get("check_runs", []) if run.get("name")}
-            observed.update(names)
             if expected <= names:
                 return names
-        return observed
+            if len(expected & names) > len(expected & best):
+                best = names
+        return best
 
     def file_exists(self, repo: str, path: str) -> bool:
         quoted = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
@@ -163,11 +211,11 @@ class Audit:
         branch = self.api(f"/repos/{repo}/branches/main")
         self.check(bool(branch.get("protected")) == bool(wanted.get("main_protected")), f"{repo}: main protection drift")
         expected = expected_checks(wanted)
-        required = self.required_contexts(repo)
+        required = self.required_contexts(repo, branch="main", default_branch=live.get("default_branch") or "main")
         self.check(expected <= required, f"{repo}: required checks drift: expected {sorted(expected)}, got {sorted(required)}")
 
         emitted = self.representative_check_names(repo, expected)
-        self.check(expected <= emitted, f"{repo}: required checks not found on recent representative internal PR heads: expected {sorted(expected)}, observed {sorted(emitted)}")
+        self.check(expected <= emitted, f"{repo}: required checks not proven on current main or a current internal PR based on current main: expected {sorted(expected)}, observed {sorted(emitted)}")
         if wanted.get("gate_mode") == "transition" and wanted.get("target_gate") and wanted["target_gate"] not in required:
             self.warnings.append(f"{repo}: transition target gate not required yet: {wanted['target_gate']}")
 
