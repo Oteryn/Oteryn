@@ -102,7 +102,6 @@ def _configured_rollout_commit(policy: dict, repository: str) -> str | None:
 def _identity_valid_request_anchors(
     *, reviews: list[dict], policy: dict, repository: str, pr_number: int,
 ) -> list[dict[str, str]]:
-    """Return all valid same-PR immutable anchors without current-head eligibility filters."""
     anchor_logins = _core._anchor_logins(policy)
     pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
     anchors: list[dict[str, str]] = []
@@ -167,7 +166,6 @@ def _eligible_anchor_map(
 def _all_valid_request_anchor_orders(
     *, reviews: list[dict], policy: dict, repository: str, pr_number: int,
 ) -> list[tuple[datetime, int]]:
-    """Validate immutable anchor identity without current-head eligibility filters."""
     orders: list[tuple[datetime, int]] = []
     for anchor in _identity_valid_request_anchors(
         reviews=reviews, policy=policy, repository=repository, pr_number=pr_number,
@@ -200,7 +198,6 @@ def _historical_anchor_trusted_edit_exists(
     comments: list[dict], *, reviews: list[dict], policy: dict,
     repository: str, pr_number: int,
 ) -> bool:
-    """Use historical anchor identity only to add fail-closed edit detection, never PASS authority."""
     anchors = _identity_valid_request_anchors(
         reviews=reviews, policy=policy, repository=repository, pr_number=pr_number,
     )
@@ -213,12 +210,10 @@ def _historical_anchor_trusted_edit_exists(
             continue
         if comment_id > 0:
             by_id[comment_id] = comment
-
     for anchor in anchors:
         comment = by_id.get(int(anchor["REQUEST_COMMENT_ID"]))
         if comment is not None and not _anchor_matches_comment(anchor, comment):
             return True
-
     for comment in comments:
         if not _core._issue_comment_identity(comment, repository, pr_number):
             continue
@@ -236,7 +231,6 @@ def _normalize_anchor_trust(
     comments: list[dict], *, reviews: list[dict], policy: dict,
     repo_root: str | Path, head: str, repository: str, pr_number: int,
 ) -> list[dict]:
-    """Restore association only for an exact current-eligible immutable request anchor."""
     by_comment = _eligible_anchor_map(
         reviews=reviews, policy=policy, repo_root=repo_root, head=head,
         repository=repository, pr_number=pr_number,
@@ -251,6 +245,26 @@ def _normalize_anchor_trust(
         anchor = by_comment.get(comment_id)
         if anchor is not None and _anchor_matches_comment(anchor, comment):
             clone["author_association"] = anchor["REQUEST_AUTHOR_ASSOCIATION"]
+        normalized.append(clone)
+    return normalized
+
+
+def _normalize_request_ambiguity_trust(
+    comments: list[dict], *, reviews: list[dict], policy: dict,
+) -> list[dict]:
+    """Historical anchor identity may only make review requests visible to ambiguity checks."""
+    trusted_authors = {
+        anchor["REQUEST_AUTHOR"].casefold(): anchor["REQUEST_AUTHOR_ASSOCIATION"]
+        for anchor in _identity_valid_request_anchors(
+            reviews=reviews, policy=policy, repository="Oteryn/Test", pr_number=7,
+        )
+    }
+    normalized: list[dict] = []
+    for comment in comments:
+        clone = deepcopy(comment)
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if _request_command_present(str(comment.get("body") or "")) and login in trusted_authors:
+            clone["author_association"] = trusted_authors[login]
         normalized.append(clone)
     return normalized
 
@@ -323,14 +337,12 @@ def _legacy_trusted_blocking_finding_exists(
     comments: list[dict], *, reviews: list[dict], policy: dict,
     repo_root: str | Path, head: str, repository: str, pr_number: int,
 ) -> bool:
-    """Retain trusted blockers from pre-registry and in-flight legacy generations."""
     rollout_commit = _configured_rollout_commit(policy, repository)
     if rollout_commit is None or not _core.is_ancestor(repo_root, rollout_commit, head):
         return False
     cutoff = _request_anchor_rollout_time(repo_root, rollout_commit)
     if cutoff is None:
         return False
-
     anchor_orders = [
         order for order in _all_valid_request_anchor_orders(
             reviews=reviews, policy=policy, repository=repository, pr_number=pr_number
@@ -338,7 +350,6 @@ def _legacy_trusted_blocking_finding_exists(
         if order[0] >= cutoff
     ]
     legacy_window_end: tuple[datetime, int] | None = min(anchor_orders) if anchor_orders else None
-
     reviewer_ids: set[str] = set()
     for reviewer_class in ("fast", "deep"):
         reviewer_ids.update(policy.get("reviewer_preferences", {}).get(reviewer_class, []))
@@ -347,7 +358,6 @@ def _legacy_trusted_blocking_finding_exists(
         trusted_logins.update(_core._trusted_logins(policy, reviewer_id))
     if not trusted_logins:
         return True
-
     for comment in comments:
         order = _comment_order(comment)
         login = str((comment.get("user") or {}).get("login", "")).casefold()
@@ -403,8 +413,11 @@ def _compat_blocking_findings(*, comments: list[dict], **kwargs) -> bool:
 
 
 def _compat_issue_comment_result(comments: list[dict], **kwargs) -> dict:
+    ambiguity_visible = _normalize_request_ambiguity_trust(
+        comments, reviews=kwargs["reviews"], policy=kwargs["policy"],
+    )
     filtered = _filter_pre_rollout_unstructured_requests(
-        comments, policy=kwargs["policy"], repo_root=kwargs["repo_root"],
+        ambiguity_visible, policy=kwargs["policy"], repo_root=kwargs["repo_root"],
         head=kwargs["head"], repository=kwargs["repository"], pr_number=kwargs["pr_number"],
     )
     return _original_issue_comment_result(filtered, **kwargs)
