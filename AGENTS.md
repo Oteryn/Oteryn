@@ -6,6 +6,14 @@
 
 It does **not** own Game, Platform or Atlas runtime implementation.
 
+## Agent execution discipline
+
+Agents MUST follow `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`.
+
+Before declaring a task blocked because of access limitations, agents must discover available capabilities, distinguish tool absence from permission/policy restrictions, and continue useful work when any safe execution path remains.
+
+Completion claims require verified evidence. `UNKNOWN` is not automatically a `BLOCKER`, and a generic access disclaimer without capability discovery is invalid.
+
 ## Authority and repository scope
 
 - Autonomous write operations governed by this file are limited to `Oteryn/Oteryn` unless the repository owner explicitly authorizes another repository for the current task.
