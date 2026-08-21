@@ -28,7 +28,7 @@ _original_resolve_reviewed_prefix = _core.resolve_reviewed_prefix
 _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
 _ALLOWED_CLEAN_FLAIR = {
     "Swish!", "Hooray!", "Chef's kiss.", "Breezy!", "Nice work!", "Bravo.",
-    ":rocket:", "More of your lovely PRs please.",
+    ":rocket:", "More of your lovely PRs please.", "You're on a roll.",
 }
 
 
@@ -366,10 +366,83 @@ def _compat_issue_comment_result(comments: list[dict], **kwargs) -> dict:
     return _original_issue_comment_result(filtered, **kwargs)
 
 
+def _filter_superseded_review_comments(
+    review_comments: list[dict], *, reviews: list[dict], policy: dict,
+    repo_root: str | Path, head: str, repository: str, pr_number: int,
+) -> list[dict]:
+    """Drop only trusted inline comments whose parent review generation is no longer eligible.
+
+    GitHub can report bot inline comments with updated_at != created_at during normal
+    review publication. Such an edit must still fail closed for the current reviewed
+    generation (including review-neutral descendants), but a non-neutral repair makes
+    the older generation ineligible and a fresh exact-head review must be able to stand
+    on its own.
+    """
+    trusted: set[str] = set()
+    for reviewer_logins in policy.get("reviewer_source_logins", {}).values():
+        trusted.update(str(login).casefold() for login in reviewer_logins)
+
+    by_id: dict[int, dict] = {}
+    for review in reviews:
+        try:
+            review_id = int(review.get("id") or 0)
+        except (TypeError, ValueError):
+            continue
+        if review_id <= 0:
+            continue
+        previous = by_id.get(review_id)
+        if previous is not None and previous != review:
+            raise RuntimeError("trusted review identity is ambiguous")
+        by_id[review_id] = review
+
+    pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
+    retained: list[dict] = []
+    for comment in review_comments:
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if login not in trusted:
+            retained.append(comment)
+            continue
+        try:
+            review_id = int(comment.get("pull_request_review_id") or 0)
+        except (TypeError, ValueError):
+            retained.append(comment)
+            continue
+        parent = by_id.get(review_id)
+        if parent is None:
+            retained.append(comment)
+            continue
+        parent_login = str((parent.get("user") or {}).get("login", "")).casefold()
+        reviewed_head = str(parent.get("commit_id") or "")
+        if (
+            parent_login not in trusted
+            or parent.get("pull_request_url") != pull_url
+            or comment.get("pull_request_url") != pull_url
+            or _core.FULL_SHA.fullmatch(reviewed_head) is None
+        ):
+            retained.append(comment)
+            continue
+        if (
+            _core.is_ancestor(repo_root, reviewed_head, head)
+            and _core.post_review_commits_are_neutral(repo_root, reviewed_head, head, policy)
+        ):
+            retained.append(comment)
+            continue
+        # The parent review is a trusted, same-PR generation that cannot attest the
+        # current head. Its inline comments remain durable history, but cannot poison
+        # a later independently reviewed risk-bearing generation.
+    return retained
+
+
 def _compat_verify_records(comments: list[dict], **kwargs) -> dict:
     normalized = _normalize_anchor_trust(
         comments, reviews=kwargs.get("reviews") or [], policy=kwargs["policy"],
         repo_root=kwargs["repo_root"], head=kwargs["head"],
+        repository=kwargs["repository"], pr_number=kwargs["pr_number"],
+    )
+    effective_kwargs = dict(kwargs)
+    effective_kwargs["review_comments"] = _filter_superseded_review_comments(
+        kwargs.get("review_comments") or [], reviews=kwargs.get("reviews") or [],
+        policy=kwargs["policy"], repo_root=kwargs["repo_root"], head=kwargs["head"],
         repository=kwargs["repository"], pr_number=kwargs["pr_number"],
     )
     saved_source = _core.fetch_review_source
@@ -381,7 +454,7 @@ def _compat_verify_records(comments: list[dict], **kwargs) -> dict:
         "resolve_reviewed_prefix", _original_resolve_reviewed_prefix
     )
     try:
-        return _original_verify_records(normalized, **kwargs)
+        return _original_verify_records(normalized, **effective_kwargs)
     finally:
         _core.fetch_review_source = saved_source
         _core.fetch_json = saved_json
@@ -404,6 +477,7 @@ globals()["_normalize_anchor_trust"] = _normalize_anchor_trust
 globals()["_filter_pre_rollout_unstructured_requests"] = _filter_pre_rollout_unstructured_requests
 globals()["_legacy_trusted_blocking_finding_exists"] = _legacy_trusted_blocking_finding_exists
 globals()["_compat_parse_clean_result"] = _compat_parse_clean_result
+globals()["_filter_superseded_review_comments"] = _filter_superseded_review_comments
 globals()["fetch_json"] = _original_fetch_json
 globals()["fetch_review_source"] = _compat_fetch_review_source
 globals()["resolve_reviewed_prefix"] = _original_resolve_reviewed_prefix
