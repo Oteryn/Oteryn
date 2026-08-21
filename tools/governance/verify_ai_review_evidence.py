@@ -251,14 +251,16 @@ def _normalize_anchor_trust(
 
 def _normalize_request_ambiguity_trust(
     comments: list[dict], *, reviews: list[dict], policy: dict,
+    repository: str, pr_number: int,
 ) -> list[dict]:
     """Historical anchor identity may only make review requests visible to ambiguity checks."""
-    trusted_authors = {
-        anchor["REQUEST_AUTHOR"].casefold(): anchor["REQUEST_AUTHOR_ASSOCIATION"]
-        for anchor in _identity_valid_request_anchors(
-            reviews=reviews, policy=policy, repository="Oteryn/Test", pr_number=7,
+    trusted_authors: dict[str, str] = {}
+    for anchor in _identity_valid_request_anchors(
+        reviews=reviews, policy=policy, repository=repository, pr_number=pr_number,
+    ):
+        trusted_authors.setdefault(
+            anchor["REQUEST_AUTHOR"].casefold(), anchor["REQUEST_AUTHOR_ASSOCIATION"]
         )
-    }
     normalized: list[dict] = []
     for comment in comments:
         clone = deepcopy(comment)
@@ -415,6 +417,7 @@ def _compat_blocking_findings(*, comments: list[dict], **kwargs) -> bool:
 def _compat_issue_comment_result(comments: list[dict], **kwargs) -> dict:
     ambiguity_visible = _normalize_request_ambiguity_trust(
         comments, reviews=kwargs["reviews"], policy=kwargs["policy"],
+        repository=kwargs["repository"], pr_number=kwargs["pr_number"],
     )
     filtered = _filter_pre_rollout_unstructured_requests(
         ambiguity_visible, policy=kwargs["policy"], repo_root=kwargs["repo_root"],
