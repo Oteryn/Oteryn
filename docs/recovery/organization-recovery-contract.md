@@ -33,7 +33,7 @@ This is an organization-level recovery contract. Provider repositories remain au
 - `RETENTION`: durable Release assets retained with the archived read-only evidence repository; no dependency on the Actions artifact expiry of `2026-08-25T13:06:44Z` remains.
 - `WHAT_IS_NOT_BACKED_UP`: post-transfer commits/settings, Issues/PR metadata, environments, secret values, packages/GHCR, deployment-provider state and production databases.
 - `RESTORE_PROCEDURE`:
-  1. download the six assets from Release `platform-transfer-cut-2026-08-18` into an isolated scratch directory;
+  1. initialize an isolated scratch directory, for example `WORKDIR="$(mktemp -d)"`, then download the six assets from Release `platform-transfer-cut-2026-08-18` into `"$WORKDIR"`;
   2. verify asset basenames against the exact SHA-256 identities below and GitHub Release digest readback;
   3. run `tar -tzf Oteryn-Platform-mirror.git.tar.gz`;
   4. clone `Oteryn-Platform-full.bundle` into a new isolated repository, for example `git clone "$WORKDIR/Oteryn-Platform-full.bundle" "$WORKDIR/restored-platform"`;
@@ -106,4 +106,4 @@ Break-glass is for containment and recovery, never a normal bypass path. Record 
 - `GAP-RECOVERY-005`: second-owner/account-recovery redundancy is unproven.
 - `GAP-RECOVERY-006`: Platform production backup/restore RPO/RTO remains unproven; staging evidence must not be promoted to production evidence.
 
-`GAP-RECOVERY-007` from the earlier candidate is closed: the transfer-cut artifact is durably retained in a Release, the path-portability issue has an explicit basename procedure, and the administrative repository is archived read-only.
+`GAP-RECOVERY-007` is **PARTIAL**: the transfer-cut artifact and checksum-portability procedure are recorded, but the current machine-readable inventory still requires terminal-disposition reconciliation. This contract does not declare the administrative repository finally archived or the gap closed until that reconciliation has live evidence.
