@@ -38,7 +38,7 @@ This is an organization-level recovery contract. Provider repositories remain au
   3. run `tar -tzf "$WORKDIR/Oteryn-Platform-mirror.git.tar.gz"`;
   4. clone `Oteryn-Platform-full.bundle` into a new isolated repository, for example `git clone "$WORKDIR/Oteryn-Platform-full.bundle" "$WORKDIR/restored-platform"`;
   5. run `git -C "$WORKDIR/restored-platform" fsck --full` and `git -C "$WORKDIR/restored-platform" bundle verify "$WORKDIR/Oteryn-Platform-full.bundle"`;
-  6. compare restored heads/tags against `source-refs.txt` by exact object ID;
+  6. compare restored heads/tags against `"$WORKDIR/source-refs.txt"` by exact object ID;
   7. require restored `refs/heads/main=c567da9d9ae444110262774f8febf5a5abab2a90` before treating the cut as valid recovery evidence;
   8. never overwrite canonical `Oteryn/Oteryn-Platform` from this historical cut without a separately authorized recovery incident.
 - `LAST_RESTORE_TEST`: isolated restore drill on 2026-08-19 plus independent re-download/hash/readback and durable Release publication on 2026-08-20.
