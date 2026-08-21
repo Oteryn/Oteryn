@@ -440,6 +440,12 @@ def test_enforcement_bootstrap_exception_is_exactly_pr15_single_use() -> None:
         "review_substitute": "independent_read_only_exact_head_agent_review",
     }
 
+def test_request_anchor_rollout_compatibility_is_exactly_meta_scoped() -> None:
+    assert policy["request_anchor_rollouts"] == {
+        "Oteryn/Oteryn": "dbed59b9cfab1e8a66ac9e0a5056053718980ce3"
+    }
+
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:
