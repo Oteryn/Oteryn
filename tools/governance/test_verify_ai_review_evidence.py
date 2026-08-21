@@ -20,11 +20,13 @@ def test_observed_dynamic_clean_flair_passes() -> None:
     assert found["review_source_commit_id"] == final
 
 
-def test_dynamic_flair_with_finding_language_fails_closed() -> None:
+def test_every_unobserved_clean_flair_fails_closed() -> None:
     for flair in (
+        "Critical defect detected.",
+        "Merge is unsafe.",
+        "Blocking regression detected.",
+        "Wonderful future diff.",
         "Ship it but P1 remains.",
-        "Great work however security concerns remain.",
-        "Ready except one bug remains.",
     ):
         repo, _, final = _v1.core_tests.make_repo()
         current = _v1.core_tests.issue_comment(
