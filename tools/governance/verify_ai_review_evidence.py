@@ -165,16 +165,13 @@ def _eligible_anchor_map(
 
     # Association trust is identity history, not current-review PASS authority.
     # Keep stale/non-neutral anchors out of by_comment while retaining their
-    # server-bound author association for fail-closed edit detection.
+    # server-bound author association for fail-closed edit detection. A user
+    # may legitimately move between trusted GitHub associations over time.
     for anchor in _identity_valid_request_anchors(
         reviews=reviews, policy=policy, repository=repository, pr_number=pr_number,
     ):
         author = anchor["REQUEST_AUTHOR"].casefold()
-        association = anchor["REQUEST_AUTHOR_ASSOCIATION"]
-        previous = trusted_authors.get(author)
-        if previous is not None and previous != association:
-            raise RuntimeError("request anchor author association is ambiguous")
-        trusted_authors[author] = association
+        trusted_authors.setdefault(author, anchor["REQUEST_AUTHOR_ASSOCIATION"])
     return by_comment, trusted_authors
 
 
