@@ -28,6 +28,7 @@ _original_issue_comment_result = _core._verify_issue_comment_result
 _original_parse_clean_result = _core.parse_clean_result
 _original_fetch_review_source = _core.fetch_review_source
 _original_fetch_json = _core.fetch_json
+_original_resolve_reviewed_prefix = _core.resolve_reviewed_prefix
 
 _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
 # Do not heuristically classify arbitrary bot prose as celebratory. Compatibility
@@ -297,13 +298,18 @@ def _compat_verify_records(comments: list[dict], **kwargs) -> dict:
     )
     saved_source = _core.fetch_review_source
     saved_json = _core.fetch_json
+    saved_resolve = _core.resolve_reviewed_prefix
     _core.fetch_review_source = globals().get("fetch_review_source", _compat_fetch_review_source)
     _core.fetch_json = globals().get("fetch_json", _original_fetch_json)
+    _core.resolve_reviewed_prefix = globals().get(
+        "resolve_reviewed_prefix", _original_resolve_reviewed_prefix
+    )
     try:
         return _original_verify_records(normalized, **kwargs)
     finally:
         _core.fetch_review_source = saved_source
         _core.fetch_json = saved_json
+        _core.resolve_reviewed_prefix = saved_resolve
 
 
 _core.parse_clean_result = _compat_parse_clean_result
@@ -325,6 +331,7 @@ globals()["_filter_pre_rollout_unstructured_requests"] = _filter_pre_rollout_uns
 globals()["_compat_parse_clean_result"] = _compat_parse_clean_result
 globals()["fetch_json"] = _original_fetch_json
 globals()["fetch_review_source"] = _compat_fetch_review_source
+globals()["resolve_reviewed_prefix"] = _original_resolve_reviewed_prefix
 
 
 if __name__ == "__main__":
