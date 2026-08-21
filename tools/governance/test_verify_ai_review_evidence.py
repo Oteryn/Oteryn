@@ -444,7 +444,7 @@ def test_preserved_core_suite_passes_standalone() -> None:
 
 def test_live_codex_clean_flair_variants_pass() -> None:
     for flair in (
-        "Swish!", "Hooray!", "Chef's kiss.", "Breezy!", "Nice work!",
+        "Swish!", "Hooray!", "Chef's kiss.", "Breezy!", "Nice work!", "Bravo.",
         ":rocket:", "More of your lovely PRs please.",
     ):
         repo, _, final = core_tests.make_repo()
