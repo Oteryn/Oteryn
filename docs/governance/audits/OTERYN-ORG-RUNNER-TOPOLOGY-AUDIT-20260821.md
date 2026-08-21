@@ -5,132 +5,137 @@ Platform live-evidence owner: `Oteryn/Oteryn-Platform#1194`
 Platform evidence PR: `Oteryn/Oteryn-Platform#1198`
 Audit contract context: `OTERYN-ORG-AUDIT-v3.10`
 
-## Verdict
+## Corrected verdict
 
-`KEEP_REPOSITORY_SCOPED_PLATFORM_RUNNER`
+`SEPARATE_REPOSITORY_SCOPED_LOCAL_RUNNERS_BY_WORKLOAD_OWNER`
 
-The current organization generation does **not** need one self-hosted runner per repository and does **not** benefit from migrating the existing privileged Synology runner to organization scope.
+The previous interim verdict was wrong because it classified runner need from the repository containing `runs-on`, rather than from the repository that owns the workload actually executed on Synology.
 
-Desired state:
+Live source proves that the current Platform runner executes Atlas-owned and Game-owned local work. The fact that Atlas/Game do not currently declare `runs-on: oteryn-staging` themselves is therefore a symptom of cross-repository execution coupling, not proof that they do not need a local execution surface.
 
-| Repository | Default execution | Self-hosted desired state |
+## Proven workload ownership
+
+### Platform
+
+Platform has a direct local requirement for Synology staging/control-plane operations and currently owns the privileged `oteryn-synology-staging` runner.
+
+### Atlas
+
+Atlas has a direct, proven local requirement. Platform's `repair-synology-autostart.yml`, running on `oteryn-staging`, currently:
+
+- fetches exact Atlas source;
+- builds/stages Atlas products;
+- reads/writes persistent Atlas revision roots;
+- controls `oteryn-atlas-fullworld-preview`;
+- serves the LAN endpoint `192.168.1.2:8097`;
+- performs live Atlas cutover/rollback;
+- runs real desktop/mobile Chromium acceptance against that local endpoint.
+
+The active deployment record states explicitly that the registered Synology self-hosted runner is the trusted path for the LAN-only Atlas preview.
+
+Atlas `AGENTS.md` says Platform may coordinate Atlas contracts but is not an Atlas runtime data source. Therefore long-lived Atlas runtime/deployment/E2E execution should be moved to an Atlas-owned runner boundary.
+
+### Game
+
+Game also has a local footprint. The same Synology job currently executes the Game-owned creature export producer from exact `Oteryn/Oteryn-Game` source, and the Synology staging Compose stack runs the `canary` game runtime with local DB/network/runtime state.
+
+Pure Game build/export CI should remain GitHub-hosted when locality is unnecessary. Game-owned live runtime/integration validation on Synology should have a separate Game-owned execution boundary rather than sharing the privileged Platform registration/workspace.
+
+Game `AGENTS.md` establishes `Oteryn/Oteryn-Game` as the canonical native game server/runtime and Game-owned export authority.
+
+### META
+
+No current host-local runtime requirement is proven for `Oteryn/Oteryn`; META remains GitHub-hosted.
+
+## Correct desired state
+
+| Repository | Default execution | Self-hosted Synology desired state |
 | --- | --- | --- |
-| `Oteryn/Oteryn` | GitHub-hosted | `NOT_NEEDED` |
-| `Oteryn/Oteryn-Game` | GitHub-hosted | `NOT_NEEDED` |
-| `Oteryn/Oteryn-Platform` | GitHub-hosted for ordinary CI/test/security | keep the existing repository-scoped Synology runner for trusted Synology/staging operations only |
-| `Oteryn/Oteryn-Atlas` | GitHub-hosted | `NOT_NEEDED` |
-| `Oteryn/Oteryn-Platform-Migration-Backup-20260818` | none | `NOT_NEEDED`; repository is archived/read-only |
+| `Oteryn/Oteryn` | GitHub-hosted | none currently |
+| `Oteryn/Oteryn-Platform` | GitHub-hosted for ordinary CI | **repo-scoped `oteryn-platform`** for Platform staging/control-plane |
+| `Oteryn/Oteryn-Atlas` | GitHub-hosted for ordinary CI/build | **repo-scoped `oteryn-atlas`** for FullWorld local state, preview, live E2E and cutover/rollback |
+| `Oteryn/Oteryn-Game` | GitHub-hosted for ordinary build/export/tests | **repo-scoped `oteryn-game`** for Game-owned local runtime/integration work |
+| archived migration backup | none | none |
 
-Do not create Game or Atlas Synology runners merely for symmetry. Do not move the current Platform runner to an organization runner group without a new workload/trust-boundary audit.
+A local runner is an additional execution surface, not the default for every job. Jobs that do not require Synology/local state remain GitHub-hosted.
 
-## Evidence basis
+## Why per repository, not one organization-wide privileged runner
 
-### Organization workflow inventory
+The live `oteryn-synology-staging` runner is high privilege:
 
-Current retained workflow search found `oteryn-staging` / self-hosted routing only in `Oteryn/Oteryn-Platform`. No retained `oteryn-staging` or `self-hosted` routing was found in META, Game or Atlas.
-
-Game's current Atlas semantic-search workflow, for example, runs on GitHub-hosted `ubuntu-24.04`. Atlas and META likewise have no proven host-local workload requiring the Synology runner.
-
-### Platform registration and scheduling boundary
-
-The accepted post-transfer Platform evidence records `oteryn-synology-staging` as repository-scoped. Current runner source reinforces that boundary:
-
-- `deploy/synology/runner/entrypoint.sh` accepts an exact repository-shaped `RUNNER_URL`;
-- registration uses the single custom label `oteryn-staging`;
-- registration uses `--no-default-labels`;
-- no organization URL / runner-group registration path is present.
-
-The Actions job field `runner_group_name=Default` is only a group-display value and is not used to infer organization scope against the stronger registration/source evidence.
-
-### Live Synology proof
-
-Trusted-main Platform run `32454899481`, job `96690198992`, reported:
-
-- runner name `oteryn-synology-staging`;
-- Actions Runner version `2.336.0`;
-- successful scheduling and execution on the existing Synology runner.
-
-A bounded read-only Platform probe, run `32460223728`, job `96705516889`, additionally proved the current live execution boundary:
-
-- Linux/X64;
-- container `oteryn-synology-staging-runner`;
 - container user `0:0`;
-- restart policy `always`;
-- Docker client `29.6.2`, server `24.0.2`, Compose `5.3.1`;
-- read-write `/runner` and `/work` volumes;
-- read-write `/var/run/docker.sock` bind mount;
-- read-write staging-state bind mount;
-- live runner image reference `ghcr.io/blakinio/oteryn-deploy-runner:main`;
-- live image ID `sha256:bad8dc119e39553f5a9d958834562a44add4978e16f9a46df7c89507c06c24b8`.
+- RW `/var/run/docker.sock`;
+- RW `/runner` and `/work`;
+- RW Platform staging-state mount;
+- Actions Runner `2.336.0`.
 
-The temporary probe did not publish environment dumps, credentials, secret values or application data. Its final non-zero result came only from attempting to parse a UTF-8-BOM-prefixed `.runner` JSON file after all required host/container facts had already been emitted. The temporary workflow changes were removed from the Platform evidence branch before closeout.
+One organization-wide runner would collapse Platform, Atlas and Game trust boundaries onto a host-equivalent credential/execution surface. That is the wrong direction.
 
-## Trust-boundary finding
+For the current scale, prefer repository-scoped registrations with custom labels only:
 
-The Platform runner is not a general-purpose compute worker. Root execution plus read-write Docker socket access makes jobs on it effectively Docker-host privileged, and the staging-state mount adds direct staging-state exposure.
+- `oteryn-platform` -> `Oteryn/Oteryn-Platform` only;
+- `oteryn-atlas` -> `Oteryn/Oteryn-Atlas` only;
+- `oteryn-game` -> `Oteryn/Oteryn-Game` only.
 
-Therefore organization-wide sharing would broaden the trust boundary without a demonstrated execution requirement. The correct default is GitHub-hosted execution; self-hosted is an exception for jobs that genuinely require the Synology control plane.
+Use separate config/work volumes and expose only the host mounts/Docker capability each workload proves it needs. Do not grant Atlas/Game Platform's staging-state mount merely because they share the same Synology.
 
-Permanent Platform workflows preserve this boundary: pull-request validation is GitHub-hosted where present, while live Synology jobs are bounded to `workflow_dispatch`, trusted `main` operations and/or the `synology-staging` environment. No permanent arbitrary pull-request job is routed onto `oteryn-staging`.
+Organization runner groups restricted one-to-one are technically possible, but do not currently improve least privilege over repository-scoped registration.
 
-## Version compatibility
+## Current architectural defect
 
-The live runner version is `2.336.0`. This is newer than the `2.327.1` minimum recorded for current Node.js 24 based Actions upgrades in the pending dependency evidence. Runner age therefore does not block those Platform workflows.
+The current Platform runner is functioning as a de facto multi-project execution broker. This was useful as a bootstrap path but is not the desired steady state.
 
-Runner freshness remains operationally important: GitHub documents that self-hosted runner software must remain updated for new Actions features and may stop receiving jobs when required updates are missed.
+Current coupling:
 
-## Organization runner groups
+```text
+Oteryn-Platform workflow
+      |
+      +-- Platform operations
+      +-- fetch/run Game producer
+      +-- fetch/build/deploy Atlas
+      +-- local Atlas browser E2E
+      +-- local Game/Canary integrated runtime
+      |
+      v
+single privileged oteryn-synology-staging runner
+```
 
-GitHub supports organization self-hosted runner groups and can restrict a group to selected repositories. GitHub also recommends self-hosted runners primarily for private repositories because public-repository fork pull requests can be dangerous when workflows allow untrusted code onto the runner.
+Desired ownership:
 
-Those capabilities do not justify an organization migration by themselves. In the current Oteryn topology only Platform has a proven Synology workload, so repository scope is the smaller and safer trust boundary.
+```text
+Synology
+|
++-- oteryn-platform  -> Platform repo only
++-- oteryn-atlas     -> Atlas repo only
++-- oteryn-game      -> Game repo only
 
-If another repository later proves a host-local workload, re-open the decision and evaluate a separate least-privilege runner/container plus repository-restricted organization group. Do not share the existing root/Docker-socket Platform runner across public repositories.
+GitHub-hosted remains default for non-local CI.
+```
 
-## Control-plane capability
+## Migration sequence
 
-GitHub's organization runner registration API requires organization `Self-hosted runners: write` permission. The currently connected GitHub action surface exposes repository and workflow operations but no organization runner/group/registration-token mutation action.
-
-This is `NOT_BLOCKING` for the chosen desired state because no organization-runner migration is required. It becomes relevant only if a later approved topology change requires organization-scoped runner creation.
+1. Preserve the working `oteryn-staging` runner unchanged as bootstrap/rollback.
+2. Create `oteryn-atlas` first; Atlas has the clearest directly proven LAN/persistent-runtime requirement.
+3. Move Atlas preview/deployment/live E2E out of Platform into Atlas-owned workflow and validate the same exact endpoint/state/rollback behavior.
+4. Create `oteryn-game` for Game-owned local runtime/integration acceptance; keep non-local Game jobs hosted.
+5. Refactor/rename the current Platform runner to Platform-only responsibility after Atlas/Game replacement paths are proven.
+6. Remove cross-repository runtime execution from Platform only after live E2E and rollback pass for each replacement.
+7. Harden image provenance and pinning without destroying persistent registration state.
 
 ## Findings
 
 | ID | Severity | State | Finding |
 | --- | --- | --- | --- |
-| `RUNNER-001` | HIGH | OPEN | The privileged live runner still uses mutable pre-transfer image coordinate `ghcr.io/blakinio/oteryn-deploy-runner:main`. |
-| `RUNNER-002` | MEDIUM | OPEN | `deploy/synology/runner/Dockerfile` uses mutable base `ghcr.io/actions/actions-runner:latest`. |
-| `RUNNER-003` | INFO | PASS | Runner `2.336.0` satisfies the current Node.js 24 runner-version prerequisite. |
-| `RUNNER-004` | INFO | PASS | `--no-default-labels` + `oteryn-staging` prevents generic `self-hosted` scheduling. |
-| `RUNNER-005` | INFO | PASS | No retained self-hosted routing was found in META, Game or Atlas. |
-| `RUNNER-006` | INFO | PASS | Permanent Platform pull-request paths do not execute on the privileged Synology runner. |
+| `RUNNER-001` | HIGH | OPEN | Current privileged runner image is mutable/pre-transfer `ghcr.io/blakinio/oteryn-deploy-runner:main`. |
+| `RUNNER-002` | MEDIUM | OPEN | Runner build base uses mutable `ghcr.io/actions/actions-runner:latest`. |
+| `RUNNER-003` | INFO | PASS | Current runner `2.336.0` satisfies the Node.js 24 runner prerequisite. |
+| `RUNNER-004` | INFO | PASS | Current custom-label-only registration avoids generic self-hosted scheduling. |
+| `RUNNER-005` | HIGH | OPEN | Atlas-owned local runtime/deployment/E2E is currently executed through Platform's privileged runner. |
+| `RUNNER-006` | MEDIUM | OPEN | Game-owned local producer/runtime integration work is mixed into Platform's runner boundary. |
+| `RUNNER-007` | INFO | PASS | Permanent arbitrary pull-request code is not currently routed onto the privileged Platform runner. |
 
-`RUNNER-001` and `RUNNER-002` are tracked by `Oteryn/Oteryn-Platform#1199`. Their remediation must preserve the existing repository registration/config volume, custom-label-only routing and rollback identity; they do not justify changing runner scope.
+`RUNNER-001`/`RUNNER-002` are tracked by `Oteryn/Oteryn-Platform#1199`. `RUNNER-005`/`RUNNER-006` are topology migration findings under META #32.
 
-## Final architecture
+## Audit status
 
-```text
-Oteryn organization
-|
-+-- Oteryn/Oteryn
-|   +-- GitHub-hosted only
-|
-+-- Oteryn/Oteryn-Game
-|   +-- GitHub-hosted only
-|
-+-- Oteryn/Oteryn-Platform
-|   +-- GitHub-hosted: ordinary CI/test/security
-|   +-- repository-scoped: oteryn-synology-staging
-|       +-- custom label: oteryn-staging
-|       +-- trusted Synology/staging operations only
-|       +-- root + Docker socket = privileged boundary; do not share
-|
-+-- Oteryn/Oteryn-Atlas
-|   +-- GitHub-hosted only
-|
-+-- archived Platform migration backup
-    +-- no runner
-```
-
-## Audit closeout status
-
-The technical runner-topology decision is complete. Publication/merge of the audit records remains subject to the normal repository governance path; no branch-protection, review or CI bypass is authorized. Platform evidence PR #1198 is intentionally held while an unrelated pre-existing Platform live-task liveness defect is being closed by its existing owner (#1191 / PR #1193). META PR #33 remains Draft while the active META AI-review hardening dependency (#30) is terminalized.
+This corrected verdict supersedes the earlier `KEEP_REPOSITORY_SCOPED_PLATFORM_RUNNER` conclusion. META PR #33 remains Draft while active META governance PR #30 is terminalized; no branch-protection or review bypass is authorized.
