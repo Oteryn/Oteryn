@@ -86,7 +86,9 @@ Review-neutral is intentionally narrower than R0. A path must match a configured
 
 ## Structured review evidence
 
-An external review record must contain at least:
+The gate supports two server-verified external evidence envelopes. Both are bound to the same repository, pull request, review tier, review fingerprint and reviewed head, and neither makes maintainer-authored text external review authority.
+
+The legacy envelope keeps the authenticated Pull Request Review model:
 
 ```text
 <!-- OTERYN_AI_REVIEW_V1 -->
@@ -100,7 +102,24 @@ REVIEW_SOURCE_URL: https://github.com/<owner>/<repo>/pull/<n>#pullrequestreview-
 FINDINGS: 0
 ```
 
-Do not treat free-form approval language without the fingerprint/head binding as a valid review gate.
+The Codex interoperability envelope starts with one exact maintainer-authored request on the pull request:
+
+```text
+@codex review
+
+<!-- OTERYN_AI_REVIEW_REQUEST_V1 -->
+REVIEW_TIER: R1 | R2
+REVIEW_FINGERPRINT: <sha256>
+REVIEWED_HEAD: <40-hex SHA>
+REVIEWER_CLASS: fast | deep
+REVIEWER_ID: codex_spark | codex
+```
+
+The trusted default-branch request-registry workflow records every trusted request-like comment as a submitted `COMMENTED` Pull Request Review anchor before it can be used as evidence. The server-authored anchor binds the original comment ID, author association, creation time, exact body digest, parsed request fields and the immutable pull-request workflow-run head that existed when the comment was created. It never rebinds a queued request to a newer live PR head. Submitted anchors remain discoverable if a maintainer later deletes the triggering Conversation comment, so deleted, malformed or competing request generations fail closed instead of disappearing from the ambiguity set. The registry workflow never checks out or executes candidate code.
+
+For that envelope, the PASS authority is the server-fetched result authored by the configured Codex bot, not the request or its registry anchor. The result must chronologically follow the one matching request, explicitly report the accepted clean/no-major-issues outcome, and contain a reviewed-commit prefix that Git resolves uniquely to the full requested `REVIEWED_HEAD`. A missing request anchor, a newer request, multiple competing matching requests, another request anchor for the same reviewed head, multiple trusted result objects, malformed or missing commit identity, or a P0/P1 finding on the same reviewed generation fails closed. Same-PR and same-repository object identity is verified from GitHub API fields, preventing cross-PR and cross-repository replay.
+
+Do not treat free-form maintainer approval, a maintainer-authored clean-result sentence, or an unattached bot response as valid review evidence. Any edit to a trusted-association maintainer PR conversation comment, a PR conversation result authored by a configured trusted reviewer bot, or a trusted reviewer-bot inline review comment invalidates the external-review evidence generation and the gate fails closed. This intentionally strict rule avoids relying on mutable request/result text or on GitHub `UserContentEdit.diff`, whose public contract is only a summary of an edit rather than an immutable full-body snapshot. Evidence must therefore be collected with trusted maintainer requests and trusted reviewer results left unedited.
 
 ## Bootstrap rule
 
@@ -118,24 +137,12 @@ Product repositories should enforce the local classifier before invoking any ext
 
 Product repositories must invoke the META-owned composite action from a trusted `pull_request_target` wrapper and pin `.github/actions/ai-review-gate/action.yml` to a full 40-hex META commit SHA; candidate-controlled `pull_request` workflows are not enforcement authority. The action classifies the caller repository, not META, so Game, Platform and Atlas share one versioned policy implementation instead of copying classifier logic. Security-critical caller inputs (base/head SHA, Draft state, repository and PR number) must exactly match immutable GitHub pull-request event context before classification or evidence verification runs.
 
-META additionally owns `.github/workflows/governance-ai-review.yml`, triggered by `pull_request_target`. That workflow executes only the workflow/action/policy/verifier from the exact protected base SHA, checks out the candidate with credentials disabled as inert Git data, and never executes candidate scripts. Cross-repository PRs fail closed. This trusted-base check is the post-bootstrap merge authority for AI review evidence.
+META additionally owns `.github/workflows/governance-ai-review.yml`, triggered by `pull_request_target`, and `.github/workflows/governance-ai-review-request.yml`, triggered by trusted-association PR Conversation comments. The gate workflow executes only the workflow/action/policy/verifier from the exact protected base SHA, checks out the candidate with credentials disabled as inert Git data, and never executes candidate scripts. The request-registry workflow executes only default-branch inline code, records immutable submitted-review anchors, and never checks out the candidate. Cross-repository PRs fail closed. This trusted-base check is the post-bootstrap merge authority for AI review evidence.
 
 - `R0`: pass after deterministic checks; no external AI is requested.
 - `R1`/`R2` while Draft: report tier/fingerprint and pass so deterministic CI can stabilize without spending AI quota.
-- `R1`/`R2` when Ready: fail closed until a trusted structured PASS record matches the current fingerprint. A deep reviewer may satisfy a fast-review requirement; a fast reviewer never satisfies `R2`.
+- `R1`/`R2` when Ready: fail closed until trusted authenticated external PASS evidence matches the current fingerprint. A deep reviewer may satisfy a fast-review requirement; a fast reviewer never satisfies `R2`.
 
-A structured record is only a maintainer pointer to an external review; it is not itself review authority. The gate accepts only an exact GitHub Pull Request Review object, requires the configured external reviewer login, rejects self-authored sources, requires the server-side review `commit_id` to equal `REVIEWED_HEAD`, requires review state `APPROVED` or `COMMENTED`, requires `FINDINGS: 0`, and verifies that the external review body itself contains the matching PASS tier, fingerprint, reviewed head, reviewer class and reviewer ID:
-
-```text
-<!-- OTERYN_AI_REVIEW_V1 -->
-REVIEW_TIER: R1 | R2
-REVIEW_FINGERPRINT: <sha256>
-REVIEWED_HEAD: <40-hex SHA>
-REVIEWER_CLASS: fast | deep
-REVIEWER_ID: codex_spark | codex
-RESULT: PASS
-REVIEW_SOURCE_URL: https://github.com/<owner>/<repo>/pull/<n>#pullrequestreview-<id>
-FINDINGS: 0
-```
+A structured legacy record is only a maintainer pointer to an external review; the referenced Pull Request Review remains the authority and is fetched server-side. For Codex issue-comment interoperability, the structured request is likewise only request metadata; the trusted Codex issue comment is fetched server-side and paired fail-closed to the single eligible request generation. The configured reviewer login and allowed source kind are always read from trusted-base policy. Candidate code cannot choose reviewer identity, evidence grammar, source kinds or authorization.
 
 For review reuse after review-neutral commits, `REVIEWED_HEAD` may be an ancestor of the final head only when the final fingerprint remains identical. The gate verifies ancestry and fingerprint and traverses every intervening commit; each must be a single-parent commit touching only safe review-neutral data paths.
