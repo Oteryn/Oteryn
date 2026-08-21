@@ -99,37 +99,13 @@ def _configured_rollout_commit(policy: dict, repository: str) -> str | None:
     return value
 
 
-def _eligible_anchor_map(
-    *, reviews: list[dict], policy: dict, repo_root: str | Path,
-    head: str, repository: str, pr_number: int,
-) -> tuple[dict[int, dict[str, str]], dict[str, str]]:
-    by_comment: dict[int, dict[str, str]] = {}
-    trusted_authors: dict[str, str] = {}
-    for _, anchor in _core._eligible_request_anchors(
-        reviews=reviews, policy=policy, repo_root=repo_root, head=head,
-        repository=repository, pr_number=pr_number,
-    ):
-        if anchor["REQUEST_VALID"] != "true":
-            continue
-        association = anchor["REQUEST_AUTHOR_ASSOCIATION"]
-        if association not in _core.TRUSTED_ASSOCIATIONS:
-            raise RuntimeError("valid request anchor has an untrusted author association")
-        comment_id = int(anchor["REQUEST_COMMENT_ID"])
-        if comment_id in by_comment and by_comment[comment_id] != anchor:
-            raise RuntimeError("request anchor comment identity is ambiguous")
-        by_comment[comment_id] = anchor
-        author = anchor["REQUEST_AUTHOR"].casefold()
-        trusted_authors.setdefault(author, association)
-    return by_comment, trusted_authors
-
-
-def _all_valid_request_anchor_orders(
+def _identity_valid_request_anchors(
     *, reviews: list[dict], policy: dict, repository: str, pr_number: int,
-) -> list[tuple[datetime, int]]:
-    """Validate immutable anchor identity without current-head eligibility filters."""
+) -> list[dict[str, str]]:
+    """Return all valid same-PR immutable anchors without current-head eligibility filters."""
     anchor_logins = _core._anchor_logins(policy)
     pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
-    orders: list[tuple[datetime, int]] = []
+    anchors: list[dict[str, str]] = []
     seen_comment_ids: dict[int, dict[str, str]] = {}
     for review in reviews:
         body = str(review.get("body") or "")
@@ -163,6 +139,57 @@ def _all_valid_request_anchor_orders(
         if previous is not None and previous != anchor:
             raise RuntimeError("request anchor comment identity is ambiguous")
         seen_comment_ids[comment_id] = anchor
+        anchors.append(anchor)
+    return anchors
+
+
+def _eligible_anchor_map(
+    *, reviews: list[dict], policy: dict, repo_root: str | Path,
+    head: str, repository: str, pr_number: int,
+) -> tuple[dict[int, dict[str, str]], dict[str, str]]:
+    by_comment: dict[int, dict[str, str]] = {}
+    trusted_authors: dict[str, str] = {}
+    for _, anchor in _core._eligible_request_anchors(
+        reviews=reviews, policy=policy, repo_root=repo_root, head=head,
+        repository=repository, pr_number=pr_number,
+    ):
+        if anchor["REQUEST_VALID"] != "true":
+            continue
+        association = anchor["REQUEST_AUTHOR_ASSOCIATION"]
+        if association not in _core.TRUSTED_ASSOCIATIONS:
+            raise RuntimeError("valid request anchor has an untrusted author association")
+        comment_id = int(anchor["REQUEST_COMMENT_ID"])
+        if comment_id in by_comment and by_comment[comment_id] != anchor:
+            raise RuntimeError("request anchor comment identity is ambiguous")
+        by_comment[comment_id] = anchor
+
+    # Association trust is identity history, not current-review PASS authority.
+    # Keep stale/non-neutral anchors out of by_comment while retaining their
+    # server-bound author association for fail-closed edit detection.
+    for anchor in _identity_valid_request_anchors(
+        reviews=reviews, policy=policy, repository=repository, pr_number=pr_number,
+    ):
+        author = anchor["REQUEST_AUTHOR"].casefold()
+        association = anchor["REQUEST_AUTHOR_ASSOCIATION"]
+        previous = trusted_authors.get(author)
+        if previous is not None and previous != association:
+            raise RuntimeError("request anchor author association is ambiguous")
+        trusted_authors[author] = association
+    return by_comment, trusted_authors
+
+
+def _all_valid_request_anchor_orders(
+    *, reviews: list[dict], policy: dict, repository: str, pr_number: int,
+) -> list[tuple[datetime, int]]:
+    """Validate immutable anchor identity without current-head eligibility filters."""
+    orders: list[tuple[datetime, int]] = []
+    for anchor in _identity_valid_request_anchors(
+        reviews=reviews, policy=policy, repository=repository, pr_number=pr_number,
+    ):
+        request_time = _strict_timestamp(anchor["REQUEST_CREATED_AT"])
+        comment_id = int(anchor["REQUEST_COMMENT_ID"])
+        if request_time is None or comment_id <= 0:
+            raise RuntimeError("valid request anchor ordering metadata is malformed")
         orders.append((request_time, comment_id))
     return orders
 
