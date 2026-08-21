@@ -19,10 +19,10 @@
       "product": "game",
       "target_coordinate": "Oteryn/Oteryn-Game",
       "current_coordinate": "Oteryn/Oteryn-Game",
-      "migration_state": "target_authoritative_source_retirement_pending",
-      "migration_verdict": "MIGRATION_COMPLETE=NO",
+      "migration_state": "target_authoritative_source_archived_final_ref_proof_incomplete",
+      "migration_verdict": "MIGRATION_COMPLETE=UNKNOWN",
       "authority_owner": "Game provider",
-      "notes": "History continuity from blakinio/Oteryn-v2 is proven, but migration acceptance remains blocked until ordinary source-side product work is frozen/retired and source-only work, copied refs, stale mutable coordinates and terminal source disposition are reconciled."
+      "notes": "Target is authoritative and legacy source blakinio/Oteryn-v2 is archived read-only. The previously source-only PROD-ENTITLEMENTS branch at 6f83c16305a4c7fb8d0303deb55a4ab8ee5827e8 was intentionally carried forward through merged Oteryn/Oteryn-Game PR #20 (merge d40a225e5fedca0396f34b4f2b6c1e343161e6ff). Final exhaustive tag/ref and stale-coordinate closure is not independently proven in this META audit, so YES is not inferred."
     },
     {
       "product": "platform",
@@ -30,10 +30,10 @@
       "current_coordinate": "Oteryn/Oteryn-Platform",
       "previous_coordinate": "blakinio/Oteryn-Platform",
       "stable_repository_id": 1305155726,
-      "migration_state": "identity_transferred_post_transfer_revalidation_incomplete",
-      "migration_verdict": "MIGRATION_COMPLETE=NO",
+      "migration_state": "identity_transferred_backup_archived_post_transfer_revalidation_incomplete",
+      "migration_verdict": "MIGRATION_COMPLETE=UNKNOWN",
       "authority_owner": "Platform provider",
-      "notes": "Stable repository identity is transferred to Oteryn. Migration acceptance still requires completion or explicit disposition of runner, package/GHCR, deployment/environment, App/webhook/deploy-key and external owner/repo-sensitive identity validation, stale-coordinate cleanup, migration-only machinery retirement and temporary-backup terminal disposition."
+      "notes": "Stable repository identity is transferred to Oteryn and the transfer-cut backup repository is archived read-only with a durable release/restore contract. Organization-level evidence still does not prove every package/GHCR, deployment/environment, App/webhook/deploy-key, external owner/repo-sensitive identity and migration-machinery retirement obligation, so YES is not inferred."
     },
     {
       "product": "atlas",
@@ -51,15 +51,15 @@
       "repository_id": 1338405017,
       "classification": "TEMPORARY_MIGRATION",
       "purpose": "Preserve the previous target-coordinate bootstrap state during the Platform owner-transfer transaction.",
-      "lifecycle_state": "terminal_disposition_required",
-      "terminal_gate": "Retain only until rollback/restore obligations and required migration evidence are resolved, then explicitly archive or delete under a separately authorized task.",
+      "lifecycle_state": "ARCHIVED_READ_ONLY",
+      "terminal_gate": "SATISFIED: durable transfer-cut Release and restore evidence are retained; repository is archived read-only and deletion is not required.",
       "normative_product_authority": false
     }
   ],
   "legacy_sources": [
     {
       "coordinate": "blakinio/Oteryn-v2",
-      "classification": "legacy_game_migration_source_retirement_pending",
+      "classification": "legacy_game_migration_source_archived_read_only",
       "normative_target_authority": false
     },
     {
