@@ -49,7 +49,8 @@ def _server_anchor(comment: dict, final: str, *, association: str = "MEMBER") ->
 
 
 def _verify_with_only_current_anchor(
-    comments, repo, final, current_request, *, policy=None, anchor=None, extra_reviews=None
+    comments, repo, final, current_request, *, policy=None, anchor=None, extra_reviews=None,
+    review_comments=None,
 ):
     return m.verify_records(
         comments,
@@ -62,7 +63,7 @@ def _verify_with_only_current_anchor(
         pr_number=7,
         token="x",
         reviews=(extra_reviews or []) + [anchor or core_tests.request_anchor(current_request, final)],
-        review_comments=[],
+        review_comments=review_comments or [],
     )
 
 
@@ -432,6 +433,27 @@ def test_anchored_author_unrelated_edit_still_fails_closed() -> None:
     ))
 
 
+
+def test_edited_inline_from_superseded_generation_does_not_poison_fresh_review() -> None:
+    repo, reviewed, final = core_tests.make_repo(non_neutral_after_review=True)
+    current = core_tests.issue_comment(
+        10, core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
+    )
+    result = core_tests.codex_result(
+        11, final[:10], stamp="2026-08-20T10:03:00Z",
+    )
+    old_review = core_tests.codex_review(700, reviewed)
+    old_edited_inline = core_tests.codex_inline(
+        700, "[P1] Superseded finding repaired by the later non-neutral commit",
+        stamp="2026-08-20T09:58:00Z", updated_stamp="2026-08-20T09:58:01Z",
+    )
+    found = _verify_with_only_current_anchor(
+        [current, result], repo, final, current, extra_reviews=[old_review],
+        review_comments=[old_edited_inline],
+    )
+    assert found["review_source_kind"] == "issue_comment_result"
+    assert found["review_source_commit_id"] == final
+
 def test_preserved_core_suite_passes_standalone() -> None:
     script = Path(core_tests.__file__).resolve()
     completed = subprocess.run(
@@ -445,7 +467,7 @@ def test_preserved_core_suite_passes_standalone() -> None:
 def test_live_codex_clean_flair_variants_pass() -> None:
     for flair in (
         "Swish!", "Hooray!", "Chef's kiss.", "Breezy!", "Nice work!", "Bravo.",
-        ":rocket:", "More of your lovely PRs please.",
+        ":rocket:", "More of your lovely PRs please.", "You're on a roll.",
     ):
         repo, _, final = core_tests.make_repo()
         current = core_tests.issue_comment(
