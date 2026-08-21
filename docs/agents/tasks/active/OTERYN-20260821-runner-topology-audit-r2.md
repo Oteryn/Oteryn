@@ -2,8 +2,9 @@
 
 Issue: #32
 Repository: Oteryn/Oteryn
-Status: PARTIAL — implementation observed; routing and GitHub control-plane scope still require proof
+Lifecycle authority: GitHub Issue #32
 Mode: live evidence audit; no destructive runner mutation
+Evidence checkpoint: GitHub Issue #32 comment `5374400776` (2026-08-21) and issue #34 comment `5374532953` (2026-08-21).
 
 ## Objective
 
@@ -11,7 +12,7 @@ Record the current runner ownership, image provenance, scope evidence and migrat
 
 ## Live checkpoint — 2026-08-21
 
-The three named organization runner registrations and their running Synology containers are now observed:
+The three named organization runner registrations and their running Synology containers were observed in the live checkpoint recorded at GitHub Issue #32 comment `5374400776` on 2026-08-21:
 
 | Workload | Registration | Group / pool observed | Image identity observed | State |
 | --- | --- | --- | --- | --- |
@@ -19,9 +20,9 @@ The three named organization runner registrations and their running Synology con
 | Atlas | `oteryn-synology-atlas` | `atlas-runners` | immutable GHCR digest | running |
 | Game | `oteryn-synology-game` | `game-runners` | immutable GHCR digest | running |
 
-These registrations use the Oteryn organization URL and Actions Runner `2.336.0`. The new containers use separate registration/config/work state. This proves the runner-split implementation exists; it does **not** prove selected-repository restrictions, workflow routing, or successful workload execution.
+The checkpoint records the Oteryn organization URL, Actions Runner `2.336.0`, the immutable digest, and separate local registration/config/work state. It is a durable GitHub evidence pointer for the implementation observation; it does **not** prove selected-repository restrictions, workflow routing, or successful workload execution.
 
-## Current facts
+## Current observations
 
 - META remains GitHub-hosted; no local-runtime need is proven.
 - The legacy `oteryn-synology-staging` runner is still present as rollback/bootstrap and still points at a mutable pre-transfer image/legacy source coordinate.
