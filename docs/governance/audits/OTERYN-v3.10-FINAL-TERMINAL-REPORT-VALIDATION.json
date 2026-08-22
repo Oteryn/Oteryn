@@ -2,8 +2,8 @@
   "artifact": "OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
   "artifact_kind": "v3.10 terminal audit report; this record is independent from the addendum validation",
   "validator": "tools/governance/validate_v310_audit_docs.py",
-  "sha256": "ed2fb9e1faad41356187254c79828e6e2a90c5a29fa0ac7b1081389e090c5f6b",
-  "bytes": 42069,
+  "sha256": "2f0b34bec2990d7db03da2257fbab899261459b3d153c83b7d56c3eff45898f8",
+  "bytes": 42142,
   "checks": {
     "report_title": true,
     "matrix_l": true,
