@@ -93,6 +93,10 @@ class CleanupTests(unittest.TestCase):
             parse_disposition("Branch-Disposition: delete after merge\nBranch-Disposition-Reason: old")
         with self.assertRaisesRegex(CleanupError, "exactly one Branch-Disposition"):
             parse_disposition("Branch-Disposition: delete\nBranch-Disposition: retain\nBranch-Disposition-Reason: conflict")
+        with self.assertRaisesRegex(CleanupError, "invalid Branch-Disposition value"):
+            parse_disposition("Branch-Disposition:\ndelete\nBranch-Disposition-Reason: old")
+        with self.assertRaisesRegex(CleanupError, "requires exactly one"):
+            parse_disposition("Branch-Disposition: delete\nBranch-Disposition-Reason:\nold")
 
     def test_no_marker_and_retain_are_non_destructive(self):
         for body, expected in [("", "NOT_APPLICABLE"), ("Branch-Disposition: retain\nBranch-Disposition-Reason: keep", "RETAIN")]:

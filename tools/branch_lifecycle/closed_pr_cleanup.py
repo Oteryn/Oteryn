@@ -12,10 +12,10 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-DISPOSITION = re.compile(r"^\s*Branch-Disposition:\s*(delete|retain)\s*$", re.I | re.M)
-ANY_DISPOSITION = re.compile(r"^\s*Branch-Disposition:\s*(.*?)\s*$", re.I | re.M)
-REASON = re.compile(r"^\s*Branch-Disposition-Reason:\s*(\S.*)\s*$", re.I | re.M)
-ANY_REASON = re.compile(r"^\s*Branch-Disposition-Reason:\s*(.*?)\s*$", re.I | re.M)
+DISPOSITION = re.compile(r"^[ \t]*Branch-Disposition:[ \t]*(delete|retain)[ \t]*$", re.I | re.M)
+ANY_DISPOSITION = re.compile(r"^[ \t]*Branch-Disposition:[ \t]*(.*?)[ \t]*$", re.I | re.M)
+REASON = re.compile(r"^[ \t]*Branch-Disposition-Reason:[ \t]*(\S[^\r\n]*)$", re.I | re.M)
+ANY_REASON = re.compile(r"^[ \t]*Branch-Disposition-Reason:[ \t]*(.*)$", re.I | re.M)
 FULL_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 RESERVED = ("release", "rollback", "recovery", "backup")
 
