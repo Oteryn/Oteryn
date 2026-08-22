@@ -72,6 +72,48 @@ def test_report_digest_is_eol_stable() -> None:
         temp.cleanup()
 
 
+
+def without_row(text: str, prefix: str) -> str:
+    matches = [line for line in text.splitlines(keepends=True) if line.startswith(prefix)]
+    assert len(matches) == 1, (prefix, len(matches))
+    return text.replace(matches[0], "", 1)
+
+
+def assert_lifecycle_row_required(prefix: str, invariant_name: str) -> None:
+    text = without_row(m.REPORT.read_text(encoding="utf-8"), prefix)
+    temp, old_root, old_report = with_report(text)
+    try:
+        record = m.build_record()
+        assert record["execution_verdict"] == "FAIL"
+        assert record["mechanical_invariants"][invariant_name]["state"] == "FAIL"
+    finally:
+        restore(temp, old_root, old_report)
+
+
+def test_missing_game_reusable_prompt_lifecycle_row_fails() -> None:
+    assert_lifecycle_row_required("| Game | reusable prompts | stable identity/version/status", "retained_reusable_prompts_have_identity_version_status")
+
+
+def test_missing_platform_active_task_lifecycle_row_fails() -> None:
+    assert_lifecycle_row_required("| Platform | active task packets | explicit lifecycle authority", "active_task_packets_have_lifecycle_authority")
+
+
+def test_missing_atlas_handover_lifecycle_row_fails() -> None:
+    assert_lifecycle_row_required("| Atlas | handovers | explicitly non-authoritative", "handovers_are_non_authoritative_and_expire")
+
+
+def test_missing_section15_material_disposition_fails() -> None:
+    text = m.REPORT.read_text(encoding="utf-8")
+    prefix = "| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`; `docs/ci/CI_CONTRACT.md` | contracts | `[KEEP]`"
+    text = without_row(text, prefix)
+    temp, old_root, old_report = with_report(text)
+    try:
+        record = m.build_record()
+        assert record["execution_verdict"] == "FAIL"
+        assert record["mechanical_invariants"]["section_15_file_dispositions_present"]["state"] == "FAIL"
+    finally:
+        restore(temp, old_root, old_report)
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:

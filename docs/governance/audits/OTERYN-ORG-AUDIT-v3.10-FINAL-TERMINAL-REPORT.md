@@ -329,7 +329,7 @@ META copies               [NOT_NEEDED]
 ```text
 /                         [KEEP] provider durable routing/security/contribution docs
 /.github/workflows/       [KEEP] Atlas gate/provenance/local acceptance
-/docs/architecture/       [KEEP] Atlas architecture
+/docs/architecture/       [OPTIONAL] only after `GAP-DOCS-ATLAS-ARCH-001` is closed with a proven provider need; do not pre-create
 /docs/agents/             [KEEP] Atlas task/agent material where used
 Atlas source/products     [KEEP] Atlas authority
 META copies               [NOT_NEEDED]
@@ -393,45 +393,73 @@ Every answer uses an allowed target-tree disposition. `[OPTIONAL]` never authori
 
 | Repository | Current file/path | Primary class | Target / disposition | Authority | Acceptance / evidence |
 | --- | --- | --- | --- | --- | --- |
-| META | `/AGENTS.md` | root AGENTS | `[KEEP]` durable routing; candidate removes obsolete rollback-only wording | META | exact PR #43 diff + meta-gate |
-| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` | contracts | `[KEEP]` | META | current main/candidate |
-| META | `docs/governance/AI_REVIEW_POLICY.md` | governance policy | `[KEEP]` | META | AI policy tests |
-| META | `docs/ci/CI_CONTRACT.md` | CI policy | `[KEEP]` | META | meta-gate |
-| META | `docs/testing/ECOSYSTEM_TEST_STRATEGY.md` | test strategy | `[KEEP]` | META | current main |
-| META | `docs/recovery/organization-recovery-contract.md` | recovery/break-glass | `[KEEP]` | META | PR #36 + desired-state audit |
-| META | `docs/agents/prompts/README.md` | one-shot prompts | `[KEEP]` historical index; explicitly DO NOT EXECUTE | META provenance | exact PR #43 content |
-| META | `docs/agents/prompts/OTERYN-ORG-AUDIT-META-DESIRED-STATE-CLOSEOUT.md` | one-shot prompts | `[KEEP]` historical/completed | META provenance | status/supersession marker |
-| META | `docs/agents/prompts/OTERYN-ORG-RUNNERS-PLATFORM-ACL-LEGACY-CLOSEOUT.md` | one-shot prompts | `[KEEP]` historical/completed | META provenance | status/supersession marker |
-| META | `docs/agents/prompts/OTERYN-GAME-RUNNER-ACCEPTANCE-CLOSEOUT.md` | one-shot prompts | `[KEEP]` historical/completed | META provenance | status/supersession marker |
-| META | `docs/evidence/OTERYN-ORG-RUNNER-ACL-LIVE-CLOSEOUT-20260822.{md,json,json.sha256}` | review evidence | `[KEEP]` sanitized terminal evidence | META evidence | detached digest verified |
-| META | `docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md` | migration evidence | `[KEEP]` successor audit artifact | META | terminal report validator |
-| META | `docs/evidence/OTERYN-ORG-AUDIT-v3.10-TERMINAL-REPORT-VALIDATION-20260822.json` | review evidence | `[GENERATED]` exact report integrity record | META evidence | validator output bound to report SHA-256 |
-| Game | `/AGENTS.md` | root AGENTS | `[KEEP]` | Game | live tree `fd39c6aa...` |
-| Game | `apps/game-server/AGENTS.md` | nested AGENTS/override | `[KEEP]` path-scoped | Game | live tree |
-| Game | `crates/simulation-determinism/AGENTS.md` | nested AGENTS/override | `[KEEP]` path-scoped | Game | live tree |
-| Game | `docs/agents/AGENTS.md` | nested AGENTS/override | `[KEEP]` path-scoped | Game | live tree |
-| Game | `docs/architecture/**` | architecture/ADR | `[KEEP]` provider canonical | Game | live tree |
-| Game | `docs/contracts/**` | contracts | `[KEEP]` provider canonical | Game | live tree |
-| Game | `docs/agents/prompts/**` | reusable prompts | `[KEEP/CLEANUP]` per-file metadata classification required | Game | `GAP-PROMPT-GAME-001` |
-| Game | `docs/agents/tasks/active/**` | task packets | `[KEEP/CLEANUP]` verify Issue authority; archive/delete terminal packets | Game | `GAP-TASK-GAME-001` |
-| Game | `docs/agents/tasks/archive/**` | task packets | `[KEEP]` historical provenance | Game | live tree |
-| Game | `docs/agents/evidence/**` | review evidence | `[KEEP/CLEANUP]` retain by evidence policy | Game | live tree |
-| Platform | `/AGENTS.md` | root AGENTS | `[KEEP/CLEANUP]` durable root remains large; compaction backlog only | Platform | live tree `8e609f05...` |
-| Platform | `docs/agents/AGENTS.md` | nested AGENTS/override | `[KEEP]` path-scoped | Platform | live tree |
-| Platform | `docs/architecture/adr/**` | architecture/ADR | `[KEEP]` provider canonical | Platform | live tree |
-| Platform | `docs/contracts/**` | contracts | `[KEEP]` provider canonical | Platform | live tree |
-| Platform | `docs/agents/prompts/**` | reusable prompts | `[KEEP/CLEANUP]` classify 22 prompt files and metadata | Platform | `GAP-PROMPT-PLATFORM-001` |
-| Platform | `docs/agents/tasks/active/**` | task packets | `[KEEP/CLEANUP]` verify Issue authority and terminal disposition | Platform | `GAP-TASK-PLATFORM-001` |
-| Platform | `docs/agents/programs/**` | programmes | `[KEEP/CLEANUP]` GitHub Issue authority; programme cache only | Platform | live tree |
-| Platform | `docs/operations/**` | operations runbooks | `[KEEP]` provider operations authority | Platform | live tree |
-| Platform | `docs/agents/evidence/**` | review evidence | `[KEEP/CLEANUP]` retain by provider evidence policy | Platform | live tree |
-| Atlas | `/AGENTS.md` | root AGENTS | `[KEEP]` | Atlas | live tree `a1b5fea1...` |
-| Atlas | `docs/agents/prompts/**` | reusable prompts | `[KEEP/CLEANUP]` per-file metadata verification required | Atlas | `GAP-PROMPT-ATLAS-001` |
-| Atlas | `docs/agents/tasks/active/ATLAS-FULLWORLD-COORDINATOR.md` | task packets | `[KEEP/CLEANUP]` verify owning Issue and terminal disposition | Atlas | `GAP-TASK-ATLAS-001` |
-| Atlas | `docs/agents/tasks/archive/DYN-ATLAS-001-semantic-thais-z7-proof.md` | task packets | `[KEEP]` historical provenance | Atlas | live tree |
-| Atlas | `docs/evidence/**` | release evidence | `[KEEP]` publication/runtime evidence | Atlas | live tree |
-| Atlas | `docs/migration/legacy-atlas-extraction-provenance.json` | migration evidence | `[KEEP]` provenance authority | Atlas | extraction-provenance validator |
-| Atlas | `tools/governance/verify_extraction_provenance.py` | documentation/agent validators | `[KEEP]` | Atlas | provider test/workflow |
+| META | `/AGENTS.md` | root AGENTS | `[KEEP]` current material family at owning repository authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `docs/architecture/adr/**` | architecture/ADR | `[KEEP]` current material family at owning repository authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `docs/governance/**` | governance policy | `[KEEP]` current material family at owning repository authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `docs/ci/**` | CI policy | `[KEEP]` current material family at owning repository authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `docs/testing/**` | test strategy | `[KEEP]` current material family at owning repository authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `docs/recovery/**` | recovery/break-glass | `[KEEP]` current material family at owning repository authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `ecosystem/**` | machine-readable policy companions | `[KEEP]` current material family at owning repository authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `tools/governance/**` | documentation/agent validators | `[KEEP]` current material family at owning repository authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `docs/agents/prompts/OTERYN-*.md` | one-shot prompts | `[KEEP]` historical/non-executable provenance only | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `docs/evidence/**` | review evidence | `[KEEP]` retain under evidence/provenance policy; cannot broaden authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `/AGENTS.md` | root AGENTS | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `apps/game-server/AGENTS.md`; `crates/simulation-determinism/AGENTS.md`; `docs/agents/AGENTS.md` | nested AGENTS/override | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/architecture/**` | architecture/ADR | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/contracts/**`; `crates/platform-contracts/**` | contracts | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `.github/repository-policy.json`; `docs/agents/GOVERNANCE_CONTRACT.json` | governance policy | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `.github/workflows/**` | CI policy | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/agents/BUILD_TEST_MATRIX.md`; `tests/**` | test strategy | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/agents/prompts/**` | reusable prompts | `[KEEP/CLEANUP]` retained; per-file metadata verification gap `GAP-PROMPT-GAME-001` | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/agents/tasks/{active,archive}/**` | task packets | `[KEEP/CLEANUP]` cache only; GitHub Issue/PR lifecycle remains authoritative | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/agents/programs/**` | programmes | `[KEEP/CLEANUP]` cache only; GitHub Issue/PR lifecycle remains authoritative | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/agents/evidence/**` | review evidence | `[KEEP]` retain under evidence/provenance policy; cannot broaden authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `/AGENTS.md` | root AGENTS | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/agents/AGENTS.md` | nested AGENTS/override | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/architecture/adr/**` | architecture/ADR | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/contracts/**` | contracts | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/agents/GOVERNANCE_CONTRACT.json`; `BRANCH_LIFECYCLE_POLICY.json` | governance policy | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `.github/workflows/**`; `docs/agents/CI_WORKFLOW_LIFECYCLE.*` | CI policy | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/testing/**`; `docs/agents/BUILD_TEST_MATRIX.md` | test strategy | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/agents/prompts/**` | reusable prompts | `[KEEP/CLEANUP]` retained; per-file lifecycle/metadata gap `GAP-PROMPT-PLATFORM-001` | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/agents/tasks/active/**` | task packets | `[KEEP/CLEANUP]` cache only; GitHub Issue/PR lifecycle remains authoritative | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/agents/programs/**` | programmes | `[KEEP/CLEANUP]` cache only; GitHub Issue/PR lifecycle remains authoritative | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/operations/**`; `deploy/synology/**` | operations runbooks | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/agents/evidence/**` | review evidence | `[KEEP]` retain under evidence/provenance policy; cannot broaden authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `/AGENTS.md` | root AGENTS | `[KEEP]` current material family at owning repository authority | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `docs/agents/prompts/**` | reusable prompts | `[KEEP/CLEANUP]` retained; per-file metadata gap `GAP-PROMPT-ATLAS-001` | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `docs/agents/tasks/{active,archive}/**` | task packets | `[KEEP/CLEANUP]` cache only; GitHub Issue/PR lifecycle remains authoritative | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `docs/evidence/**` | release evidence | `[KEEP]` retain under evidence/provenance policy; cannot broaden authority | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `docs/migration/**` | migration evidence | `[KEEP]` retain under evidence/provenance policy; cannot broaden authority | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `tools/governance/**` | documentation/agent validators | `[KEEP]` current material family at owning repository authority | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `README.md`; `SECURITY.md`; `e2e/README.md` | human reference docs | `[KEEP]` current material family at owning repository authority | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`; `docs/ci/CI_CONTRACT.md` | contracts | `[KEEP]` current material family at owning repository authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `docs/governance/audits/**`; `docs/evidence/**`; `ecosystem/repositories.json` | migration evidence | `[KEEP]` retain under evidence/provenance policy; cannot broaden authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| META | `README.md`; `CONTRIBUTING.md`; `SECURITY.md`; `docs/**` | human reference docs | `[KEEP]` current material family at owning repository authority | META | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | historical prompt/task/evidence files under `docs/agents/tasks/archive/**` and `docs/agents/evidence/**` | one-shot prompts | `[KEEP]` historical/non-executable provenance only | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/agents/CONTEXT_HANDOFF.md`; handoff evidence/reports | handovers | `[KEEP/CLEANUP]` cache only; GitHub Issue/PR lifecycle remains authoritative | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/agents/EXECUTION_PROTOCOL.md`; `GITHUB_ONLY_EXECUTION.md`; related agent procedures | agent runbooks | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/architecture/ADR-0009-game-node-execution-capacity-deployment-and-recovery-baseline.md`; `docs/agents/SESSION_RECOVERY_AND_ORPHANED_EXECUTION.md` | recovery/break-glass | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `docs/agents/evidence/OTV2-20260818-*`; migration ADRs | migration evidence | `[KEEP]` retain under evidence/provenance policy; cannot broaden authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `README.md`; `CONTRIBUTING.md`; `SECURITY.md`; provider docs | human reference docs | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `.github/repository-policy.json`; `docs/agents/GOVERNANCE_CONTRACT.json`; `PROJECT_LANES.json` | machine-readable policy companions | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Game | `.github/workflows/agent-governance.yml`; `architecture-semantic-audit.yml`; `merge-gate.yml`; `repository-configuration.yml` | documentation/agent validators | `[KEEP]` current material family at owning repository authority | Game | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/agents/CONTEXT_HANDOFF.md`; provider evidence handoffs | handovers | `[KEEP/CLEANUP]` cache only; GitHub Issue/PR lifecycle remains authoritative | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/agents/**` execution/governance procedures | agent runbooks | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/operations/INCIDENT_RECOVERY_RUNBOOK.md`; `SYNOLOGY_ROLLBACK_SCHEMA_SAFETY.md`; `deploy/synology/scripts/rollback.sh`; `recover-schema.sh` | recovery/break-glass | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `deploy/synology/release-contract.env`; release/deployment workflow evidence | release evidence | `[KEEP]` retain under evidence/provenance policy; cannot broaden authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | provider migration/audit evidence; historical branch audit; META reconciliation | migration evidence | `[KEEP]` retain under evidence/provenance policy; cannot broaden authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/agents/evidence/**/index.md`; machine-generated evidence manifests | generated docs/indexes | `[GENERATED]` regenerate from authoritative inputs; manual output remains non-authoritative | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `README.md`; `CONTRIBUTING.md`; `SECURITY.md`; `docs/**` | human reference docs | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `docs/agents/*.json`; release/deployment contract data | machine-readable policy companions | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Platform | `.github/workflows/agent-governance.yml`; `historical-branch-audit.yml`; prompt-eval/governance checks | documentation/agent validators | `[KEEP]` current material family at owning repository authority | Platform | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `.github/workflows/ci.yml`; `extraction-provenance.yml`; `synology-live-acceptance.yml`; `synology-runner-health.yml` | CI policy | `[KEEP]` current material family at owning repository authority | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `docs/evidence/DYN-ATLAS-001-target-gui-execution-prompt.md` and bounded execution evidence | one-shot prompts | `[KEEP]` historical/non-executable provenance only | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `docs/evidence/ATLAS-FULLWORLD-PROGRAMME-LEDGER.md` | programmes | `[KEEP/CLEANUP]` cache only; GitHub Issue/PR lifecycle remains authoritative | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `docs/evidence/fullworld-generation/handoff-summary.json` | handovers | `[KEEP]` historical provenance; live Issue/PR/provider state supersedes | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `docs/agents/SYNOLOGY_DESKTOP_COMMANDER_ACCESS.md`; prompt/task routing docs | agent runbooks | `[KEEP]` current material family at owning repository authority | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `docs/evidence/ISSUE-*.md`; GitHub PR/review/check objects | review evidence | `[KEEP]` retain under evidence/provenance policy; cannot broaden authority | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
+| Atlas | `web/semantic-search/index.json`; FullWorld generated evidence/index outputs | generated docs/indexes | `[GENERATED]` regenerate from authoritative inputs; manual output remains non-authoritative | Atlas | section 4 inventory + Matrix L; exact section-15 coverage enforced by terminal-report validator |
 
 ## 16. GitHub settings, protection and ruleset matrix
 

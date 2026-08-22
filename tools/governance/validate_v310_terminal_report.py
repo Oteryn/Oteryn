@@ -62,9 +62,11 @@ def table_rows(text: str, marker: str) -> list[list[str]]:
 
 
 def state_from_rows(rows: list[list[str]], artifact: str) -> tuple[str, list[str]]:
-    states = [row[3] for row in rows if len(row) >= 4 and row[1] == artifact]
-    if not states:
-        return "FAIL", [f"missing lifecycle rows for {artifact}"]
+    matched = [row for row in rows if len(row) >= 4 and row[1] == artifact]
+    repos = [row[0] for row in matched]
+    if len(matched) != len(REPOS) or set(repos) != set(REPOS) or len(set(repos)) != len(repos):
+        return "FAIL", [f"{artifact} lifecycle rows must cover exactly {REPOS}; got {repos}"]
+    states = [row[3] for row in matched]
     gaps = sorted({m.group(0) for state in states for m in re.finditer(r"GAP-[A-Z0-9-]+", state)})
     if any(state.startswith("UNKNOWN") for state in states):
         return "UNKNOWN", gaps
@@ -213,14 +215,22 @@ def build_record() -> dict:
     disposition_repos = {repo for row in dispositions if len(row) == 6 for repo in [row[0]]}
     if disposition_repos != set(REPOS):
         errors.append(f"section 15 lacks provider documentation dispositions: {disposition_repos}")
+    disposition_keys: list[tuple[str, str, str]] = []
     for row in dispositions:
         if len(row) != 6 or any(not cell for cell in row):
             errors.append(f"invalid section 15 disposition row: {row}")
             continue
         if row[0] not in REPOS or row[2] not in CLASSES:
             errors.append(f"invalid section 15 repo/class: {row}")
+        disposition_keys.append((row[0], row[1], row[2]))
         if not re.match(r"^`?\[(KEEP|KEEP/CLEANUP|MOVE|NEW|GENERATED|OPTIONAL|REMOVE_AFTER_MIGRATION|NOT_NEEDED)\]`?", row[3]):
             errors.append(f"invalid section 15 disposition: {row[3]}")
+    inventory_keys = [(row[0], row[1], row[2]) for row in inventory if len(row) == 7]
+    missing_dispositions = sorted(set(inventory_keys) - set(disposition_keys))
+    extra_dispositions = sorted(set(disposition_keys) - set(inventory_keys))
+    duplicate_dispositions = len(disposition_keys) != len(set(disposition_keys))
+    if missing_dispositions or extra_dispositions or duplicate_dispositions:
+        errors.append(f"section 15 inventory mapping mismatch: missing={missing_dispositions}, extra={extra_dispositions}, duplicates={duplicate_dispositions}")
 
     backlog = table_rows(text, "| Order | Type | CURRENT_PATHS | TARGET_PATHS | AUTHORITY_OWNER | MIGRATION/DISPOSITION | BACKWARD_LINK_OR_REDIRECT_PLAN | ACCEPTANCE_CRITERIA | DETERMINISTIC_VALIDATION | ROLLBACK |")
     backlog_types = [row[1] for row in backlog if len(row) == 10]
@@ -264,7 +274,10 @@ def build_record() -> dict:
         "documentation_agent_access_gaps_are_explicit": invariant("PASS" if matrix_access_gaps else "FAIL", "GAP-IDs parsed from Matrix L/lifecycle ledger", matrix_access_gaps),
         "documentation_agent_gaps_have_ordered_backlog": invariant("PASS" if not unmapped_doc_gaps else "FAIL", "all Matrix L/lifecycle GAP-IDs appear in section 19 remediation backlog"),
         "g11_result_present": invariant("PASS" if g11_ok else "FAIL", grows.get("G11", "missing")),
-        "section_15_file_dispositions_present": invariant("PASS" if disposition_repos == set(REPOS) else "FAIL", f"{len(dispositions)} documentation/agent disposition rows"),
+        "section_15_file_dispositions_present": invariant(
+            "PASS" if disposition_repos == set(REPOS) and not missing_dispositions and not extra_dispositions and not duplicate_dispositions else "FAIL",
+            f"{len(set(disposition_keys))}/{len(set(inventory_keys))} section-4 material families mapped exactly once",
+        ),
         "section_19_required_backlog_categories_present": invariant("PASS" if backlog_types == BACKLOG_TYPES else "FAIL", ", ".join(backlog_types)),
     }
     hard_fail = bool(errors) or any(item["state"] == "FAIL" for item in invariants.values())
