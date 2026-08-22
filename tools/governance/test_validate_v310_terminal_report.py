@@ -48,9 +48,9 @@ def test_missing_docs_ci_backlog_fails() -> None:
 
 def test_missing_material_classification_fails() -> None:
     text = m.REPORT.read_text(encoding="utf-8")
-    line = "| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` | contracts | YES | META | durable while authoritative; update through protected provider process | on-demand/routed |\n"
-    assert line in text
-    temp, old_root, old_report = with_report(text.replace(line, "", 1))
+    prefix = "| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` | contracts | CROSS_REPO_CONTRACT |"
+    text = without_row(text, prefix)
+    temp, old_root, old_report = with_report(text)
     try:
         record = m.build_record()
         assert record["execution_verdict"] == "FAIL"
@@ -104,7 +104,7 @@ def test_missing_atlas_handover_lifecycle_row_fails() -> None:
 
 def test_missing_section15_material_disposition_fails() -> None:
     text = m.REPORT.read_text(encoding="utf-8")
-    prefix = "| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` | contracts | `[KEEP] current material family"
+    prefix = "| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` | CROSS_REPO_CONTRACT |"
     text = without_row(text, prefix)
     temp, old_root, old_report = with_report(text)
     try:
@@ -114,17 +114,41 @@ def test_missing_section15_material_disposition_fails() -> None:
     finally:
         restore(temp, old_root, old_report)
 
+
 def test_grouped_inventory_path_overlap_fails() -> None:
     text = m.REPORT.read_text(encoding="utf-8")
-    marker = "| META | `/AGENTS.md` | root AGENTS | YES | META | durable routing policy | always loaded; bounded root context |\n"
-    assert marker in text
-    overlap = "| META | `/AGENTS.md`; `docs/agents/contracts/SYNTHETIC.md` | contracts | YES | META | synthetic overlap | routed |\n"
-    text = text.replace(marker, marker + overlap, 1)
+    old = "| META | `docs/architecture/adr/**` | architecture/ADR | ARCHITECTURE_ADR |"
+    new_prefix = "| META | `/AGENTS.md`; `docs/architecture/adr/**` | architecture/ADR | ARCHITECTURE_ADR |"
+    assert old in text
+    text = text.replace(old, new_prefix, 1)
     temp, old_root, old_report = with_report(text)
     try:
         record = m.build_record()
         assert record["execution_verdict"] == "FAIL"
         assert any("multiple primary classes" in error for error in record["errors"])
+    finally:
+        restore(temp, old_root, old_report)
+
+
+def test_section4_uses_contract_operational_primary_classes() -> None:
+    record = m.build_record()
+    assert record["execution_verdict"] == "PASS"
+    assert set(record["operational_primary_classes"]) <= m.OPERATIONAL_PRIMARY_CLASSES
+    assert "root AGENTS" not in record["operational_primary_classes"]
+
+
+def test_unquoted_inventory_selector_fails() -> None:
+    text = m.REPORT.read_text(encoding="utf-8")
+    inv = "| META | `/AGENTS.md` | root AGENTS | NORMATIVE_AGENT_INSTRUCTION |"
+    disp = "| META | `/AGENTS.md` | NORMATIVE_AGENT_INSTRUCTION |"
+    assert inv in text and disp in text
+    text = text.replace(inv, "| META | /AGENTS.md | root AGENTS | NORMATIVE_AGENT_INSTRUCTION |", 1)
+    text = text.replace(disp, "| META | /AGENTS.md | NORMATIVE_AGENT_INSTRUCTION |", 1)
+    temp, old_root, old_report = with_report(text)
+    try:
+        record = m.build_record()
+        assert record["execution_verdict"] == "FAIL"
+        assert any("unparseable CURRENT_PATH selector" in error for error in record["errors"])
     finally:
         restore(temp, old_root, old_report)
 

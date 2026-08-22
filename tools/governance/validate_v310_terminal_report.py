@@ -24,6 +24,16 @@ CLASSES = [
     "migration evidence", "generated docs/indexes", "human reference docs",
     "machine-readable policy companions", "documentation/agent validators",
 ]
+OPERATIONAL_PRIMARY_CLASSES = {
+    "NORMATIVE_AGENT_INSTRUCTION", "GOVERNANCE_POLICY", "MACHINE_READABLE_POLICY",
+    "ARCHITECTURE_ADR", "CROSS_REPO_CONTRACT", "PROVIDER_CONTRACT", "CI_POLICY",
+    "TEST_STRATEGY", "RUNBOOK_OPERATIONAL", "RUNBOOK_RECOVERY", "PROMPT_REUSABLE",
+    "PROMPT_TASK_EXECUTION", "PROMPT_ONE_SHOT", "TASK_PACKET_ACTIVE",
+    "TASK_PACKET_ARCHIVED", "PROGRAMME_OBJECT", "HANDOVER_CACHE", "EVIDENCE_REVIEW",
+    "EVIDENCE_RELEASE", "EVIDENCE_MIGRATION", "GENERATED_REFERENCE", "HUMAN_REFERENCE",
+    "HISTORICAL_ARCHIVE", "OBSOLETE_DELETE", "UNKNOWN",
+}
+
 PLACEMENT_QUESTIONS = [
     "Where does a new reusable prompt go?", "Where does a one-shot prompt go while active?",
     "What happens to a one-shot prompt when complete?", "Where does an optional task packet go?",
@@ -76,24 +86,40 @@ def state_from_rows(rows: list[list[str]], artifact: str) -> tuple[str, list[str
     return "FAIL", [f"unexpected lifecycle state: {state}" for state in states]
 
 
-def inventory_path_atoms(cell: str) -> list[str]:
-    return [atom.strip() for atom in re.findall(r"`([^`]+)`", cell) if atom.strip()]
+def parse_selector_spec(cell: str) -> tuple[list[str], list[str]]:
+    parts = cell.split(" EXCEPT ")
+    if len(parts) > 2:
+        raise ValueError("multiple EXCEPT clauses")
+    include_text = parts[0]
+    exclude_text = parts[1] if len(parts) == 2 else ""
+    def parse_side(side: str, required: bool) -> list[str]:
+        atoms = [x.strip() for x in re.findall(r"`([^`]+)`", side) if x.strip()]
+        residue = re.sub(r"`[^`]+`", "", side).replace(";", "").strip()
+        if residue or (required and not atoms):
+            raise ValueError(f"unparseable selector side: {side!r}")
+        if len(atoms) != len(set(atoms)):
+            raise ValueError(f"duplicate selector atom: {side!r}")
+        return atoms
+    return parse_side(include_text, True), parse_side(exclude_text, False)
 
-
-def path_atoms_overlap(left: str, right: str) -> bool:
-    if left == right:
-        return True
-    left_glob = any(ch in left for ch in "*?[")
-    right_glob = any(ch in right for ch in "*?[")
-    if left_glob and not right_glob and fnmatch.fnmatchcase(right, left):
-        return True
-    if right_glob and not left_glob and fnmatch.fnmatchcase(left, right):
-        return True
-    if left.endswith("/**") and right.startswith(left[:-3]):
-        return True
-    if right.endswith("/**") and left.startswith(right[:-3]):
-        return True
+def path_pattern_contains(parent: str, child: str) -> bool:
+    if parent == child: return True
+    if parent.endswith("/**") and child.startswith(parent[:-3]): return True
+    if any(ch in parent for ch in "*?[") and not any(ch in child for ch in "*?["):
+        return fnmatch.fnmatchcase(child, parent)
     return False
+
+def selector_specs_overlap(left, right):
+    left_in, left_ex = left; right_in, right_ex = right
+    for a in left_in:
+        for b in right_in:
+            if path_pattern_contains(a,b): narrower=b
+            elif path_pattern_contains(b,a): narrower=a
+            else: continue
+            if any(path_pattern_contains(ex,narrower) for ex in left_ex): continue
+            if any(path_pattern_contains(ex,narrower) for ex in right_ex): continue
+            return a,b
+    return None
 
 
 def invariant(state: str, evidence: str, gaps: list[str] | None = None) -> dict:
@@ -167,50 +193,57 @@ def build_record() -> dict:
     for repo, classes in by_repo.items():
         if classes != CLASSES:
             errors.append(f"Matrix L coverage mismatch for {repo}: {classes}")
-    inventory = table_rows(text, "| Repository | Current path/object | Primary class | Normative | Canonical authority | Lifecycle / disposition | Context cost |")
-    seen_inventory: set[tuple[str, str]] = set()
+    inventory = table_rows(text, "| Repository | Current path/object | Artifact family | Primary operational class | Authority owner | Canonical repository | Canonical target path/object | Purpose | Consumers | Normative | Mutable state allowed | Local copy allowed | Override/precedence rule | Required metadata | Lifecycle | Retention/expiry | Supersession/archive rule | CI/drift enforcement | Migration action | Evidence ID | Context cost |")
+    inventory_families = {repo: set() for repo in REPOS}
+    selector_records = {repo: [] for repo in REPOS}
     for row in inventory:
-        if len(row) != 7 or any(not cell for cell in row):
+        if len(row) != 21 or any(not cell for cell in row):
             errors.append(f"invalid material inventory row: {row}")
             continue
-        repo, current, primary, normative, authority, lifecycle, _ = row
-        if repo not in REPOS or primary not in CLASSES:
-            errors.append(f"invalid inventory repo/class: {row}")
-        key = (repo, current)
-        if key in seen_inventory:
-            errors.append(f"duplicate material inventory path: {key}")
-        seen_inventory.add(key)
-        if normative not in {"YES", "NO"}:
-            errors.append(f"invalid normative flag: {row}")
+        repo,current,family,primary,authority,canonical_repo,canonical_target,purpose,consumers,normative,mutable_state,local_copy,override_rule,required_metadata,lifecycle,retention,supersession,ci_enforcement,migration_action,evidence_id,context_cost = row
+        if repo not in REPOS:
+            errors.append(f"invalid inventory repository: {row}")
+            continue
+        if family not in CLASSES:
+            errors.append(f"invalid inventory artifact family: {repo}:{family}")
+        else:
+            inventory_families[repo].add(family)
+        if primary not in OPERATIONAL_PRIMARY_CLASSES:
+            errors.append(f"invalid operational primary class: {repo}:{current}:{primary}")
+        if canonical_repo not in REPOS:
+            errors.append(f"invalid canonical repository: {repo}:{current}:{canonical_repo}")
+        for name,value in (("Normative",normative),("Mutable state allowed",mutable_state),("Local copy allowed",local_copy)):
+            if value not in {"YES","NO"}:
+                errors.append(f"invalid {name} flag: {repo}:{current}:{value}")
         if normative == "YES" and authority != repo:
             errors.append(f"normative artifact has non-single/non-owning authority: {row}")
+        if primary == "UNKNOWN" and "GAP-" not in " | ".join(row):
+            errors.append(f"UNKNOWN primary class lacks GAP-ID: {repo}:{current}")
         if "UNKNOWN" in lifecycle and "GAP-" not in lifecycle:
             errors.append(f"inventory lifecycle UNKNOWN without GAP-ID: {row}")
-
-    atom_owners: dict[str, list[tuple[str, str]]] = {repo: [] for repo in REPOS}
-    for row in inventory:
-        if len(row) != 7 or row[0] not in atom_owners:
+        try:
+            spec=parse_selector_spec(current)
+        except ValueError as exc:
+            errors.append(f"unparseable CURRENT_PATH selector: {repo}:{current}: {exc}")
             continue
-        repo, current, primary = row[0], row[1], row[2]
-        for atom in inventory_path_atoms(current):
-            for prior_atom, prior_primary in atom_owners[repo]:
-                if prior_primary != primary and path_atoms_overlap(prior_atom, atom):
-                    errors.append(
-                        f"material artifact has multiple primary classes: {repo}:{prior_atom} ({prior_primary}) <> {atom} ({primary})"
-                    )
-            atom_owners[repo].append((atom, primary))
+        for prior_spec,prior_primary,prior_current in selector_records[repo]:
+            overlap=selector_specs_overlap(prior_spec,spec)
+            if not overlap:
+                continue
+            a,b=overlap
+            if prior_primary != primary:
+                errors.append(f"material artifact has multiple primary classes: {repo}:{prior_current} ({prior_primary}) <> {current} ({primary}); overlap={a}::{b}")
+            else:
+                errors.append(f"material artifact appears in multiple primary records: {repo}:{prior_current} <> {current} ({primary}); overlap={a}::{b}")
+        selector_records[repo].append((spec,primary,current))
 
-    inventory_classes = {repo: set() for repo in REPOS}
-    for row in inventory:
-        if len(row) == 7 and row[0] in inventory_classes and row[2] in CLASSES:
-            inventory_classes[row[0]].add(row[2])
     for row in matrix_l:
-        if len(row) != 12 or row[0] not in inventory_classes:
+        if len(row) != 12 or row[0] not in inventory_families:
             continue
-        current = row[2]
-        if any(token in current for token in ("NOT_NEEDED", "NOT_APPLICABLE", "UNKNOWN")):
+        current=row[2]
+        if any(token in current for token in ("NOT_NEEDED","NOT_APPLICABLE","UNKNOWN")):
             continue
-        if row[1] not in inventory_classes[row[0]]:
+        if row[1] not in inventory_families[row[0]]:
             errors.append(f"material Matrix L class missing from section 4 inventory: {row[0]}:{row[1]}")
 
     lifecycle_rows = table_rows(text, "| Repository | Artifact family | Required invariant | Verification state | Lifecycle authority / supersession |")
@@ -245,7 +278,7 @@ def build_record() -> dict:
     empty_taxonomy_ok = all("[NEW]" not in answer for row in placement for answer in row[1:])
     if not empty_taxonomy_ok:
         errors.append("target tree creates NEW taxonomy without a proven need")
-    dispositions = table_rows(text, "| Repository | Current file/path | Primary class | Target / disposition | Authority | Acceptance / evidence |")
+    dispositions = table_rows(text, "| Repository | Current file/path | Primary operational class | Target / disposition | Authority | Acceptance / evidence |")
     disposition_repos = {repo for row in dispositions if len(row) == 6 for repo in [row[0]]}
     if disposition_repos != set(REPOS):
         errors.append(f"section 15 lacks provider documentation dispositions: {disposition_repos}")
@@ -254,12 +287,12 @@ def build_record() -> dict:
         if len(row) != 6 or any(not cell for cell in row):
             errors.append(f"invalid section 15 disposition row: {row}")
             continue
-        if row[0] not in REPOS or row[2] not in CLASSES:
-            errors.append(f"invalid section 15 repo/class: {row}")
+        if row[0] not in REPOS or row[2] not in OPERATIONAL_PRIMARY_CLASSES:
+            errors.append(f"invalid section 15 repo/operational-class: {row}")
         disposition_keys.append((row[0], row[1], row[2]))
         if not re.match(r"^`?\[(KEEP|KEEP/CLEANUP|MOVE|NEW|GENERATED|OPTIONAL|REMOVE_AFTER_MIGRATION|NOT_NEEDED)\]`?", row[3]):
             errors.append(f"invalid section 15 disposition: {row[3]}")
-    inventory_keys = [(row[0], row[1], row[2]) for row in inventory if len(row) == 7]
+    inventory_keys = [(row[0], row[1], row[3]) for row in inventory if len(row) == 21]
     missing_dispositions = sorted(set(inventory_keys) - set(disposition_keys))
     extra_dispositions = sorted(set(disposition_keys) - set(inventory_keys))
     duplicate_dispositions = len(disposition_keys) != len(set(disposition_keys))
@@ -276,7 +309,7 @@ def build_record() -> dict:
 
     matrix_access_gaps = sorted({
         m.group(0)
-        for row in matrix_l + lifecycle_rows
+        for row in matrix_l + lifecycle_rows + inventory
         for cell in row
         for m in re.finditer(r"GAP-[A-Z0-9-]+", cell)
     })
@@ -297,7 +330,15 @@ def build_record() -> dict:
     invariants = {
         "matrix_l_exists": invariant("PASS" if matrix_l else "FAIL", f"{len(matrix_l)} Matrix L rows"),
         "matrix_l_covers_all_four_repositories": invariant("PASS" if all(by_repo[r] == CLASSES for r in REPOS) else "FAIL", "4 repositories x 22 classes"),
-        "material_artifacts_have_primary_class": invariant("PASS" if inventory and not any(e.startswith("invalid material inventory") or e.startswith("duplicate material") for e in errors) else "FAIL", f"{len(inventory)} material path/object families"),
+        "material_artifacts_have_primary_class": invariant(
+            "PASS" if inventory and not any(
+                token in e for e in errors for token in (
+                    "invalid material inventory", "invalid operational primary class", "multiple primary classes",
+                    "multiple primary records", "unparseable CURRENT_PATH selector", "UNKNOWN primary class lacks GAP-ID",
+                )
+            ) else "FAIL",
+            f"{len(inventory)} material artifact records using section-10A operational taxonomy",
+        ),
         "normative_artifacts_have_single_authority": invariant("PASS" if inventory and not any("normative artifact" in e for e in errors) else "FAIL", "section 4 normative inventory authority column"),
         "retained_reusable_prompts_have_identity_version_status": invariant(prompt_state, "section 7 lifecycle verification", prompt_gaps),
         "active_task_packets_have_lifecycle_authority": invariant(task_state, "section 7 lifecycle verification", task_gaps),
@@ -317,7 +358,7 @@ def build_record() -> dict:
     hard_fail = bool(errors) or any(item["state"] == "FAIL" for item in invariants.values())
     unresolved = sorted({gap for item in invariants.values() for gap in item.get("gap_ids", [])})
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "validator": "tools/governance/validate_v310_terminal_report.py",
         "report": str(REPORT.relative_to(ROOT)).replace("\\", "/"),
         "report_sha256": sha256(REPORT),
@@ -331,6 +372,7 @@ def build_record() -> dict:
         "matrix_l_rows": len(matrix_l),
         "matrix_l_rows_by_repo": {repo: len(by_repo[repo]) for repo in REPOS},
         "material_inventory_rows": len(inventory),
+        "operational_primary_classes": sorted({row[3] for row in inventory if len(row) == 21}),
         "section_15_disposition_rows": len(dispositions),
         "section_19_documentation_backlog_types": backlog_types,
         "runner_capture_sha256": actual_runner,

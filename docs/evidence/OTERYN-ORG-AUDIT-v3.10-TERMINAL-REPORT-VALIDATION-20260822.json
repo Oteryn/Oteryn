@@ -1,8 +1,8 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "validator": "tools/governance/validate_v310_terminal_report.py",
   "report": "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
-  "report_sha256": "e0ebafb59d108ec07b1487d0cfc7fb305d9b992e05238bfb6ca92a472d120bc7",
+  "report_sha256": "f738135ece1fd23f1dabcef06aac207db5c4bd4c4dda540d8950228944828349",
   "execution_verdict": "PASS",
   "programme_verdict": "INCOMPLETE",
   "contract_completeness": "INCOMPLETE",
@@ -58,8 +58,31 @@
     "Platform": 22,
     "Atlas": 22
   },
-  "material_inventory_rows": 66,
-  "section_15_disposition_rows": 66,
+  "material_inventory_rows": 69,
+  "operational_primary_classes": [
+    "ARCHITECTURE_ADR",
+    "CI_POLICY",
+    "CROSS_REPO_CONTRACT",
+    "EVIDENCE_MIGRATION",
+    "EVIDENCE_RELEASE",
+    "EVIDENCE_REVIEW",
+    "GENERATED_REFERENCE",
+    "GOVERNANCE_POLICY",
+    "HANDOVER_CACHE",
+    "HUMAN_REFERENCE",
+    "MACHINE_READABLE_POLICY",
+    "NORMATIVE_AGENT_INSTRUCTION",
+    "PROGRAMME_OBJECT",
+    "PROMPT_ONE_SHOT",
+    "PROVIDER_CONTRACT",
+    "RUNBOOK_OPERATIONAL",
+    "RUNBOOK_RECOVERY",
+    "TASK_PACKET_ACTIVE",
+    "TASK_PACKET_ARCHIVED",
+    "TEST_STRATEGY",
+    "UNKNOWN"
+  ],
+  "section_15_disposition_rows": 69,
   "section_19_documentation_backlog_types": [
     "DOCUMENTATION_IA",
     "AGENT_INSTRUCTION",
@@ -81,7 +104,7 @@
     },
     "material_artifacts_have_primary_class": {
       "state": "PASS",
-      "evidence": "66 material path/object families"
+      "evidence": "69 material artifact records using section-10A operational taxonomy"
     },
     "normative_artifacts_have_single_authority": {
       "state": "PASS",
@@ -159,7 +182,7 @@
     },
     "section_15_file_dispositions_present": {
       "state": "PASS",
-      "evidence": "66/66 section-4 material families mapped exactly once"
+      "evidence": "69/69 section-4 material families mapped exactly once"
     },
     "section_19_required_backlog_categories_present": {
       "state": "PASS",
