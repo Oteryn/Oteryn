@@ -301,8 +301,9 @@ def codeowners_pattern_covers(pattern: str, path: str) -> bool:
     anchored = pattern.startswith("/")
     normalized = pattern.lstrip("/")
     if normalized.endswith("/"):
-        prefix = normalized.rstrip("/") + "/"
-        return path.startswith(prefix)
+        # Unlike .gitignore, CODEOWNERS does not make a trailing slash a
+        # recursive directory rule.  Require an explicit /** for descendants.
+        return path.rstrip("/") == normalized.rstrip("/")
     regex = _codeowners_glob_regex(normalized)
     if "/" not in normalized and not anchored:
         return any(re.fullmatch(regex, part) is not None for part in path.split("/"))
@@ -320,6 +321,27 @@ def codeowners_text_covers_paths(text: str, required_paths: list[str]) -> bool:
             return False
         rules.append(parts[0])
     return bool(rules) and all(any(codeowners_pattern_covers(pattern, path) for pattern in rules) for path in required_paths)
+
+
+def _workflow_activity_filter_covers(
+    rows: list[tuple[int, str]], start: int, event_indent: int, value: str, event: str
+) -> bool:
+    required = {"opened", "synchronize", "reopened"}
+    if event not in {"pull_request", "pull_request_target"}:
+        return False
+    if value:
+        if not (value.startswith("[") and value.endswith("]")):
+            return False
+        values = {_yaml_scalar(item) for item in value[1:-1].split(",") if item.strip()}
+        return required <= values
+    values: set[str] = set()
+    for child_indent, child_body in rows[start + 1:]:
+        if child_indent <= event_indent:
+            break
+        if child_indent != event_indent + 2 or not child_body.startswith("- "):
+            return False
+        values.add(_yaml_scalar(child_body[2:]))
+    return required <= values
 
 
 def workflow_event_unfiltered(text: str, event: str) -> bool:
@@ -352,11 +374,15 @@ def workflow_event_unfiltered(text: str, event: str) -> bool:
             event_value = child[2]
             if event_value and event_value != "{}":
                 return False
-            for nested_indent, nested_body in rows[child_index + 1:]:
+            for nested_index, (nested_indent, nested_body) in enumerate(rows[child_index + 1:], child_index + 1):
                 if nested_indent <= child_indent:
                     break
                 nested = _yaml_mapping_field(nested_body)
-                if nested is not None and nested[1] in {"paths", "paths-ignore", "types"}:
+                if nested is not None and nested[1] in {"paths", "paths-ignore"}:
+                    return False
+                if nested is not None and nested[1] == "types" and not _workflow_activity_filter_covers(
+                    rows, nested_index, nested_indent, nested[2], event
+                ):
                     return False
             return True
         return False
