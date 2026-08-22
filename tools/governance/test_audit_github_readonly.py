@@ -194,6 +194,29 @@ def test_dependabot_security_updates_treat_404_as_disabled() -> None:
     assert audit.calls == [f"/repos/{repo}/automated-security-fixes"]
 
 
+def test_coordinate_scan_ignores_policy_manifest_but_flags_mutable_use() -> None:
+    repo = "Oteryn/Test"
+    needle = "blakinio/Oteryn-Platform"
+    q = m.urllib.parse.quote_plus(f'"{needle}" repo:{repo}')
+    audit = FakeAudit({
+        f"/search/code?q={q}&per_page=100": {
+            "items": [
+                {"path": "ecosystem/governance-desired-state.json"},
+                {"path": "README.md"},
+            ]
+        }
+    })
+    audit.coordinate_scan({
+        "permanent_repositories": [{"repository": repo}],
+        "mutable_coordinate_policy": {
+            "forbidden": [needle],
+            "historical_reference_only": [],
+        },
+    })
+    assert audit.errors == [f"{repo}: stale mutable coordinate {needle} in README.md"]
+    assert audit.warnings == []
+
+
 def test_desired_state_binds_all_required_checks_to_github_actions_app() -> None:
     desired = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
     assert {item["required_check_app_id"] for item in desired["permanent_repositories"]} == {ACTIONS_APP_ID}
