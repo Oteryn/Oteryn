@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 10518)
+Total output lines: 478
+
 # OTERYN-ORG-AUDIT-v3.10 — final terminal audit report
 
 Audit contract: `OTERYN-ORG-AUDIT-v3.10`
@@ -318,14 +321,8 @@ No source or rollback object is removed merely because it looks old.
 | ---: | --- | --- | --- |
 | 1 | merge terminal desired-state/drift audit | META | DONE — #37 squash-merged as `c0dbad93f791953d5efcc6b556e6be73693f0a4f`; #23 and #9 closed as superseded |
 | 2 | obtain Platform trusted-main diagnostics run/job readback | Platform | UNKNOWN until direct run evidence |
-| 3 | obtain permitted independent review and merge Game runner candidate | Game | BLOCKED by review authorization/surface |
-| 4 | run trusted-main Game acceptance | Game | blocked by item 3 |
-| 5 | read runner-group selected-repository ACLs | organization owner/control plane | UNKNOWN with current connector |
-| 6 | retire legacy staging runner after 2–5 PASS | organization/Platform | NOT DONE by design |
-| 7 | close migration-specific Game/Platform/Atlas evidence | each provider + META reconciliation | UNKNOWN/NO |
-| 8 | implement recurring current-state recovery/control-plane/package/secret-owner recovery evidence | organization/providers | PARTIAL |
-| 9 | terminalize stable `game-gate` / `platform-gate` transitions | Game/Platform | PARTIAL |
-| 10 | re-run v3.10 final acceptance and close remaining Issues | META | blocked by preceding items |
+| 3 | obtain …518 tokens truncated…audit evidence | META + provider evidence owners | PARTIAL — META exact-head/byte-bound evidence is enforced; provider evidence remains incomplete |
+| 17 | **DOCS_CI**: require deterministic documentation/agent validation in governing CI | META + provider owners | PARTIAL — this report validator is required by META `meta-gate`; provider-equivalent coverage remains UNKNOWN |
 
 ## 20. Owner decisions
 
@@ -398,14 +395,14 @@ The labels below are the v3.10 completeness index used by this execution. They d
 | G1 | complete permanent/admin scope | PASS | four permanent repos plus bounded legacy/admin estate identified |
 | G2 | access gaps explicit, no inferred PASS | PASS | missing proof remains explicit: `V310-RUNNER-ACL`, `V310-PLATFORM-RUN-01`, `V310-GAME-REVIEW-01` |
 | G3 | authority graph/source-of-truth reconciled | PASS | sections 3 and 14 establish META/provider authority boundaries |
-| G4 | migration completion mode-by-mode | UNKNOWN (`V310-MIG-GAME-01`, `V310-MIG-PLATFORM-01`, `V310-MIG-ATLAS-01`) | required mode-specific acceptance evidence is incomplete |
-| G5 | protection/check governance live-verified | UNKNOWN (`V310-GAME-PROTECTION-01`, `V310-PLATFORM-PROTECTION-01`) | META is verified; current provider transition evidence is incomplete |
-| G6 | CI/test/security target validated | UNKNOWN (`V310-PLATFORM-RUN-01`, `V310-GAME-REVIEW-01`) | deterministic META proof exists; required provider trusted-main proof is missing |
-| G7 | recovery/break-glass terminal | UNKNOWN (`V310-RECOVERY-01`) | recurring current-state control-plane/package/secret/owner-redundancy proof is absent |
-| G8 | runner topology/security/retirement terminal | UNKNOWN (`V310-RUNNER-ACL`, `V310-PLATFORM-RUN-01`, `V310-GAME-REVIEW-01`) | selected-repository ACL and replacement/retirement proof remain incomplete |
-| G9 | stale task/PR/branch/source cleanup terminal | UNKNOWN (`V310-CLEANUP-01`) | cleanup is dependency-bound on successor merges and retained evidence |
-| G10 | exact evidence/recommendation ledger and mechanical validation | UNKNOWN (`V310-POSTMERGE-01`) | byte-bound report validation exists; final successor merge and post-merge refresh are pending |
-| G11 | complete 21-section report + Matrix L + H14 with all terminal gates satisfied | UNKNOWN (`V310-G4`, `V310-G5`, `V310-G6`, `V310-G7`, `V310-G8`, `V310-G9`, `V310-G10`) | report structure is mechanically validated, but dependent terminal gates are not PASS |
+| G4 | migration completion mode-by-mode | UNKNOWN (GAP-ID: `V310-MIG-GAME-01`, `V310-MIG-PLATFORM-01`, `V310-MIG-ATLAS-01`) | required mode-specific acceptance evidence is incomplete |
+| G5 | protection/check governance live-verified | UNKNOWN (GAP-ID: `V310-GAME-PROTECTION-01`, `V310-PLATFORM-PROTECTION-01`) | META is verified; current provider transition evidence is incomplete |
+| G6 | CI/test/security target validated | UNKNOWN (GAP-ID: `V310-PLATFORM-RUN-01`, `V310-GAME-REVIEW-01`) | deterministic META proof exists; required provider trusted-main proof is missing |
+| G7 | recovery/break-glass terminal | UNKNOWN (GAP-ID: `V310-RECOVERY-01`) | recurring current-state control-plane/package/secret/owner-redundancy proof is absent |
+| G8 | runner topology/security/retirement terminal | UNKNOWN (GAP-ID: `V310-RUNNER-ACL`, `V310-PLATFORM-RUN-01`, `V310-GAME-REVIEW-01`) | selected-repository ACL and replacement/retirement proof remain incomplete |
+| G9 | stale task/PR/branch/source cleanup terminal | UNKNOWN (GAP-ID: `V310-CLEANUP-01`) | cleanup is dependency-bound on successor merges and retained evidence |
+| G10 | exact evidence/recommendation ledger and mechanical validation | UNKNOWN (GAP-ID: `V310-POSTMERGE-01`) | byte-bound report validation exists; final successor merge and post-merge refresh are pending |
+| G11 | complete 21-section report + Matrix L + H14 with all terminal gates satisfied | UNKNOWN (GAP-ID: `V310-G4`, `V310-G5`, `V310-G6`, `V310-G7`, `V310-G8`, `V310-G9`, `V310-G10`) | report structure is mechanically validated, but dependent terminal gates are not PASS |
 
 # Matrix L — Documentation & Agent Information Architecture
 
@@ -435,7 +432,7 @@ The labels below are the v3.10 completeness index used by this execution. They d
 
 ### Matrix L required-class completion ledger
 
-The broad authority rows above are supplemented by this exhaustive disposition ledger. Every compact cell is `current path/object → canonical target; authority; lifecycle; enforcement; disposition`. `UNKNOWN (GAP-ID)` means the repository remains provider-owned but its current inventory/canonical-path evidence was not directly revalidated; it is never an inferred PASS. `NOT_NEEDED` means no empty taxonomy is to be created.
+The broad authority rows above are supplemented by this exhaustive disposition ledger. Every compact cell is `current path/object → canonical target; authority; lifecycle; enforcement; disposition`. Every `UNKNOWN` cell carries a `V310-*` gap identifier and means the repository remains provider-owned but its current inventory/canonical-path evidence was not directly revalidated; it is never an inferred PASS. `NOT_NEEDED` means no empty taxonomy is to be created.
 
 | Required artifact class | META | Game | Platform | Atlas |
 | --- | --- | --- | --- | --- |
