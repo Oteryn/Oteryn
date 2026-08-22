@@ -7,6 +7,7 @@ import fnmatch
 import hashlib
 import json
 import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -286,27 +287,26 @@ def build_record() -> dict:
         errors.append(f"material META .github governance surface missing from section 4 inventory: {missing_meta_github}")
 
     material_roots = (
-        ".github", "docs/agents", "docs/architecture", "docs/ci", "docs/testing",
-        "docs/release", "docs/recovery", "docs/governance", "docs/evidence",
-        "ecosystem", "tools/governance",
+        ".github/", "docs/agents/", "docs/architecture/", "docs/ci/", "docs/testing/",
+        "docs/release/", "docs/recovery/", "docs/governance/", "docs/evidence/",
+        "ecosystem/", "tools/governance/",
     )
-    material_root_files = ("AGENTS.md", "README.md", "CONTRIBUTING.md", "SECURITY.md")
-    material_files = []
-    for relative in material_root_files:
-        path = REPO_STRUCTURE_ROOT / relative
-        if path.is_file():
-            material_files.append(path)
-    for relative in material_roots:
-        root = REPO_STRUCTURE_ROOT / relative
-        if not root.exists():
-            continue
-        material_files.extend(
-            path for path in root.rglob("*")
-            if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
-        )
-    meta_material = sorted({
-        str(path.relative_to(REPO_STRUCTURE_ROOT)).replace("\\", "/") for path in material_files
-    })
+    material_root_files = {"AGENTS.md", "README.md", "CONTRIBUTING.md", "SECURITY.md"}
+    try:
+        tracked_raw = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=REPO_STRUCTURE_ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        tracked = tracked_raw.decode("utf-8").split("\0")
+    except (subprocess.CalledProcessError, UnicodeDecodeError, OSError) as exc:
+        errors.append(f"unable to enumerate tracked META material surface: {exc}")
+        tracked = []
+    meta_material = sorted(
+        path for path in tracked
+        if path and (path in material_root_files or path.startswith(material_roots))
+    )
     def spec_covers_path(spec, path: str) -> bool:
         includes, excludes = spec
         normalized_includes = [item.lstrip("/") for item in includes]

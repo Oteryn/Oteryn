@@ -179,6 +179,30 @@ def test_meta_material_surface_is_inventory_covered() -> None:
     assert record["mechanical_invariants"]["meta_material_surface_inventory"]["state"] == "PASS"
 
 
+def test_untracked_meta_file_does_not_change_exact_head_validation() -> None:
+    note = m.REPO_STRUCTURE_ROOT / "docs/agents/.codex-local-note.md"
+    assert not note.exists()
+    note.write_text("local scratch only\n", encoding="utf-8")
+    try:
+        record = m.build_record()
+        assert record["execution_verdict"] == "PASS"
+        assert record["mechanical_invariants"]["meta_material_surface_inventory"]["state"] == "PASS"
+    finally:
+        note.unlink(missing_ok=True)
+
+
+def test_untracked_meta_file_does_not_change_exact_head_validation() -> None:
+    note = m.REPO_STRUCTURE_ROOT / "docs/agents/.codex-local-note.md"
+    assert not note.exists()
+    note.write_text("local scratch only\n", encoding="utf-8")
+    try:
+        record = m.build_record()
+        assert record["execution_verdict"] == "PASS"
+        assert record["mechanical_invariants"]["meta_material_surface_inventory"]["state"] == "PASS"
+    finally:
+        note.unlink(missing_ok=True)
+
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:
