@@ -350,6 +350,8 @@ def workflow_event_unfiltered(text: str, event: str) -> bool:
     for raw in text.splitlines():
         line = _strip_yaml_comment(raw)
         if line.strip():
+            if re.match(r'''^\s*(?:-\s*)?&[^\s:]+\s+[^\s:]+\s*:''', line):
+                return False
             rows.append((len(line) - len(line.lstrip(" ")), line.strip()))
     for index, (indent, body) in enumerate(rows):
         field = _yaml_mapping_field(body)
@@ -389,7 +391,7 @@ def workflow_event_unfiltered(text: str, event: str) -> bool:
     return False
 
 
-def workflow_text_secure(text: str) -> bool:
+def workflow_text_secure(text: str, *, require_top_permissions: bool = True) -> bool:
     has_top_permissions = False
     permissions_indent: int | None = None
     permissions_values: dict[str, str] = {}
@@ -415,6 +417,8 @@ def workflow_text_secure(text: str) -> bool:
         field = _yaml_mapping_field(body)
         if field is None:
             compact = body.lstrip("- ").strip()
+            if re.match(r'''^&[^\s:]+\s+[^\s:]+\s*:''', compact):
+                return False
             if re.match(r'''^\*[^\s:]+\s*:''', compact):
                 return False
             if re.match(r'''^"[^"\n]*\\[^"\n]*"\s*:''', compact):
@@ -467,7 +471,29 @@ def workflow_text_secure(text: str) -> bool:
                 return False
     if not close_permissions_block():
         return False
-    return has_top_permissions
+    return has_top_permissions or not require_top_permissions
+
+
+def local_action_references(text: str) -> set[str] | None:
+    references: set[str] = set()
+    for raw in text.splitlines():
+        line = _strip_yaml_comment(raw)
+        if not line.strip():
+            continue
+        field = _yaml_mapping_field(line.strip())
+        if field is None:
+            continue
+        _, key, raw_value = field
+        if key != "uses":
+            continue
+        value = _yaml_scalar(raw_value)
+        if not value.startswith("./"):
+            continue
+        normalized = value[2:].rstrip("/")
+        if not normalized or normalized.startswith("/") or "/../" in f"/{normalized}/" or normalized.startswith("../"):
+            return None
+        references.add(normalized)
+    return references
 
 
 def merge_sources(*groups: dict[str, set[int | None]]) -> dict[str, set[int | None]]:
@@ -922,13 +948,28 @@ class Audit:
         ]
         if not workflows:
             return False
+        inspected: set[str] = set()
+
+        def validate(path: str, *, require_top_permissions: bool) -> bool:
+            if path in inspected:
+                return True
+            inspected.add(path)
+            quoted = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
+            text = self._decoded_contents(self.api(f"/repos/{repo}/contents/{quoted}", allow_404=True))
+            if text is None or not workflow_text_secure(text, require_top_permissions=require_top_permissions):
+                return False
+            references = local_action_references(text)
+            if references is None:
+                return False
+            for reference in references:
+                if not (validate(f"{reference}/action.yml", require_top_permissions=False)
+                        or validate(f"{reference}/action.yaml", require_top_permissions=False)):
+                    return False
+            return True
+
         for item in workflows:
             path = item.get("path")
-            if not isinstance(path, str) or not path:
-                return False
-            payload = self.api(f"/repos/{repo}/contents/{'/'.join(urllib.parse.quote(part, safe='') for part in path.split('/'))}")
-            text = self._decoded_contents(payload)
-            if text is None or not workflow_text_secure(text):
+            if not isinstance(path, str) or not path or not validate(path, require_top_permissions=True):
                 return False
         return True
 
