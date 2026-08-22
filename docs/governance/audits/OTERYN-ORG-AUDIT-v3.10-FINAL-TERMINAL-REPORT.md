@@ -6,7 +6,7 @@ Report date: 2026-08-22
 Lifecycle authority: GitHub Issues and protected pull requests
 Evidence policy: fail closed; `UNKNOWN` is retained where the connected surfaces cannot prove a fact
 
-This report is the full v3.10 execution artifact. The accompanying Documentation & Agent IA addendum is preserved byte-for-byte from its validated successor branch; this report does not rewrite the historical v3.9 result.
+This report is the full v3.10 execution artifact. The accompanying Documentation & Agent IA addendum is preserved byte-for-byte from its validated successor branch; this report does not rewrite the historical v3.9 result. Its own byte-bound validation record is `OTERYN-v3.10-FINAL-TERMINAL-REPORT-VALIDATION.json`, verified by `tools/governance/validate_v310_audit_docs.py`; the addendum validation is not evidence for this report.
 
 ## 1. Executive verdict
 
@@ -395,17 +395,17 @@ The labels below are the v3.10 completeness index used by this execution. They d
 
 | Gate | Terminal condition | State | Reason |
 | --- | --- | --- | --- |
-| G1 | complete permanent/admin scope | YES | four permanent repos + bounded legacy/admin estate identified |
-| G2 | access gaps explicit, no inferred PASS | YES | runner ACL/push-run/reviewer gaps recorded as UNKNOWN/BLOCKED |
-| G3 | authority graph/source-of-truth reconciled | YES | sections 3/14 |
-| G4 | migration completion mode-by-mode | NO | Game/Platform UNKNOWN; Atlas NO |
-| G5 | protection/check governance live-verified | PARTIAL | META/Atlas stable; Game/Platform transitions remain |
-| G6 | CI/test/security target validated | PARTIAL | deterministic META proof; runner/provider terminal gaps remain |
-| G7 | recovery/break-glass terminal | NO | current recurring/control-plane/package/secret/owner recovery unproved |
-| G8 | runner topology/security/retirement terminal | NO | ACL UNKNOWN; Platform/Game proof incomplete; legacy retained |
-| G9 | stale task/PR/branch/source cleanup terminal | PARTIAL | cleanup proceeds only after successor merges; active blockers intentionally retained |
-| G10 | exact evidence/recommendation ledger and mechanical validation | PARTIAL | delivered with this successor; final post-merge refresh still required |
-| G11 | complete 21-section report + Matrix L + H14 with all terminal gates satisfied | NO | report is structurally complete but G4/G7/G8 are not terminal |
+| G1 | complete permanent/admin scope | PASS | four permanent repos plus bounded legacy/admin estate identified |
+| G2 | access gaps explicit, no inferred PASS | PASS | missing proof remains explicit: `V310-RUNNER-ACL`, `V310-PLATFORM-RUN-01`, `V310-GAME-REVIEW-01` |
+| G3 | authority graph/source-of-truth reconciled | PASS | sections 3 and 14 establish META/provider authority boundaries |
+| G4 | migration completion mode-by-mode | UNKNOWN (`V310-MIG-GAME-01`, `V310-MIG-PLATFORM-01`, `V310-MIG-ATLAS-01`) | required mode-specific acceptance evidence is incomplete |
+| G5 | protection/check governance live-verified | UNKNOWN (`V310-GAME-PROTECTION-01`, `V310-PLATFORM-PROTECTION-01`) | META is verified; current provider transition evidence is incomplete |
+| G6 | CI/test/security target validated | UNKNOWN (`V310-PLATFORM-RUN-01`, `V310-GAME-REVIEW-01`) | deterministic META proof exists; required provider trusted-main proof is missing |
+| G7 | recovery/break-glass terminal | UNKNOWN (`V310-RECOVERY-01`) | recurring current-state control-plane/package/secret/owner-redundancy proof is absent |
+| G8 | runner topology/security/retirement terminal | UNKNOWN (`V310-RUNNER-ACL`, `V310-PLATFORM-RUN-01`, `V310-GAME-REVIEW-01`) | selected-repository ACL and replacement/retirement proof remain incomplete |
+| G9 | stale task/PR/branch/source cleanup terminal | UNKNOWN (`V310-CLEANUP-01`) | cleanup is dependency-bound on successor merges and retained evidence |
+| G10 | exact evidence/recommendation ledger and mechanical validation | UNKNOWN (`V310-POSTMERGE-01`) | byte-bound report validation exists; final successor merge and post-merge refresh are pending |
+| G11 | complete 21-section report + Matrix L + H14 with all terminal gates satisfied | UNKNOWN (`V310-G4`, `V310-G5`, `V310-G6`, `V310-G7`, `V310-G8`, `V310-G9`, `V310-G10`) | report structure is mechanically validated, but dependent terminal gates are not PASS |
 
 # Matrix L — Documentation & Agent Information Architecture
 
@@ -432,6 +432,35 @@ The labels below are the v3.10 completeness index used by this execution. They d
 | all | PROMPT_REUSABLE | provider/META/user prompt location by scope | exactly one owning layer | scope owner | agents | stable ID/version/status/contracts | versioned | local override only if declared | duplicate-ID/ownership checks where justified | KEEP/MOVE | v3.10 contract |
 | all | GENERATED_REFERENCE | generated reports/indexes | generator-owned output | generator source owner | humans/agents | provenance marker/input identity | regenerate | manual copy non-authoritative | deterministic generation | GENERATED | v3.10 contract |
 | historical | HISTORICAL_ARCHIVE | archived legacy/migration repos and evidence paths | historical only | provenance owner | audit/recovery | old coordinates allowed as history | retained by explicit reason | never current authority | exclusion-aware drift rules | ARCHIVE | live archive state |
+
+### Matrix L required-class completion ledger
+
+The broad authority rows above are supplemented by this exhaustive disposition ledger. Every compact cell is `current path/object → canonical target; authority; lifecycle; enforcement; disposition`. `UNKNOWN (GAP-ID)` means the repository remains provider-owned but its current inventory/canonical-path evidence was not directly revalidated; it is never an inferred PASS. `NOT_NEEDED` means no empty taxonomy is to be created.
+
+| Required artifact class | META | Game | Platform | Atlas |
+| --- | --- | --- | --- | --- |
+| root AGENTS | `/AGENTS.md → same; META; durable; meta-gate; KEEP` | `UNKNOWN (V310-GAME-DOC-01): provider root instruction inventory` | `UNKNOWN (V310-PLATFORM-DOC-01): provider root instruction inventory` | `UNKNOWN (V310-ATLAS-DOC-01): provider root instruction inventory` |
+| nested AGENTS/override | `NOT_NEEDED; no nested META authority` | `UNKNOWN (V310-GAME-DOC-01): provider override inventory` | `UNKNOWN (V310-PLATFORM-DOC-01): provider override inventory` | `UNKNOWN (V310-ATLAS-DOC-01): provider override inventory` |
+| architecture/ADR | `docs/governance/** → META; retained; protected review; KEEP` | `UNKNOWN (V310-GAME-DOC-01): provider canonical ADR path` | `UNKNOWN (V310-PLATFORM-DOC-01): provider canonical ADR path` | `UNKNOWN (V310-ATLAS-DOC-01): provider canonical ADR path` |
+| contracts | `docs/agents/contracts/** → META; retained; meta-gate; KEEP` | `UNKNOWN (V310-GAME-DOC-01): provider contract inventory` | `UNKNOWN (V310-PLATFORM-DOC-01): provider contract inventory` | `UNKNOWN (V310-ATLAS-DOC-01): provider contract inventory` |
+| governance policy | `docs/governance/** → META; retained; R2 where sensitive; KEEP` | `provider local policy → Game; durable; local gate; KEEP` | `provider local policy → Platform; durable; local gate; KEEP` | `provider local policy → Atlas; durable; local gate; KEEP` |
+| CI policy | `.github/workflows/** → META; current; meta-gate; KEEP` | `UNKNOWN (V310-GAME-PROTECTION-01): current workflow policy` | `UNKNOWN (V310-PLATFORM-PROTECTION-01): current workflow policy` | `provider workflows → Atlas; current; atlas/provenance gates; KEEP` |
+| test strategy | `tools/governance/test_*.py → META; retained; CI; KEEP` | `UNKNOWN (V310-GAME-DOC-01): provider strategy/evidence` | `UNKNOWN (V310-PLATFORM-DOC-01): provider strategy/evidence` | `UNKNOWN (V310-ATLAS-DOC-01): provider strategy/evidence` |
+| reusable prompts | `docs/agents/prompts/README.md → META; versioned; ownership index; KEEP` | `NOT_APPLICABLE; provider decides local reusable prompts` | `NOT_APPLICABLE; provider decides local reusable prompts` | `NOT_APPLICABLE; provider decides local reusable prompts` |
+| one-shot prompts | `terminal #37 prompt → historical; do-not-invoke; ARCHIVE` | `UNKNOWN (V310-GAME-DOC-01): provider one-shot prompt lifecycle` | `UNKNOWN (V310-PLATFORM-DOC-01): provider one-shot prompt lifecycle` | `UNKNOWN (V310-ATLAS-DOC-01): provider one-shot prompt lifecycle` |
+| task packets | `Issue + optional docs/agents/tasks/active → owner; expire on close; CLEANUP` | `UNKNOWN (V310-GAME-DOC-01): provider task lifecycle` | `docs/agents/tasks/active → Platform; archive on proof; KEEP ACTIVE` | `UNKNOWN (V310-ATLAS-DOC-01): provider task lifecycle` |
+| programmes | `audit/report + GitHub Issues → META; retained; meta-gate; KEEP` | `NOT_APPLICABLE; no META programme copy` | `NOT_APPLICABLE; no META programme copy` | `NOT_APPLICABLE; no META programme copy` |
+| handovers | `checkpoint → Issue/PR authority; supersede on merge; ARCHIVE` | `UNKNOWN (V310-GAME-DOC-01): provider handover rule` | `UNKNOWN (V310-PLATFORM-DOC-01): provider handover rule` | `UNKNOWN (V310-ATLAS-DOC-01): provider handover rule` |
+| agent runbooks | `NOT_NEEDED; META has no host-local runtime` | `UNKNOWN (V310-GAME-DOC-01): provider agent-runbook inventory` | `UNKNOWN (V310-PLATFORM-DOC-01): provider agent-runbook inventory` | `UNKNOWN (V310-ATLAS-DOC-01): provider agent-runbook inventory` |
+| operations runbooks | `docs/recovery/** only → META recovery coordination; retained; KEEP` | `UNKNOWN (V310-GAME-DOC-01): provider operations runbook` | `docs/operations/** → Platform; versioned; Platform CI; KEEP` | `UNKNOWN (V310-ATLAS-DOC-01): provider operations runbook` |
+| recovery/break-glass | `docs/recovery/organization-recovery-contract.md → META; durable; protected review; KEEP` | `UNKNOWN (V310-RECOVERY-01): provider recovery proof` | `UNKNOWN (V310-RECOVERY-01): provider recovery proof` | `UNKNOWN (V310-RECOVERY-01): provider recovery proof` |
+| review evidence | `PR reviews/checks → GitHub; immutable provenance; verifier; KEEP` | `UNKNOWN (V310-GAME-REVIEW-01): permitted independent review proof` | `UNKNOWN (V310-PLATFORM-PROTECTION-01): current review evidence` | `UNKNOWN (V310-ATLAS-DOC-01): current review evidence` |
+| release evidence | `NOT_APPLICABLE; META is coordination authority` | `UNKNOWN (V310-GAME-DOC-01): provider release evidence` | `UNKNOWN (V310-PLATFORM-DOC-01): provider release evidence` | `artifacts/workflow evidence → Atlas; retained; provenance gate; KEEP` |
+| migration evidence | `ecosystem/repositories.json + audit → META reconciliation; retained; KEEP` | `UNKNOWN (V310-MIG-GAME-01): mode-specific acceptance` | `UNKNOWN (V310-MIG-PLATFORM-01): mode-specific acceptance` | `UNKNOWN (V310-MIG-ATLAS-01): selective-extraction acceptance` |
+| generated docs/indexes | `NOT_NEEDED unless generator is introduced; generator source authoritative` | `UNKNOWN (V310-GAME-DOC-01): generated-doc inventory` | `UNKNOWN (V310-PLATFORM-DOC-01): generated-doc inventory` | `UNKNOWN (V310-ATLAS-DOC-01): generated-doc inventory` |
+| human reference docs | `README.md + docs/governance/** → META; versioned; meta-gate; KEEP` | `UNKNOWN (V310-GAME-DOC-01): provider reference-doc inventory` | `UNKNOWN (V310-PLATFORM-DOC-01): provider reference-doc inventory` | `UNKNOWN (V310-ATLAS-DOC-01): provider reference-doc inventory` |
+| machine-readable policy companions | `ecosystem/*.json → META; schema/CI; KEEP` | `UNKNOWN (V310-GAME-DOC-01): provider machine policy` | `UNKNOWN (V310-PLATFORM-DOC-01): provider machine policy` | `UNKNOWN (V310-ATLAS-DOC-01): provider machine policy` |
+| documentation/agent validators | `OTERYN-v3.10-*-VALIDATION.json → META; byte-bound; deterministic hash check; KEEP` | `UNKNOWN (V310-GAME-DOC-01): provider validator inventory` | `UNKNOWN (V310-PLATFORM-DOC-01): provider validator inventory` | `UNKNOWN (V310-ATLAS-DOC-01): provider validator inventory` |
 
 ## Mechanical completion statement
 
