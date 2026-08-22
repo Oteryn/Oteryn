@@ -2,6 +2,8 @@
 
 MODE: Autonomous Game runner acceptance closeout with independent-review separation.
 
+Lifecycle: **ONE_SHOT**. On terminal closure, archive this prompt as historical execution evidence; do not keep it as an active/reusable alias.
+
 Repository: `https://github.com/Oteryn/Oteryn-Game`
 Primary lifecycle: `Oteryn/Oteryn-Game#34`
 Primary PR checkpoint: `Oteryn/Oteryn-Game#36`
