@@ -16,7 +16,10 @@ for _name in dir(_v1):
         globals()[_name] = getattr(_v1, _name)
 
 _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
-_OBSERVED_CLEAN_FLAIR = "Already looking forward to the next diff."
+_OBSERVED_CLEAN_FLAIRS = {
+    "Already looking forward to the next diff.",
+    "Another round soon, please!",
+}
 
 
 def _compat_parse_clean_result(body: str) -> str | None:
@@ -26,7 +29,10 @@ def _compat_parse_clean_result(body: str) -> str | None:
         return exact
     text = (body or "").strip()
     lines = text.splitlines()
-    if not lines or lines[0] != f"{_CLEAN_PREFIX} {_OBSERVED_CLEAN_FLAIR}":
+    if not lines or not lines[0].startswith(f"{_CLEAN_PREFIX} "):
+        return None
+    flair = lines[0][len(_CLEAN_PREFIX) + 1:]
+    if flair not in _OBSERVED_CLEAN_FLAIRS:
         return None
     normalized = "\n".join([_CLEAN_PREFIX, *lines[1:]])
     return _v1._original_parse_clean_result(normalized)
