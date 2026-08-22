@@ -350,16 +350,13 @@ def workflow_event_unfiltered(text: str, event: str) -> bool:
             if child is None or child[0] or child_indent != indent + 2 or child[1] != event:
                 continue
             event_value = child[2]
-            if event_value and re.search(
-                r'''(?:^|[,{])\s*(?:paths|paths-ignore|"paths"|"paths-ignore"|'paths'|'paths-ignore')\s*:''',
-                event_value,
-            ):
+            if event_value and event_value != "{}":
                 return False
             for nested_indent, nested_body in rows[child_index + 1:]:
                 if nested_indent <= child_indent:
                     break
                 nested = _yaml_mapping_field(nested_body)
-                if nested is not None and nested[1] in {"paths", "paths-ignore"}:
+                if nested is not None and nested[1] in {"paths", "paths-ignore", "types"}:
                     return False
             return True
         return False
