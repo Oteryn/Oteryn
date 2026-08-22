@@ -68,7 +68,7 @@ def test_ruleset_scope_only_accepts_main_applicable_rulesets() -> None:
     )
 
 
-def test_required_gate_trigger_rejects_path_filters() -> None:
+def test_required_gate_trigger_rejects_path_filters_and_incomplete_activity_filters() -> None:
     assert m.core.workflow_event_unfiltered("on: [pull_request]\n", "pull_request")
     assert m.core.workflow_event_unfiltered("on:\n  pull_request:\n    branches: [main]\n", "pull_request")
     assert not m.core.workflow_event_unfiltered(
@@ -80,8 +80,14 @@ def test_required_gate_trigger_rejects_path_filters() -> None:
     assert not m.core.workflow_event_unfiltered(
         'on:\n  pull_request: {"paths": [src/**]}\n', "pull_request"
     )
+    assert m.core.workflow_event_unfiltered(
+        "on:\n  pull_request:\n    types: [opened, synchronize, reopened, ready_for_review]\n", "pull_request"
+    )
+    assert m.core.workflow_event_unfiltered(
+        "on:\n  pull_request_target:\n    types:\n      - opened\n      - synchronize\n      - reopened\n", "pull_request_target"
+    )
     assert not m.core.workflow_event_unfiltered(
-        "on:\n  pull_request:\n    types: [opened]\n", "pull_request"
+        "on:\n  pull_request:\n    types: [opened, synchronize]\n", "pull_request"
     )
     assert not m.core.workflow_event_unfiltered(
         'on:\n  pull_request: {"pa\\u0074hs": [src/**]}\n', "pull_request"
@@ -497,9 +503,9 @@ updates:
 def test_codeowners_requires_clean_errors_and_critical_coverage() -> None:
     repo = "Oteryn/Test"
     encode = lambda text: m.core.base64.b64encode(text.encode("utf-8")).decode("ascii")
-    text = """/.github/workflows/ @owner
+    text = """/.github/workflows/** @owner
 /SECURITY.md @owner
-/contracts/ @owner
+/contracts/** @owner
 """
     paths = [".github/workflows/ci.yml", "SECURITY.md", "contracts/api.md"]
     good = FakeAudit({
@@ -513,6 +519,8 @@ def test_codeowners_requires_clean_errors_and_critical_coverage() -> None:
     })
     assert not malformed.codeowners_baseline_valid(repo, paths)
     assert not m.core.codeowners_text_covers_paths("/.github/workflows/ @owner\n", paths)
+    assert not m.core.codeowners_pattern_covers("/.github/", ".github/workflows/ci.yml")
+    assert m.core.codeowners_pattern_covers("/.github/**", ".github/workflows/ci.yml")
     assert not m.core.codeowners_pattern_covers("/.github/*", ".github/workflows/ci.yml")
     assert m.core.codeowners_pattern_covers("/.github/**", ".github/workflows/ci.yml")
 
