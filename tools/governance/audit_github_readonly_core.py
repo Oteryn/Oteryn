@@ -140,14 +140,15 @@ def dependabot_github_actions_entry_valid(text: str) -> bool:
     except StopIteration:
         return False
     i = updates_index + 1
+    if i >= len(rows) or rows[i][0] == 0:
+        return False
+    item_indent = rows[i][0]
     while i < len(rows):
         indent, body = rows[i]
         if indent == 0:
             break
-        if not body.startswith("-"):
-            i += 1
-            continue
-        item_indent = indent
+        if indent != item_indent or not body.startswith("-"):
+            return False
         entry = []
         while i < len(rows):
             child_indent, child_body = rows[i]
@@ -188,19 +189,39 @@ def dependabot_github_actions_entry_valid(text: str) -> bool:
             return directory == "/" and interval in {"daily", "weekly", "monthly", "quarterly", "semiannually", "yearly"}
     return False
 
+def _codeowners_glob_regex(pattern: str) -> str:
+    out = []
+    i = 0
+    while i < len(pattern):
+        char = pattern[i]
+        if char == "*":
+            if i + 1 < len(pattern) and pattern[i + 1] == "*":
+                out.append(".*")
+                i += 2
+                continue
+            out.append("[^/]*")
+        elif char == "?":
+            out.append("[^/]")
+        else:
+            out.append(re.escape(char))
+        i += 1
+    return "".join(out)
+
+
 def codeowners_pattern_covers(pattern: str, path: str) -> bool:
     pattern = pattern.strip()
     path = path.lstrip("/")
-    if pattern in {"*", "**", "/*", "/**"}:
+    if pattern in {"*", "**", "/**"}:
         return True
     anchored = pattern.startswith("/")
     normalized = pattern.lstrip("/")
     if normalized.endswith("/"):
         prefix = normalized.rstrip("/") + "/"
         return path.startswith(prefix)
+    regex = _codeowners_glob_regex(normalized)
     if "/" not in normalized and not anchored:
-        return any(fnmatch.fnmatchcase(part, normalized) for part in path.split("/"))
-    return fnmatch.fnmatchcase(path, normalized)
+        return any(re.fullmatch(regex, part) is not None for part in path.split("/"))
+    return re.fullmatch(regex, path) is not None
 
 
 def codeowners_text_covers_paths(text: str, required_paths: list[str]) -> bool:
@@ -226,8 +247,19 @@ def workflow_text_secure(text: str) -> bool:
         body = line.strip()
         field = _yaml_mapping_field(body)
         if field is None:
+            compact = body.lstrip("- ").strip()
+            if compact.startswith("{") and compact.endswith("}") and re.search(
+                r"""(?:^|,)\s*(?:uses|permissions|"uses"|"permissions"|'uses'|'permissions')\s*:""",
+                compact[1:-1],
+            ):
+                return False
             continue
         is_sequence, key, raw_value = field
+        if ("{" in raw_value or "[" in raw_value) and re.search(
+            r"""(?:^|[,\[{])\s*(?:uses|permissions|"uses"|"permissions"|'uses'|'permissions')\s*:""",
+            raw_value,
+        ):
+            return False
         if indent == 0 and not is_sequence and key == "permissions":
             has_top_permissions = True
         if key == "permissions" and _yaml_scalar(raw_value) == "write-all":

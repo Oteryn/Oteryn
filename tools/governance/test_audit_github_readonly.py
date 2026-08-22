@@ -370,6 +370,14 @@ updates:
   schedule:
     interval: weekly
 """
+    wrapped_item = """version: 2
+updates:
+  wrapper:
+    - package-ecosystem: github-actions
+      directory: /
+      schedule:
+        interval: weekly
+"""
     encode = lambda text: m.core.base64.b64encode(text.encode("utf-8")).decode("ascii")
     reordered = """version: 2
 updates:
@@ -381,7 +389,7 @@ updates:
     for valid in (good, reordered):
         enabled = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(valid)}})
         assert enabled.github_actions_dependency_updates_configured(repo)
-    for invalid in (outside, missing_directory, missing_schedule, interval_outside_schedule, fields_aligned_with_dash):
+    for invalid in (outside, missing_directory, missing_schedule, interval_outside_schedule, fields_aligned_with_dash, wrapped_item):
         audit = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(invalid)}})
         assert not audit.github_actions_dependency_updates_configured(repo)
 
@@ -405,6 +413,8 @@ def test_codeowners_requires_clean_errors_and_critical_coverage() -> None:
     })
     assert not malformed.codeowners_baseline_valid(repo, paths)
     assert not m.core.codeowners_text_covers_paths("/.github/workflows/ @owner\n", paths)
+    assert not m.core.codeowners_pattern_covers("/.github/*", ".github/workflows/ci.yml")
+    assert m.core.codeowners_pattern_covers("/.github/**", ".github/workflows/ci.yml")
 
 
 def test_workflow_supply_chain_requires_permissions_and_full_sha_pins() -> None:
@@ -426,6 +436,16 @@ jobs:
         '- "uses": actions/checkout@v4',
     )
     assert not m.core.workflow_text_secure(quoted_mutable)
+    flow_mutable = secure.replace(
+        "- uses: actions/checkout@0123456789abcdef0123456789abcdef01234567",
+        "- {uses: actions/checkout@v4}",
+    )
+    assert not m.core.workflow_text_secure(flow_mutable)
+    flow_write_all = secure.replace(
+        "runs-on: ubuntu-latest",
+        "runs-on: ubuntu-latest\n    policy: {permissions: write-all}",
+    )
+    assert not m.core.workflow_text_secure(flow_write_all)
     quoted_write_all = secure.replace("permissions:\n  contents: read", '"permissions": write-all')
     assert not m.core.workflow_text_secure(quoted_write_all)
     assert not m.core.workflow_text_secure(
