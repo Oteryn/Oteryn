@@ -285,6 +285,42 @@ def build_record() -> dict:
     if missing_meta_github:
         errors.append(f"material META .github governance surface missing from section 4 inventory: {missing_meta_github}")
 
+    material_roots = (
+        ".github", "docs/agents", "docs/architecture", "docs/ci", "docs/testing",
+        "docs/release", "docs/recovery", "docs/governance", "docs/evidence",
+        "ecosystem", "tools/governance",
+    )
+    material_root_files = ("AGENTS.md", "README.md", "CONTRIBUTING.md", "SECURITY.md")
+    material_files = []
+    for relative in material_root_files:
+        path = REPO_STRUCTURE_ROOT / relative
+        if path.is_file():
+            material_files.append(path)
+    for relative in material_roots:
+        root = REPO_STRUCTURE_ROOT / relative
+        if not root.exists():
+            continue
+        material_files.extend(
+            path for path in root.rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+        )
+    meta_material = sorted({
+        str(path.relative_to(REPO_STRUCTURE_ROOT)).replace("\\", "/") for path in material_files
+    })
+    def spec_covers_path(spec, path: str) -> bool:
+        includes, excludes = spec
+        normalized_includes = [item.lstrip("/") for item in includes]
+        normalized_excludes = [item.lstrip("/") for item in excludes]
+        return (
+            any(path_pattern_contains(include, path) for include in normalized_includes)
+            and not any(path_pattern_contains(exclude, path) for exclude in normalized_excludes)
+        )
+    missing_meta_material = [
+        path for path in meta_material if not any(spec_covers_path(spec, path) for spec in meta_specs)
+    ]
+    if missing_meta_material:
+        errors.append(f"tracked META material surface missing from section 4 inventory: {missing_meta_material}")
+
     lifecycle_rows = table_rows(text, "| Repository | Artifact family | Required invariant | Verification state | Lifecycle authority / supersession |")
     prompt_state, prompt_gaps = state_from_rows(lifecycle_rows, "reusable prompts")
     task_state, task_gaps = state_from_rows(lifecycle_rows, "active task packets")
@@ -382,6 +418,10 @@ def build_record() -> dict:
         "meta_github_governance_surface_inventory": invariant(
             "PASS" if not missing_meta_github else "FAIL",
             f"{len(required_meta_github) - len(missing_meta_github)}/{len(required_meta_github)} META workflow/action files covered by section 4",
+        ),
+        "meta_material_surface_inventory": invariant(
+            "PASS" if not missing_meta_material else "FAIL",
+            f"{len(meta_material) - len(missing_meta_material)}/{len(meta_material)} tracked META material files covered by section 4",
         ),
         "retained_reusable_prompts_have_identity_version_status": invariant(prompt_state, "section 7 lifecycle verification", prompt_gaps),
         "active_task_packets_have_lifecycle_authority": invariant(task_state, "section 7 lifecycle verification", task_gaps),

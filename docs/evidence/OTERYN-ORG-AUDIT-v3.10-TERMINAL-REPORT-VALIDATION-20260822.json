@@ -2,7 +2,7 @@
   "schema_version": 3,
   "validator": "tools/governance/validate_v310_terminal_report.py",
   "report": "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
-  "report_sha256": "579c9fec410be4d0a6d2e45e07ff53c527326a6b87ed819e4249a4e0ebfa2d21",
+  "report_sha256": "47512c5e6a7cdf5077d49d3205447ce696bda25dea00208b039e5b85f705dc54",
   "execution_verdict": "PASS",
   "programme_verdict": "INCOMPLETE",
   "contract_completeness": "INCOMPLETE",
@@ -58,7 +58,7 @@
     "Platform": 22,
     "Atlas": 22
   },
-  "material_inventory_rows": 73,
+  "material_inventory_rows": 78,
   "operational_primary_classes": [
     "ARCHITECTURE_ADR",
     "CI_POLICY",
@@ -82,7 +82,7 @@
     "TEST_STRATEGY",
     "UNKNOWN"
   ],
-  "section_15_disposition_rows": 73,
+  "section_15_disposition_rows": 78,
   "section_19_documentation_backlog_types": [
     "DOCUMENTATION_IA",
     "AGENT_INSTRUCTION",
@@ -104,7 +104,7 @@
     },
     "material_artifacts_have_primary_class": {
       "state": "PASS",
-      "evidence": "73 material artifact records using section-10A operational taxonomy"
+      "evidence": "78 material artifact records using section-10A operational taxonomy"
     },
     "normative_artifacts_have_single_authority": {
       "state": "PASS",
@@ -113,6 +113,10 @@
     "meta_github_governance_surface_inventory": {
       "state": "PASS",
       "evidence": "4/4 META workflow/action files covered by section 4"
+    },
+    "meta_material_surface_inventory": {
+      "state": "PASS",
+      "evidence": "51/51 tracked META material files covered by section 4"
     },
     "retained_reusable_prompts_have_identity_version_status": {
       "state": "UNKNOWN",
@@ -186,7 +190,7 @@
     },
     "section_15_file_dispositions_present": {
       "state": "PASS",
-      "evidence": "73/73 section-4 material families mapped exactly once"
+      "evidence": "78/78 section-4 material families mapped exactly once"
     },
     "section_19_required_backlog_categories_present": {
       "state": "PASS",

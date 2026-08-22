@@ -174,6 +174,11 @@ def test_wildcard_pair_possible_intersection_fails_closed() -> None:
         restore(temp, old_root, old_report)
 
 
+def test_meta_material_surface_is_inventory_covered() -> None:
+    record = m.build_record()
+    assert record["mechanical_invariants"]["meta_material_surface_inventory"]["state"] == "PASS"
+
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:
