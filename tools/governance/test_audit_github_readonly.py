@@ -601,6 +601,30 @@ jobs:
     )
     assert not m.core.workflow_text_secure(secure.replace("permissions:\n  contents: read", "permissions: write-all"))
     assert not m.core.workflow_text_secure(secure.replace("permissions:\n  contents: read\n", ""))
+    assert not m.core.workflow_text_secure(secure.replace("- uses:", "- &step uses:", 1))
+
+
+def test_workflow_supply_chain_checks_local_composite_actions() -> None:
+    repo = "Oteryn/Test"
+    encode = lambda text: m.core.base64.b64encode(text.encode("utf-8")).decode("ascii")
+    audit = FakeAudit({
+        f"/repos/{repo}/contents/.github/workflows": [{
+            "type": "file", "name": "ci.yml", "path": ".github/workflows/ci.yml",
+        }],
+        f"/repos/{repo}/contents/.github/workflows/ci.yml": {"content": encode("""permissions:
+  contents: read
+jobs:
+  test:
+    steps:
+      - uses: ./actions/build
+""")},
+        f"/repos/{repo}/contents/actions/build/action.yml": {"content": encode("""runs:
+  using: composite
+  steps:
+    - uses: vendor/action@v4
+""")},
+    })
+    assert not audit.workflow_supply_chain_valid(repo)
 
 
 def test_disabled_required_gate_workflow_does_not_prove_emission() -> None:
