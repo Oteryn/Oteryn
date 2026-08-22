@@ -350,7 +350,10 @@ def workflow_event_unfiltered(text: str, event: str) -> bool:
             if child is None or child[0] or child_indent != indent + 2 or child[1] != event:
                 continue
             event_value = child[2]
-            if event_value and re.search(r'''(?:^|[,{])\s*paths(?:-ignore)?\s*:''', event_value):
+            if event_value and re.search(
+                r'''(?:^|[,{])\s*(?:paths|paths-ignore|"paths"|"paths-ignore"|'paths'|'paths-ignore')\s*:''',
+                event_value,
+            ):
                 return False
             for nested_indent, nested_body in rows[child_index + 1:]:
                 if nested_indent <= child_indent:
@@ -788,7 +791,9 @@ class Audit:
 
     def private_vulnerability_reporting_enabled(self, repo: str) -> bool:
         state = self.api(f"/repos/{repo}/private-vulnerability-reporting", allow_404=True)
-        return isinstance(state, dict) and state.get("enabled") is True
+        return isinstance(state, dict) and (
+            state.get("_http_status") == 204 or state.get("enabled") is True
+        )
 
     def representative_check_sources(
         self,
