@@ -64,6 +64,10 @@ jobs:
               Path('tools/governance/audit_github_readonly_core.py'),
               Path('tools/governance/test_audit_github_readonly.py'),
               Path('tools/governance/test_audit_github_readonly_terminal.py'),
+              Path('tools/governance/validate_v310_audit_docs.py'),
+              Path('tools/governance/test_validate_v310_audit_docs.py'),
+              Path('docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md'),
+              Path('docs/governance/audits/OTERYN-v3.10-FINAL-TERMINAL-REPORT-VALIDATION.json'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
           if missing:
@@ -174,6 +178,13 @@ jobs:
           python3 tools/governance/audit_github_readonly.py --offline
           python3 tools/governance/test_audit_github_readonly.py
           python3 tools/governance/test_audit_github_readonly_terminal.py
+
+      - name: Validate v3.10 terminal audit report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/governance/test_validate_v310_audit_docs.py
+          python3 tools/governance/validate_v310_audit_docs.py
 
       - name: Validate AI review risk policy
         shell: bash
