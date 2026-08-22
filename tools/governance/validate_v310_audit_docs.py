@@ -65,7 +65,7 @@ def validate(repo_root: Path) -> dict[str, int | str]:
     sections = re.findall(r"^## ([1-9]|1[0-9]|2[01])\. .+$", text, flags=re.MULTILINE)
     if sections != [str(number) for number in range(1, 22)]:
         raise ValueError("report must contain exactly ordered sections 1 through 21")
-    fence_count = sum(line.strip() == "```" for line in text.splitlines())
+    fence_count = sum(line.strip().startswith("```") for line in text.splitlines())
     if fence_count % 2:
         raise ValueError("report Markdown fences are unbalanced")
     if not text.rstrip().endswith("`OTERYN_ORG_AUDIT_V3_10 = INCOMPLETE`"):
