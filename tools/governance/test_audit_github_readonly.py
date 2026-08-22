@@ -29,8 +29,18 @@ class FakeAudit(m.Audit):
         raise AssertionError(f"unexpected API call: {path}")
 
 
-def run(name: str, app_id: int = ACTIONS_APP_ID) -> dict:
-    return {"name": name, "app": {"id": app_id}}
+def check_run(name: str, run_id: int, *, app_id: int = ACTIONS_APP_ID, pr_number: int | None = None) -> dict:
+    pull_requests = [] if pr_number is None else [{"number": pr_number}]
+    return {
+        "name": name,
+        "app": {"id": app_id},
+        "details_url": f"https://github.com/Oteryn/Test/actions/runs/{run_id}/job/{run_id + 1000}",
+        "pull_requests": pull_requests,
+    }
+
+
+def workflow(event: str, head_sha: str) -> dict:
+    return {"event": event, "head_sha": head_sha}
 
 
 def test_ruleset_scope_only_accepts_main_applicable_rulesets() -> None:
@@ -97,24 +107,42 @@ def test_required_context_sources_reject_wrong_or_unbound_app() -> None:
     assert not m.expected_sources_satisfied(sources, {"gate"}, ACTIONS_APP_ID)
 
 
-def test_current_main_check_run_is_valid_emission_proof() -> None:
+def test_current_main_push_is_valid_emission_proof() -> None:
     main = "a" * 40
     audit = FakeAudit({
         "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
         f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {
-            "check_runs": [run("gate-a"), run("gate-b")],
+            "check_runs": [check_run("gate-a", 101), check_run("gate-b", 102)],
         },
+        "/repos/Oteryn/Test/actions/runs/101": workflow("push", main),
+        "/repos/Oteryn/Test/actions/runs/102": workflow("push", main),
     })
     observed = audit.representative_check_sources("Oteryn/Test", {"gate-a", "gate-b"}, ACTIONS_APP_ID)
     assert m.expected_sources_satisfied(observed, {"gate-a", "gate-b"}, ACTIONS_APP_ID)
     assert not any("pulls?" in call for call in audit.calls)
 
 
+def test_workflow_dispatch_on_main_does_not_prove_protected_emission() -> None:
+    main = "a" * 40
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
+        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {
+            "check_runs": [check_run("gate", 103)],
+        },
+        "/repos/Oteryn/Test/actions/runs/103": workflow("workflow_dispatch", main),
+        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [],
+    })
+    assert audit.representative_check_sources("Oteryn/Test", {"gate"}, ACTIONS_APP_ID) == {}
+
+
 def test_same_name_from_wrong_app_does_not_prove_emission() -> None:
     main = "a" * 40
     audit = FakeAudit({
         "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
-        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {"check_runs": [run("gate", 999)]},
+        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {
+            "check_runs": [check_run("gate", 104, app_id=999)],
+        },
+        "/repos/Oteryn/Test/actions/runs/104": workflow("push", main),
         "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [],
     })
     observed = audit.representative_check_sources("Oteryn/Test", {"gate"}, ACTIONS_APP_ID)
@@ -129,6 +157,7 @@ def test_pr_payload_base_sha_does_not_replace_head_ancestry_proof() -> None:
         "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
         f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {"check_runs": []},
         "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
+            "number": 7,
             "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
             "base": {"ref": "main", "sha": main},
         }],
@@ -141,6 +170,48 @@ def test_pr_payload_base_sha_does_not_replace_head_ancestry_proof() -> None:
     assert f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100" not in audit.calls
 
 
+def test_current_internal_pr_requires_pull_request_event_and_association() -> None:
+    main = "a" * 40
+    head = "b" * 40
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
+        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {"check_runs": []},
+        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
+            "number": 7,
+            "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
+            "base": {"ref": "main"},
+        }],
+        f"/repos/Oteryn/Test/compare/{main}...{head}": {"status": "ahead", "merge_base_commit": {"sha": main}},
+        f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {
+            "check_runs": [check_run("gate-a", 201, pr_number=7), check_run("gate-b", 202, pr_number=7)],
+        },
+        "/repos/Oteryn/Test/actions/runs/201": workflow("pull_request", head),
+        "/repos/Oteryn/Test/actions/runs/202": workflow("pull_request", head),
+    })
+    observed = audit.representative_check_sources("Oteryn/Test", {"gate-a", "gate-b"}, ACTIONS_APP_ID)
+    assert m.expected_sources_satisfied(observed, {"gate-a", "gate-b"}, ACTIONS_APP_ID)
+
+
+def test_scheduled_pr_head_check_does_not_prove_pr_emission() -> None:
+    main = "a" * 40
+    head = "b" * 40
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
+        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {"check_runs": []},
+        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
+            "number": 7,
+            "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
+            "base": {"ref": "main"},
+        }],
+        f"/repos/Oteryn/Test/compare/{main}...{head}": {"status": "ahead", "merge_base_commit": {"sha": main}},
+        f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {
+            "check_runs": [check_run("gate", 203, pr_number=7)],
+        },
+        "/repos/Oteryn/Test/actions/runs/203": workflow("schedule", head),
+    })
+    assert audit.representative_check_sources("Oteryn/Test", {"gate"}, ACTIONS_APP_ID) == {}
+
+
 def test_check_names_are_not_union_across_multiple_pr_heads() -> None:
     main = "a" * 40
     head1 = "b" * 40
@@ -149,35 +220,18 @@ def test_check_names_are_not_union_across_multiple_pr_heads() -> None:
         "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
         f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {"check_runs": []},
         "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [
-            {"head": {"sha": head1, "repo": {"full_name": "Oteryn/Test"}}, "base": {"ref": "main", "sha": main}},
-            {"head": {"sha": head2, "repo": {"full_name": "Oteryn/Test"}}, "base": {"ref": "main", "sha": main}},
+            {"number": 7, "head": {"sha": head1, "repo": {"full_name": "Oteryn/Test"}}, "base": {"ref": "main"}},
+            {"number": 8, "head": {"sha": head2, "repo": {"full_name": "Oteryn/Test"}}, "base": {"ref": "main"}},
         ],
         f"/repos/Oteryn/Test/compare/{main}...{head1}": {"status": "ahead", "merge_base_commit": {"sha": main}},
         f"/repos/Oteryn/Test/compare/{main}...{head2}": {"status": "ahead", "merge_base_commit": {"sha": main}},
-        f"/repos/Oteryn/Test/commits/{head1}/check-runs?per_page=100": {"check_runs": [run("gate-a")]},
-        f"/repos/Oteryn/Test/commits/{head2}/check-runs?per_page=100": {"check_runs": [run("gate-b")]},
+        f"/repos/Oteryn/Test/commits/{head1}/check-runs?per_page=100": {"check_runs": [check_run("gate-a", 204, pr_number=7)]},
+        f"/repos/Oteryn/Test/commits/{head2}/check-runs?per_page=100": {"check_runs": [check_run("gate-b", 205, pr_number=8)]},
+        "/repos/Oteryn/Test/actions/runs/204": workflow("pull_request", head1),
+        "/repos/Oteryn/Test/actions/runs/205": workflow("pull_request", head2),
     })
     observed = audit.representative_check_sources("Oteryn/Test", {"gate-a", "gate-b"}, ACTIONS_APP_ID)
     assert not m.expected_sources_satisfied(observed, {"gate-a", "gate-b"}, ACTIONS_APP_ID)
-
-
-def test_current_internal_pr_can_prove_required_checks_only_after_ancestry() -> None:
-    main = "a" * 40
-    head = "b" * 40
-    audit = FakeAudit({
-        "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
-        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {"check_runs": []},
-        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
-            "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
-            "base": {"ref": "main", "sha": "d" * 40},
-        }],
-        f"/repos/Oteryn/Test/compare/{main}...{head}": {"status": "ahead", "merge_base_commit": {"sha": main}},
-        f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {
-            "check_runs": [run("gate-a"), run("gate-b")],
-        },
-    })
-    observed = audit.representative_check_sources("Oteryn/Test", {"gate-a", "gate-b"}, ACTIONS_APP_ID)
-    assert m.expected_sources_satisfied(observed, {"gate-a", "gate-b"}, ACTIONS_APP_ID)
 
 
 def test_dependabot_security_updates_treat_204_as_enabled() -> None:
@@ -194,27 +248,74 @@ def test_dependabot_security_updates_treat_404_as_disabled() -> None:
     assert audit.calls == [f"/repos/{repo}/automated-security-fixes"]
 
 
+def search_path(repo: str, needle: str, page: int) -> str:
+    q = m.urllib.parse.quote_plus(f'"{needle}" repo:{repo}')
+    return f"/search/code?q={q}&per_page=100&page={page}"
+
+
 def test_coordinate_scan_ignores_policy_manifest_but_flags_mutable_use() -> None:
     repo = "Oteryn/Test"
     needle = "blakinio/Oteryn-Platform"
-    q = m.urllib.parse.quote_plus(f'"{needle}" repo:{repo}')
     audit = FakeAudit({
-        f"/search/code?q={q}&per_page=100": {
+        search_path(repo, needle, 1): {
+            "total_count": 2,
+            "incomplete_results": False,
             "items": [
                 {"path": "ecosystem/governance-desired-state.json"},
                 {"path": "README.md"},
-            ]
+            ],
         }
     })
     audit.coordinate_scan({
         "permanent_repositories": [{"repository": repo}],
-        "mutable_coordinate_policy": {
-            "forbidden": [needle],
-            "historical_reference_only": [],
-        },
+        "mutable_coordinate_policy": {"forbidden": [needle], "historical_reference_only": []},
     })
     assert audit.errors == [f"{repo}: stale mutable coordinate {needle} in README.md"]
-    assert audit.warnings == []
+
+
+def test_coordinate_scan_rejects_incomplete_results() -> None:
+    repo = "Oteryn/Test"
+    needle = "legacy"
+    audit = FakeAudit({
+        search_path(repo, needle, 1): {"total_count": 1, "incomplete_results": True, "items": []},
+    })
+    try:
+        audit._search_all_code(repo, needle)
+    except RuntimeError as exc:
+        assert "incomplete" in str(exc)
+    else:
+        raise AssertionError("incomplete code search must fail closed")
+
+
+def test_coordinate_scan_paginates_before_passing() -> None:
+    repo = "Oteryn/Test"
+    needle = "legacy"
+    page1 = [{"path": f"docs/evidence/archive-{i}.md"} for i in range(100)]
+    page2 = [{"path": "README.md"}]
+    audit = FakeAudit({
+        search_path(repo, needle, 1): {"total_count": 101, "incomplete_results": False, "items": page1},
+        search_path(repo, needle, 2): {"total_count": 101, "incomplete_results": False, "items": page2},
+    })
+    audit.coordinate_scan({
+        "permanent_repositories": [{"repository": repo}],
+        "mutable_coordinate_policy": {"forbidden": [needle], "historical_reference_only": []},
+    })
+    assert audit.errors == [f"{repo}: stale mutable coordinate {needle} in README.md"]
+    assert search_path(repo, needle, 2) in audit.calls
+
+
+def test_coordinate_scan_rejects_results_above_github_cap() -> None:
+    repo = "Oteryn/Test"
+    needle = "legacy"
+    audit = FakeAudit({
+        search_path(repo, needle, 1): {"total_count": 1001, "incomplete_results": False, "items": []},
+    })
+    try:
+        audit._search_all_code(repo, needle)
+    except RuntimeError as exc:
+        assert "1000-result" in str(exc)
+    else:
+        raise AssertionError("search above GitHub completeness cap must fail closed")
 
 
 def test_desired_state_binds_all_required_checks_to_github_actions_app() -> None:
