@@ -98,6 +98,16 @@ def load_desired() -> dict:
             target = item.get("target_gate")
             if not isinstance(target, str) or not target:
                 raise SystemExit(f"transition repository lacks target_gate: {item}")
+    policy = data.get("mutable_coordinate_policy")
+    if not isinstance(policy, dict) or set(policy) != {"forbidden", "historical_reference_only"}:
+        raise SystemExit("mutable_coordinate_policy must contain forbidden and historical_reference_only")
+    for field in ("forbidden", "historical_reference_only"):
+        values = policy.get(field)
+        if not isinstance(values, list) or not values or not all(isinstance(value, str) and value for value in values):
+            raise SystemExit(f"mutable_coordinate_policy.{field} must be a non-empty string array")
+        if len(set(values)) != len(values):
+            raise SystemExit(f"mutable_coordinate_policy.{field} contains duplicates")
+
     admins = data.get("administrative_repositories")
     if not isinstance(admins, list):
         raise SystemExit("administrative_repositories must be an array")

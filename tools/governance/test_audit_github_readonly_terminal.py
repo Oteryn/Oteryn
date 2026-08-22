@@ -175,6 +175,25 @@ def test_desired_state_requires_complete_merge_and_security_contract() -> None:
         finally:
             m.core.DESIRED_PATH = original_path
 
+def test_desired_state_requires_complete_coordinate_policy() -> None:
+    data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    original_path = m.core.DESIRED_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "desired.json"
+        broken = json.loads(json.dumps(data))
+        del broken["mutable_coordinate_policy"]["forbidden"]
+        path.write_text(json.dumps(broken), encoding="utf-8")
+        m.core.DESIRED_PATH = path
+        try:
+            try:
+                m.core.load_desired()
+            except SystemExit as exc:
+                assert "mutable_coordinate_policy" in str(exc)
+            else:
+                raise AssertionError("missing coordinate policy must fail closed")
+        finally:
+            m.core.DESIRED_PATH = original_path
+
 def test_transport_failure_becomes_runtime_unknown_signal() -> None:
     original = m.urllib.request.urlopen
 
