@@ -123,7 +123,10 @@ def process_event(event: dict[str, Any], repository: str, github: Any, git: Any)
         return result("ALREADY_ABSENT", branch=branch, number=number, sha=sha, reason=reason)
     if current != sha:
         raise CleanupError(f"branch head SHA drift: expected {sha}, got {current}")
-    if github.get_branch(branch).get("protected") is True:
+    branch_state = github.get_branch(branch)
+    if not isinstance(branch_state, dict):
+        raise CleanupError(f"branch protection response is invalid for {branch!r}")
+    if branch_state.get("protected") is True:
         raise CleanupError(f"branch {branch!r} is protected")
     if github.get_open_pulls_for_branch(branch):
         raise CleanupError(f"branch {branch!r} still has an open pull request")
@@ -152,8 +155,13 @@ def process_event(event: dict[str, Any], repository: str, github: Any, git: Any)
             f"delete disposition requires repository write authority at deletion boundary for "
             f"close-event sender {sender_login!r}; live permission is {boundary_permission!r}"
         )
+    boundary_branch_state = github.get_branch(branch)
+    if not isinstance(boundary_branch_state, dict):
+        raise CleanupError(f"branch protection response is invalid at deletion boundary for {branch!r}")
+    if boundary_branch_state.get("protected") is True:
+        raise CleanupError(f"branch {branch!r} is protected at deletion boundary")
 
-    # The boundary pull and permission revalidation are deliberately the final authority queries
+    # The boundary PR, sender permission, and branch protection revalidations are deliberately the final authority queries
     # before the destructive push. Exact branch-SHA drift is enforced atomically
     # by the Git force-with-lease used by delete_with_lease().
 

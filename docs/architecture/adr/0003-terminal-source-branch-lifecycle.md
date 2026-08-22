@@ -30,7 +30,7 @@ and exactly one non-empty `Branch-Disposition-Reason: ...` line.
 2. the authenticated close-event sender has live `write`, `maintain`, or `admin` repository permission, revalidated again at the deletion boundary;
 3. the pull request remains closed, unmerged, same-repository, on the same source branch and exact head SHA;
 4. the source ref still resolves to that exact SHA;
-5. the source branch is neither the default branch nor protected;
+5. the source branch is neither the default branch nor protected, with protection revalidated again at the deletion boundary;
 6. no open pull request owns the same ref;
 7. release, rollback, recovery, and backup-sensitive names are excluded;
 8. the remote used for deletion resolves to the caller repository;

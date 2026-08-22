@@ -28,8 +28,9 @@ def live(evt):
 
 
 class GH:
-    def __init__(self, evt=None, *, protected=False, open_pulls=None, open_pull_snapshots=None, pull_snapshots=None, fail_open_call=None, permission="write", permission_snapshots=None, default="main"):
+    def __init__(self, evt=None, *, protected=False, protected_snapshots=None, open_pulls=None, open_pull_snapshots=None, pull_snapshots=None, fail_open_call=None, permission="write", permission_snapshots=None, default="main"):
         self.evt, self.protected, self.open_pulls, self.default = evt, protected, open_pulls or [], default
+        self.protected_snapshots = list(protected_snapshots) if protected_snapshots is not None else None
         self.permission = permission
         self.permission_snapshots = list(permission_snapshots) if permission_snapshots is not None else None
         self.open_pull_snapshots = list(open_pull_snapshots) if open_pull_snapshots is not None else None
@@ -54,7 +55,12 @@ class GH:
             return live(self.pull_snapshots.pop(0))
         return live(self.evt)
     def get_branch(self, branch):
-        self.calls.append("branch"); return {"protected": self.protected}
+        self.calls.append("branch")
+        if self.protected_snapshots is not None:
+            if not self.protected_snapshots:
+                raise CleanupError("unexpected branch-protection revalidation")
+            return {"protected": self.protected_snapshots.pop(0)}
+        return {"protected": self.protected}
     def get_open_pulls_for_branch(self, branch):
         self.calls.append("open")
         self.open_calls += 1
@@ -176,6 +182,16 @@ class CleanupTests(unittest.TestCase):
         self.assertEqual(git.prepared, [("feat/demo", SHA)])
         self.assertEqual(git.deletes, [])
         self.assertEqual(gh.calls.count("permission"), 2)
+
+    def test_branch_protection_is_revalidated_at_delete_boundary(self):
+        evt = self.delete_event()
+        gh = GH(evt, protected_snapshots=[False, True])
+        git = Git()
+        with self.assertRaisesRegex(CleanupError, "protected at deletion boundary"):
+            process_event(evt, "Oteryn/Demo", gh, git)
+        self.assertEqual(git.prepared, [("feat/demo", SHA)])
+        self.assertEqual(git.deletes, [])
+        self.assertEqual(gh.calls.count("branch"), 2)
 
     def test_live_disposition_is_revalidated_at_delete_boundary(self):
         evt = self.delete_event()
