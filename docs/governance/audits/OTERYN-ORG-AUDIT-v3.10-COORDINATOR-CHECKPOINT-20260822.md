@@ -156,3 +156,29 @@ Executors must not mutate each other's active branches.
 8. Close/supersede obsolete audit PRs/tasks/branches only after durable successor merge; preserve unique historical evidence.
 9. Re-verify `main` branch protection and exact terminal evidence.
 10. Final programme verdict may be `COMPLETE` only when G4/G7/G8/G9/G10/G11 acceptance is directly satisfied; otherwise preserve the exact remaining blockers.
+
+## Runner executor terminal supersession — 2026-08-22
+
+The earlier runner `UNKNOWN/PENDING/BLOCKED` checkpoint above is historical and is superseded by direct terminal evidence:
+
+- direct organization API readback: `platform-runners` -> `Oteryn/Oteryn-Platform` only, `atlas-runners` -> `Oteryn/Oteryn-Atlas` only, `game-runners` -> `Oteryn/Oteryn-Game` only;
+- live organization runner estate: exactly three product runners, all online on Actions Runner `2.336.0`; `Default` group has zero runners;
+- Atlas trusted-main run/job `32526864123` / `96911114022`: PASS;
+- Game trusted-main run/job `32566399984` / `97015531724`: PASS;
+- Platform trusted-main run/job `32567509732` / `97018190282`: PASS;
+- Platform #1221 removed retained `oteryn-staging` selectors; legacy runner id `21` was deregistered and its container removed after replacement gates passed; rollback state was preserved;
+- META Issue #32 and parent runner implementation Issue #34 are terminally closed.
+
+`RUNNER_TOPOLOGY_SECURITY_RETIREMENT = PASS`
+
+This supersession closes the runner workstream only. Migration-mode and recurring organization-recovery evidence remain independently fail-closed in the final report.
+
+## Coordinator state after META #37 merge
+
+- META PR #37 merged through required gates as `c0dbad93f791953d5efcc6b556e6be73693f0a4f`.
+- `docs/issue-16-org-audit-v3-10-final` was merge-updated from that exact `main` without force-push and without losing executor evidence.
+- Runner/control-plane acceptance is terminal and is no longer a programme blocker.
+- PR #38 is a pre-closeout runner snapshot and must not be merged as current truth; close it as superseded only after this #43 successor is durably merged.
+- The final report remains `INCOMPLETE` solely where independent migration, recovery, gate-transition or cleanup evidence remains non-terminal; no runner `UNKNOWN` is retained as a current fact.
+
+Current coordinator path: validate #43 exact head, apply the META review policy, merge only through required checks, then retire superseded audit lineage and re-read final `main`.

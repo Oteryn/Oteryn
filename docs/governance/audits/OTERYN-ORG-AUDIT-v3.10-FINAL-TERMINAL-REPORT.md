@@ -12,14 +12,11 @@ This report is the full v3.10 execution artifact. The accompanying Documentation
 
 **Current terminal verdict: `INCOMPLETE`.**
 
-The organization has a coherent four-repository authority model, protected META governance, a merged organization recovery contract, an immutable organization-runner image, a proven Atlas replacement route, and implemented Platform/Game runner routes. The audit cannot truthfully return `COMPLETE` while the following acceptance facts remain unproved or blocked:
+The organization has a coherent four-repository authority model, protected META governance, a merged organization recovery contract, an immutable organization-runner image, and a terminal product-isolated Synology runner estate. Direct organization API readback proves one selected repository per runner group, all three provider-owned trusted-main acceptance workloads passed, and the legacy staging runner was retired only after those gates closed. The audit cannot truthfully return `COMPLETE` while the following independent acceptance facts remain unproved or incomplete:
 
-1. organization runner-group `Selected repositories` ACLs cannot be read back through the connected GitHub surface;
-2. the Platform replacement workload is merged, but the trusted-main push-run result is not readable through the available run-list surfaces in this session;
-3. the Game replacement candidate is hosted-CI green but cannot be merged without an independent review; Game policy separately prohibits owner-funded metered AI/Codex without explicit authorization;
-4. Game and Platform migration verdicts remain `UNKNOWN`, and Atlas migration remains `NO`, because their mode-specific terminal evidence is not complete;
-5. legacy runner retirement is intentionally blocked until the replacement/ACL gates above close;
-6. organization-wide recurring current-state backup/control-plane/package/secret/owner-redundancy recovery remains unproved.
+1. Game and Platform migration verdicts remain `UNKNOWN`, and Atlas migration remains `NO`, because their mode-specific terminal evidence is not complete;
+2. organization-wide recurring current-state backup/control-plane/package/secret/owner-redundancy recovery remains unproved;
+3. the Game and Platform stable gate-name transitions remain non-terminal governance work.
 
 These are evidence gaps, not inferred failures. No blocker is converted to PASS merely to close the programme.
 
@@ -81,15 +78,17 @@ Historical/archive paths may contain old coordinates and state as evidence. Muta
 
 | ID | Severity | State | Finding |
 | --- | --- | --- | --- |
-| V310-RUNNER-ACL | HIGH | UNKNOWN | selected-repository ACLs for `platform-runners`, `atlas-runners`, `game-runners` cannot be read back from the connected org control-plane surface |
-| V310-RUNNER-PLATFORM | HIGH | PARTIAL | Platform route is merged; trusted-main push workload result remains unreadable in this session |
-| V310-RUNNER-GAME | HIGH | PARTIAL | Game route is hosted-CI green but independent-review policy blocks merge |
-| V310-RUNNER-LEGACY | HIGH | NOT DONE | legacy `oteryn-synology-staging` deliberately retained until all replacement/security gates close |
+| V310-RUNNER-ACL | HIGH | DONE | direct organization API readback proves `platform-runners` -> `Oteryn/Oteryn-Platform`, `atlas-runners` -> `Oteryn/Oteryn-Atlas`, and `game-runners` -> `Oteryn/Oteryn-Game`, exactly one selected repository each |
+| V310-RUNNER-PLATFORM | HIGH | DONE | trusted-main run/job `32567509732` / `97018190282` passed on `platform-runners` + `oteryn-platform` + `oteryn-synology-platform` |
+| V310-RUNNER-GAME | HIGH | DONE | trusted-main run/job `32566399984` / `97015531724` passed on `game-runners` + `oteryn-game` + `oteryn-synology-game` with UID/GID `1001:1001` and no Docker-host control |
+| V310-RUNNER-LEGACY | HIGH | DONE | Platform #1221 removed retained `oteryn-staging` selectors; legacy runner id `21` was deregistered and its container removed after replacement proof, while rollback state was preserved |
 | V310-MIG-GAME | HIGH | UNKNOWN | target authority and archived source are known; exhaustive final ref/tag/stale-coordinate closure remains unproved |
 | V310-MIG-PLATFORM | HIGH | UNKNOWN | identity transfer is complete; full package/control-plane/external-identity/migration-machinery closure is unproved |
 | V310-MIG-ATLAS | HIGH | NOT DONE | target is authoritative, but mode-specific selective-extraction/source-disposition acceptance is not fully proved in META |
 | V310-RECOVERY | HIGH | PARTIAL | historical transfer-cut recovery is proved; current recurring organization recovery is not |
 | V310-ACTIONS-POLICY | MEDIUM | PARTIAL | live governance audit records broad Actions-policy surfaces as warnings rather than silently promoting them |
+
+Durable runner closeout evidence: `docs/evidence/OTERYN-ORG-RUNNER-ACL-LIVE-CLOSEOUT-20260822.md`.
 
 ## 6. Agent and Codex instruction architecture
 
@@ -138,7 +137,7 @@ Verified design:
 - GitHub Issues as lifecycle authority;
 - read-only governance drift audit by default;
 - CODEOWNERS/security/dependency baseline where supported;
-- organization runner groups are intended to be selected-repository-only; this remains `UNKNOWN` until direct ACL readback is available.
+- organization runner groups are selected-repository-only and directly re-verified on 2026-08-22: `platform-runners` -> Platform only, `atlas-runners` -> Atlas only, `game-runners` -> Game only; the organization `Default` group has no runners.
 
 No general auto-rewriter is authorized as the baseline drift mechanism.
 
@@ -173,8 +172,9 @@ Self-hosted privileged workloads are trusted-path only. A pull request must not 
 
 Current runner replacement proof:
 - Atlas trusted-main acceptance: PASS;
-- Platform trusted-main result: UNKNOWN in available read surface;
-- Game trusted-main acceptance: not reachable until independently reviewed PR can merge.
+- Platform trusted-main run/job `32567509732` / `97018190282`: PASS on `platform-runners` + `oteryn-platform`;
+- Game trusted-main run/job `32566399984` / `97015531724`: PASS on `game-runners` + `oteryn-game`;
+- direct organization readback on 2026-08-22 shows exactly three organization runners, each online on Actions Runner `2.336.0`, and zero runners in the `Default` group.
 
 ## 12. Security, dependency and supply-chain baseline
 
@@ -184,7 +184,7 @@ Current runner replacement proof:
 - Actions changes are risk-bearing and reviewed accordingly;
 - self-hosted runner base image is immutable and runner version is 2.336.0;
 - raw Docker socket is host-equivalent privilege, never described as container isolation;
-- Platform and Atlas have proved local workloads requiring Docker-host capability; Game target remains non-root without Docker socket;
+- Platform and Atlas have proved local workloads requiring Docker-host capability; Game proved its least-privilege local route at UID/GID `1001:1001` without Docker-host control;
 - secrets, `.credentials`, environment dumps and private runtime data must not be committed as audit evidence.
 
 ## 13. Target repository trees and migrated-source disposition
@@ -270,9 +270,9 @@ META copies               [NOT_NEEDED]
 | `blakinio/Otheryn` bounded Atlas lineage | `Oteryn/Oteryn-Atlas`; source material historical/non-authoritative | selective extraction completion NOT DONE |
 | transferred Platform identity | `Oteryn/Oteryn-Platform`, stable repo ID preserved | identity DONE; complete migration UNKNOWN |
 | Platform transfer-cut backup | archived administrative repository | terminal disposition DONE |
-| historical runner image/tag | immutable `ghcr.io/oteryn/...@sha256:f0c452...` | new supply chain DONE; legacy retirement pending |
+| historical runner image/tag | immutable `ghcr.io/oteryn/...@sha256:f0c452...` | new supply chain DONE; legacy staging runner retired |
 | Platform-owned Atlas execution | Atlas-owned local runner/workflows | DONE |
-| Game local integration execution | Game-owned runner candidate | PARTIAL / review blocked |
+| Game local integration execution | Game-owned runner/workflow | DONE |
 
 ## 16. GitHub settings, protection and ruleset matrix
 
@@ -282,7 +282,7 @@ META copies               [NOT_NEEDED]
 | Game | protected/transition governance | `Merge gate / validate` | `game-gate` | transition not terminal |
 | Platform | protected | `classify-changes`, `test` | `platform-gate` | transition not terminal |
 | Atlas | protected | `atlas-gate`, `provenance-gate` | stable | none in known check contract |
-| runner groups | organization control plane | selected-repository-only desired | exact one-provider repository each | direct ACL readback UNKNOWN |
+| runner groups | organization control plane | selected-repository-only | exact one-provider repository each | direct ACL readback PASS |
 
 ## 17. Drift and governance-as-code
 
@@ -302,12 +302,9 @@ Documentation/agent drift additionally covers canonical path/ownership, root-ins
 
 1. Preserve current provider authorities and immutable provenance.
 2. Close mode-specific migration evidence, not just repository existence.
-3. Prove Platform and Game replacement runner workloads on trusted `main`.
-4. Read back exact runner-group selected-repository ACLs.
-5. Verify no workflow still requires the legacy staging runner.
-6. Only then decide/remove legacy registration/container/state with bounded rollback evidence.
-7. Re-run full stale-coordinate/ref/tag/source-disposition checks.
-8. Promote Game/Platform/Atlas migration verdicts only when every acceptance item has direct evidence.
+3. Runner split closeout is terminal: Platform, Atlas and Game trusted-main acceptance passed, selected-repository ACLs were read back directly, no retained workflow requires `oteryn-staging`, and the legacy registration/container was retired with rollback state preserved.
+4. Re-run full stale-coordinate/ref/tag/source-disposition checks.
+5. Promote Game/Platform/Atlas migration verdicts only when every acceptance item has direct evidence.
 
 No source or rollback object is removed merely because it looks old.
 
@@ -315,12 +312,12 @@ No source or rollback object is removed merely because it looks old.
 
 | Order | Item | Owner | State / acceptance |
 | ---: | --- | --- | --- |
-| 1 | merge terminal desired-state/drift audit | META | current governed PR workstream; exact-head CI/R2 required |
-| 2 | obtain Platform trusted-main diagnostics run/job readback | Platform | UNKNOWN until direct run evidence |
-| 3 | obtain permitted independent review and merge Game runner candidate | Game | BLOCKED by review authorization/surface |
-| 4 | run trusted-main Game acceptance | Game | blocked by item 3 |
-| 5 | read runner-group selected-repository ACLs | organization owner/control plane | UNKNOWN with current connector |
-| 6 | retire legacy staging runner after 2–5 PASS | organization/Platform | NOT DONE by design |
+| 1 | merge terminal desired-state/drift audit | META | DONE: PR #37 merged as `c0dbad93f791953d5efcc6b556e6be73693f0a4f` after exact-head `meta-gate` + `ai-review-gate` PASS |
+| 2 | obtain Platform trusted-main diagnostics run/job readback | Platform | DONE: `32567509732` / `97018190282` |
+| 3 | merge Game runner acceptance candidate through its provider policy | Game | DONE |
+| 4 | run trusted-main Game acceptance | Game | DONE: `32566399984` / `97015531724` |
+| 5 | read runner-group selected-repository ACLs | organization owner/control plane | DONE: exactly one provider repository per group |
+| 6 | retire legacy staging runner after 2–5 PASS | organization/Platform | DONE: selector removed; runner deregistered; container removed; rollback state preserved |
 | 7 | close migration-specific Game/Platform/Atlas evidence | each provider + META reconciliation | UNKNOWN/NO |
 | 8 | implement recurring current-state recovery/control-plane/package/secret-owner recovery evidence | organization/providers | PARTIAL |
 | 9 | terminalize stable `game-gate` / `platform-gate` transitions | Game/Platform | PARTIAL |
@@ -330,8 +327,6 @@ No source or rollback object is removed merely because it looks old.
 
 Decisions that cannot be invented by an autonomous audit:
 - whether/when provider policy may authorize paid/metered AI review in Game;
-- organization-owner runner-group ACL visibility/change when the connector cannot read it;
-- final legacy-runner retirement after all rollback gates pass;
 - acceptable organization-wide current backup RPO/RTO and independent secret/owner-recovery mechanisms;
 - any destructive retirement of mixed-content historical repositories not wholly owned by this migration.
 
@@ -349,7 +344,7 @@ The target architecture is accepted as the direction of travel:
 - **CODEX USER/REPOSITORY CONFIG** — reusable AI configuration only at its actual supported authority layer;
 - **GITHUB-NATIVE ENFORCEMENT** — protected branches/rulesets/checks/reviews as merge truth.
 
-The architecture is coherent; the programme is not terminally complete while required evidence remains UNKNOWN/PARTIAL/NO.
+The architecture is coherent and the runner/control-plane workstream is terminal; the programme is not terminally complete while independent migration/recovery evidence remains UNKNOWN/PARTIAL/NO.
 
 # Matrix A0–L — execution coverage ledger
 
@@ -357,17 +352,17 @@ The labels below are the v3.10 completeness index used by this execution. They d
 
 | Matrix | Evidence family | State | Key result |
 | --- | --- | --- | --- |
-| A0 | scope, access and evidence coherence | PARTIAL | permanent repos inspected; org runner ACL/read surfaces incomplete |
+| A0 | scope, access and evidence coherence | PARTIAL | permanent repos and runner control plane inspected; independent migration/recovery evidence remains incomplete |
 | A | repository identity and topology | DONE | four permanent authorities and admin backup identity verified |
 | B | authority/source-of-truth | DONE | META/provider/GitHub-native authority boundaries explicit |
 | C | migration/source retirement | NOT DONE | Game/Platform UNKNOWN; Atlas NO |
 | D | branch protection/merge governance | PARTIAL | stable META/Atlas; Game/Platform transitions remain |
 | E | CI/check architecture | PARTIAL | stable identities plus transition targets recorded |
-| F | test/runtime acceptance | PARTIAL | Atlas PASS; Platform/Game replacement proof incomplete |
+| F | test/runtime acceptance | PARTIAL | Platform/Atlas/Game runner replacement acceptance PASS; broader migration-mode acceptance remains incomplete |
 | G | security/dependency/supply chain | PARTIAL | immutable runner supply chain; remaining governance warnings/gaps |
 | H | agents/Codex/instruction loading | PARTIAL | durable model defined; provider-wide final hygiene not fully re-proved here |
 | I | documentation/source ownership | DONE | central-vs-provider ownership defined without duplicate mutable authority |
-| J | task/prompt/handover/evidence lifecycle | PARTIAL | model defined; open runner tasks remain active by design |
+| J | task/prompt/handover/evidence lifecycle | PARTIAL | runner lifecycle tasks terminalized; broader stale-task/PR cleanup remains successor-dependent |
 | K | recovery/break-glass | PARTIAL | historical transfer cut PASS; current org recovery gaps remain |
 | L | Documentation & Agent IA | PARTIAL | full Matrix L/H14 present; G11 cannot PASS while terminal blockers remain |
 
@@ -395,16 +390,16 @@ The labels below are the v3.10 completeness index used by this execution. They d
 | Gate | Terminal condition | State | Reason |
 | --- | --- | --- | --- |
 | G1 | complete permanent/admin scope | YES | four permanent repos + bounded legacy/admin estate identified |
-| G2 | access gaps explicit, no inferred PASS | YES | runner ACL/push-run/reviewer gaps recorded as UNKNOWN/BLOCKED |
+| G2 | access gaps explicit, no inferred PASS | YES | runner gaps were closed by direct evidence; remaining migration/recovery unknowns are retained explicitly |
 | G3 | authority graph/source-of-truth reconciled | YES | sections 3/14 |
 | G4 | migration completion mode-by-mode | NO | Game/Platform UNKNOWN; Atlas NO |
 | G5 | protection/check governance live-verified | PARTIAL | META/Atlas stable; Game/Platform transitions remain |
-| G6 | CI/test/security target validated | PARTIAL | deterministic META proof; runner/provider terminal gaps remain |
+| G6 | CI/test/security target validated | PARTIAL | deterministic META proof and runner acceptance are terminal; provider gate transitions/migration acceptance remain |
 | G7 | recovery/break-glass terminal | NO | current recurring/control-plane/package/secret/owner recovery unproved |
-| G8 | runner topology/security/retirement terminal | NO | ACL UNKNOWN; Platform/Game proof incomplete; legacy retained |
+| G8 | runner topology/security/retirement terminal | YES | direct one-repository ACL proof, all three trusted-main provider runs PASS, legacy selector/runner/container retired after rollback gates |
 | G9 | stale task/PR/branch/source cleanup terminal | PARTIAL | cleanup proceeds only after successor merges; active blockers intentionally retained |
 | G10 | exact evidence/recommendation ledger and mechanical validation | PARTIAL | delivered with this successor; final post-merge refresh still required |
-| G11 | complete 21-section report + Matrix L + H14 with all terminal gates satisfied | NO | report is structurally complete but G4/G7/G8 are not terminal |
+| G11 | complete 21-section report + Matrix L + H14 with all terminal gates satisfied | NO | report is structurally complete; G8 is terminal, but G4/G7 and other independent programme gates remain open |
 
 # Matrix L — Documentation & Agent Information Architecture
 
