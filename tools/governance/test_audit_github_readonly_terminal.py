@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import base64
 import tempfile
 import urllib.error
 from pathlib import Path
@@ -27,7 +28,9 @@ class FakeAudit(m.Audit):
         if path in self.responses:
             return self.responses[path]
         if path.startswith("/repos/Oteryn/Test/actions/workflows/"):
-            return {"state": "active"}
+            return {"id": 1, "state": "active", "path": ".github/workflows/gate.yml"}
+        if path == "/repos/Oteryn/Test/contents/.github/workflows/gate.yml":
+            return {"content": base64.b64encode(b"on: [pull_request, pull_request_target]\n").decode("ascii")}
         if allow_404:
             return None
         raise AssertionError(f"unexpected API call: {path}")
