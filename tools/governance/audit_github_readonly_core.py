@@ -434,6 +434,8 @@ def workflow_text_secure(text: str) -> bool:
         if ("{" in raw_value or "[" in raw_value) and re.search(r'''"[^"\n]*\\[^"\n]*"\s*:''', raw_value):
             return False
         if permissions_indent is not None and not is_sequence and indent == permissions_indent + 2:
+            if raw_value.startswith(("&", "*")):
+                return False
             permissions_values[key] = _yaml_scalar(raw_value)
         if key == "permissions":
             if indent == 0 and not is_sequence:
@@ -673,15 +675,16 @@ class Audit:
             self._workflow_definitions[key] = payload if isinstance(payload, dict) else None
         return self._workflow_definitions[key]
 
-    def _workflow_event_unfiltered(self, repo: str, definition: dict, event: str) -> bool:
+    def _workflow_event_unfiltered(self, repo: str, definition: dict, event: str, *, ref: str) -> bool:
         workflow_id = definition.get("id")
         path = definition.get("path")
         if not isinstance(workflow_id, int) or workflow_id <= 0 or not isinstance(path, str) or not path:
             return False
-        key = (repo, workflow_id, event)
+        key = (repo, workflow_id, event, ref)
         if key not in self._workflow_trigger_validity:
             quoted_path = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
-            text = self._decoded_contents(self.api(f"/repos/{repo}/contents/{quoted_path}", allow_404=True))
+            quoted_ref = urllib.parse.quote(ref, safe="")
+            text = self._decoded_contents(self.api(f"/repos/{repo}/contents/{quoted_path}?ref={quoted_ref}", allow_404=True))
             self._workflow_trigger_validity[key] = text is not None and workflow_event_unfiltered(text, event)
         return self._workflow_trigger_validity[key]
 
@@ -692,6 +695,7 @@ class Audit:
         *,
         event: str,
         allowed_head_shas: set[str],
+        workflow_ref: str,
         pr_number: int | None = None,
     ) -> dict[str, set[int | None]]:
         sources: dict[str, set[int | None]] = {}
@@ -702,7 +706,7 @@ class Audit:
             definition = self._workflow_definition(repo, workflow)
             if not definition or definition.get("state") != "active":
                 continue
-            if not self._workflow_event_unfiltered(repo, definition, event):
+            if not self._workflow_event_unfiltered(repo, definition, event, ref=workflow_ref):
                 continue
             if workflow.get("event") != event or workflow.get("head_sha") not in allowed_head_shas:
                 continue
@@ -854,6 +858,7 @@ class Audit:
                 runs,
                 event="pull_request",
                 allowed_head_shas={sha},
+                workflow_ref=sha,
                 pr_number=pr_number,
             )
             target_sources = self._protected_flow_sources(
@@ -861,6 +866,7 @@ class Audit:
                 runs,
                 event="pull_request_target",
                 allowed_head_shas={main_sha},
+                workflow_ref=main_sha,
                 pr_number=pr_number,
             )
             sources = merge_sources(pr_sources, target_sources)
