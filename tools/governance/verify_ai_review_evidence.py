@@ -19,6 +19,7 @@ _CLEAN_PREFIX = "Codex Review: Didn't find any major issues."
 _OBSERVED_CLEAN_FLAIRS = {
     "Already looking forward to the next diff.",
     "Another round soon, please!",
+    "Keep it up!",
 }
 
 

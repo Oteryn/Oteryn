@@ -8,6 +8,7 @@ def test_observed_dynamic_clean_flair_passes() -> None:
     for flair in (
         "Already looking forward to the next diff.",
         "Another round soon, please!",
+        "Keep it up!",
     ):
         repo, _, final = _v1.core_tests.make_repo()
         current = _v1.core_tests.issue_comment(
