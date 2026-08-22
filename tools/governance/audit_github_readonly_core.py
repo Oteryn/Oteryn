@@ -197,6 +197,14 @@ def dependabot_github_actions_entry_valid(text: str) -> bool:
         if not line.strip():
             continue
         rows.append((len(line) - len(line.lstrip(" ")), line.strip()))
+    top_level_keys: set[str] = set()
+    for indent, body in rows:
+        if indent != 0:
+            continue
+        field = _yaml_mapping_field(body)
+        if field is None or field[0] or not field[1] or field[1] in top_level_keys:
+            return False
+        top_level_keys.add(field[1])
     if not any(
         indent == 0 and (field := _yaml_mapping_field(body)) is not None
         and not field[0] and field[1] == "version" and _yaml_scalar(field[2]) == "2"
@@ -355,7 +363,7 @@ def workflow_text_secure(text: str) -> bool:
             if indent == 0 and not is_sequence:
                 has_top_permissions = True
             scalar = _yaml_scalar(raw_value)
-            if scalar == "write-all":
+            if scalar == "write-all" or raw_value.startswith(("&", "*")):
                 return False
             if raw_value == "":
                 if permissions_indent is not None and not close_permissions_block():
@@ -526,6 +534,7 @@ class Audit:
         self.errors: list[str] = []
         self.warnings: list[str] = []
         self._workflow_runs: dict[tuple[str, int], dict] = {}
+        self._workflow_definitions: dict[tuple[str, int], dict | None] = {}
 
     def api(self, path: str, *, allow_404: bool = False):
         req = urllib.request.Request(
@@ -571,6 +580,16 @@ class Audit:
             self._workflow_runs[key] = payload
         return self._workflow_runs[key]
 
+    def _workflow_definition(self, repo: str, workflow_run: dict) -> dict | None:
+        workflow_id = workflow_run.get("workflow_id")
+        if not isinstance(workflow_id, int) or workflow_id <= 0:
+            return None
+        key = (repo, workflow_id)
+        if key not in self._workflow_definitions:
+            payload = self.api(f"/repos/{repo}/actions/workflows/{workflow_id}", allow_404=True)
+            self._workflow_definitions[key] = payload if isinstance(payload, dict) else None
+        return self._workflow_definitions[key]
+
     def _protected_flow_sources(
         self,
         repo: str,
@@ -584,6 +603,9 @@ class Audit:
         for check_run in payload.get("check_runs", []):
             workflow = self._workflow_run(repo, check_run)
             if not workflow:
+                continue
+            definition = self._workflow_definition(repo, workflow)
+            if not definition or definition.get("state") != "active":
                 continue
             if workflow.get("event") != event or workflow.get("head_sha") not in allowed_head_shas:
                 continue

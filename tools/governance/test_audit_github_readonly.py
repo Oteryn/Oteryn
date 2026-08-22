@@ -24,6 +24,8 @@ class FakeAudit(m.Audit):
         self.calls.append(path)
         if path in self.responses:
             return self.responses[path]
+        if path.startswith("/repos/Oteryn/Test/actions/workflows/"):
+            return {"state": "active"}
         if allow_404:
             return None
         raise AssertionError(f"unexpected API call: {path}")
@@ -39,8 +41,8 @@ def check_run(name: str, run_id: int, *, app_id: int = ACTIONS_APP_ID, pr_number
     }
 
 
-def workflow(event: str, head_sha: str) -> dict:
-    return {"event": event, "head_sha": head_sha}
+def workflow(event: str, head_sha: str, workflow_id: int = 1) -> dict:
+    return {"event": event, "head_sha": head_sha, "workflow_id": workflow_id}
 
 
 def test_ruleset_scope_only_accepts_main_applicable_rulesets() -> None:
@@ -483,6 +485,8 @@ jobs:
     assert not m.core.workflow_text_secure(flow_write_wide)
     bounded_write = secure.replace("contents: read", "contents: write")
     assert m.core.workflow_text_secure(bounded_write)
+    anchored_write_wide = block_write_wide.replace("permissions:", "permissions: &wide", 1)
+    assert not m.core.workflow_text_secure(anchored_write_wide)
     quoted_write_all = secure.replace("permissions:\n  contents: read", '"permissions": write-all')
     assert not m.core.workflow_text_secure(quoted_write_all)
     assert not m.core.workflow_text_secure(
@@ -493,6 +497,32 @@ jobs:
     )
     assert not m.core.workflow_text_secure(secure.replace("permissions:\n  contents: read", "permissions: write-all"))
     assert not m.core.workflow_text_secure(secure.replace("permissions:\n  contents: read\n", ""))
+
+
+def test_disabled_required_gate_workflow_does_not_prove_emission() -> None:
+    main = "a" * 40
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
+        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {"check_runs": [check_run("gate", 301)]},
+        "/repos/Oteryn/Test/actions/runs/301": workflow("push", main, workflow_id=9),
+        "/repos/Oteryn/Test/actions/workflows/9": {"state": "disabled_manually"},
+        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [],
+    })
+    assert audit.representative_check_sources("Oteryn/Test", {"gate"}, ACTIONS_APP_ID) == {}
+
+
+def test_dependabot_duplicate_top_level_keys_fail_closed() -> None:
+    duplicate_updates = """version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+updates: []
+"""
+    duplicate_version = duplicate_updates.replace("updates: []", "version: 2")
+    assert not m.core.dependabot_github_actions_entry_valid(duplicate_updates)
+    assert not m.core.dependabot_github_actions_entry_valid(duplicate_version)
 
 
 def test_retained_release_requires_all_pinned_asset_identities() -> None:
