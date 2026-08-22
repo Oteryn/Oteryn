@@ -101,8 +101,14 @@ def _strip_yaml_comment(raw: str) -> str:
 
 def _yaml_scalar(value: str) -> str:
     value = value.strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        return value[1:-1]
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        try:
+            decoded = json.loads(value)
+        except json.JSONDecodeError:
+            return value[1:-1]
+        return decoded if isinstance(decoded, str) else value[1:-1]
+    if len(value) >= 2 and value[0] == value[-1] == "'":
+        return value[1:-1].replace("''", "'")
     return value
 
 
@@ -113,7 +119,73 @@ def _yaml_mapping_field(body: str) -> tuple[bool, str, str] | None:
     )
     if not match:
         return None
-    return bool(match.group("dash")), _yaml_scalar(match.group("key")), match.group("value").strip()
+    key_token = match.group("key")
+    if key_token.startswith('"') and "\\" in key_token:
+        try:
+            key = json.loads(key_token)
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(key, str):
+            return None
+    else:
+        key = _yaml_scalar(key_token)
+    return bool(match.group("dash")), key, match.group("value").strip()
+
+
+WRITE_CAPABLE_TOKEN_SCOPES = {
+    "actions", "attestations", "checks", "contents", "deployments", "discussions",
+    "id-token", "issues", "packages", "pages", "pull-requests", "security-events", "statuses",
+}
+
+
+def _simple_flow_mapping(value: str) -> dict[str, str] | None:
+    value = value.strip()
+    if not (value.startswith("{") and value.endswith("}")):
+        return None
+    inner = value[1:-1].strip()
+    if not inner:
+        return {}
+    parts: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    escaped = False
+    for char in inner:
+        if escaped:
+            current.append(char)
+            escaped = False
+            continue
+        if char == "\\" and quote == '"':
+            current.append(char)
+            escaped = True
+            continue
+        if char in {"'", '"'}:
+            if quote is None:
+                quote = char
+            elif quote == char:
+                quote = None
+            current.append(char)
+            continue
+        if char == "," and quote is None:
+            parts.append("".join(current).strip())
+            current = []
+            continue
+        if char in "{}[]" and quote is None:
+            return None
+        current.append(char)
+    if quote is not None:
+        return None
+    parts.append("".join(current).strip())
+    result: dict[str, str] = {}
+    for part in parts:
+        field = _yaml_mapping_field(part)
+        if field is None or field[0] or not field[1] or field[1] in result:
+            return None
+        result[field[1]] = _yaml_scalar(field[2])
+    return result
+
+
+def _permissions_write_wide(values: dict[str, str]) -> bool:
+    return WRITE_CAPABLE_TOKEN_SCOPES <= {key for key, value in values.items() if value == "write"}
 
 
 def dependabot_github_actions_entry_valid(text: str) -> bool:
@@ -239,31 +311,61 @@ def codeowners_text_covers_paths(text: str, required_paths: list[str]) -> bool:
 
 def workflow_text_secure(text: str) -> bool:
     has_top_permissions = False
+    permissions_indent: int | None = None
+    permissions_values: dict[str, str] = {}
+
+    def close_permissions_block() -> bool:
+        nonlocal permissions_indent, permissions_values
+        if permissions_indent is None:
+            return True
+        safe = not _permissions_write_wide(permissions_values)
+        permissions_indent = None
+        permissions_values = {}
+        return safe
+
     for raw in text.splitlines():
         line = _strip_yaml_comment(raw)
         if not line.strip():
             continue
         indent = len(line) - len(line.lstrip(" "))
         body = line.strip()
+        if permissions_indent is not None and indent <= permissions_indent:
+            if not close_permissions_block():
+                return False
         field = _yaml_mapping_field(body)
         if field is None:
             compact = body.lstrip("- ").strip()
+            if re.match(r'''^"[^"\n]*\\[^"\n]*"\s*:''', compact):
+                return False
             if compact.startswith("{") and compact.endswith("}") and re.search(
-                r"""(?:^|,)\s*(?:uses|permissions|"uses"|"permissions"|'uses'|'permissions')\s*:""",
+                r'''(?:^|,)\s*(?:uses|permissions|"uses"|"permissions"|'uses'|'permissions')\s*:''',
                 compact[1:-1],
             ):
                 return False
             continue
         is_sequence, key, raw_value = field
         if ("{" in raw_value or "[" in raw_value) and re.search(
-            r"""(?:^|[,\[{])\s*(?:uses|permissions|"uses"|"permissions"|'uses'|'permissions')\s*:""",
+            r'''(?:^|[,\[{])\s*(?:uses|permissions|"uses"|"permissions"|'uses'|'permissions')\s*:''',
             raw_value,
         ):
             return False
-        if indent == 0 and not is_sequence and key == "permissions":
-            has_top_permissions = True
-        if key == "permissions" and _yaml_scalar(raw_value) == "write-all":
-            return False
+        if permissions_indent is not None and not is_sequence and indent == permissions_indent + 2:
+            permissions_values[key] = _yaml_scalar(raw_value)
+        if key == "permissions":
+            if indent == 0 and not is_sequence:
+                has_top_permissions = True
+            scalar = _yaml_scalar(raw_value)
+            if scalar == "write-all":
+                return False
+            if raw_value == "":
+                if permissions_indent is not None and not close_permissions_block():
+                    return False
+                permissions_indent = indent
+                permissions_values = {}
+            elif raw_value.lstrip().startswith("{"):
+                mapping = _simple_flow_mapping(raw_value)
+                if mapping is None or _permissions_write_wide(mapping):
+                    return False
         if key == "uses":
             value = _yaml_scalar(raw_value)
             if value.startswith("./"):
@@ -277,6 +379,8 @@ def workflow_text_secure(text: str) -> bool:
             ref = value.rsplit("@", 1)[1]
             if not re.fullmatch(r"[0-9a-fA-F]{40}", ref):
                 return False
+    if not close_permissions_block():
+        return False
     return has_top_permissions
 
 
@@ -315,7 +419,7 @@ def load_desired() -> dict:
             if item.get(field) is not True:
                 raise SystemExit(f"repository must require {field}=true: {item}")
         protection = item.get("protection")
-        required_protection = {"force_pushes": False, "deletions": False, "broad_bypass": False}
+        required_protection = {"pull_requests": True, "force_pushes": False, "deletions": False, "broad_bypass": False}
         if protection != required_protection:
             raise SystemExit(f"repository has incomplete or weakened protection contract: {item}")
         security = item.get("security")
@@ -546,6 +650,7 @@ class Audit:
                 if isinstance(rule, dict)
             }
             return {
+                "pull_requests": "pull_request" in rule_types,
                 "force_pushes": "non_fast_forward" not in rule_types,
                 "deletions": "deletion" not in rule_types,
                 "broad_bypass": any(bool(detail.get("bypass_actors")) for detail in applicable),
@@ -555,12 +660,13 @@ class Audit:
             allow_404=True,
         )
         if not protection:
-            return {"force_pushes": True, "deletions": True, "broad_bypass": True}
+            return {"pull_requests": False, "force_pushes": True, "deletions": True, "broad_bypass": True}
         bypass_allowances = (
             (protection.get("required_pull_request_reviews") or {}).get("bypass_pull_request_allowances") or {}
         )
         has_pr_bypass = any(bool(bypass_allowances.get(kind)) for kind in ("users", "teams", "apps"))
         return {
+            "pull_requests": protection.get("required_pull_request_reviews") is not None,
             "force_pushes": bool((protection.get("allow_force_pushes") or {}).get("enabled")),
             "deletions": bool((protection.get("allow_deletions") or {}).get("enabled")),
             "broad_bypass": (

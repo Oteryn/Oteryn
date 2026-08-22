@@ -227,6 +227,8 @@ def test_desired_state_requires_strict_protection_contract() -> None:
         path = Path(tmp) / "desired.json"
         for mutate in (
             lambda item: item["protection"].pop("broad_bypass"),
+            lambda item: item["protection"].pop("pull_requests"),
+            lambda item: item["protection"].__setitem__("pull_requests", False),
             lambda item: item["protection"].__setitem__("force_pushes", True),
         ):
             broken = json.loads(json.dumps(data))

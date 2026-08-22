@@ -268,17 +268,25 @@ def test_ruleset_protection_controls_require_no_bypass_force_or_delete() -> None
     detail = {
         "target": "branch", "enforcement": "active", "bypass_actors": [],
         "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
-        "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}],
+        "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}, {"type": "pull_request"}],
     }
     audit = FakeAudit({
         "/repos/Oteryn/Test/rulesets": [{"id": 1, "enforcement": "active"}],
         "/repos/Oteryn/Test/rulesets/1": detail,
     })
     assert audit.main_protection_controls("Oteryn/Test") == {
-        "force_pushes": False, "deletions": False, "broad_bypass": False,
+        "pull_requests": True, "force_pushes": False, "deletions": False, "broad_bypass": False,
     }
     detail["bypass_actors"] = [{"actor_id": 1}]
     assert audit.main_protection_controls("Oteryn/Test")["broad_bypass"] is True
+    no_pr_detail = dict(detail)
+    no_pr_detail["bypass_actors"] = []
+    no_pr_detail["rules"] = [{"type": "deletion"}, {"type": "non_fast_forward"}]
+    no_pr = FakeAudit({
+        "/repos/Oteryn/Test/rulesets": [{"id": 1, "enforcement": "active"}],
+        "/repos/Oteryn/Test/rulesets/1": no_pr_detail,
+    })
+    assert no_pr.main_protection_controls("Oteryn/Test")["pull_requests"] is False
 
 
 def test_classic_protection_controls_detect_admin_bypass() -> None:
@@ -288,10 +296,11 @@ def test_classic_protection_controls_detect_admin_bypass() -> None:
             "allow_force_pushes": {"enabled": False},
             "allow_deletions": {"enabled": False},
             "enforce_admins": {"enabled": True},
+            "required_pull_request_reviews": {},
         },
     })
     assert clean.main_protection_controls("Oteryn/Test") == {
-        "force_pushes": False, "deletions": False, "broad_bypass": False,
+        "pull_requests": True, "force_pushes": False, "deletions": False, "broad_bypass": False,
     }
     bypass = FakeAudit({
         "/repos/Oteryn/Test/rulesets": [],
@@ -299,6 +308,7 @@ def test_classic_protection_controls_detect_admin_bypass() -> None:
             "allow_force_pushes": {"enabled": False},
             "allow_deletions": {"enabled": False},
             "enforce_admins": {"enabled": False},
+            "required_pull_request_reviews": {},
         },
     })
     assert bypass.main_protection_controls("Oteryn/Test")["broad_bypass"] is True
@@ -314,6 +324,15 @@ def test_classic_protection_controls_detect_admin_bypass() -> None:
         },
     })
     assert allowance.main_protection_controls("Oteryn/Test")["broad_bypass"] is True
+    no_pr = FakeAudit({
+        "/repos/Oteryn/Test/rulesets": [],
+        "/repos/Oteryn/Test/branches/main/protection": {
+            "allow_force_pushes": {"enabled": False},
+            "allow_deletions": {"enabled": False},
+            "enforce_admins": {"enabled": True},
+        },
+    })
+    assert no_pr.main_protection_controls("Oteryn/Test")["pull_requests"] is False
 
 
 def test_private_vulnerability_reporting_status() -> None:
@@ -436,6 +455,11 @@ jobs:
         '- "uses": actions/checkout@v4',
     )
     assert not m.core.workflow_text_secure(quoted_mutable)
+    escaped_mutable = secure.replace(
+        "- uses: actions/checkout@0123456789abcdef0123456789abcdef01234567",
+        '- "u\\u0073es": actions/checkout@v4',
+    )
+    assert not m.core.workflow_text_secure(escaped_mutable)
     flow_mutable = secure.replace(
         "- uses: actions/checkout@0123456789abcdef0123456789abcdef01234567",
         "- {uses: actions/checkout@v4}",
@@ -446,6 +470,19 @@ jobs:
         "runs-on: ubuntu-latest\n    policy: {permissions: write-all}",
     )
     assert not m.core.workflow_text_secure(flow_write_all)
+    write_scopes = sorted(m.core.WRITE_CAPABLE_TOKEN_SCOPES)
+    block_write_wide = secure.replace(
+        "  contents: read",
+        "\n".join(f"  {scope}: write" for scope in write_scopes),
+    )
+    assert not m.core.workflow_text_secure(block_write_wide)
+    flow_write_wide = secure.replace(
+        "permissions:\n  contents: read",
+        "permissions: {" + ", ".join(f"{scope}: write" for scope in write_scopes) + "}",
+    )
+    assert not m.core.workflow_text_secure(flow_write_wide)
+    bounded_write = secure.replace("contents: read", "contents: write")
+    assert m.core.workflow_text_secure(bounded_write)
     quoted_write_all = secure.replace("permissions:\n  contents: read", '"permissions": write-all')
     assert not m.core.workflow_text_secure(quoted_write_all)
     assert not m.core.workflow_text_secure(

@@ -24,6 +24,7 @@
         "workflow_supply_chain": true
       },
       "protection": {
+        "pull_requests": true,
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false
@@ -56,6 +57,7 @@
         "workflow_supply_chain": true
       },
       "protection": {
+        "pull_requests": true,
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false
@@ -89,6 +91,7 @@
         "workflow_supply_chain": true
       },
       "protection": {
+        "pull_requests": true,
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false
@@ -121,6 +124,7 @@
         "workflow_supply_chain": true
       },
       "protection": {
+        "pull_requests": true,
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false
