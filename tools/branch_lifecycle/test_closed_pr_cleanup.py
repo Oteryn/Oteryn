@@ -10,13 +10,14 @@ from closed_pr_cleanup import CleanupError, parse_disposition, process_event, ru
 SHA = "a" * 40
 
 
-def event(body="", branch="feat/demo", sha=SHA, merged=False, head_repo="Oteryn/Demo"):
+def event(body="", branch="feat/demo", sha=SHA, merged=False, head_repo="Oteryn/Demo", closed_at="2026-08-22T00:01:00Z"):
     return {
         "repository": {"full_name": "Oteryn/Demo"},
         "sender": {"login": "maintainer"},
         "pull_request": {
             "number": 7, "state": "closed", "merged": merged,
             "merged_at": "2026-08-22T00:00:00Z" if merged else None,
+            "closed_at": closed_at,
             "body": body,
             "head": {"ref": branch, "sha": sha, "repo": {"full_name": head_repo}},
         },
@@ -135,6 +136,15 @@ class CleanupTests(unittest.TestCase):
         git = Git()
         with self.assertRaisesRegex(CleanupError, "requires repository write authority"):
             process_event(evt, "Oteryn/Demo", GH(evt, permission="read"), git)
+        self.assertEqual(git.deletes, [])
+
+    def test_delete_is_bound_to_triggering_closure_identity(self):
+        evt = self.delete_event()
+        reclosed = self.delete_event()
+        reclosed["pull_request"]["closed_at"] = "2026-08-22T00:02:00Z"
+        git = Git()
+        with self.assertRaisesRegex(CleanupError, "closure identity drift"):
+            process_event(evt, "Oteryn/Demo", GH(reclosed), git)
         self.assertEqual(git.deletes, [])
 
     def test_live_disposition_revalidation_can_revoke_delete(self):

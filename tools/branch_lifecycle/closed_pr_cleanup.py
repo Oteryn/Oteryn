@@ -88,6 +88,9 @@ def process_event(event: dict[str, Any], repository: str, github: Any, git: Any)
         return result("RETAIN", branch=branch, number=number, sha=sha, reason=reason)
     if pull.get("state") != "closed" or pull.get("merged") is True or pull.get("merged_at") is not None or repo_name(head.get("repo")) != repository:
         return result("NOT_APPLICABLE", branch=branch, number=number, sha=sha, reason=reason)
+    closed_at = pull.get("closed_at")
+    if not isinstance(closed_at, str) or not closed_at.strip():
+        raise CleanupError("delete disposition requires a valid triggering close-event closed_at identity")
     sender = event.get("sender") if isinstance(event.get("sender"), dict) else {}
     sender_login = sender.get("login")
     if not isinstance(sender_login, str) or not sender_login.strip():
@@ -109,6 +112,8 @@ def process_event(event: dict[str, Any], repository: str, github: Any, git: Any)
     live_pull = github.get_pull(number)
     if not live_pull_matches(live_pull, repository, number, branch, sha):
         raise CleanupError("live pull request identity drift")
+    if live_pull.get("closed_at") != closed_at:
+        raise CleanupError("live pull request closure identity drift")
     live_disposition, live_reason = parse_disposition(
         live_pull.get("body") if isinstance(live_pull.get("body"), str) else ""
     )
@@ -141,6 +146,8 @@ def process_event(event: dict[str, Any], repository: str, github: Any, git: Any)
     boundary_pull = github.get_pull(number)
     if not live_pull_matches(boundary_pull, repository, number, branch, sha):
         raise CleanupError("live pull request identity drift at deletion boundary")
+    if boundary_pull.get("closed_at") != closed_at:
+        raise CleanupError("live pull request closure identity drift at deletion boundary")
     boundary_disposition, boundary_reason = parse_disposition(
         boundary_pull.get("body") if isinstance(boundary_pull.get("body"), str) else ""
     )

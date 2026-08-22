@@ -28,7 +28,7 @@ and exactly one non-empty `Branch-Disposition-Reason: ...` line.
 
 1. the event and live repository identities match the caller repository;
 2. the authenticated close-event sender has live `write`, `maintain`, or `admin` repository permission, revalidated again at the deletion boundary;
-3. the pull request remains closed, unmerged, same-repository, on the same source branch and exact head SHA;
+3. the pull request remains closed, unmerged, same-repository, on the same source branch and exact head SHA, and its live `closed_at` matches the triggering close event so a reopen/reclose cannot inherit stale destructive authority;
 4. the source ref still resolves to that exact SHA;
 5. the source branch is neither the default branch nor protected, with protection revalidated again at the deletion boundary;
 6. no open pull request owns the same ref;
