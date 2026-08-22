@@ -6,8 +6,8 @@ These prompts split the remaining `OTERYN-ORG-AUDIT-v3.10` closeout into indepen
 
 | Alias | Primary repository | Primary lifecycle | Ownership |
 | --- | --- | --- | --- |
-| `OTERYN-ORG-RUNNERS-PLATFORM-ACL-LEGACY-CLOSEOUT` | `Oteryn/Oteryn` + `Oteryn/Oteryn-Platform` | META #34 / Platform #1215 | Platform trusted-main proof, runner-group ACL readback, dependency-aware legacy retirement |
-| `OTERYN-GAME-RUNNER-ACCEPTANCE-CLOSEOUT` | `Oteryn/Oteryn-Game` | Game #34 / PR #36 | policy-permitted independent review, merge and trusted-main Game runner acceptance |
+| `OTERYN-ORG-RUNNERS-PLATFORM-ACL-LEGACY-CLOSEOUT` | `Oteryn/Oteryn` + `Oteryn/Oteryn-Platform` | META #34 / Platform #1215 | **ONE_SHOT**; archive as historical evidence when its terminal contract closes — Platform trusted-main proof, runner-group ACL readback, dependency-aware legacy retirement |
+| `OTERYN-GAME-RUNNER-ACCEPTANCE-CLOSEOUT` | `Oteryn/Oteryn-Game` | Game #34 / PR #36 | **ONE_SHOT**; archive as historical evidence when its terminal contract closes — policy-permitted independent review, merge and trusted-main Game runner acceptance |
 
 ## Parallelism rules
 
