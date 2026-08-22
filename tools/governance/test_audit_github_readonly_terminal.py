@@ -175,6 +175,27 @@ def test_desired_state_requires_complete_merge_and_security_contract() -> None:
         finally:
             m.core.DESIRED_PATH = original_path
 
+def test_desired_state_requires_complete_administrative_contract() -> None:
+    data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    original_path = m.core.DESIRED_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "desired.json"
+        for field in ("classification", "terminal_state", "archived", "retention_authority"):
+            broken = json.loads(json.dumps(data))
+            del broken["administrative_repositories"][0][field]
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            m.core.DESIRED_PATH = path
+            try:
+                try:
+                    m.core.load_desired()
+                except SystemExit as exc:
+                    assert "administrative repository" in str(exc)
+                else:
+                    raise AssertionError(f"missing {field} must fail closed")
+            finally:
+                m.core.DESIRED_PATH = original_path
+
+
 def test_desired_state_requires_complete_coordinate_policy() -> None:
     data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
     original_path = m.core.DESIRED_PATH

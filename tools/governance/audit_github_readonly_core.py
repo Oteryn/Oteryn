@@ -111,10 +111,21 @@ def load_desired() -> dict:
     admins = data.get("administrative_repositories")
     if not isinstance(admins, list):
         raise SystemExit("administrative_repositories must be an array")
+    required_admin_fields = {
+        "repository", "repository_id", "classification", "terminal_state",
+        "archived", "retention_authority",
+    }
     for item in admins:
-        if not isinstance(item.get("repository_id"), int) or not item.get("repository"):
-            raise SystemExit(f"invalid administrative repository entry: {item}")
-        if item.get("terminal_state") == "ARCHIVED_READ_ONLY" and item.get("archived") is not True:
+        if not isinstance(item, dict) or set(item) != required_admin_fields:
+            raise SystemExit(f"administrative repository has incomplete contract: {item}")
+        if not isinstance(item["repository_id"], int) or item["repository_id"] <= 0:
+            raise SystemExit(f"invalid administrative repository_id: {item}")
+        for field in ("repository", "classification", "terminal_state", "retention_authority"):
+            if not isinstance(item[field], str) or not item[field].strip():
+                raise SystemExit(f"administrative repository lacks {field}: {item}")
+        if not isinstance(item["archived"], bool):
+            raise SystemExit(f"administrative repository archived must be boolean: {item}")
+        if item["terminal_state"] == "ARCHIVED_READ_ONLY" and item["archived"] is not True:
             raise SystemExit(f"archived terminal state must require archived=true: {item}")
     return data
 
