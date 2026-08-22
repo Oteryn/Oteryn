@@ -52,7 +52,7 @@
       "classification": "TEMPORARY_MIGRATION",
       "purpose": "Preserve the previous target-coordinate bootstrap state during the Platform owner-transfer transaction.",
       "lifecycle_state": "ARCHIVED_READ_ONLY",
-      "terminal_gate": "PARTIAL: durable transfer-cut Release and restore evidence are retained and the repository is archived read-only, but current backup recurrence and full organization recovery/control-plane authority remain unproven in the recovery contract.",
+      "terminal_gate": "DONE: durable transfer-cut Release and restore evidence are retained, live repository ID 1338405017 is archived read-only, and the recovery contract records the final terminal disposition. Broader current-backup recurrence and organization recovery/control-plane gaps are tracked separately and do not reopen this administrative-repository terminal gate.",
       "normative_product_authority": false
     }
   ],
