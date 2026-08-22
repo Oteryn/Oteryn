@@ -1,0 +1,23 @@
+{
+  "artifact": "OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
+  "artifact_kind": "v3.10 terminal audit report; this record is independent from the addendum validation",
+  "validator": "tools/governance/validate_v310_audit_docs.py",
+  "sha256": "35702cd1775f19517f825aa72ad6243e6d430a5f63a36cd107cc04e499ed5db4",
+  "bytes": 40362,
+  "checks": {
+    "report_title": true,
+    "matrix_l": true,
+    "matrix_l_all_required_classes_disposed": true,
+    "all_four_permanent_repositories_disposed": true,
+    "h1_to_h14": true,
+    "g1_to_g11": true,
+    "gate_state_vocabulary_pass_fail_unknown": true,
+    "unknowns_have_gap_ids": true,
+    "report_structure_complete": true,
+    "terminal_verdict_fail_closed": true,
+    "fences_balanced": true,
+    "ends_in_terminal_verdict": true
+  },
+  "result": "PASS",
+  "limitation": "This byte-bound record validates report structure and exact bytes only. It does not upgrade the report's explicitly listed live UNKNOWN or NOT DONE programme requirements."
+}
