@@ -27,7 +27,8 @@
         "pull_requests": true,
         "force_pushes": false,
         "deletions": false,
-        "broad_bypass": false
+        "broad_bypass": false,
+        "strict_required_status_checks": true
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",
@@ -60,7 +61,8 @@
         "pull_requests": true,
         "force_pushes": false,
         "deletions": false,
-        "broad_bypass": false
+        "broad_bypass": false,
+        "strict_required_status_checks": true
       },
       "codeowners_required_paths": [
         ".github/workflows/merge-gate.yml",
@@ -94,7 +96,8 @@
         "pull_requests": true,
         "force_pushes": false,
         "deletions": false,
-        "broad_bypass": false
+        "broad_bypass": false,
+        "strict_required_status_checks": true
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",
@@ -127,7 +130,8 @@
         "pull_requests": true,
         "force_pushes": false,
         "deletions": false,
-        "broad_bypass": false
+        "broad_bypass": false,
+        "strict_required_status_checks": true
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",
