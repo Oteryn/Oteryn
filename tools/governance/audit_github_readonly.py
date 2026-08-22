@@ -27,6 +27,7 @@ HISTORICAL_PREFIXES = (
     "docs/recovery/",
 )
 HISTORICAL_FILES = {"ecosystem/repositories.json"}
+POLICY_DECLARATION_FILES = {"ecosystem/governance-desired-state.json"}
 
 
 def expected_checks(item: dict) -> set[str]:
@@ -330,6 +331,8 @@ class Audit:
                 result = self.api(f"/search/code?q={q}&per_page=100") or {}
                 for item in result.get("items", []):
                     path = item.get("path", "")
+                    if path in POLICY_DECLARATION_FILES:
+                        continue
                     historical = path in HISTORICAL_FILES or path.startswith(HISTORICAL_PREFIXES)
                     if needle in policy.get("forbidden", []) and not historical:
                         self.errors.append(f"{repo}: stale mutable coordinate {needle} in {path}")
