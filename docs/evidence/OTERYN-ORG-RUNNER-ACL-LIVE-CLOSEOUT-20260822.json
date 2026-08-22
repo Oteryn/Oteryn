@@ -1,0 +1,156 @@
+{
+  "schema_version": 1,
+  "captured_at_utc": "2026-08-22T16:48:42.564Z",
+  "source": "GitHub REST API via authenticated gh CLI",
+  "authenticated_as": "blakinio",
+  "credential_value_recorded": false,
+  "required_scope_observed": "admin:org",
+  "api_endpoints": [
+    "/orgs/Oteryn/actions/runner-groups",
+    "/orgs/Oteryn/actions/runner-groups/{id}/repositories",
+    "/orgs/Oteryn/actions/runner-groups/{id}/runners",
+    "/orgs/Oteryn/actions/runners"
+  ],
+  "selected_groups": [
+    {
+      "id": 3,
+      "name": "platform-runners",
+      "visibility": "selected",
+      "allows_public_repositories": true,
+      "selected_repositories_total": 1,
+      "selected_repositories": [
+        {
+          "id": 1305155726,
+          "full_name": "Oteryn/Oteryn-Platform",
+          "private": false
+        }
+      ],
+      "runners_total": 1,
+      "runners": [
+        {
+          "id": 44,
+          "name": "oteryn-synology-platform",
+          "os": "unknown",
+          "status": "online",
+          "busy": false,
+          "version": "2.336.0",
+          "labels": [
+            {
+              "name": "oteryn-platform",
+              "type": "custom"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "atlas-runners",
+      "visibility": "selected",
+      "allows_public_repositories": true,
+      "selected_repositories_total": 1,
+      "selected_repositories": [
+        {
+          "id": 1337995824,
+          "full_name": "Oteryn/Oteryn-Atlas",
+          "private": false
+        }
+      ],
+      "runners_total": 1,
+      "runners": [
+        {
+          "id": 45,
+          "name": "oteryn-synology-atlas",
+          "os": "unknown",
+          "status": "online",
+          "busy": false,
+          "version": "2.336.0",
+          "labels": [
+            {
+              "name": "oteryn-atlas",
+              "type": "custom"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "game-runners",
+      "visibility": "selected",
+      "allows_public_repositories": true,
+      "selected_repositories_total": 1,
+      "selected_repositories": [
+        {
+          "id": 1338291140,
+          "full_name": "Oteryn/Oteryn-Game",
+          "private": false
+        }
+      ],
+      "runners_total": 1,
+      "runners": [
+        {
+          "id": 46,
+          "name": "oteryn-synology-game",
+          "os": "unknown",
+          "status": "online",
+          "busy": false,
+          "version": "2.336.0",
+          "labels": [
+            {
+              "name": "oteryn-game",
+              "type": "custom"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "default_group": {
+    "id": 1,
+    "name": "Default",
+    "runners_total": 0
+  },
+  "organization_runners_total": 3,
+  "organization_runners": [
+    {
+      "id": 44,
+      "name": "oteryn-synology-platform",
+      "status": "online",
+      "busy": false,
+      "version": "2.336.0",
+      "labels": [
+        "oteryn-platform"
+      ]
+    },
+    {
+      "id": 45,
+      "name": "oteryn-synology-atlas",
+      "status": "online",
+      "busy": false,
+      "version": "2.336.0",
+      "labels": [
+        "oteryn-atlas"
+      ]
+    },
+    {
+      "id": 46,
+      "name": "oteryn-synology-game",
+      "status": "online",
+      "busy": false,
+      "version": "2.336.0",
+      "labels": [
+        "oteryn-game"
+      ]
+    }
+  ],
+  "verdict": "PASS",
+  "capture_commands": [
+    "gh api /orgs/Oteryn/actions/runner-groups",
+    "gh api /orgs/Oteryn/actions/runner-groups/{id}/repositories",
+    "gh api /orgs/Oteryn/actions/runner-groups/{id}/runners",
+    "gh api /orgs/Oteryn/actions/runners",
+    "gh api /user --jq .login"
+  ],
+  "sanitization": "Retained ACL-relevant organization/repository/runner metadata only; no token, registration credential, runner credential, secret, environment value, or private runtime data retained."
+}

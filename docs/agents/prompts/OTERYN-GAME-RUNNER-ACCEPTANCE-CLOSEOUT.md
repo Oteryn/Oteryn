@@ -1,5 +1,9 @@
 # Alias: OTERYN-GAME-RUNNER-ACCEPTANCE-CLOSEOUT
 
+**Status:** `HISTORICAL / COMPLETED - DO NOT EXECUTE`
+
+**Superseded:** 2026-08-22. Game #34 is closed; trusted-main acceptance `32566399984` / `97015531724` passed. This prompt is retained only as execution provenance; live repository/provider state and the final v3.10 report are authoritative.
+
 MODE: Autonomous Game runner acceptance closeout with independent-review separation.
 
 Repository: `https://github.com/Oteryn/Oteryn-Game`

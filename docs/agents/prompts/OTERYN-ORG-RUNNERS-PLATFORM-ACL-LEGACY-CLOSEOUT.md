@@ -1,5 +1,9 @@
 # Alias: OTERYN-ORG-RUNNERS-PLATFORM-ACL-LEGACY-CLOSEOUT
 
+**Status:** `HISTORICAL / COMPLETED - DO NOT EXECUTE`
+
+**Superseded:** 2026-08-22. Runner ACL/routing/legacy retirement gates are terminal PASS; META #34 and #32 are closed. This prompt is retained only as execution provenance; live repository/provider state and the final v3.10 report are authoritative.
+
 MODE: Autonomous multi-surface runner terminal proof + cleanup closeout.
 
 Primary repositories:

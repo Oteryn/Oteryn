@@ -4,6 +4,10 @@
 
 **Evidence policy:** direct GitHub organization API readback outranks stale repository snapshots. No registration token, runner credential or secret value is recorded here.
 
+Machine-readable provenance is retained beside this document in `OTERYN-ORG-RUNNER-ACL-LIVE-CLOSEOUT-20260822.json` with detached digest `OTERYN-ORG-RUNNER-ACL-LIVE-CLOSEOUT-20260822.json.sha256`. The sanitized capture was generated at `2026-08-22T16:48:42.564Z` by authenticated GitHub CLI account `blakinio`; credential values were not recorded. Capture SHA-256: `4d4c9c41d9b1e200e403f2607ea1a630453d25384fa42c1fa12050c15ad5c1d3`.
+
+Recorded successful API surfaces: `GET /orgs/Oteryn/actions/runner-groups`, each selected group's `/repositories` and `/runners`, the default group's `/runners`, and `GET /orgs/Oteryn/actions/runners`. The JSON preserves the ACL-relevant response fields, repository IDs/full names, runner IDs/names/status/version/custom labels, counts, capture identity and timestamp.
+
 ## Direct organization API readback
 
 An authenticated organization-admin GitHub CLI session successfully read `/orgs/Oteryn/actions/runner-groups`, each selected group's `/repositories` and `/runners`, the `Default` group's runners, and `/orgs/Oteryn/actions/runners`.

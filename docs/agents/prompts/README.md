@@ -1,8 +1,10 @@
 # Oteryn v3.10 parallel closeout agent prompts
 
-These prompts split the remaining `OTERYN-ORG-AUDIT-v3.10` closeout into independent workstreams. Every executor must refresh live state before mutation; the checkpoint values in the prompt are starting evidence, not authority.
+**Status:** `HISTORICAL / COMPLETED - DO NOT EXECUTE`
 
-## Execution aliases
+These files preserve the executor instructions used during the 2026-08-22 closeout. All three workstreams are terminal; their checkpoint commands and mutable-state instructions are superseded by live GitHub/provider state, `docs/evidence/OTERYN-ORG-RUNNER-ACL-LIVE-CLOSEOUT-20260822.md`, and the final v3.10 report.
+
+## Historical executor aliases
 
 | Alias | Primary repository | Primary lifecycle | Ownership |
 | --- | --- | --- | --- |

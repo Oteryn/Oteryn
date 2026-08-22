@@ -1,5 +1,9 @@
 # Alias: OTERYN-ORG-AUDIT-META-DESIRED-STATE-CLOSEOUT
 
+**Status:** `HISTORICAL / COMPLETED - DO NOT EXECUTE`
+
+**Superseded:** 2026-08-22. PR #37 merged as `c0dbad93f791953d5efcc6b556e6be73693f0a4f`. This prompt is retained only as execution provenance; live repository/provider state and the final v3.10 report are authoritative.
+
 MODE: Autonomous terminal closeout.
 
 Repository: `https://github.com/Oteryn/Oteryn`
