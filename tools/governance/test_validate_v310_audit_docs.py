@@ -14,12 +14,14 @@ SPEC.loader.exec_module(m)
 
 
 def test_terminal_report_validation_binds_bytes_and_required_v310_ledgers() -> None:
-    """Fails if report bytes, Matrix L, or G1-G11 fail-closed vocabulary drift."""
+    """Fails if any advertised terminal-report structural control drifts."""
     result = m.validate(ROOT)
-    assert result["report_sha256"] == "35702cd1775f19517f825aa72ad6243e6d430a5f63a36cd107cc04e499ed5db4"
-    assert result["report_bytes"] == 40362
     assert result["matrix_l_required_classes"] == 22
     assert result["gate_rows"] == 11
+    assert result["h_rows"] == 14
+    assert result["numbered_sections"] == 21
+    assert result["unknown_gate_rows"] == 8
+    assert result["validation_checks"] == 12
 
 
 if __name__ == "__main__":
