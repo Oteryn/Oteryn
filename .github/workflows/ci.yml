@@ -64,6 +64,8 @@ jobs:
               Path('tools/governance/audit_github_readonly_core.py'),
               Path('tools/governance/test_audit_github_readonly.py'),
               Path('tools/governance/test_audit_github_readonly_terminal.py'),
+              Path('tools/governance/validate_v310_terminal_report.py'),
+              Path('tools/governance/test_validate_v310_terminal_report.py'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
           if missing:
@@ -174,6 +176,8 @@ jobs:
           python3 tools/governance/audit_github_readonly.py --offline
           python3 tools/governance/test_audit_github_readonly.py
           python3 tools/governance/test_audit_github_readonly_terminal.py
+          python3 tools/governance/validate_v310_terminal_report.py
+          python3 tools/governance/test_validate_v310_terminal_report.py
 
       - name: Validate AI review risk policy
         shell: bash

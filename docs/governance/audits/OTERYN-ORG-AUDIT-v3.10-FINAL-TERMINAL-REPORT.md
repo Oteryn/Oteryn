@@ -74,6 +74,80 @@ No mutable canonical category is intentionally assigned to two repositories.
 
 Historical/archive paths may contain old coordinates and state as evidence. Mutable root/governance/active-task paths must not present historical coordinates as current authority.
 
+### Material documentation/agent inventory
+
+Each row assigns one primary class to a material current path/object family. `Normative = YES` means the row has exactly one canonical authority; non-normative evidence/cache rows cannot broaden authority.
+
+| Repository | Current path/object | Primary class | Normative | Canonical authority | Lifecycle / disposition | Context cost |
+| --- | --- | --- | --- | --- | --- | --- |
+| META | `/AGENTS.md` | root AGENTS | YES | META | durable routing policy | always loaded; bounded root context |
+| META | `docs/architecture/adr/**` | architecture/ADR | YES | META | durable/versioned | routed |
+| META | `docs/governance/**` | governance policy | YES | META | durable/protected | routed |
+| META | `docs/ci/**` | CI policy | YES | META | durable/protected | routed |
+| META | `docs/testing/**` | test strategy | YES | META | durable/protected | routed |
+| META | `docs/recovery/**` | recovery/break-glass | YES | META | durable; incident-driven | routed |
+| META | `ecosystem/**` | machine-readable policy companions | YES | META | current authority | machine-read |
+| META | `tools/governance/**` | documentation/agent validators | YES | META | versioned with policy | CI-loaded |
+| META | `docs/agents/prompts/OTERYN-*.md` | one-shot prompts | NO | META | historical/completed; do not execute | on-demand provenance |
+| META | `docs/evidence/**` | review evidence | NO | META | retained by evidence policy | on-demand |
+| Game | `/AGENTS.md` | root AGENTS | YES | Game | durable routing policy | always loaded; 3,267-byte live baseline |
+| Game | `apps/game-server/AGENTS.md`; `crates/simulation-determinism/AGENTS.md`; `docs/agents/AGENTS.md` | nested AGENTS/override | YES | Game | path-scoped; no override file | path-loaded |
+| Game | `docs/architecture/**` | architecture/ADR | YES | Game | provider canonical | routed |
+| Game | `docs/contracts/**`; `crates/platform-contracts/**` | contracts | YES | Game | provider canonical | routed |
+| Game | `.github/repository-policy.json`; `docs/agents/GOVERNANCE_CONTRACT.json` | governance policy | YES | Game | provider canonical | CI/machine-read |
+| Game | `.github/workflows/**` | CI policy | YES | Game | current provider workflows | CI-loaded |
+| Game | `docs/agents/BUILD_TEST_MATRIX.md`; `tests/**` | test strategy | YES | Game | provider canonical | routed/test-loaded |
+| Game | `docs/agents/prompts/**` | reusable prompts | NO | Game | retained; per-file metadata verification gap `GAP-PROMPT-GAME-001` | on-demand |
+| Game | `docs/agents/tasks/{active,archive}/**` | task packets | NO | Game | Issue authority; packet cache | on-demand |
+| Game | `docs/agents/programs/**` | programmes | NO | Game | Issue authority; programme cache | on-demand |
+| Game | `docs/agents/evidence/**` | review evidence | NO | Game | retained provider evidence | on-demand |
+| Platform | `/AGENTS.md` | root AGENTS | YES | Platform | durable routing policy | always loaded; 22,157-byte live baseline |
+| Platform | `docs/agents/AGENTS.md` | nested AGENTS/override | YES | Platform | path-scoped; no override file | path-loaded |
+| Platform | `docs/architecture/adr/**` | architecture/ADR | YES | Platform | provider canonical | routed |
+| Platform | `docs/contracts/**` | contracts | YES | Platform | provider canonical | routed |
+| Platform | `docs/agents/GOVERNANCE_CONTRACT.json`; `BRANCH_LIFECYCLE_POLICY.json` | governance policy | YES | Platform | provider canonical | machine-read |
+| Platform | `.github/workflows/**`; `docs/agents/CI_WORKFLOW_LIFECYCLE.*` | CI policy | YES | Platform | provider canonical | CI-loaded |
+| Platform | `docs/testing/**`; `docs/agents/BUILD_TEST_MATRIX.md` | test strategy | YES | Platform | provider canonical | routed/test-loaded |
+| Platform | `docs/agents/prompts/**` | reusable prompts | NO | Platform | retained; per-file lifecycle/metadata gap `GAP-PROMPT-PLATFORM-001` | on-demand |
+| Platform | `docs/agents/tasks/active/**` | task packets | NO | Platform | Issue authority; packet cache | on-demand |
+| Platform | `docs/agents/programs/**` | programmes | NO | Platform | Issue authority; programme cache | on-demand |
+| Platform | `docs/operations/**`; `deploy/synology/**` | operations runbooks | YES | Platform | provider operations authority | operator-routed |
+| Platform | `docs/agents/evidence/**` | review evidence | NO | Platform | retained provider evidence | on-demand |
+| Atlas | `/AGENTS.md` | root AGENTS | YES | Atlas | durable routing policy | always loaded; 2,917-byte live baseline |
+| Atlas | `docs/agents/prompts/**` | reusable prompts | NO | Atlas | retained; per-file metadata gap `GAP-PROMPT-ATLAS-001` | on-demand |
+| Atlas | `docs/agents/tasks/{active,archive}/**` | task packets | NO | Atlas | Issue authority; packet cache | on-demand |
+| Atlas | `docs/evidence/**` | release evidence | NO | Atlas | retained publication/runtime evidence | on-demand |
+| Atlas | `docs/migration/**` | migration evidence | NO | Atlas | retained extraction provenance | on-demand |
+| Atlas | `tools/governance/**` | documentation/agent validators | YES | Atlas | provider validator authority | CI-loaded |
+| Atlas | `README.md`; `SECURITY.md`; `e2e/README.md` | human reference docs | YES | Atlas | provider canonical | human-routed |
+| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`; `docs/ci/CI_CONTRACT.md` | contracts | YES | META | durable while authoritative; update through protected provider process | on-demand/routed |
+| META | `docs/governance/audits/**`; `docs/evidence/**`; `ecosystem/repositories.json` | migration evidence | NO | META | append/retain by evidence or migration provenance policy | on-demand/routed |
+| META | `README.md`; `CONTRIBUTING.md`; `SECURITY.md`; `docs/**` | human reference docs | YES | META | durable while authoritative; update through protected provider process | on-demand/routed |
+| Game | historical prompt/task/evidence files under `docs/agents/tasks/archive/**` and `docs/agents/evidence/**` | one-shot prompts | NO | Game | historical retained by provenance rule | on-demand/routed |
+| Game | `docs/agents/CONTEXT_HANDOFF.md`; handoff evidence/reports | handovers | NO | Game | active only while linked lifecycle is live; archive/delete on supersession | on-demand/routed |
+| Game | `docs/agents/EXECUTION_PROTOCOL.md`; `GITHUB_ONLY_EXECUTION.md`; related agent procedures | agent runbooks | YES | Game | durable while authoritative; update through protected provider process | on-demand/routed |
+| Game | `docs/architecture/ADR-0009-game-node-execution-capacity-deployment-and-recovery-baseline.md`; `docs/agents/SESSION_RECOVERY_AND_ORPHANED_EXECUTION.md` | recovery/break-glass | YES | Game | durable while authoritative; update through protected provider process | operator-routed |
+| Game | `docs/agents/evidence/OTV2-20260818-*`; migration ADRs | migration evidence | NO | Game | append/retain by evidence or migration provenance policy | on-demand/routed |
+| Game | `README.md`; `CONTRIBUTING.md`; `SECURITY.md`; provider docs | human reference docs | YES | Game | durable while authoritative; update through protected provider process | on-demand/routed |
+| Game | `.github/repository-policy.json`; `docs/agents/GOVERNANCE_CONTRACT.json`; `PROJECT_LANES.json` | machine-readable policy companions | YES | Game | durable while authoritative; update through protected provider process | machine-read |
+| Game | `.github/workflows/agent-governance.yml`; `architecture-semantic-audit.yml`; `merge-gate.yml`; `repository-configuration.yml` | documentation/agent validators | YES | Game | durable while authoritative; update through protected provider process | CI-loaded |
+| Platform | `docs/agents/CONTEXT_HANDOFF.md`; provider evidence handoffs | handovers | NO | Platform | active only while linked lifecycle is live; archive/delete on supersession | on-demand/routed |
+| Platform | `docs/agents/**` execution/governance procedures | agent runbooks | YES | Platform | durable while authoritative; update through protected provider process | on-demand/routed |
+| Platform | `docs/operations/INCIDENT_RECOVERY_RUNBOOK.md`; `SYNOLOGY_ROLLBACK_SCHEMA_SAFETY.md`; `deploy/synology/scripts/rollback.sh`; `recover-schema.sh` | recovery/break-glass | YES | Platform | durable while authoritative; update through protected provider process | operator-routed |
+| Platform | `deploy/synology/release-contract.env`; release/deployment workflow evidence | release evidence | NO | Platform | append/retain by evidence or migration provenance policy | on-demand/routed |
+| Platform | provider migration/audit evidence; historical branch audit; META reconciliation | migration evidence | NO | Platform | append/retain by evidence or migration provenance policy | on-demand/routed |
+| Platform | `docs/agents/evidence/**/index.md`; machine-generated evidence manifests | generated docs/indexes | NO | Platform | regenerate from authoritative inputs; output non-authoritative unless promoted | on-demand/routed |
+| Platform | `README.md`; `CONTRIBUTING.md`; `SECURITY.md`; `docs/**` | human reference docs | YES | Platform | durable while authoritative; update through protected provider process | on-demand/routed |
+| Platform | `docs/agents/*.json`; release/deployment contract data | machine-readable policy companions | YES | Platform | durable while authoritative; update through protected provider process | machine-read |
+| Platform | `.github/workflows/agent-governance.yml`; `historical-branch-audit.yml`; prompt-eval/governance checks | documentation/agent validators | YES | Platform | durable while authoritative; update through protected provider process | CI-loaded |
+| Atlas | `.github/workflows/ci.yml`; `extraction-provenance.yml`; `synology-live-acceptance.yml`; `synology-runner-health.yml` | CI policy | YES | Atlas | durable while authoritative; update through protected provider process | CI-loaded |
+| Atlas | `docs/evidence/DYN-ATLAS-001-target-gui-execution-prompt.md` and bounded execution evidence | one-shot prompts | NO | Atlas | historical retained by provenance rule | on-demand/routed |
+| Atlas | `docs/evidence/ATLAS-FULLWORLD-PROGRAMME-LEDGER.md` | programmes | NO | Atlas | active only while linked lifecycle is live; archive/delete on supersession | on-demand/routed |
+| Atlas | `docs/evidence/fullworld-generation/handoff-summary.json` | handovers | NO | Atlas | historical retained by provenance rule | on-demand/routed |
+| Atlas | `docs/agents/SYNOLOGY_DESKTOP_COMMANDER_ACCESS.md`; prompt/task routing docs | agent runbooks | YES | Atlas | durable while authoritative; update through protected provider process | on-demand/routed |
+| Atlas | `docs/evidence/ISSUE-*.md`; GitHub PR/review/check objects | review evidence | NO | Atlas | append/retain by evidence or migration provenance policy | on-demand/routed |
+| Atlas | `web/semantic-search/index.json`; FullWorld generated evidence/index outputs | generated docs/indexes | NO | Atlas | regenerate from authoritative inputs; output non-authoritative unless promoted | on-demand/routed |
+
 ## 5. Critical inconsistencies and risks
 
 | ID | Severity | State | Finding |
@@ -123,6 +197,26 @@ Prompts:
 - reusable prompts require stable identity/version/owner/input/output/prohibited-actions/validation metadata;
 - one-shot prompts terminate as delete, historical archive, reusable template, or retained evidence;
 - `final`, `latest`, `v2`, `new` naming alone is not a lifecycle mechanism.
+
+### Prompt/task/handover lifecycle verification
+
+The table is the deterministic audit ledger for the 30A prompt/task/handover invariants. A non-PASS row is an explicit audit gap and constrains G11; it is not silently accepted.
+
+| Repository | Artifact family | Required invariant | Verification state | Lifecycle authority / supersession |
+| --- | --- | --- | --- | --- |
+| META | reusable prompts | stable identity/version/status for every retained reusable prompt | PASS - active reusable prompt library is `NOT_NEEDED`; retained executor prompts are classified one-shot historical | META policy; live GitHub state outranks historical prompts |
+| META | one-shot prompts | terminal prompts cannot remain executable | PASS | `docs/agents/prompts/OTERYN-*.md` marked `HISTORICAL / COMPLETED - DO NOT EXECUTE`; final report supersedes |
+| Game | reusable prompts | stable identity/version/status for every retained reusable prompt | UNKNOWN (`GAP-PROMPT-GAME-001`: per-file metadata not exhaustively reverified) | Game provider authority; remediation in section 19 |
+| Platform | reusable prompts | stable identity/version/status for every retained reusable prompt | UNKNOWN (`GAP-PROMPT-PLATFORM-001`: 22 prompt files not exhaustively classified/metadata-verified) | Platform provider authority; remediation in section 19 |
+| Atlas | reusable prompts | stable identity/version/status for every retained reusable prompt | UNKNOWN (`GAP-PROMPT-ATLAS-001`: per-file metadata not exhaustively reverified) | Atlas provider authority; remediation in section 19 |
+| META | active task packets | explicit lifecycle authority | PASS - no active META task packet required for this terminal closeout | GitHub Issue/PR; optional packet only as cache |
+| Game | active task packets | explicit lifecycle authority on every active packet | UNKNOWN (`GAP-TASK-GAME-001`: per-file Issue linkage not exhaustively reverified) | GitHub Issues are authority; packet is cache |
+| Platform | active task packets | explicit lifecycle authority on every active packet | UNKNOWN (`GAP-TASK-PLATFORM-001`: per-file Issue linkage not exhaustively reverified) | GitHub Issues are authority; packet is cache |
+| Atlas | active task packets | explicit lifecycle authority on every active packet | UNKNOWN (`GAP-TASK-ATLAS-001`: active coordinator packet linkage not exhaustively reverified) | GitHub Issues are authority; packet is cache |
+| META | handovers | explicitly non-authoritative plus expiry/supersession | PASS - none retained as current authority | GitHub Issue/PR/live checks supersede any session cache |
+| Game | handovers | explicitly non-authoritative plus expiry/supersession | UNKNOWN (`GAP-HANDOVER-GAME-001`: retained handoff evidence not exhaustively metadata-verified) | live Issue/PR/provider state outranks handover |
+| Platform | handovers | explicitly non-authoritative plus expiry/supersession | UNKNOWN (`GAP-HANDOVER-PLATFORM-001`: retained handoff evidence not exhaustively metadata-verified) | live Issue/PR/provider state outranks handover |
+| Atlas | handovers | explicitly non-authoritative plus expiry/supersession | PASS for `docs/evidence/fullworld-generation/handoff-summary.json` as historical evidence | live Issue/PR/provider state supersedes retained handoff evidence |
 
 ## 8. Architecture, ADR and contract ownership
 
@@ -241,6 +335,25 @@ Atlas source/products     [KEEP] Atlas authority
 META copies               [NOT_NEEDED]
 ```
 
+### Section-26A placement decision matrix
+
+Every answer uses an allowed target-tree disposition. `[OPTIONAL]` never authorizes pre-creating an empty path; the path/object is created only when the stated need exists.
+
+| Placement question | META | Game | Platform | Atlas |
+| --- | --- | --- | --- | --- |
+| Where does a new reusable prompt go? | `[OPTIONAL] docs/agents/prompts/<ID>.md` only for a demonstrated META-owned reusable need | `[KEEP] docs/agents/prompts/<ID>.md` | `[KEEP] docs/agents/prompts/<ID>.md` | `[KEEP] docs/agents/prompts/<ID>.md` |
+| Where does a one-shot prompt go while active? | `[OPTIONAL] owning GitHub Issue/PR or optional task packet; not the reusable library by default` | `[KEEP] GitHub Issue + optional docs/agents/tasks/active/<ID>.md` | `[KEEP] GitHub Issue + optional docs/agents/tasks/active/<ID>.md` | `[KEEP] GitHub Issue + optional docs/agents/tasks/active/<ID>.md` |
+| What happens to a one-shot prompt when complete? | `[KEEP] mark historical/completed when retained as provenance, otherwise delete with Issue history preserved` | `[KEEP] archive/delete under provider task/evidence policy` | `[KEEP] archive/delete under provider task/evidence policy` | `[KEEP] archive/delete under provider task/evidence policy` |
+| Where does an optional task packet go? | `[OPTIONAL] docs/agents/tasks/active/<ID>.md only if GitHub Issue needs durable detail` | `[KEEP] docs/agents/tasks/active/<ID>.md` | `[KEEP] docs/agents/tasks/active/<ID>.md` | `[KEEP] docs/agents/tasks/active/<ID>.md` |
+| Where does it go when the Issue closes? | `[KEEP] archive/delete according to retention; Issue remains authority` | `[KEEP] docs/agents/tasks/archive/** or delete if no provenance need` | `[KEEP] archive/delete according to provider policy` | `[KEEP] docs/agents/tasks/archive/** or delete if no provenance need` |
+| Where does a handover live and when does it expire? | `[OPTIONAL] Issue/PR/session cache; expires on supersession/terminal PR` | `[KEEP] provider handoff/evidence cache; live Issue/PR supersedes` | `[KEEP] provider handoff/evidence cache; live Issue/PR supersedes` | `[KEEP] retained handoff evidence; live Issue/PR supersedes` |
+| Where does operational/recovery procedure live? | `[KEEP] docs/recovery/**` | `[OPTIONAL] provider-owned runbook only when recurring need is proven; recovery ADR remains current durable baseline` | `[KEEP] docs/operations/** and deploy/synology/**` | `[OPTIONAL] provider-owned operations/recovery runbook when recurring need is proven; current gaps remain explicit` |
+| Where does review/release/migration evidence live? | `[KEEP] docs/evidence/** and docs/governance/audits/**` | `[KEEP] docs/agents/evidence/** plus GitHub PR/check objects` | `[KEEP] docs/agents/evidence/** plus GitHub PR/check/release objects` | `[KEEP] docs/evidence/** and docs/migration/**` |
+| Where does generated documentation live? | `[NOT_NEEDED] no generated documentation is normative META authority` | `[NOT_NEEDED] generated product artifacts remain provider outputs, not normative docs` | `[GENERATED] bounded generator/evidence index outputs under provider-owned evidence paths` | `[GENERATED] provider generated indexes such as web/semantic-search/index.json with source provenance` |
+| Which documents belong only in META? | `[KEEP] ecosystem topology, cross-repository governance/ADR, composition/recovery authority` | `[NOT_NEEDED] do not copy META normative authority` | `[NOT_NEEDED] do not copy META normative authority` | `[NOT_NEEDED] do not copy META normative authority` |
+| Which remain provider-local? | `[NOT_NEEDED] provider implementation/operations docs are referenced, not copied` | `[KEEP] Game architecture/contracts/tests/runtime/agent material` | `[KEEP] Platform architecture/contracts/tests/operations/deployment/agent material` | `[KEEP] Atlas publication/provenance/FullWorld/runtime/agent material` |
+| Which paths are checked by CI? | `[KEEP] AGENTS.md, ecosystem/**, tools/governance/** and audit artifacts through meta-gate` | `[KEEP] provider governance/merge/architecture workflows` | `[KEEP] Agent Governance, CI, historical-branch/prompt lifecycle checks` | `[KEEP] atlas/provenance gates plus extraction-provenance validators` |
+
 ### Migrated sources
 
 - `blakinio/Oteryn-v2`: `[HISTORICAL_ARCHIVE]`, archived read-only, non-authoritative.
@@ -264,6 +377,8 @@ META copies               [NOT_NEEDED]
 
 ## 15. Migrated-source/current-file to target/disposition matrix
 
+### Product/migration objects
+
 | Source/current object | Target / disposition | Current verdict |
 | --- | --- | --- |
 | `blakinio/Oteryn-v2` Game lineage | `Oteryn/Oteryn-Game`; legacy source archived | authority DONE; full migration completion UNKNOWN |
@@ -273,6 +388,50 @@ META copies               [NOT_NEEDED]
 | historical runner image/tag | immutable `ghcr.io/oteryn/...@sha256:f0c452...` | new supply chain DONE; legacy staging runner retired |
 | Platform-owned Atlas execution | Atlas-owned local runner/workflows | DONE |
 | Game local integration execution | Game-owned runner/workflow | DONE |
+
+### Material documentation/agent file-path disposition
+
+| Repository | Current file/path | Primary class | Target / disposition | Authority | Acceptance / evidence |
+| --- | --- | --- | --- | --- | --- |
+| META | `/AGENTS.md` | root AGENTS | `[KEEP]` durable routing; candidate removes obsolete rollback-only wording | META | exact PR #43 diff + meta-gate |
+| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` | contracts | `[KEEP]` | META | current main/candidate |
+| META | `docs/governance/AI_REVIEW_POLICY.md` | governance policy | `[KEEP]` | META | AI policy tests |
+| META | `docs/ci/CI_CONTRACT.md` | CI policy | `[KEEP]` | META | meta-gate |
+| META | `docs/testing/ECOSYSTEM_TEST_STRATEGY.md` | test strategy | `[KEEP]` | META | current main |
+| META | `docs/recovery/organization-recovery-contract.md` | recovery/break-glass | `[KEEP]` | META | PR #36 + desired-state audit |
+| META | `docs/agents/prompts/README.md` | one-shot prompts | `[KEEP]` historical index; explicitly DO NOT EXECUTE | META provenance | exact PR #43 content |
+| META | `docs/agents/prompts/OTERYN-ORG-AUDIT-META-DESIRED-STATE-CLOSEOUT.md` | one-shot prompts | `[KEEP]` historical/completed | META provenance | status/supersession marker |
+| META | `docs/agents/prompts/OTERYN-ORG-RUNNERS-PLATFORM-ACL-LEGACY-CLOSEOUT.md` | one-shot prompts | `[KEEP]` historical/completed | META provenance | status/supersession marker |
+| META | `docs/agents/prompts/OTERYN-GAME-RUNNER-ACCEPTANCE-CLOSEOUT.md` | one-shot prompts | `[KEEP]` historical/completed | META provenance | status/supersession marker |
+| META | `docs/evidence/OTERYN-ORG-RUNNER-ACL-LIVE-CLOSEOUT-20260822.{md,json,json.sha256}` | review evidence | `[KEEP]` sanitized terminal evidence | META evidence | detached digest verified |
+| META | `docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md` | migration evidence | `[KEEP]` successor audit artifact | META | terminal report validator |
+| META | `docs/evidence/OTERYN-ORG-AUDIT-v3.10-TERMINAL-REPORT-VALIDATION-20260822.json` | review evidence | `[GENERATED]` exact report integrity record | META evidence | validator output bound to report SHA-256 |
+| Game | `/AGENTS.md` | root AGENTS | `[KEEP]` | Game | live tree `fd39c6aa...` |
+| Game | `apps/game-server/AGENTS.md` | nested AGENTS/override | `[KEEP]` path-scoped | Game | live tree |
+| Game | `crates/simulation-determinism/AGENTS.md` | nested AGENTS/override | `[KEEP]` path-scoped | Game | live tree |
+| Game | `docs/agents/AGENTS.md` | nested AGENTS/override | `[KEEP]` path-scoped | Game | live tree |
+| Game | `docs/architecture/**` | architecture/ADR | `[KEEP]` provider canonical | Game | live tree |
+| Game | `docs/contracts/**` | contracts | `[KEEP]` provider canonical | Game | live tree |
+| Game | `docs/agents/prompts/**` | reusable prompts | `[KEEP/CLEANUP]` per-file metadata classification required | Game | `GAP-PROMPT-GAME-001` |
+| Game | `docs/agents/tasks/active/**` | task packets | `[KEEP/CLEANUP]` verify Issue authority; archive/delete terminal packets | Game | `GAP-TASK-GAME-001` |
+| Game | `docs/agents/tasks/archive/**` | task packets | `[KEEP]` historical provenance | Game | live tree |
+| Game | `docs/agents/evidence/**` | review evidence | `[KEEP/CLEANUP]` retain by evidence policy | Game | live tree |
+| Platform | `/AGENTS.md` | root AGENTS | `[KEEP/CLEANUP]` durable root remains large; compaction backlog only | Platform | live tree `8e609f05...` |
+| Platform | `docs/agents/AGENTS.md` | nested AGENTS/override | `[KEEP]` path-scoped | Platform | live tree |
+| Platform | `docs/architecture/adr/**` | architecture/ADR | `[KEEP]` provider canonical | Platform | live tree |
+| Platform | `docs/contracts/**` | contracts | `[KEEP]` provider canonical | Platform | live tree |
+| Platform | `docs/agents/prompts/**` | reusable prompts | `[KEEP/CLEANUP]` classify 22 prompt files and metadata | Platform | `GAP-PROMPT-PLATFORM-001` |
+| Platform | `docs/agents/tasks/active/**` | task packets | `[KEEP/CLEANUP]` verify Issue authority and terminal disposition | Platform | `GAP-TASK-PLATFORM-001` |
+| Platform | `docs/agents/programs/**` | programmes | `[KEEP/CLEANUP]` GitHub Issue authority; programme cache only | Platform | live tree |
+| Platform | `docs/operations/**` | operations runbooks | `[KEEP]` provider operations authority | Platform | live tree |
+| Platform | `docs/agents/evidence/**` | review evidence | `[KEEP/CLEANUP]` retain by provider evidence policy | Platform | live tree |
+| Atlas | `/AGENTS.md` | root AGENTS | `[KEEP]` | Atlas | live tree `a1b5fea1...` |
+| Atlas | `docs/agents/prompts/**` | reusable prompts | `[KEEP/CLEANUP]` per-file metadata verification required | Atlas | `GAP-PROMPT-ATLAS-001` |
+| Atlas | `docs/agents/tasks/active/ATLAS-FULLWORLD-COORDINATOR.md` | task packets | `[KEEP/CLEANUP]` verify owning Issue and terminal disposition | Atlas | `GAP-TASK-ATLAS-001` |
+| Atlas | `docs/agents/tasks/archive/DYN-ATLAS-001-semantic-thais-z7-proof.md` | task packets | `[KEEP]` historical provenance | Atlas | live tree |
+| Atlas | `docs/evidence/**` | release evidence | `[KEEP]` publication/runtime evidence | Atlas | live tree |
+| Atlas | `docs/migration/legacy-atlas-extraction-provenance.json` | migration evidence | `[KEEP]` provenance authority | Atlas | extraction-provenance validator |
+| Atlas | `tools/governance/verify_extraction_provenance.py` | documentation/agent validators | `[KEEP]` | Atlas | provider test/workflow |
 
 ## 16. GitHub settings, protection and ruleset matrix
 
@@ -310,6 +469,8 @@ No source or rollback object is removed merely because it looks old.
 
 ## 19. Ordered implementation backlog
 
+### Programme/runner/migration backlog
+
 | Order | Item | Owner | State / acceptance |
 | ---: | --- | --- | --- |
 | 1 | merge terminal desired-state/drift audit | META | DONE: PR #37 merged as `c0dbad93f791953d5efcc6b556e6be73693f0a4f` after exact-head `meta-gate` + `ai-review-gate` PASS |
@@ -321,7 +482,21 @@ No source or rollback object is removed merely because it looks old.
 | 7 | close migration-specific Game/Platform/Atlas evidence | each provider + META reconciliation | UNKNOWN/NO |
 | 8 | implement recurring current-state recovery/control-plane/package/secret-owner recovery evidence | organization/providers | PARTIAL |
 | 9 | terminalize stable `game-gate` / `platform-gate` transitions | Game/Platform | PARTIAL |
-| 10 | re-run v3.10 final acceptance and close remaining Issues | META | blocked by preceding items |
+| 10 | re-run v3.10 final acceptance and close remaining Issues | META | blocked by preceding independent programme gaps |
+
+### Mandatory documentation/agent implementation backlog
+
+Every row contains the required v3.10 backlog fields. These are remediation items discovered by the audit; this META report does not mutate provider repositories.
+
+| Order | Type | CURRENT_PATHS | TARGET_PATHS | AUTHORITY_OWNER | MIGRATION/DISPOSITION | BACKWARD_LINK_OR_REDIRECT_PLAN | ACCEPTANCE_CRITERIA | DETERMINISTIC_VALIDATION | ROLLBACK |
+| ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 11 | DOCUMENTATION_IA | Atlas lacks dedicated architecture/contracts/governance/test/operations/recovery policy paths; Matrix L GAPs | only provider-owned paths justified by recurring need; no empty taxonomy | Atlas | resolve `GAP-DOCS-ATLAS-ARCH-001`, `GAP-DOCS-ATLAS-CONTRACT-001`, `GAP-DOCS-ATLAS-GOV-001`, `GAP-DOCS-ATLAS-POLICY-001`, `GAP-DOCS-ATLAS-TEST-001` with evidence-backed KEEP/OPTIONAL/NOT_NEEDED decisions | retain existing evidence/README links until replacement authority is merged; no blind moves | every Atlas Matrix L UNKNOWN either becomes evidence-backed canonical target or explicit NOT_NEEDED | provider tree inventory + Matrix L validator + Atlas gate | revert documentation-only PR; existing provider evidence remains authority until successor merge |
+| 12 | AGENT_INSTRUCTION | Platform `/AGENTS.md` 22,157-byte live baseline; Game nested AGENTS; current provider roots | short durable root plus bounded path-scoped nested AGENTS only where justified | each provider | compact transient/repeated procedure text without changing runtime authority | preserve anchors/links from moved procedures; live root remains authority until replacement merge | no transient task/PR/head state in root; context budget measured; effective chain documented | root/nested AGENTS inventory + provider Agent Governance | revert instruction-only PR; no product behavior changes |
+| 13 | PROMPT_LIFECYCLE | Game/Platform/Atlas `docs/agents/prompts/**`; META executor prompts historical | one canonical provider/user scope; historical one-shot prompts status-marked or archived | owning provider/META | close `GAP-PROMPT-GAME-001`, `GAP-PROMPT-PLATFORM-001`, `GAP-PROMPT-ATLAS-001`, `GAP-DOCS-PLATFORM-PROMPT-001` | preserve historical prompt IDs and links; do not rewrite completed provenance | every retained reusable prompt has stable ID/version/status/owner; one-shot terminal prompts non-executable | prompt metadata/lifecycle validator in owning repo | restore prior prompt file from Git history; no runtime rollback needed |
+| 14 | TASK_LIFECYCLE | Game/Platform/Atlas active task packet trees; GitHub Issues | GitHub Issue lifecycle authority + optional active packet cache; archive/delete on terminal Issue | owning provider | close `GAP-TASK-GAME-001`, `GAP-TASK-PLATFORM-001`, `GAP-TASK-ATLAS-001`, `GAP-HANDOVER-GAME-001`, `GAP-HANDOVER-PLATFORM-001` | keep Issue/PR links from archived packets; no second status database | every active packet names owning Issue and acceptance; no packet stays active after terminal Issue | task-liveness/Issue-link validator + branch/PR reconciliation | restore packet from Git history if provenance needed; Issue remains authority |
+| 15 | RUNBOOK | Game/Atlas recurring local runner/publication/recovery procedures are not fully classified; Platform `docs/operations/**` established | provider-owned operations/recovery runbooks only for recurring procedures | owning provider | resolve `GAP-DOCS-GAME-OPS-001`, `GAP-DOCS-ATLAS-OPS-001`, `GAP-DOCS-ATLAS-RECOVERY-001` | old evidence pages retain links until a runbook successor is merged | recurring procedure has one owner, preconditions, safety boundary, validation and rollback; otherwise mark NOT_NEEDED | provider docs validator + representative operation/recovery test where applicable | revert runbook-only PR; operational state is not mutated by docs migration |
+| 16 | EVIDENCE_GOVERNANCE | META `docs/evidence/**`; Game/Platform agent evidence; Atlas evidence/migration | owning evidence paths with subject/source/time/identity/digest/retention metadata | owning repo; META reconciles cross-repo evidence | close `GAP-DOCS-GAME-RELEASE-001`; retain unique provenance; archive superseded evidence; never broaden authority | keep immutable GitHub object links and historical IDs | every retained evidence class has explicit retention/disposition; sanitized secrets boundary preserved | evidence metadata/digest validator; terminal report validator | recover from Git history/GitHub object; never recreate secret values from metadata |
+| 17 | DOCS_CI | META meta-gate; provider governance/agent/provenance checks vary | deterministic checks in existing provider gates; no new external required check unless separately governed | owning repo | enforce canonical path/class/metadata/lifecycle invariants where high-signal | preserve existing required check names; add internal subchecks first | invariant violations fail existing stable gate or produce explicit GAP/UNKNOWN; no empty taxonomy generation | `tools/governance/validate_v310_terminal_report.py` in META + provider-local validators | revert internal subcheck while preserving stable required gate identity |
 
 ## 20. Owner decisions
 

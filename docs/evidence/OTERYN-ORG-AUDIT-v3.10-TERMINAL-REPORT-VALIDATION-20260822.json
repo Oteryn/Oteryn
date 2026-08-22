@@ -1,7 +1,11 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
+  "validator": "tools/governance/validate_v310_terminal_report.py",
   "report": "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
-  "report_sha256": "ac127a74696101e4d4c021d060e71464cee60f8b1ea1d3527d324bd991610225",
+  "report_sha256": "d499846cbb83e3728664561123ec31478b5cff8666f4b37073858e0b90a3698f",
+  "execution_verdict": "PASS",
+  "programme_verdict": "INCOMPLETE",
+  "contract_completeness": "INCOMPLETE",
   "numbered_sections": 21,
   "matrices": [
     "A0",
@@ -54,16 +58,133 @@
     "Platform": 22,
     "Atlas": 22
   },
+  "material_inventory_rows": 67,
+  "section_15_disposition_rows": 39,
+  "section_19_documentation_backlog_types": [
+    "DOCUMENTATION_IA",
+    "AGENT_INSTRUCTION",
+    "PROMPT_LIFECYCLE",
+    "TASK_LIFECYCLE",
+    "RUNBOOK",
+    "EVIDENCE_GOVERNANCE",
+    "DOCS_CI"
+  ],
   "runner_capture_sha256": "4d4c9c41d9b1e200e403f2607ea1a630453d25384fa42c1fa12050c15ad5c1d3",
-  "checks": {
-    "sections_1_21": true,
-    "matrices_A0_L": true,
-    "H1_H14": true,
-    "G1_G11": true,
-    "matrix_l_4x22": true,
-    "matrix_l_no_empty_cells": true,
-    "runner_capture_digest": true
+  "mechanical_invariants": {
+    "matrix_l_exists": {
+      "state": "PASS",
+      "evidence": "88 Matrix L rows"
+    },
+    "matrix_l_covers_all_four_repositories": {
+      "state": "PASS",
+      "evidence": "4 repositories x 22 classes"
+    },
+    "material_artifacts_have_primary_class": {
+      "state": "PASS",
+      "evidence": "67 material path/object families"
+    },
+    "normative_artifacts_have_single_authority": {
+      "state": "PASS",
+      "evidence": "section 4 normative inventory authority column"
+    },
+    "retained_reusable_prompts_have_identity_version_status": {
+      "state": "UNKNOWN",
+      "evidence": "section 7 lifecycle verification",
+      "gap_ids": [
+        "GAP-PROMPT-ATLAS-001",
+        "GAP-PROMPT-GAME-001",
+        "GAP-PROMPT-PLATFORM-001"
+      ]
+    },
+    "active_task_packets_have_lifecycle_authority": {
+      "state": "UNKNOWN",
+      "evidence": "section 7 lifecycle verification",
+      "gap_ids": [
+        "GAP-TASK-ATLAS-001",
+        "GAP-TASK-GAME-001",
+        "GAP-TASK-PLATFORM-001"
+      ]
+    },
+    "handovers_are_non_authoritative_and_expire": {
+      "state": "UNKNOWN",
+      "evidence": "section 7 lifecycle verification",
+      "gap_ids": [
+        "GAP-HANDOVER-GAME-001",
+        "GAP-HANDOVER-PLATFORM-001"
+      ]
+    },
+    "evidence_classes_have_retention_disposition": {
+      "state": "PASS",
+      "evidence": "12 repository/evidence-class rows"
+    },
+    "target_trees_answer_section_26A": {
+      "state": "PASS",
+      "evidence": "12/12 placement questions"
+    },
+    "no_empty_taxonomy_created_for_symmetry": {
+      "state": "PASS",
+      "evidence": "no [NEW] target-tree entry without proven need"
+    },
+    "documentation_agent_access_gaps_are_explicit": {
+      "state": "PASS",
+      "evidence": "GAP-IDs parsed from Matrix L/lifecycle ledger",
+      "gap_ids": [
+        "GAP-DOCS-ATLAS-ARCH-001",
+        "GAP-DOCS-ATLAS-CONTRACT-001",
+        "GAP-DOCS-ATLAS-GOV-001",
+        "GAP-DOCS-ATLAS-OPS-001",
+        "GAP-DOCS-ATLAS-POLICY-001",
+        "GAP-DOCS-ATLAS-RECOVERY-001",
+        "GAP-DOCS-ATLAS-TEST-001",
+        "GAP-DOCS-GAME-OPS-001",
+        "GAP-DOCS-GAME-RELEASE-001",
+        "GAP-DOCS-PLATFORM-PROMPT-001",
+        "GAP-HANDOVER-GAME-001",
+        "GAP-HANDOVER-PLATFORM-001",
+        "GAP-PROMPT-ATLAS-001",
+        "GAP-PROMPT-GAME-001",
+        "GAP-PROMPT-PLATFORM-001",
+        "GAP-TASK-ATLAS-001",
+        "GAP-TASK-GAME-001",
+        "GAP-TASK-PLATFORM-001"
+      ]
+    },
+    "documentation_agent_gaps_have_ordered_backlog": {
+      "state": "PASS",
+      "evidence": "all Matrix L/lifecycle GAP-IDs appear in section 19 remediation backlog"
+    },
+    "g11_result_present": {
+      "state": "PASS",
+      "evidence": "UNKNOWN (GAP-DOCS-IA-001: Matrix L exposes unresolved provider classes, especially Atlas architecture/contracts/governance/test/recovery and selected Game/Platform prompt/operations/release classifications)"
+    },
+    "section_15_file_dispositions_present": {
+      "state": "PASS",
+      "evidence": "39 documentation/agent disposition rows"
+    },
+    "section_19_required_backlog_categories_present": {
+      "state": "PASS",
+      "evidence": "DOCUMENTATION_IA, AGENT_INSTRUCTION, PROMPT_LIFECYCLE, TASK_LIFECYCLE, RUNBOOK, EVIDENCE_GOVERNANCE, DOCS_CI"
+    }
   },
-  "errors": [],
-  "verdict": "PASS"
+  "explicit_gap_ids": [
+    "GAP-DOCS-ATLAS-ARCH-001",
+    "GAP-DOCS-ATLAS-CONTRACT-001",
+    "GAP-DOCS-ATLAS-GOV-001",
+    "GAP-DOCS-ATLAS-OPS-001",
+    "GAP-DOCS-ATLAS-POLICY-001",
+    "GAP-DOCS-ATLAS-RECOVERY-001",
+    "GAP-DOCS-ATLAS-TEST-001",
+    "GAP-DOCS-GAME-OPS-001",
+    "GAP-DOCS-GAME-RELEASE-001",
+    "GAP-DOCS-PLATFORM-PROMPT-001",
+    "GAP-HANDOVER-GAME-001",
+    "GAP-HANDOVER-PLATFORM-001",
+    "GAP-PROMPT-ATLAS-001",
+    "GAP-PROMPT-GAME-001",
+    "GAP-PROMPT-PLATFORM-001",
+    "GAP-TASK-ATLAS-001",
+    "GAP-TASK-GAME-001",
+    "GAP-TASK-PLATFORM-001"
+  ],
+  "errors": []
 }
