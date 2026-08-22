@@ -6,19 +6,21 @@ These files preserve the executor instructions used during the 2026-08-22 closeo
 
 ## Historical executor aliases
 
-| Alias | Primary repository | Primary lifecycle | Ownership |
+| Alias | Primary repository | Historical lifecycle | Terminal outcome |
 | --- | --- | --- | --- |
-| `OTERYN-ORG-AUDIT-META-DESIRED-STATE-CLOSEOUT` | `Oteryn/Oteryn` | PR #37 | finish META desired-state/drift audit, exact-head R2, protected merge and predecessor reconciliation |
-| `OTERYN-ORG-RUNNERS-PLATFORM-ACL-LEGACY-CLOSEOUT` | `Oteryn/Oteryn` + `Oteryn/Oteryn-Platform` | META #34 / Platform #1215 | Platform trusted-main proof, runner-group ACL readback, dependency-aware legacy retirement |
-| `OTERYN-GAME-RUNNER-ACCEPTANCE-CLOSEOUT` | `Oteryn/Oteryn-Game` | Game #34 / PR #36 | policy-permitted independent review, merge and trusted-main Game runner acceptance |
+| `OTERYN-ORG-AUDIT-META-DESIRED-STATE-CLOSEOUT` | `Oteryn/Oteryn` | PR #37 | DONE ? merged as `c0dbad93f791953d5efcc6b556e6be73693f0a4f` |
+| `OTERYN-ORG-RUNNERS-PLATFORM-ACL-LEGACY-CLOSEOUT` | `Oteryn/Oteryn` + `Oteryn/Oteryn-Platform` | META #34 / Platform closeout | DONE ? selected-repository ACLs and provider runs PASS; legacy runner retired |
+| `OTERYN-GAME-RUNNER-ACCEPTANCE-CLOSEOUT` | `Oteryn/Oteryn-Game` | Game #34 | DONE ? trusted-main run/job `32566399984` / `97015531724` PASS |
 
-## Parallelism rules
+## Historical execution rules
+
+The following constraints applied while these workstreams were active. They are retained as provenance, not as executable tasks.
 
 - One active owner per branch/PR.
 - Executors must not modify another executor's active branch.
 - Cross-workstream repositories/issues may be inspected read-only for dependency state.
 - `UNKNOWN` remains `UNKNOWN` until direct evidence exists.
-- Do not retire the legacy runner until all replacement-route and ACL prerequisites are terminal PASS.
+- During execution, the legacy runner could not be retired until all replacement-route and ACL prerequisites were terminal PASS; those prerequisites passed before retirement.
 - Do not consume owner-funded/metered AI outside the applicable repository policy and explicit authorization.
 
 ## Coordinator

@@ -21,6 +21,7 @@ An authenticated organization-admin GitHub CLI session successfully read `/orgs/
 `Default` has zero runners. Organization runner inventory contains exactly the three product runners above.
 
 `ORGANIZATION_RUNNER_SELECTED_REPOSITORY_ACL = PASS`
+
 ## Corroborating provider acceptance
 
 - Platform organization seal: run/job `32512311186` / `96866035808`, source `efe35c1ffa4af5f10904580fe3a587aa5c343a50`, terminal marker `organization-runner-estate=PASS`.
