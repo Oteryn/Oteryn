@@ -14,6 +14,20 @@ Before declaring a task blocked because of access limitations, agents must disco
 
 Completion claims require verified evidence. `UNKNOWN` is not automatically a `BLOCKER`, and a generic access disclaimer without capability discovery is invalid.
 
+## Organization runner routing
+
+Product-owned host-local GitHub Actions workloads MUST use the product-isolated organization runner group and product label together:
+
+- Platform: `platform-runners` + `oteryn-platform`;
+- Atlas: `atlas-runners` + `oteryn-atlas`;
+- Game: `game-runners` + `oteryn-game`.
+
+Agents MUST NOT route new workloads by a custom label alone, MUST NOT add generic `self-hosted` eligibility, and MUST NOT introduce new workflow dependencies on the legacy `oteryn-staging` selector. `oteryn-synology-staging` is rollback-only while the organization-runner migration remains open and may be retired only after the provider closeout gates prove that it has no retained workload owner. META remains GitHub-hosted unless a separate host-local META workload is explicitly proven and authorized.
+
+When migrating an existing `oteryn-staging` workflow, replace it with the owning product's group+label selector; do not preserve the legacy selector as a fallback in new code.
+
+The detailed operational contract and live rollout evidence are provider-owned in `Oteryn/Oteryn-Platform/docs/operations/SYNOLOGY_ORGANIZATION_RUNNERS.md`; live GitHub organization state and provider workflow state outrank stale documentation.
+
 ## Authority and repository scope
 
 - Autonomous write operations governed by this file are limited to `Oteryn/Oteryn` unless the repository owner explicitly authorizes another repository for the current task.
