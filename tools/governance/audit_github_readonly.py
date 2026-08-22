@@ -10,6 +10,7 @@ import argparse
 import fnmatch
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -28,6 +29,7 @@ HISTORICAL_PREFIXES = (
 )
 HISTORICAL_FILES = {"ecosystem/repositories.json"}
 POLICY_DECLARATION_FILES = {"ecosystem/governance-desired-state.json"}
+WORKFLOW_RUN_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/actions/runs/(\d+)(?:/|$)")
 
 
 def expected_checks(item: dict) -> set[str]:
@@ -100,7 +102,6 @@ def _ref_pattern_matches(pattern: str, *, branch: str, default_branch: str) -> b
 
 
 def ruleset_applies_to_branch(detail: dict, *, branch: str, default_branch: str) -> bool:
-    """Return true only when an active branch ruleset applies to this branch."""
     if detail.get("enforcement") != "active" or detail.get("target") != "branch":
         return False
     ref_name = (detail.get("conditions") or {}).get("ref_name") or {}
@@ -124,6 +125,7 @@ class Audit:
         self.token = token
         self.errors: list[str] = []
         self.warnings: list[str] = []
+        self._workflow_runs: dict[tuple[str, int], dict] = {}
 
     def api(self, path: str, *, allow_404: bool = False):
         req = urllib.request.Request(
@@ -156,11 +158,44 @@ class Audit:
         if context:
             sources.setdefault(context, set()).add(app_id if isinstance(app_id, int) else None)
 
-    @classmethod
-    def _check_run_sources(cls, payload: dict) -> dict[str, set[int | None]]:
+    def _workflow_run(self, repo: str, check_run: dict) -> dict | None:
+        match = WORKFLOW_RUN_RE.match(str(check_run.get("details_url") or ""))
+        if not match:
+            return None
+        run_id = int(match.group(1))
+        key = (repo, run_id)
+        if key not in self._workflow_runs:
+            payload = self.api(f"/repos/{repo}/actions/runs/{run_id}")
+            if not isinstance(payload, dict):
+                return None
+            self._workflow_runs[key] = payload
+        return self._workflow_runs[key]
+
+    def _protected_flow_sources(
+        self,
+        repo: str,
+        payload: dict,
+        *,
+        event: str,
+        head_sha: str,
+        pr_number: int | None = None,
+    ) -> dict[str, set[int | None]]:
         sources: dict[str, set[int | None]] = {}
-        for run in payload.get("check_runs", []):
-            cls._add_source(sources, run.get("name"), (run.get("app") or {}).get("id"))
+        for check_run in payload.get("check_runs", []):
+            workflow = self._workflow_run(repo, check_run)
+            if not workflow:
+                continue
+            if workflow.get("event") != event or workflow.get("head_sha") != head_sha:
+                continue
+            if pr_number is not None:
+                associated = {
+                    item.get("number")
+                    for item in check_run.get("pull_requests", [])
+                    if isinstance(item, dict)
+                }
+                if pr_number not in associated:
+                    continue
+            self._add_source(sources, check_run.get("name"), (check_run.get("app") or {}).get("id"))
         return sources
 
     def required_context_sources(
@@ -205,13 +240,18 @@ class Audit:
         expected: set[str],
         expected_app_id: int,
     ) -> dict[str, set[int | None]]:
-        """Prove current emission from main or one current internal PR that contains main."""
+        """Prove emission from a protected push or a current internal PR containing main."""
         branch = self.api(f"/repos/{repo}/branches/main") or {}
         main_sha = ((branch.get("commit") or {}).get("sha") or "").strip()
         if not main_sha:
             return {}
         main_runs = self.api(f"/repos/{repo}/commits/{main_sha}/check-runs?per_page=100") or {}
-        main_sources = self._check_run_sources(main_runs)
+        main_sources = self._protected_flow_sources(
+            repo,
+            main_runs,
+            event="push",
+            head_sha=main_sha,
+        )
         if expected_sources_satisfied(main_sources, expected, expected_app_id):
             return main_sources
 
@@ -224,7 +264,8 @@ class Audit:
             head = pr.get("head", {})
             base = pr.get("base", {})
             head_repo = (head.get("repo") or {}).get("full_name")
-            if head_repo != repo or base.get("ref") != "main":
+            pr_number = pr.get("number")
+            if head_repo != repo or base.get("ref") != "main" or not isinstance(pr_number, int):
                 continue
             sha = head.get("sha")
             if not sha:
@@ -234,7 +275,13 @@ class Audit:
             if comparison.get("status") not in {"ahead", "identical"} or merge_base != main_sha:
                 continue
             runs = self.api(f"/repos/{repo}/commits/{sha}/check-runs?per_page=100") or {}
-            sources = self._check_run_sources(runs)
+            sources = self._protected_flow_sources(
+                repo,
+                runs,
+                event="pull_request",
+                head_sha=sha,
+                pr_number=pr_number,
+            )
             if expected_sources_satisfied(sources, expected, expected_app_id):
                 return sources
             if score(sources) > score(best):
@@ -285,7 +332,7 @@ class Audit:
         emitted_names = set(emitted)
         self.check(
             expected <= emitted_names,
-            f"{repo}: required checks not proven on current main or a current internal PR containing current main: expected {sorted(expected)}, observed {sorted(emitted_names)}",
+            f"{repo}: required checks not proven on current protected push or a current internal PR containing current main: expected {sorted(expected)}, observed {sorted(emitted_names)}",
         )
         for context in expected:
             observed_apps = emitted.get(context, set())
@@ -321,15 +368,42 @@ class Audit:
         if "archived" in wanted:
             self.check(bool(live.get("archived")) == bool(wanted["archived"]), f"{repo}: archived terminal-state drift")
 
+    def _search_all_code(self, repo: str, needle: str) -> list[dict]:
+        q = urllib.parse.quote_plus(f'"{needle}" repo:{repo}')
+        items: list[dict] = []
+        total: int | None = None
+        for page in range(1, 11):
+            result = self.api(f"/search/code?q={q}&per_page=100&page={page}") or {}
+            if result.get("incomplete_results") is True:
+                raise RuntimeError(f"code search incomplete for {repo} / {needle}")
+            current_total = result.get("total_count")
+            if not isinstance(current_total, int) or current_total < 0:
+                raise RuntimeError(f"code search missing total_count for {repo} / {needle}")
+            if current_total > 1000:
+                raise RuntimeError(f"code search exceeds GitHub 1000-result completeness cap for {repo} / {needle}")
+            if total is None:
+                total = current_total
+            elif total != current_total:
+                raise RuntimeError(f"code search changed during pagination for {repo} / {needle}")
+            page_items = result.get("items")
+            if not isinstance(page_items, list):
+                raise RuntimeError(f"code search malformed items for {repo} / {needle}")
+            items.extend(item for item in page_items if isinstance(item, dict))
+            if len(items) >= total:
+                return items[:total]
+            if not page_items:
+                break
+        if total is None or len(items) < total:
+            raise RuntimeError(f"code search pagination incomplete for {repo} / {needle}")
+        return items[:total]
+
     def coordinate_scan(self, desired: dict) -> None:
         policy = desired.get("mutable_coordinate_policy") or {}
         needles = list(policy.get("forbidden") or []) + list(policy.get("historical_reference_only") or [])
         for repo_item in desired["permanent_repositories"]:
             repo = repo_item["repository"]
             for needle in needles:
-                q = urllib.parse.quote_plus(f'"{needle}" repo:{repo}')
-                result = self.api(f"/search/code?q={q}&per_page=100") or {}
-                for item in result.get("items", []):
+                for item in self._search_all_code(repo, needle):
                     path = item.get("path", "")
                     if path in POLICY_DECLARATION_FILES:
                         continue
