@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import base64
 from pathlib import Path
 
 MODULE_PATH = Path(__file__).with_name("audit_github_readonly.py")
@@ -25,7 +26,9 @@ class FakeAudit(m.Audit):
         if path in self.responses:
             return self.responses[path]
         if path.startswith("/repos/Oteryn/Test/actions/workflows/"):
-            return {"state": "active"}
+            return {"id": 1, "state": "active", "path": ".github/workflows/gate.yml"}
+        if path == "/repos/Oteryn/Test/contents/.github/workflows/gate.yml":
+            return {"content": base64.b64encode(b"on: [pull_request, pull_request_target]\n").decode("ascii")}
         if allow_404:
             return None
         raise AssertionError(f"unexpected API call: {path}")
@@ -62,6 +65,17 @@ def test_ruleset_scope_only_accepts_main_applicable_rulesets() -> None:
     assert not m.ruleset_applies_to_branch(
         {**base, "conditions": {"ref_name": {"include": ["~ALL"], "exclude": []}}, "enforcement": "disabled"},
         branch="main", default_branch="main",
+    )
+
+
+def test_required_gate_trigger_rejects_path_filters() -> None:
+    assert m.core.workflow_event_unfiltered("on: [pull_request]\n", "pull_request")
+    assert m.core.workflow_event_unfiltered("on:\n  pull_request:\n    branches: [main]\n", "pull_request")
+    assert not m.core.workflow_event_unfiltered(
+        "on:\n  pull_request:\n    paths: ['src/**']\n", "pull_request"
+    )
+    assert not m.core.workflow_event_unfiltered(
+        "on:\n  pull_request:\n    paths-ignore: ['docs/**']\n", "pull_request"
     )
 
 
@@ -526,6 +540,14 @@ jobs:
         'steps: [{"u\\u0073es": actions/checkout@v4}]',
     )
     assert not m.core.workflow_text_secure(escaped_flow_key)
+    aliased_key = secure.replace(
+        "jobs:\n",
+        "env:\n  KEY: &key uses\njobs:\n",
+    ).replace(
+        "- uses: actions/checkout@0123456789abcdef0123456789abcdef01234567",
+        "- *key: actions/checkout@v4",
+    )
+    assert not m.core.workflow_text_secure(aliased_key)
     flow_write_all = secure.replace(
         "runs-on: ubuntu-latest",
         "runs-on: ubuntu-latest\n    policy: {permissions: write-all}",
