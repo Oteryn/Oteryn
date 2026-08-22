@@ -40,6 +40,17 @@ def expected_checks(item: dict) -> set[str]:
     return set(checks)
 
 
+def expected_check_app_id(item: dict) -> int:
+    app_id = item.get("required_check_app_id")
+    if not isinstance(app_id, int) or app_id <= 0:
+        raise SystemExit(f"repository lacks required_check_app_id: {item}")
+    return app_id
+
+
+def expected_sources_satisfied(sources: dict[str, set[int | None]], expected: set[str], app_id: int) -> bool:
+    return all(sources.get(context) == {app_id} for context in expected)
+
+
 def load_desired() -> dict:
     data = json.loads(DESIRED_PATH.read_text(encoding="utf-8"))
     if data.get("schema_version") != 1:
@@ -62,6 +73,7 @@ def load_desired() -> dict:
         if item.get("gate_mode") not in {"stable", "transition"}:
             raise SystemExit(f"invalid gate_mode: {item}")
         expected_checks(item)
+        expected_check_app_id(item)
         if item.get("gate_mode") == "transition":
             target = item.get("target_gate")
             if not isinstance(target, str) or not target:
@@ -135,8 +147,26 @@ class Audit:
         if not condition:
             self.errors.append(message)
 
-    def required_contexts(self, repo: str, *, branch: str = "main", default_branch: str = "main") -> set[str]:
-        contexts: set[str] = set()
+    @staticmethod
+    def _add_source(sources: dict[str, set[int | None]], context: str | None, app_id: int | None) -> None:
+        if context:
+            sources.setdefault(context, set()).add(app_id if isinstance(app_id, int) else None)
+
+    @classmethod
+    def _check_run_sources(cls, payload: dict) -> dict[str, set[int | None]]:
+        sources: dict[str, set[int | None]] = {}
+        for run in payload.get("check_runs", []):
+            cls._add_source(sources, run.get("name"), (run.get("app") or {}).get("id"))
+        return sources
+
+    def required_context_sources(
+        self,
+        repo: str,
+        *,
+        branch: str = "main",
+        default_branch: str = "main",
+    ) -> dict[str, set[int | None]]:
+        sources: dict[str, set[int | None]] = {}
         rulesets = self.api(f"/repos/{repo}/rulesets") or []
         for summary in rulesets:
             if summary.get("enforcement") != "active":
@@ -148,47 +178,68 @@ class Audit:
                 if rule.get("type") != "required_status_checks":
                     continue
                 for check in rule.get("parameters", {}).get("required_status_checks", []):
-                    context = check.get("context")
-                    if context:
-                        contexts.add(context)
+                    self._add_source(sources, check.get("context"), check.get("integration_id"))
         protection = self.api(
             f"/repos/{repo}/branches/{urllib.parse.quote(branch, safe='')}/protection/required_status_checks",
             allow_404=True,
         )
         if protection:
-            contexts.update(protection.get("contexts", []))
-            contexts.update(c.get("context") for c in protection.get("checks", []) if c.get("context"))
-        return contexts
+            bound_contexts: set[str] = set()
+            for check in protection.get("checks", []):
+                context = check.get("context")
+                if context:
+                    bound_contexts.add(context)
+                self._add_source(sources, context, check.get("app_id"))
+            for context in protection.get("contexts", []):
+                if context not in bound_contexts:
+                    self._add_source(sources, context, None)
+        return sources
 
-    def representative_check_names(self, repo: str, expected: set[str]) -> set[str]:
-        """Prove current emission from main or one current internal PR, never stale history/union."""
+    def representative_check_sources(
+        self,
+        repo: str,
+        expected: set[str],
+        expected_app_id: int,
+    ) -> dict[str, set[int | None]]:
+        """Prove current emission from main or one current internal PR that contains main."""
         branch = self.api(f"/repos/{repo}/branches/main") or {}
         main_sha = ((branch.get("commit") or {}).get("sha") or "").strip()
         if not main_sha:
-            return set()
+            return {}
         main_runs = self.api(f"/repos/{repo}/commits/{main_sha}/check-runs?per_page=100") or {}
-        main_names = {run.get("name") for run in main_runs.get("check_runs", []) if run.get("name")}
-        if expected <= main_names:
-            return main_names
+        main_sources = self._check_run_sources(main_runs)
+        if expected_sources_satisfied(main_sources, expected, expected_app_id):
+            return main_sources
 
-        best = main_names
+        def score(candidate: dict[str, set[int | None]]) -> int:
+            return sum(candidate.get(context) == {expected_app_id} for context in expected)
+
+        best = main_sources
         pulls = self.api(f"/repos/{repo}/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20") or []
         for pr in pulls:
             head = pr.get("head", {})
             base = pr.get("base", {})
             head_repo = (head.get("repo") or {}).get("full_name")
-            if head_repo != repo or base.get("ref") != "main" or base.get("sha") != main_sha:
+            if head_repo != repo or base.get("ref") != "main":
                 continue
             sha = head.get("sha")
             if not sha:
                 continue
+            comparison = self.api(f"/repos/{repo}/compare/{main_sha}...{sha}") or {}
+            merge_base = (comparison.get("merge_base_commit") or {}).get("sha")
+            if comparison.get("status") not in {"ahead", "identical"} or merge_base != main_sha:
+                continue
             runs = self.api(f"/repos/{repo}/commits/{sha}/check-runs?per_page=100") or {}
-            names = {run.get("name") for run in runs.get("check_runs", []) if run.get("name")}
-            if expected <= names:
-                return names
-            if len(expected & names) > len(expected & best):
-                best = names
+            sources = self._check_run_sources(runs)
+            if expected_sources_satisfied(sources, expected, expected_app_id):
+                return sources
+            if score(sources) > score(best):
+                best = sources
         return best
+
+    def dependabot_security_updates_enabled(self, repo: str) -> bool:
+        fixes = self.api(f"/repos/{repo}/automated-security-fixes", allow_404=True) or {}
+        return fixes.get("enabled") is True
 
     def file_exists(self, repo: str, path: str) -> bool:
         quoted = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
@@ -211,12 +262,34 @@ class Audit:
         branch = self.api(f"/repos/{repo}/branches/main")
         self.check(bool(branch.get("protected")) == bool(wanted.get("main_protected")), f"{repo}: main protection drift")
         expected = expected_checks(wanted)
-        required = self.required_contexts(repo, branch="main", default_branch=live.get("default_branch") or "main")
-        self.check(expected <= required, f"{repo}: required checks drift: expected {sorted(expected)}, got {sorted(required)}")
+        expected_app = expected_check_app_id(wanted)
+        required_sources = self.required_context_sources(
+            repo,
+            branch="main",
+            default_branch=live.get("default_branch") or "main",
+        )
+        required_names = set(required_sources)
+        self.check(expected <= required_names, f"{repo}: required checks drift: expected {sorted(expected)}, got {sorted(required_names)}")
+        for context in expected:
+            observed_apps = required_sources.get(context, set())
+            self.check(
+                observed_apps == {expected_app},
+                f"{repo}: required check {context!r} App binding drift: expected {expected_app}, got {sorted(str(value) for value in observed_apps)}",
+            )
 
-        emitted = self.representative_check_names(repo, expected)
-        self.check(expected <= emitted, f"{repo}: required checks not proven on current main or a current internal PR based on current main: expected {sorted(expected)}, observed {sorted(emitted)}")
-        if wanted.get("gate_mode") == "transition" and wanted.get("target_gate") and wanted["target_gate"] not in required:
+        emitted = self.representative_check_sources(repo, expected, expected_app)
+        emitted_names = set(emitted)
+        self.check(
+            expected <= emitted_names,
+            f"{repo}: required checks not proven on current main or a current internal PR containing current main: expected {sorted(expected)}, observed {sorted(emitted_names)}",
+        )
+        for context in expected:
+            observed_apps = emitted.get(context, set())
+            self.check(
+                observed_apps == {expected_app},
+                f"{repo}: emitted check {context!r} App drift: expected {expected_app}, got {sorted(str(value) for value in observed_apps)}",
+            )
+        if wanted.get("gate_mode") == "transition" and wanted.get("target_gate") and wanted["target_gate"] not in required_names:
             self.warnings.append(f"{repo}: transition target gate not required yet: {wanted['target_gate']}")
 
         sec = live.get("security_and_analysis") or {}
@@ -224,11 +297,12 @@ class Audit:
         mapping = {
             "secret_scanning": "secret_scanning",
             "push_protection": "secret_scanning_push_protection",
-            "dependabot_security_updates": "dependabot_security_updates",
         }
         for key, api_key in mapping.items():
             if expected_sec.get(key):
                 self.check((sec.get(api_key) or {}).get("status") == "enabled", f"{repo}: security baseline missing {key}")
+        if expected_sec.get("dependabot_security_updates"):
+            self.check(self.dependabot_security_updates_enabled(repo), f"{repo}: security baseline missing dependabot_security_updates")
         for path in ("SECURITY.md", ".github/CODEOWNERS"):
             self.check(self.file_exists(repo, path), f"{repo}: missing {path}")
 
