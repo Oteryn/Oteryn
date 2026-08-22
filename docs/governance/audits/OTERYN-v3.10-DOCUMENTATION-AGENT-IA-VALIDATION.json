@@ -1,0 +1,25 @@
+{
+  "artifact": "OTERYN-ORG-GOVERNANCE-ARCHITECTURE-ULTRA-AUDIT-v3.10-DOCUMENTATION-AGENT-IA-ADDENDUM.md",
+  "artifact_kind": "v3.10 addendum to v3.9; not a retroactive rewrite of the historical v3.9 result",
+  "sha256": "c7fc6f91a34e50e05a53cc424b744697ecf9b81f8e12030c5ae6af23317f6db0",
+  "bytes": 24321,
+  "checks": {
+    "title_v3_10": true,
+    "base_v3_9_preserved": true,
+    "historical_result_not_rewritten": true,
+    "artifact_classification": true,
+    "canonical_path_decision": true,
+    "no_empty_taxonomy": true,
+    "matrix_l": true,
+    "h14": true,
+    "g11": true,
+    "a0_to_l": true,
+    "h1_to_h14": true,
+    "ci_enforcement": true,
+    "retention_archive": true,
+    "fences_balanced": true,
+    "ends_end": true
+  },
+  "result": "PASS",
+  "limitation": "The original v3.9 File Library object is reference-only in this runtime and is not mounted as raw bytes, so this artifact is a verified addendum/upgrade contract rather than a byte-for-byte merged replacement."
+}
