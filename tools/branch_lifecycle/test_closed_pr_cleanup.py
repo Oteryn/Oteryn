@@ -27,8 +27,9 @@ def live(evt):
 
 
 class GH:
-    def __init__(self, evt=None, *, protected=False, open_pulls=None, default="main"):
+    def __init__(self, evt=None, *, protected=False, open_pulls=None, open_pull_snapshots=None, default="main"):
         self.evt, self.protected, self.open_pulls, self.default = evt, protected, open_pulls or [], default
+        self.open_pull_snapshots = list(open_pull_snapshots) if open_pull_snapshots is not None else None
         self.calls = []
     def get_repository(self):
         self.calls.append("repo"); return {"full_name": "Oteryn/Demo", "default_branch": self.default}
@@ -37,15 +38,27 @@ class GH:
     def get_branch(self, branch):
         self.calls.append("branch"); return {"protected": self.protected}
     def get_open_pulls_for_branch(self, branch):
-        self.calls.append("open"); return self.open_pulls
+        self.calls.append("open")
+        if self.open_pull_snapshots is not None:
+            if not self.open_pull_snapshots:
+                return []
+            return self.open_pull_snapshots.pop(0)
+        return self.open_pulls
 
 
 class Git:
-    def __init__(self, sha=SHA): self.sha, self.deletes = sha, []
+    def __init__(self, sha=SHA):
+        self.sha, self.deletes, self.prepared, self.restores = sha, [], [], []
     def remote_ref_sha(self, branch): return self.sha
+    def prepare_recovery(self, branch, expected_sha):
+        if self.sha != expected_sha: raise CleanupError("recovery preparation mismatch")
+        self.prepared.append((branch, expected_sha))
     def delete_with_lease(self, branch, expected_sha):
         if self.sha != expected_sha: raise CleanupError("lease mismatch")
         self.deletes.append((branch, expected_sha)); self.sha = None
+    def restore_if_absent(self, branch, expected_sha):
+        if self.sha is not None: raise CleanupError("restore target is not absent")
+        self.restores.append((branch, expected_sha)); self.sha = expected_sha
 
 
 class CleanupTests(unittest.TestCase):
@@ -78,6 +91,21 @@ class CleanupTests(unittest.TestCase):
         for evt in [event("Branch-Disposition: delete\nBranch-Disposition-Reason: old", head_repo="fork/repo"), event("Branch-Disposition: delete\nBranch-Disposition-Reason: old", merged=True)]:
             git = Git(); self.assertEqual(process_event(evt, "Oteryn/Demo", GH(), git)["result"], "NOT_APPLICABLE"); self.assertEqual(git.deletes, [])
 
+    def test_live_disposition_revalidation_can_revoke_delete(self):
+        evt = self.delete_event()
+        retained = self.delete_event()
+        retained["pull_request"]["body"] = "Branch-Disposition: retain\nBranch-Disposition-Reason: reopened work remains active"
+        git = Git()
+        out = process_event(evt, "Oteryn/Demo", GH(retained), git)
+        self.assertEqual(out["result"], "RETAIN")
+        self.assertEqual(out["reason"], "reopened work remains active")
+        self.assertEqual(git.deletes, [])
+
+        malformed = self.delete_event()
+        malformed["pull_request"]["body"] = "Branch-Disposition: delete"
+        with self.assertRaisesRegex(CleanupError, "requires exactly one"):
+            process_event(evt, "Oteryn/Demo", GH(malformed), Git())
+
     def test_sha_or_live_identity_drift_blocks(self):
         evt = self.delete_event()
         with self.assertRaisesRegex(CleanupError, "head SHA drift"):
@@ -98,6 +126,17 @@ class CleanupTests(unittest.TestCase):
         for candidate, gh, message in cases:
             with self.subTest(message=message), self.assertRaisesRegex(CleanupError, message):
                 process_event(candidate, "Oteryn/Demo", gh, Git())
+
+    def test_open_pr_race_after_delete_restores_exact_head_and_blocks(self):
+        evt = self.delete_event()
+        gh = GH(evt, open_pull_snapshots=[[], [{"number": 9}]])
+        git = Git()
+        with self.assertRaisesRegex(CleanupError, "restored after an open pull request appeared"):
+            process_event(evt, "Oteryn/Demo", gh, git)
+        self.assertEqual(git.prepared, [("feat/demo", SHA)])
+        self.assertEqual(git.deletes, [("feat/demo", SHA)])
+        self.assertEqual(git.restores, [("feat/demo", SHA)])
+        self.assertEqual(git.sha, SHA)
 
     def test_absent_is_idempotent(self):
         evt = self.delete_event(); out = process_event(evt, "Oteryn/Demo", GH(evt), Git(None))

@@ -24,10 +24,10 @@ jobs:
       contents: write
       pull-requests: read
     steps:
-      - name: Check out trusted protected main
+      - name: Check out exact trusted event base
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 1
 
       - name: Apply explicit terminal branch disposition

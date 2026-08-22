@@ -25,7 +25,8 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn('contents: write', text)
         self.assertIn('github.event.pull_request.merged == false', text)
         self.assertIn('github.event.pull_request.head.repo.full_name == github.repository', text)
-        self.assertIn('ref: main', text)
+        self.assertIn('ref: ${{ github.event.pull_request.base.sha }}', text)
+        self.assertNotIn('ref: main', text)
         self.assertIn('uses: ./.github/actions/terminal-branch-cleanup', text)
         self.assertIn('token: ${{ github.token }}', text)
 

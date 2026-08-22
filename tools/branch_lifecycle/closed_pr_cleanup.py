@@ -53,7 +53,9 @@ def result(status: str, *, branch=None, number=None, sha=None, reason=None, dele
     return {"result": status, "branch": branch, "pull_request": number, "head_sha": sha, "reason": reason, "deleted": deleted}
 
 
-def live_pull_matches(pull: dict[str, Any], repository: str, number: int, branch: str, sha: str) -> bool:
+def live_pull_matches(pull: Any, repository: str, number: int, branch: str, sha: str) -> bool:
+    if not isinstance(pull, dict):
+        return False
     head = pull.get("head") if isinstance(pull.get("head"), dict) else {}
     return (
         pull.get("number") == number
@@ -93,8 +95,17 @@ def process_event(event: dict[str, Any], repository: str, github: Any, git: Any)
         raise CleanupError("live repository identity drift")
     if branch == repo.get("default_branch"):
         raise CleanupError(f"refusing to delete default branch {branch!r}")
-    if not live_pull_matches(github.get_pull(number), repository, number, branch, sha):
+    live_pull = github.get_pull(number)
+    if not live_pull_matches(live_pull, repository, number, branch, sha):
         raise CleanupError("live pull request identity drift")
+    live_disposition, live_reason = parse_disposition(
+        live_pull.get("body") if isinstance(live_pull.get("body"), str) else ""
+    )
+    if live_disposition is None:
+        return result("NOT_APPLICABLE", branch=branch, number=number, sha=sha)
+    if live_disposition == "retain":
+        return result("RETAIN", branch=branch, number=number, sha=sha, reason=live_reason)
+    reason = live_reason
 
     current = git.remote_ref_sha(branch)
     if current is None:
@@ -108,9 +119,20 @@ def process_event(event: dict[str, Any], repository: str, github: Any, git: Any)
     current = git.remote_ref_sha(branch)
     if current != sha:
         raise CleanupError(f"branch head SHA drift before delete: expected {sha}, got {current}")
+    git.prepare_recovery(branch, sha)
     git.delete_with_lease(branch, sha)
     if git.remote_ref_sha(branch) is not None:
         raise CleanupError(f"branch {branch!r} still exists after deletion")
+    if github.get_open_pulls_for_branch(branch):
+        git.restore_if_absent(branch, sha)
+        restored = git.remote_ref_sha(branch)
+        if restored != sha:
+            raise CleanupError(
+                f"branch {branch!r} acquired an open pull request during deletion and exact-head restoration failed"
+            )
+        raise CleanupError(
+            f"branch {branch!r} restored after an open pull request appeared during deletion"
+        )
     return result("DELETED", branch=branch, number=number, sha=sha, reason=reason, deleted=True)
 
 
@@ -189,6 +211,34 @@ class GitTransport:
         if len(rows) != 1 or len(rows[0]) != 2 or rows[0][1] != ref or not FULL_SHA.fullmatch(rows[0][0]):
             raise CleanupError(f"unexpected remote ref data for {branch}")
         return rows[0][0]
+
+    def prepare_recovery(self, branch: str, expected_sha: str) -> None:
+        recovery_ref = f"refs/oteryn-terminal-recovery/{expected_sha}"
+        source_ref = f"refs/heads/{branch}"
+        out = self.run([
+            "git", "fetch", "--no-tags", "--depth=1", self.remote,
+            f"{source_ref}:{recovery_ref}",
+        ])
+        if out.returncode != 0:
+            raise CleanupError(f"failed to prepare recovery object for {branch}")
+        probe = self.run(["git", "rev-parse", "--verify", recovery_ref])
+        if probe.returncode != 0 or probe.stdout.strip() != expected_sha:
+            raise CleanupError(f"recovery object mismatch for {branch}")
+
+    def restore_if_absent(self, branch: str, expected_sha: str) -> None:
+        ref = f"refs/heads/{branch}"
+        out = self.run([
+            "git", "push", "--porcelain", f"--force-with-lease={ref}:",
+            self.remote, f"{expected_sha}:{ref}",
+        ])
+        if out.returncode == 0:
+            return
+        current = self.remote_ref_sha(branch)
+        if current == expected_sha:
+            return
+        raise CleanupError(
+            f"exact-head restoration was rejected for {branch}; current {current or 'absent'}"
+        )
 
     def delete_with_lease(self, branch: str, expected_sha: str) -> None:
         ref = f"refs/heads/{branch}"
