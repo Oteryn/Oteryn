@@ -627,6 +627,52 @@ jobs:
     assert not audit.workflow_supply_chain_valid(repo)
 
 
+def test_workflow_supply_chain_handles_reusable_workflows_and_action_precedence() -> None:
+    repo = "Oteryn/Test"
+    encode = lambda text: m.core.base64.b64encode(text.encode("utf-8")).decode("ascii")
+    workflow = """permissions:
+  contents: read
+jobs:
+  reuse:
+    uses: ./.github/workflows/reuse.yml
+"""
+    reusable = """permissions:
+  contents: read
+on: workflow_call
+jobs: {}
+"""
+    valid = FakeAudit({
+        f"/repos/{repo}/contents/.github/workflows": [
+            {"type": "file", "name": "ci.yml", "path": ".github/workflows/ci.yml"},
+            {"type": "file", "name": "reuse.yml", "path": ".github/workflows/reuse.yml"},
+        ],
+        f"/repos/{repo}/contents/.github/workflows/ci.yml": {"content": encode(workflow)},
+        f"/repos/{repo}/contents/.github/workflows/reuse.yml": {"content": encode(reusable)},
+    })
+    assert valid.workflow_supply_chain_valid(repo)
+    unsafe_primary = FakeAudit({
+        f"/repos/{repo}/contents/.github/workflows": [{"type": "file", "name": "ci.yml", "path": ".github/workflows/ci.yml"}],
+        f"/repos/{repo}/contents/.github/workflows/ci.yml": {"content": encode("""permissions:
+  contents: read
+jobs:
+  test:
+    steps:
+      - uses: ./actions/build
+""")},
+        f"/repos/{repo}/contents/actions/build/action.yml": {"content": encode("""runs:
+  using: composite
+  steps:
+    - uses: vendor/action@v4
+""")},
+        f"/repos/{repo}/contents/actions/build/action.yaml": {"content": encode("""runs:
+  using: composite
+  steps:
+    - uses: vendor/action@0123456789abcdef0123456789abcdef01234567
+""")},
+    })
+    assert not unsafe_primary.workflow_supply_chain_valid(repo)
+
+
 def test_disabled_required_gate_workflow_does_not_prove_emission() -> None:
     main = "a" * 40
     audit = FakeAudit({
