@@ -28,9 +28,10 @@ def live(evt):
 
 
 class GH:
-    def __init__(self, evt=None, *, protected=False, open_pulls=None, open_pull_snapshots=None, pull_snapshots=None, fail_open_call=None, permission="write", default="main"):
+    def __init__(self, evt=None, *, protected=False, open_pulls=None, open_pull_snapshots=None, pull_snapshots=None, fail_open_call=None, permission="write", permission_snapshots=None, default="main"):
         self.evt, self.protected, self.open_pulls, self.default = evt, protected, open_pulls or [], default
         self.permission = permission
+        self.permission_snapshots = list(permission_snapshots) if permission_snapshots is not None else None
         self.open_pull_snapshots = list(open_pull_snapshots) if open_pull_snapshots is not None else None
         self.pull_snapshots = list(pull_snapshots) if pull_snapshots is not None else None
         self.fail_open_call = fail_open_call
@@ -39,7 +40,12 @@ class GH:
     def get_repository(self):
         self.calls.append("repo"); return {"full_name": "Oteryn/Demo", "default_branch": self.default}
     def get_user_permission(self, login):
-        self.calls.append("permission"); return self.permission
+        self.calls.append("permission")
+        if self.permission_snapshots is not None:
+            if not self.permission_snapshots:
+                raise CleanupError("unexpected permission revalidation")
+            return self.permission_snapshots.pop(0)
+        return self.permission
     def get_pull(self, number):
         self.calls.append("pull")
         if self.pull_snapshots is not None:
@@ -160,6 +166,16 @@ class CleanupTests(unittest.TestCase):
         for candidate, gh, message in cases:
             with self.subTest(message=message), self.assertRaisesRegex(CleanupError, message):
                 process_event(candidate, "Oteryn/Demo", gh, Git())
+
+    def test_sender_permission_is_revalidated_at_delete_boundary(self):
+        evt = self.delete_event()
+        gh = GH(evt, permission_snapshots=["write", "read"])
+        git = Git()
+        with self.assertRaisesRegex(CleanupError, "requires repository write authority at deletion boundary"):
+            process_event(evt, "Oteryn/Demo", gh, git)
+        self.assertEqual(git.prepared, [("feat/demo", SHA)])
+        self.assertEqual(git.deletes, [])
+        self.assertEqual(gh.calls.count("permission"), 2)
 
     def test_live_disposition_is_revalidated_at_delete_boundary(self):
         evt = self.delete_event()

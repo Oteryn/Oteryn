@@ -146,8 +146,14 @@ def process_event(event: dict[str, Any], repository: str, github: Any, git: Any)
     if boundary_disposition == "retain":
         return result("RETAIN", branch=branch, number=number, sha=sha, reason=boundary_reason)
     reason = boundary_reason
+    boundary_permission = github.get_user_permission(sender_login)
+    if boundary_permission not in WRITE_PERMISSIONS:
+        raise CleanupError(
+            f"delete disposition requires repository write authority at deletion boundary for "
+            f"close-event sender {sender_login!r}; live permission is {boundary_permission!r}"
+        )
 
-    # The boundary pull revalidation is deliberately the final authority query
+    # The boundary pull and permission revalidation are deliberately the final authority queries
     # before the destructive push. Exact branch-SHA drift is enforced atomically
     # by the Git force-with-lease used by delete_with_lease().
 

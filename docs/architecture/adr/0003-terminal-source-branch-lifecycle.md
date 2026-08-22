@@ -27,7 +27,7 @@ and exactly one non-empty `Branch-Disposition-Reason: ...` line.
 `delete` is destructive authority only for that exact closed pull request head. The trusted cleanup implementation must revalidate immediately before deletion that:
 
 1. the event and live repository identities match the caller repository;
-2. the authenticated close-event sender has live `write`, `maintain`, or `admin` repository permission;
+2. the authenticated close-event sender has live `write`, `maintain`, or `admin` repository permission, revalidated again at the deletion boundary;
 3. the pull request remains closed, unmerged, same-repository, on the same source branch and exact head SHA;
 4. the source ref still resolves to that exact SHA;
 5. the source branch is neither the default branch nor protected;
