@@ -175,6 +175,30 @@ def test_desired_state_requires_complete_merge_and_security_contract() -> None:
         finally:
             m.core.DESIRED_PATH = original_path
 
+def test_desired_state_requires_terminal_administrative_identity() -> None:
+    data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    original_path = m.core.DESIRED_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "desired.json"
+        for broken in (
+            {**data, "administrative_repositories": []},
+            json.loads(json.dumps(data)),
+        ):
+            if broken["administrative_repositories"]:
+                broken["administrative_repositories"][0]["repository_id"] = 1
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            m.core.DESIRED_PATH = path
+            try:
+                try:
+                    m.core.load_desired()
+                except SystemExit as exc:
+                    assert "administrative repository" in str(exc)
+                else:
+                    raise AssertionError("missing or wrong administrative identity must fail closed")
+            finally:
+                m.core.DESIRED_PATH = original_path
+
+
 def test_desired_state_requires_complete_administrative_contract() -> None:
     data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
     original_path = m.core.DESIRED_PATH

@@ -130,8 +130,11 @@ def load_desired() -> dict:
             raise SystemExit(f"mutable_coordinate_policy.{field} contains duplicates")
 
     admins = data.get("administrative_repositories")
-    if not isinstance(admins, list):
-        raise SystemExit("administrative_repositories must be an array")
+    if not isinstance(admins, list) or len(admins) != 1:
+        raise SystemExit("exactly one administrative repository is required")
+    expected_admin = ("Oteryn/Oteryn-Platform-Migration-Backup-20260818", 1338405017)
+    if (admins[0].get("repository"), admins[0].get("repository_id")) != expected_admin:
+        raise SystemExit(f"unexpected administrative repository identity: {admins[0]}")
     required_admin_fields = {
         "repository", "repository_id", "classification", "terminal_state",
         "archived", "retention_authority",
