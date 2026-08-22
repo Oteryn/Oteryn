@@ -29,7 +29,7 @@ class FakeAudit(m.Audit):
             return self.responses[path]
         if path.startswith("/repos/Oteryn/Test/actions/workflows/"):
             return {"id": 1, "state": "active", "path": ".github/workflows/gate.yml"}
-        if path == "/repos/Oteryn/Test/contents/.github/workflows/gate.yml":
+        if path.startswith("/repos/Oteryn/Test/contents/.github/workflows/gate.yml"):
             return {"content": base64.b64encode(b"on: [pull_request, pull_request_target]\n").decode("ascii")}
         if allow_404:
             return None
@@ -78,6 +78,34 @@ def test_pull_request_target_is_read_from_current_base_commit() -> None:
     assert m.expected_sources_satisfied(
         observed, {"meta-gate", "ai-review-gate"}, ACTIONS_APP_ID
     )
+
+
+def test_pull_request_workflow_is_read_from_candidate_head() -> None:
+    main = "a" * 40
+    head = "b" * 40
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
+        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {"check_runs": []},
+        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
+            "number": 7,
+            "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
+            "base": {"ref": "main"},
+        }],
+        f"/repos/Oteryn/Test/compare/{main}...{head}": {
+            "status": "ahead", "merge_base_commit": {"sha": main},
+        },
+        f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {
+            "check_runs": [check_run("gate", 309, 7)],
+        },
+        "/repos/Oteryn/Test/actions/runs/309": {
+            "event": "pull_request", "head_sha": head, "workflow_id": 1,
+        },
+        f"/repos/Oteryn/Test/contents/.github/workflows/gate.yml?ref={head}": {
+            "content": base64.b64encode(b"on:\n  pull_request:\n    paths: [src/**]\n").decode("ascii"),
+        },
+    })
+    assert audit.representative_check_sources("Oteryn/Test", {"gate"}, ACTIONS_APP_ID) == {}
+    assert f"/repos/Oteryn/Test/contents/.github/workflows/gate.yml?ref={head}" in audit.calls
 
 
 def test_disabled_pull_request_target_workflow_does_not_prove_gate() -> None:
