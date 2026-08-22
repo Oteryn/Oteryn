@@ -263,6 +263,51 @@ def test_desired_state_requires_complete_coordinate_policy() -> None:
         finally:
             m.core.DESIRED_PATH = original_path
 
+def test_desired_state_requires_codeowners_coverage_contract() -> None:
+    data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    original_path = m.core.DESIRED_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "desired.json"
+        broken = json.loads(json.dumps(data))
+        del broken["permanent_repositories"][0]["codeowners_required_paths"]
+        path.write_text(json.dumps(broken), encoding="utf-8")
+        m.core.DESIRED_PATH = path
+        try:
+            try:
+                m.core.load_desired()
+            except SystemExit as exc:
+                assert "codeowners_required_paths" in str(exc)
+            else:
+                raise AssertionError("missing CODEOWNERS coverage contract must fail closed")
+        finally:
+            m.core.DESIRED_PATH = original_path
+
+
+def test_desired_state_requires_retention_release_contract() -> None:
+    data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    original_path = m.core.DESIRED_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "desired.json"
+        for broken in (json.loads(json.dumps(data)), json.loads(json.dumps(data))):
+            if "retention_release" in broken["administrative_repositories"][0]:
+                if broken is not None and broken["administrative_repositories"][0]["retention_release"]["assets"]:
+                    if len(broken["administrative_repositories"][0]["retention_release"]["assets"]) == 6:
+                        broken["administrative_repositories"][0]["retention_release"]["assets"].pop(next(iter(broken["administrative_repositories"][0]["retention_release"]["assets"])))
+                    else:
+                        del broken["administrative_repositories"][0]["retention_release"]
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            m.core.DESIRED_PATH = path
+            try:
+                try:
+                    m.core.load_desired()
+                except SystemExit as exc:
+                    assert "retention" in str(exc)
+                else:
+                    raise AssertionError("weakened retention release contract must fail closed")
+            finally:
+                m.core.DESIRED_PATH = original_path
+
+
 def test_transport_failure_becomes_runtime_unknown_signal() -> None:
     original = m.urllib.request.urlopen
 

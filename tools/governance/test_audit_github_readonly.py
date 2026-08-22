@@ -318,23 +318,104 @@ def test_actions_permissions_must_be_enabled() -> None:
     assert not m.core.actions_permissions_enabled({})
 
 
-def test_github_actions_dependency_updates_require_active_dependabot_entry() -> None:
+def test_github_actions_dependency_updates_require_structured_entry() -> None:
     repo = "Oteryn/Test"
-    good = "version: 2\nupdates:\n  - package-ecosystem: github-actions\n    directory: /\n"
-    commented = "version: 2\n# package-ecosystem: github-actions\n"
+    good = """version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+"""
+    outside = """version: 2
+package-ecosystem: github-actions
+updates: []
+"""
+    missing_directory = """version: 2
+updates:
+  - package-ecosystem: github-actions
+    schedule:
+      interval: weekly
+"""
+    missing_schedule = """version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+"""
     encode = lambda text: m.core.base64.b64encode(text.encode("utf-8")).decode("ascii")
-    enabled = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(good)}})
-    disabled = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(commented)}})
-    assert enabled.github_actions_dependency_updates_configured(repo)
-    assert not disabled.github_actions_dependency_updates_configured(repo)
+    reordered = """version: 2
+updates:
+  - directory: /
+    package-ecosystem: github-actions
+    schedule:
+      interval: weekly
+"""
+    for valid in (good, reordered):
+        enabled = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(valid)}})
+        assert enabled.github_actions_dependency_updates_configured(repo)
+    for invalid in (outside, missing_directory, missing_schedule):
+        audit = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(invalid)}})
+        assert not audit.github_actions_dependency_updates_configured(repo)
+
+
+def test_codeowners_requires_clean_errors_and_critical_coverage() -> None:
+    repo = "Oteryn/Test"
+    encode = lambda text: m.core.base64.b64encode(text.encode("utf-8")).decode("ascii")
+    text = """/.github/workflows/ @owner
+/SECURITY.md @owner
+/contracts/ @owner
+"""
+    paths = [".github/workflows/ci.yml", "SECURITY.md", "contracts/api.md"]
+    good = FakeAudit({
+        f"/repos/{repo}/contents/.github/CODEOWNERS": {"content": encode(text)},
+        f"/repos/{repo}/codeowners/errors": {"errors": []},
+    })
+    assert good.codeowners_baseline_valid(repo, paths)
+    malformed = FakeAudit({
+        f"/repos/{repo}/contents/.github/CODEOWNERS": {"content": encode(text)},
+        f"/repos/{repo}/codeowners/errors": {"errors": [{"line": 1}]},
+    })
+    assert not malformed.codeowners_baseline_valid(repo, paths)
+    assert not m.core.codeowners_text_covers_paths("/.github/workflows/ @owner\n", paths)
+
+
+def test_workflow_supply_chain_requires_permissions_and_full_sha_pins() -> None:
+    secure = """name: test
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567
+      - uses: ./local-action
+"""
+    assert m.core.workflow_text_secure(secure)
+    assert not m.core.workflow_text_secure(secure.replace("0123456789abcdef0123456789abcdef01234567", "v4"))
+    assert not m.core.workflow_text_secure(secure.replace("permissions:\n  contents: read", "permissions: write-all"))
+    assert not m.core.workflow_text_secure(secure.replace("permissions:\n  contents: read\n", ""))
+
+
+def test_retained_release_requires_all_pinned_asset_identities() -> None:
+    repo = "Oteryn/Test"
+    wanted = {"tag": "cut", "assets": {"bundle": {"size": 10, "digest": "sha256:" + "a" * 64}}}
+    release = {"tag_name": "cut", "assets": [{"name": "bundle", "size": 10, "digest": "sha256:" + "a" * 64}]}
+    good = FakeAudit({f"/repos/{repo}/releases/tags/cut": release})
+    assert good.retained_release_valid(repo, wanted)
+    missing = FakeAudit({f"/repos/{repo}/releases/tags/cut": {"tag_name": "cut", "assets": []}})
+    assert not missing.retained_release_valid(repo, wanted)
 
 
 def test_administrative_repo_live_coordinate_is_pinned() -> None:
     repo = "Oteryn/Test"
-    audit = FakeAudit({f"/repos/{repo}": {"full_name": "Oteryn/Renamed", "id": 123, "archived": True}})
-    audit.audit_administrative_repo({"repository": repo, "repository_id": 123, "archived": True})
+    retention = {"tag": "cut", "assets": {"bundle": {"size": 10, "digest": "sha256:" + "a" * 64}}}
+    release = {"tag_name": "cut", "assets": [{"name": "bundle", "size": 10, "digest": "sha256:" + "a" * 64}]}
+    audit = FakeAudit({
+        f"/repos/{repo}": {"full_name": "Oteryn/Renamed", "id": 123, "archived": True},
+        f"/repos/{repo}/releases/tags/cut": release,
+    })
+    audit.audit_administrative_repo({"repository": repo, "repository_id": 123, "archived": True, "retention_release": retention})
     assert audit.errors == [f"{repo}: administrative coordinate drift"]
-
 
 def search_path(repo: str, needle: str, page: int) -> str:
     q = m.urllib.parse.quote_plus(f'"{needle}" repo:{repo}')

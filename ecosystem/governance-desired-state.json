@@ -20,13 +20,19 @@
         "secret_scanning": true,
         "push_protection": true,
         "dependabot_security_updates": true,
-        "github_actions_dependency_updates": true
+        "github_actions_dependency_updates": true,
+        "workflow_supply_chain": true
       },
       "protection": {
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false
-      }
+      },
+      "codeowners_required_paths": [
+        ".github/workflows/ci.yml",
+        "SECURITY.md",
+        "ecosystem/repositories.json"
+      ]
     },
     {
       "repository": "Oteryn/Oteryn-Game",
@@ -46,13 +52,19 @@
         "secret_scanning": true,
         "push_protection": true,
         "dependabot_security_updates": true,
-        "github_actions_dependency_updates": true
+        "github_actions_dependency_updates": true,
+        "workflow_supply_chain": true
       },
       "protection": {
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false
-      }
+      },
+      "codeowners_required_paths": [
+        ".github/workflows/merge-gate.yml",
+        "SECURITY.md",
+        ".github/repository-policy.json"
+      ]
     },
     {
       "repository": "Oteryn/Oteryn-Platform",
@@ -73,13 +85,19 @@
         "secret_scanning": true,
         "push_protection": true,
         "dependabot_security_updates": true,
-        "github_actions_dependency_updates": true
+        "github_actions_dependency_updates": true,
+        "workflow_supply_chain": true
       },
       "protection": {
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false
-      }
+      },
+      "codeowners_required_paths": [
+        ".github/workflows/ci.yml",
+        "SECURITY.md",
+        "docs/contracts/_governance-contract"
+      ]
     },
     {
       "repository": "Oteryn/Oteryn-Atlas",
@@ -99,13 +117,19 @@
         "secret_scanning": true,
         "push_protection": true,
         "dependabot_security_updates": true,
-        "github_actions_dependency_updates": true
+        "github_actions_dependency_updates": true,
+        "workflow_supply_chain": true
       },
       "protection": {
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false
-      }
+      },
+      "codeowners_required_paths": [
+        ".github/workflows/ci.yml",
+        "SECURITY.md",
+        "docs/migration/_governance-contract"
+      ]
     }
   ],
   "administrative_repositories": [
@@ -115,7 +139,36 @@
       "classification": "TEMPORARY_MIGRATION",
       "terminal_state": "ARCHIVED_READ_ONLY",
       "archived": true,
-      "retention_authority": "docs/recovery/organization-recovery-contract.md"
+      "retention_authority": "docs/recovery/organization-recovery-contract.md",
+      "retention_release": {
+        "tag": "platform-transfer-cut-2026-08-18",
+        "assets": {
+          "Oteryn-Platform-full.bundle": {
+            "size": 13604250,
+            "digest": "sha256:dcd54ab36459db447087fff5490e06d643478f01e441fd5f65cfe061df8c5d60"
+          },
+          "Oteryn-Platform-mirror.git.tar.gz": {
+            "size": 14411720,
+            "digest": "sha256:0ff51dd0226595adfd2ffc505f1997cfb344cbb41f992642d3e0f6bb8ee33409"
+          },
+          "source-refs.txt": {
+            "size": 978,
+            "digest": "sha256:f97a8f859d2896c69f25668f179d2933d5862012ed5c5c8e753bc6d60d8f886a"
+          },
+          "source-refs.snapshot.txt": {
+            "size": 978,
+            "digest": "sha256:f97a8f859d2896c69f25668f179d2933d5862012ed5c5c8e753bc6d60d8f886a"
+          },
+          "manifest.txt": {
+            "size": 215,
+            "digest": "sha256:6852fb3c058a7142f003c0b788fed6764a23e332c3b060811a7a128e35eb09fe"
+          },
+          "SHA256SUMS.txt": {
+            "size": 274,
+            "digest": "sha256:c1afbfcb98a34593378e31173bc922166960151894548be45679e61346e9e188"
+          }
+        }
+      }
     }
   ],
   "mutable_coordinate_policy": {

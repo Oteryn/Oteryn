@@ -73,6 +73,144 @@ def actions_permissions_enabled(payload: object) -> bool:
     return isinstance(payload, dict) and payload.get("enabled") is True
 
 
+def _strip_yaml_comment(raw: str) -> str:
+    quote = None
+    escaped = False
+    out = []
+    for char in raw:
+        if escaped:
+            out.append(char)
+            escaped = False
+            continue
+        if char == "\\" and quote == '"':
+            out.append(char)
+            escaped = True
+            continue
+        if char in {"'", '"'}:
+            if quote is None:
+                quote = char
+            elif quote == char:
+                quote = None
+            out.append(char)
+            continue
+        if char == "#" and quote is None:
+            break
+        out.append(char)
+    return "".join(out).rstrip()
+
+
+def _yaml_scalar(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def dependabot_github_actions_entry_valid(text: str) -> bool:
+    rows = []
+    for raw in text.splitlines():
+        if "\t" in raw:
+            return False
+        line = _strip_yaml_comment(raw)
+        if not line.strip():
+            continue
+        rows.append((len(line) - len(line.lstrip(" ")), line.strip()))
+    if (0, "version: 2") not in rows:
+        return False
+    try:
+        updates_index = next(i for i, (indent, body) in enumerate(rows) if indent == 0 and body == "updates:")
+    except StopIteration:
+        return False
+    i = updates_index + 1
+    while i < len(rows):
+        indent, body = rows[i]
+        if indent == 0:
+            break
+        if not body.startswith("-"):
+            i += 1
+            continue
+        item_indent = indent
+        entry = []
+        while i < len(rows):
+            child_indent, child_body = rows[i]
+            if child_indent == 0 or (entry and child_indent == item_indent and child_body.startswith("-")):
+                break
+            entry.append((child_indent, child_body))
+            i += 1
+        ecosystem = None
+        directory = None
+        interval = None
+        schedule_indent = None
+        for offset, (child_indent, child_body) in enumerate(entry):
+            body_value = child_body[1:].strip() if offset == 0 and child_body.startswith("-") else child_body
+            if child_indent <= item_indent + 2 and body_value.startswith("package-ecosystem:"):
+                ecosystem = _yaml_scalar(body_value.split(":", 1)[1])
+            elif child_indent <= item_indent + 2 and body_value.startswith("directory:"):
+                directory = _yaml_scalar(body_value.split(":", 1)[1])
+            elif child_indent <= item_indent + 2 and body_value == "schedule:":
+                schedule_indent = child_indent
+            elif schedule_indent is not None and child_indent > schedule_indent and body_value.startswith("interval:"):
+                interval = _yaml_scalar(body_value.split(":", 1)[1])
+        if ecosystem == "github-actions":
+            return directory == "/" and interval in {"daily", "weekly", "monthly", "quarterly", "semiannually", "yearly"}
+    return False
+
+def codeowners_pattern_covers(pattern: str, path: str) -> bool:
+    pattern = pattern.strip()
+    path = path.lstrip("/")
+    if pattern in {"*", "**", "/*", "/**"}:
+        return True
+    anchored = pattern.startswith("/")
+    normalized = pattern.lstrip("/")
+    if normalized.endswith("/"):
+        prefix = normalized.rstrip("/") + "/"
+        return path.startswith(prefix)
+    if "/" not in normalized and not anchored:
+        return any(fnmatch.fnmatchcase(part, normalized) for part in path.split("/"))
+    return fnmatch.fnmatchcase(path, normalized)
+
+
+def codeowners_text_covers_paths(text: str, required_paths: list[str]) -> bool:
+    rules = []
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        parts = stripped.split()
+        if len(parts) < 2 or not any(owner.startswith("@") or "@" in owner for owner in parts[1:]):
+            return False
+        rules.append(parts[0])
+    return bool(rules) and all(any(codeowners_pattern_covers(pattern, path) for pattern in rules) for path in required_paths)
+
+
+def workflow_text_secure(text: str) -> bool:
+    has_top_permissions = False
+    for raw in text.splitlines():
+        line = _strip_yaml_comment(raw)
+        if not line.strip():
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        body = line.strip()
+        if indent == 0 and body.startswith("permissions:"):
+            has_top_permissions = True
+            value = _yaml_scalar(body.split(":", 1)[1])
+            if value == "write-all":
+                return False
+        if re.fullmatch(r"permissions:\s*[\"']?write-all[\"']?", body):
+            return False
+        match = re.match(r"(?:-\s*)?uses:\s*(.+)$", body)
+        if match:
+            value = _yaml_scalar(match.group(1).strip())
+            if value.startswith("./") or value.startswith("docker://"):
+                continue
+            if "@" not in value:
+                return False
+            ref = value.rsplit("@", 1)[1]
+            if not re.fullmatch(r"[0-9a-fA-F]{40}", ref):
+                return False
+    return has_top_permissions
+
+
 def merge_sources(*groups: dict[str, set[int | None]]) -> dict[str, set[int | None]]:
     merged: dict[str, set[int | None]] = {}
     for group in groups:
@@ -115,7 +253,7 @@ def load_desired() -> dict:
         required_security = (
             "private_vulnerability_reporting", "secret_scanning",
             "push_protection", "dependabot_security_updates",
-            "github_actions_dependency_updates",
+            "github_actions_dependency_updates", "workflow_supply_chain",
         )
         if not isinstance(security, dict) or set(security) != set(required_security):
             raise SystemExit(f"repository has incomplete security contract: {item}")
@@ -125,6 +263,13 @@ def load_desired() -> dict:
             target = item.get("target_gate")
             if not isinstance(target, str) or not target:
                 raise SystemExit(f"transition repository lacks target_gate: {item}")
+        codeowner_paths = item.get("codeowners_required_paths")
+        if not isinstance(codeowner_paths, list) or not codeowner_paths or not all(
+            isinstance(path, str) and path and not path.startswith("/") for path in codeowner_paths
+        ):
+            raise SystemExit(f"repository has invalid codeowners_required_paths: {item}")
+        if len(set(codeowner_paths)) != len(codeowner_paths):
+            raise SystemExit(f"repository has duplicate codeowners_required_paths: {item}")
     policy = data.get("mutable_coordinate_policy")
     if not isinstance(policy, dict) or set(policy) != {"forbidden", "historical_reference_only"}:
         raise SystemExit("mutable_coordinate_policy must contain forbidden and historical_reference_only")
@@ -143,7 +288,7 @@ def load_desired() -> dict:
         raise SystemExit(f"unexpected administrative repository identity: {admins[0]}")
     required_admin_fields = {
         "repository", "repository_id", "classification", "terminal_state",
-        "archived", "retention_authority",
+        "archived", "retention_authority", "retention_release",
     }
     for item in admins:
         if not isinstance(item, dict) or set(item) != required_admin_fields:
@@ -157,6 +302,20 @@ def load_desired() -> dict:
             raise SystemExit(f"administrative repository archived must be boolean: {item}")
         if item["terminal_state"] == "ARCHIVED_READ_ONLY" and item["archived"] is not True:
             raise SystemExit(f"archived terminal state must require archived=true: {item}")
+        release = item.get("retention_release")
+        if not isinstance(release, dict) or set(release) != {"tag", "assets"}:
+            raise SystemExit(f"administrative repository has invalid retention_release: {item}")
+        if not isinstance(release.get("tag"), str) or not release["tag"].strip():
+            raise SystemExit(f"administrative repository has invalid retention release tag: {item}")
+        assets = release.get("assets")
+        if not isinstance(assets, dict) or len(assets) != 6:
+            raise SystemExit(f"administrative repository must pin six retention assets: {item}")
+        digest_re = re.compile(r"^sha256:[0-9a-f]{64}$")
+        for name, identity in assets.items():
+            if not isinstance(name, str) or not name or not isinstance(identity, dict) or set(identity) != {"size", "digest"}:
+                raise SystemExit(f"invalid retention asset identity: {name!r} / {identity!r}")
+            if not isinstance(identity.get("size"), int) or identity["size"] <= 0 or not isinstance(identity.get("digest"), str) or not digest_re.fullmatch(identity["digest"]):
+                raise SystemExit(f"invalid retention asset size/digest: {name!r} / {identity!r}")
     return data
 
 
@@ -410,22 +569,66 @@ class Audit:
         quoted = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
         return self.api(f"/repos/{repo}/contents/{quoted}", allow_404=True) is not None
 
+    @staticmethod
+    def _decoded_contents(payload: object) -> str | None:
+        if not isinstance(payload, dict) or not isinstance(payload.get("content"), str):
+            return None
+        try:
+            return base64.b64decode(payload["content"]).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return None
+
     def github_actions_dependency_updates_configured(self, repo: str) -> bool:
         payload = self.api(f"/repos/{repo}/contents/.github/dependabot.yml", allow_404=True)
-        if not isinstance(payload, dict):
+        text = self._decoded_contents(payload)
+        return text is not None and dependabot_github_actions_entry_valid(text)
+
+    def codeowners_baseline_valid(self, repo: str, required_paths: list[str]) -> bool:
+        payload = self.api(f"/repos/{repo}/contents/.github/CODEOWNERS", allow_404=True)
+        text = self._decoded_contents(payload)
+        errors = self.api(f"/repos/{repo}/codeowners/errors", allow_404=True)
+        return (
+            text is not None
+            and isinstance(errors, dict)
+            and errors.get("errors") == []
+            and codeowners_text_covers_paths(text, required_paths)
+        )
+
+    def workflow_supply_chain_valid(self, repo: str) -> bool:
+        listing = self.api(f"/repos/{repo}/contents/.github/workflows", allow_404=True)
+        if not isinstance(listing, list):
             return False
-        content = payload.get("content")
-        if not isinstance(content, str):
+        workflows = [
+            item for item in listing
+            if isinstance(item, dict) and item.get("type") == "file"
+            and str(item.get("name") or "").lower().endswith((".yml", ".yaml"))
+        ]
+        if not workflows:
             return False
-        try:
-            text = base64.b64decode(content).decode("utf-8")
-        except (ValueError, UnicodeDecodeError):
+        for item in workflows:
+            path = item.get("path")
+            if not isinstance(path, str) or not path:
+                return False
+            payload = self.api(f"/repos/{repo}/contents/{'/'.join(urllib.parse.quote(part, safe='') for part in path.split('/'))}")
+            text = self._decoded_contents(payload)
+            if text is None or not workflow_text_secure(text):
+                return False
+        return True
+
+    def retained_release_valid(self, repo: str, wanted: dict) -> bool:
+        tag = wanted.get("tag")
+        assets = wanted.get("assets")
+        if not isinstance(tag, str) or not isinstance(assets, dict):
             return False
-        for raw_line in text.splitlines():
-            line = raw_line.split("#", 1)[0].strip()
-            if re.fullmatch(r"(?:-\s*)?package-ecosystem:\s*[\"']?github-actions[\"']?", line):
-                return True
-        return False
+        release = self.api(f"/repos/{repo}/releases/tags/{urllib.parse.quote(tag, safe='')}", allow_404=True)
+        if not isinstance(release, dict) or release.get("tag_name") != tag:
+            return False
+        observed = {
+            asset.get("name"): {"size": asset.get("size"), "digest": asset.get("digest")}
+            for asset in release.get("assets", [])
+            if isinstance(asset, dict) and isinstance(asset.get("name"), str)
+        }
+        return all(observed.get(name) == identity for name, identity in assets.items())
 
     def audit_repo(self, wanted: dict) -> None:
         repo = wanted["repository"]
@@ -496,8 +699,16 @@ class Audit:
                 self.github_actions_dependency_updates_configured(repo),
                 f"{repo}: security baseline missing github_actions_dependency_updates",
             )
-        for path in ("SECURITY.md", ".github/CODEOWNERS"):
-            self.check(self.file_exists(repo, path), f"{repo}: missing {path}")
+        self.check(self.file_exists(repo, "SECURITY.md"), f"{repo}: missing SECURITY.md")
+        self.check(
+            self.codeowners_baseline_valid(repo, wanted["codeowners_required_paths"]),
+            f"{repo}: CODEOWNERS missing, invalid, or lacks required critical-path coverage",
+        )
+        if expected_sec.get("workflow_supply_chain"):
+            self.check(
+                self.workflow_supply_chain_valid(repo),
+                f"{repo}: workflow supply-chain baseline missing explicit permissions or full-SHA action pins",
+            )
 
         permissions = self.api(f"/repos/{repo}/actions/permissions")
         self.check(actions_permissions_enabled(permissions), f"{repo}: GitHub Actions disabled")
@@ -511,6 +722,10 @@ class Audit:
         self.check(live.get("id") == wanted["repository_id"], f"{repo}: administrative repository ID drift")
         if "archived" in wanted:
             self.check(bool(live.get("archived")) == bool(wanted["archived"]), f"{repo}: archived terminal-state drift")
+        self.check(
+            self.retained_release_valid(repo, wanted["retention_release"]),
+            f"{repo}: retained transfer-cut Release assets drift",
+        )
 
     def _search_all_code(self, repo: str, needle: str) -> list[dict]:
         q = urllib.parse.quote_plus(f'"{needle}" repo:{repo}')
