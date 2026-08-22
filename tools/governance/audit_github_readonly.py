@@ -94,13 +94,26 @@ class Audit(core.Audit):
                 allowed_head_shas={sha},
                 pr_number=pr_number,
             )
-            target_sources = self._protected_flow_sources(
-                repo,
-                main_runs,
-                event="pull_request_target",
-                allowed_head_shas={main_sha},
-                pr_number=pr_number,
-            )
+            target_sources: dict[str, set[int | None]] = {}
+            for check_run in main_runs.get("check_runs", []):
+                workflow = self._workflow_run(repo, check_run)
+                if not workflow or workflow.get("event") != "pull_request_target":
+                    continue
+                if workflow.get("head_sha") != main_sha:
+                    continue
+                bound_to_current_head = any(
+                    item.get("number") == pr_number
+                    and ((item.get("head") or {}).get("sha") == sha)
+                    for item in workflow.get("pull_requests", [])
+                    if isinstance(item, dict)
+                )
+                if not bound_to_current_head:
+                    continue
+                self._add_source(
+                    target_sources,
+                    check_run.get("name"),
+                    (check_run.get("app") or {}).get("id"),
+                )
             sources = merge_sources(pr_sources, target_sources)
             if expected_sources_satisfied(sources, expected, expected_app_id):
                 return sources

@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import tempfile
 import urllib.error
 from pathlib import Path
 
@@ -48,6 +50,7 @@ def test_pull_request_target_is_read_from_current_base_commit() -> None:
         },
         "/repos/Oteryn/Test/actions/runs/301": {
             "event": "pull_request_target", "head_sha": main,
+            "pull_requests": [{"number": 7, "head": {"sha": head}}],
         },
         "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
             "number": 7,
@@ -82,6 +85,7 @@ def test_pull_request_target_for_other_pr_does_not_prove_gate() -> None:
         },
         "/repos/Oteryn/Test/actions/runs/303": {
             "event": "pull_request_target", "head_sha": main,
+            "pull_requests": [{"number": 99, "head": {"sha": "c" * 40}}],
         },
         "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
             "number": 7,
@@ -105,6 +109,71 @@ def test_pull_request_target_for_other_pr_does_not_prove_gate() -> None:
         observed, {"meta-gate", "ai-review-gate"}, ACTIONS_APP_ID
     )
 
+
+
+def test_stale_pull_request_target_generation_does_not_prove_current_head() -> None:
+    main = "a" * 40
+    old_head = "b" * 40
+    head = "c" * 40
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
+        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {
+            "check_runs": [check_run("ai-review-gate", 305, 7)],
+        },
+        "/repos/Oteryn/Test/actions/runs/305": {
+            "event": "pull_request_target", "head_sha": main,
+            "pull_requests": [{"number": 7, "head": {"sha": old_head}}],
+        },
+        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
+            "number": 7,
+            "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
+            "base": {"ref": "main"},
+        }],
+        f"/repos/Oteryn/Test/compare/{main}...{head}": {
+            "status": "ahead", "merge_base_commit": {"sha": main},
+        },
+        f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {
+            "check_runs": [check_run("meta-gate", 306, 7)],
+        },
+        "/repos/Oteryn/Test/actions/runs/306": {
+            "event": "pull_request", "head_sha": head,
+        },
+    })
+    observed = audit.representative_check_sources(
+        "Oteryn/Test", {"meta-gate", "ai-review-gate"}, ACTIONS_APP_ID
+    )
+    assert not m.expected_sources_satisfied(
+        observed, {"meta-gate", "ai-review-gate"}, ACTIONS_APP_ID
+    )
+
+
+def test_desired_state_requires_complete_merge_and_security_contract() -> None:
+    data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    original_path = m.core.DESIRED_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "desired.json"
+        broken = json.loads(json.dumps(data))
+        del broken["permanent_repositories"][0]["squash_only"]
+        path.write_text(json.dumps(broken), encoding="utf-8")
+        m.core.DESIRED_PATH = path
+        try:
+            m.core.load_desired()
+        except SystemExit as exc:
+            assert "squash_only" in str(exc)
+        else:
+            raise AssertionError("missing squash_only must fail closed")
+
+        broken = json.loads(json.dumps(data))
+        del broken["permanent_repositories"][0]["security"]["push_protection"]
+        path.write_text(json.dumps(broken), encoding="utf-8")
+        try:
+            m.core.load_desired()
+        except SystemExit as exc:
+            assert "security contract" in str(exc)
+        else:
+            raise AssertionError("incomplete security object must fail closed")
+        finally:
+            m.core.DESIRED_PATH = original_path
 
 def test_transport_failure_becomes_runtime_unknown_signal() -> None:
     original = m.urllib.request.urlopen

@@ -234,6 +234,12 @@ def test_check_names_are_not_union_across_multiple_pr_heads() -> None:
     assert not m.expected_sources_satisfied(observed, {"gate-a", "gate-b"}, ACTIONS_APP_ID)
 
 
+def test_dependabot_security_updates_treat_200_json_as_enabled() -> None:
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/automated-security-fixes": {"enabled": True, "paused": False},
+    })
+    assert audit.dependabot_security_updates_enabled("Oteryn/Test")
+
 def test_dependabot_security_updates_treat_204_as_enabled() -> None:
     repo = "Oteryn/Test"
     audit = FakeAudit({f"/repos/{repo}/automated-security-fixes": {"_http_status": 204}})

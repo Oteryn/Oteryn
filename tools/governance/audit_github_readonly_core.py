@@ -85,6 +85,15 @@ def load_desired() -> dict:
             raise SystemExit(f"invalid gate_mode: {item}")
         expected_checks(item)
         expected_check_app_id(item)
+        for field in ("main_protected", "squash_only", "delete_branch_on_merge"):
+            if not isinstance(item.get(field), bool):
+                raise SystemExit(f"repository lacks boolean {field}: {item}")
+        security = item.get("security")
+        required_security = ("secret_scanning", "push_protection", "dependabot_security_updates")
+        if not isinstance(security, dict) or set(security) != set(required_security):
+            raise SystemExit(f"repository has incomplete security contract: {item}")
+        if not all(isinstance(security.get(field), bool) for field in required_security):
+            raise SystemExit(f"repository security controls must be booleans: {item}")
         if item.get("gate_mode") == "transition":
             target = item.get("target_gate")
             if not isinstance(target, str) or not target:
@@ -306,7 +315,9 @@ class Audit:
 
     def dependabot_security_updates_enabled(self, repo: str) -> bool:
         fixes = self.api(f"/repos/{repo}/automated-security-fixes", allow_404=True)
-        return isinstance(fixes, dict) and fixes.get("_http_status") == 204
+        return isinstance(fixes, dict) and (
+            fixes.get("_http_status") == 204 or fixes.get("enabled") is True
+        )
 
     def file_exists(self, repo: str, path: str) -> bool:
         quoted = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
