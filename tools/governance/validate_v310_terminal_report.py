@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import re
@@ -73,6 +74,26 @@ def state_from_rows(rows: list[list[str]], artifact: str) -> tuple[str, list[str
     if all(state.startswith("PASS") for state in states):
         return "PASS", []
     return "FAIL", [f"unexpected lifecycle state: {state}" for state in states]
+
+
+def inventory_path_atoms(cell: str) -> list[str]:
+    return [atom.strip() for atom in re.findall(r"`([^`]+)`", cell) if atom.strip()]
+
+
+def path_atoms_overlap(left: str, right: str) -> bool:
+    if left == right:
+        return True
+    left_glob = any(ch in left for ch in "*?[")
+    right_glob = any(ch in right for ch in "*?[")
+    if left_glob and not right_glob and fnmatch.fnmatchcase(right, left):
+        return True
+    if right_glob and not left_glob and fnmatch.fnmatchcase(left, right):
+        return True
+    if left.endswith("/**") and right.startswith(left[:-3]):
+        return True
+    if right.endswith("/**") and left.startswith(right[:-3]):
+        return True
+    return False
 
 
 def invariant(state: str, evidence: str, gaps: list[str] | None = None) -> dict:
@@ -165,6 +186,19 @@ def build_record() -> dict:
             errors.append(f"normative artifact has non-single/non-owning authority: {row}")
         if "UNKNOWN" in lifecycle and "GAP-" not in lifecycle:
             errors.append(f"inventory lifecycle UNKNOWN without GAP-ID: {row}")
+
+    atom_owners: dict[str, list[tuple[str, str]]] = {repo: [] for repo in REPOS}
+    for row in inventory:
+        if len(row) != 7 or row[0] not in atom_owners:
+            continue
+        repo, current, primary = row[0], row[1], row[2]
+        for atom in inventory_path_atoms(current):
+            for prior_atom, prior_primary in atom_owners[repo]:
+                if prior_primary != primary and path_atoms_overlap(prior_atom, atom):
+                    errors.append(
+                        f"material artifact has multiple primary classes: {repo}:{prior_atom} ({prior_primary}) <> {atom} ({primary})"
+                    )
+            atom_owners[repo].append((atom, primary))
 
     inventory_classes = {repo: set() for repo in REPOS}
     for row in inventory:

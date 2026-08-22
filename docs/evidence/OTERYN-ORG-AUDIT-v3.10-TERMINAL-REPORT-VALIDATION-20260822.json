@@ -2,7 +2,7 @@
   "schema_version": 2,
   "validator": "tools/governance/validate_v310_terminal_report.py",
   "report": "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
-  "report_sha256": "b810fe45acec84a6c62ba76ea321de2a1a0ae2e1cf7ff83dbccedcf6ff421a13",
+  "report_sha256": "e0ebafb59d108ec07b1487d0cfc7fb305d9b992e05238bfb6ca92a472d120bc7",
   "execution_verdict": "PASS",
   "programme_verdict": "INCOMPLETE",
   "contract_completeness": "INCOMPLETE",
@@ -58,8 +58,8 @@
     "Platform": 22,
     "Atlas": 22
   },
-  "material_inventory_rows": 67,
-  "section_15_disposition_rows": 67,
+  "material_inventory_rows": 66,
+  "section_15_disposition_rows": 66,
   "section_19_documentation_backlog_types": [
     "DOCUMENTATION_IA",
     "AGENT_INSTRUCTION",
@@ -81,7 +81,7 @@
     },
     "material_artifacts_have_primary_class": {
       "state": "PASS",
-      "evidence": "67 material path/object families"
+      "evidence": "66 material path/object families"
     },
     "normative_artifacts_have_single_authority": {
       "state": "PASS",
@@ -159,7 +159,7 @@
     },
     "section_15_file_dispositions_present": {
       "state": "PASS",
-      "evidence": "67/67 section-4 material families mapped exactly once"
+      "evidence": "66/66 section-4 material families mapped exactly once"
     },
     "section_19_required_backlog_categories_present": {
       "state": "PASS",

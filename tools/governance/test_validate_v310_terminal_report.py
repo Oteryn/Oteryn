@@ -48,7 +48,7 @@ def test_missing_docs_ci_backlog_fails() -> None:
 
 def test_missing_material_classification_fails() -> None:
     text = m.REPORT.read_text(encoding="utf-8")
-    line = "| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`; `docs/ci/CI_CONTRACT.md` | contracts | YES | META | durable while authoritative; update through protected provider process | on-demand/routed |\n"
+    line = "| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` | contracts | YES | META | durable while authoritative; update through protected provider process | on-demand/routed |\n"
     assert line in text
     temp, old_root, old_report = with_report(text.replace(line, "", 1))
     try:
@@ -104,7 +104,7 @@ def test_missing_atlas_handover_lifecycle_row_fails() -> None:
 
 def test_missing_section15_material_disposition_fails() -> None:
     text = m.REPORT.read_text(encoding="utf-8")
-    prefix = "| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`; `docs/ci/CI_CONTRACT.md` | contracts | `[KEEP]`"
+    prefix = "| META | `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` | contracts | `[KEEP] current material family"
     text = without_row(text, prefix)
     temp, old_root, old_report = with_report(text)
     try:
@@ -113,6 +113,21 @@ def test_missing_section15_material_disposition_fails() -> None:
         assert record["mechanical_invariants"]["section_15_file_dispositions_present"]["state"] == "FAIL"
     finally:
         restore(temp, old_root, old_report)
+
+def test_grouped_inventory_path_overlap_fails() -> None:
+    text = m.REPORT.read_text(encoding="utf-8")
+    marker = "| META | `/AGENTS.md` | root AGENTS | YES | META | durable routing policy | always loaded; bounded root context |\n"
+    assert marker in text
+    overlap = "| META | `/AGENTS.md`; `docs/agents/contracts/SYNTHETIC.md` | contracts | YES | META | synthetic overlap | routed |\n"
+    text = text.replace(marker, marker + overlap, 1)
+    temp, old_root, old_report = with_report(text)
+    try:
+        record = m.build_record()
+        assert record["execution_verdict"] == "FAIL"
+        assert any("multiple primary classes" in error for error in record["errors"])
+    finally:
+        restore(temp, old_root, old_report)
+
 
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
