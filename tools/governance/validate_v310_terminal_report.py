@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+REPO_STRUCTURE_ROOT = Path(__file__).resolve().parents[2]
 REPORT = ROOT / "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md"
 RECORD = ROOT / "docs/evidence/OTERYN-ORG-AUDIT-v3.10-TERMINAL-REPORT-VALIDATION-20260822.json"
 RUNNER_CAPTURE = ROOT / "docs/evidence/OTERYN-ORG-RUNNER-ACL-LIVE-CLOSEOUT-20260822.json"
@@ -109,12 +110,27 @@ def path_pattern_contains(parent: str, child: str) -> bool:
         return fnmatch.fnmatchcase(child, parent)
     return False
 
+def wildcard_literal_prefix(pattern: str) -> str:
+    positions = [pattern.find(ch) for ch in "*?[" if ch in pattern]
+    return pattern[:min(positions)] if positions else pattern
+
+def wildcard_patterns_may_overlap(left: str, right: str) -> bool:
+    if not any(ch in left for ch in "*?[") or not any(ch in right for ch in "*?["):
+        return False
+    lp = wildcard_literal_prefix(left)
+    rp = wildcard_literal_prefix(right)
+    return lp.startswith(rp) or rp.startswith(lp)
+
 def selector_specs_overlap(left, right):
     left_in, left_ex = left; right_in, right_ex = right
     for a in left_in:
         for b in right_in:
             if path_pattern_contains(a,b): narrower=b
             elif path_pattern_contains(b,a): narrower=a
+            elif wildcard_patterns_may_overlap(a,b):
+                # Fail closed when two wildcard sets share a compatible literal prefix
+                # and disjointness cannot be proven structurally.
+                return a,b
             else: continue
             if any(path_pattern_contains(ex,narrower) for ex in left_ex): continue
             if any(path_pattern_contains(ex,narrower) for ex in right_ex): continue
@@ -246,6 +262,29 @@ def build_record() -> dict:
         if row[1] not in inventory_families[row[0]]:
             errors.append(f"material Matrix L class missing from section 4 inventory: {row[0]}:{row[1]}")
 
+    required_meta_github = sorted(
+        str(path.relative_to(REPO_STRUCTURE_ROOT)).replace("\\", "/")
+        for path in [
+            *list((REPO_STRUCTURE_ROOT / ".github/workflows").glob("*.yml")),
+            *list((REPO_STRUCTURE_ROOT / ".github/workflows").glob("*.yaml")),
+            *list((REPO_STRUCTURE_ROOT / ".github/actions").rglob("action.yml")),
+            *list((REPO_STRUCTURE_ROOT / ".github/actions").rglob("action.yaml")),
+        ]
+        if path.is_file()
+    )
+    meta_specs = [spec for spec, _primary, _current in selector_records["META"]]
+    missing_meta_github = []
+    for path in required_meta_github:
+        covered = any(
+            any(path_pattern_contains(include, path) for include in includes)
+            and not any(path_pattern_contains(exclude, path) for exclude in excludes)
+            for includes, excludes in meta_specs
+        )
+        if not covered:
+            missing_meta_github.append(path)
+    if missing_meta_github:
+        errors.append(f"material META .github governance surface missing from section 4 inventory: {missing_meta_github}")
+
     lifecycle_rows = table_rows(text, "| Repository | Artifact family | Required invariant | Verification state | Lifecycle authority / supersession |")
     prompt_state, prompt_gaps = state_from_rows(lifecycle_rows, "reusable prompts")
     task_state, task_gaps = state_from_rows(lifecycle_rows, "active task packets")
@@ -340,6 +379,10 @@ def build_record() -> dict:
             f"{len(inventory)} material artifact records using section-10A operational taxonomy",
         ),
         "normative_artifacts_have_single_authority": invariant("PASS" if inventory and not any("normative artifact" in e for e in errors) else "FAIL", "section 4 normative inventory authority column"),
+        "meta_github_governance_surface_inventory": invariant(
+            "PASS" if not missing_meta_github else "FAIL",
+            f"{len(required_meta_github) - len(missing_meta_github)}/{len(required_meta_github)} META workflow/action files covered by section 4",
+        ),
         "retained_reusable_prompts_have_identity_version_status": invariant(prompt_state, "section 7 lifecycle verification", prompt_gaps),
         "active_task_packets_have_lifecycle_authority": invariant(task_state, "section 7 lifecycle verification", task_gaps),
         "handovers_are_non_authoritative_and_expire": invariant(handover_state, "section 7 lifecycle verification", handover_gaps),

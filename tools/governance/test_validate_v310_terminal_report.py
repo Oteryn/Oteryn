@@ -153,6 +153,27 @@ def test_unquoted_inventory_selector_fails() -> None:
         restore(temp, old_root, old_report)
 
 
+def test_meta_github_governance_surface_is_inventory_covered() -> None:
+    record = m.build_record()
+    assert record["mechanical_invariants"]["meta_github_governance_surface_inventory"]["state"] == "PASS"
+
+
+def test_wildcard_pair_possible_intersection_fails_closed() -> None:
+    text = m.REPORT.read_text(encoding="utf-8")
+    gov = "`docs/agents/OWNER_FUNDED_AI_POLICY.md`; `docs/agents/PROMPTING_STANDARD.md`; `docs/agents/PROMPT_EVAL_STANDARD.md`; `docs/agents/PROMPTING_HANDOVER.md`"
+    machine = "`.github/repository-policy.json`; `docs/agents/GOVERNANCE_CONTRACT.json`; `docs/agents/PROJECT_LANES.json`"
+    assert text.count(gov) >= 2 and text.count(machine) >= 2
+    text = text.replace(gov, "`docs/agents/*POLICY*.md`", 2)
+    text = text.replace(machine, "`docs/agents/*AI*.md`", 2)
+    temp, old_root, old_report = with_report(text)
+    try:
+        record = m.build_record()
+        assert record["execution_verdict"] == "FAIL"
+        assert any("multiple primary classes" in error for error in record["errors"])
+    finally:
+        restore(temp, old_root, old_report)
+
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:
