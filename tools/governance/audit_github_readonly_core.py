@@ -962,8 +962,17 @@ class Audit:
             if references is None:
                 return False
             for reference in references:
-                if not (validate(f"{reference}/action.yml", require_top_permissions=False)
-                        or validate(f"{reference}/action.yaml", require_top_permissions=False)):
+                if reference.startswith(".github/workflows/") and reference.endswith((".yml", ".yaml")):
+                    if not validate(reference, require_top_permissions=True):
+                        return False
+                    continue
+                primary = f"{reference}/action.yml"
+                primary_quoted = "/".join(urllib.parse.quote(part, safe="") for part in primary.split("/"))
+                if self.api(f"/repos/{repo}/contents/{primary_quoted}", allow_404=True) is not None:
+                    if not validate(primary, require_top_permissions=False):
+                        return False
+                    continue
+                if not validate(f"{reference}/action.yaml", require_top_permissions=False):
                     return False
             return True
 
