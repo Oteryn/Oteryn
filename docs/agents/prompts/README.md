@@ -6,7 +6,6 @@ These prompts split the remaining `OTERYN-ORG-AUDIT-v3.10` closeout into indepen
 
 | Alias | Primary repository | Primary lifecycle | Ownership |
 | --- | --- | --- | --- |
-| `OTERYN-ORG-AUDIT-META-DESIRED-STATE-CLOSEOUT` | `Oteryn/Oteryn` | PR #37 | finish META desired-state/drift audit, exact-head R2, protected merge and predecessor reconciliation |
 | `OTERYN-ORG-RUNNERS-PLATFORM-ACL-LEGACY-CLOSEOUT` | `Oteryn/Oteryn` + `Oteryn/Oteryn-Platform` | META #34 / Platform #1215 | Platform trusted-main proof, runner-group ACL readback, dependency-aware legacy retirement |
 | `OTERYN-GAME-RUNNER-ACCEPTANCE-CLOSEOUT` | `Oteryn/Oteryn-Game` | Game #34 / PR #36 | policy-permitted independent review, merge and trusted-main Game runner acceptance |
 
@@ -32,3 +31,7 @@ The coordinator owns:
 - final #38 runner-audit reconciliation, v3.10 PR readiness, cleanup and terminal verdict.
 
 The coordinator must not rewrite executor-owned implementation branches while they are active.
+
+## Historical one-shot prompt
+
+`OTERYN-ORG-AUDIT-META-DESIRED-STATE-CLOSEOUT` is terminal and must not be invoked: PR #37 was squash-merged as `c0dbad93f791953d5efcc6b556e6be73693f0a4f`, and predecessors #23/#9 were closed as superseded. Its file is retained only as historical execution evidence.
