@@ -13,6 +13,7 @@ SHA = "a" * 40
 def event(body="", branch="feat/demo", sha=SHA, merged=False, head_repo="Oteryn/Demo"):
     return {
         "repository": {"full_name": "Oteryn/Demo"},
+        "sender": {"login": "maintainer"},
         "pull_request": {
             "number": 7, "state": "closed", "merged": merged,
             "merged_at": "2026-08-22T00:00:00Z" if merged else None,
@@ -27,8 +28,9 @@ def live(evt):
 
 
 class GH:
-    def __init__(self, evt=None, *, protected=False, open_pulls=None, open_pull_snapshots=None, pull_snapshots=None, fail_open_call=None, default="main"):
+    def __init__(self, evt=None, *, protected=False, open_pulls=None, open_pull_snapshots=None, pull_snapshots=None, fail_open_call=None, permission="write", default="main"):
         self.evt, self.protected, self.open_pulls, self.default = evt, protected, open_pulls or [], default
+        self.permission = permission
         self.open_pull_snapshots = list(open_pull_snapshots) if open_pull_snapshots is not None else None
         self.pull_snapshots = list(pull_snapshots) if pull_snapshots is not None else None
         self.fail_open_call = fail_open_call
@@ -36,6 +38,8 @@ class GH:
         self.calls = []
     def get_repository(self):
         self.calls.append("repo"); return {"full_name": "Oteryn/Demo", "default_branch": self.default}
+    def get_user_permission(self, login):
+        self.calls.append("permission"); return self.permission
     def get_pull(self, number):
         self.calls.append("pull")
         if self.pull_snapshots is not None:
@@ -113,6 +117,13 @@ class CleanupTests(unittest.TestCase):
     def test_cross_repo_or_merged_is_not_applicable(self):
         for evt in [event("Branch-Disposition: delete\nBranch-Disposition-Reason: old", head_repo="fork/repo"), event("Branch-Disposition: delete\nBranch-Disposition-Reason: old", merged=True)]:
             git = Git(); self.assertEqual(process_event(evt, "Oteryn/Demo", GH(), git)["result"], "NOT_APPLICABLE"); self.assertEqual(git.deletes, [])
+
+    def test_delete_requires_write_authority_from_close_event_sender(self):
+        evt = self.delete_event()
+        git = Git()
+        with self.assertRaisesRegex(CleanupError, "requires repository write authority"):
+            process_event(evt, "Oteryn/Demo", GH(evt, permission="read"), git)
+        self.assertEqual(git.deletes, [])
 
     def test_live_disposition_revalidation_can_revoke_delete(self):
         evt = self.delete_event()

@@ -18,6 +18,7 @@ REASON = re.compile(r"^[ \t]*Branch-Disposition-Reason:[ \t]*(\S[^\r\n]*)$", re.
 ANY_REASON = re.compile(r"^[ \t]*Branch-Disposition-Reason:[ \t]*(.*)$", re.I | re.M)
 FULL_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 RESERVED = ("release", "rollback", "recovery", "backup")
+WRITE_PERMISSIONS = frozenset({"admin", "maintain", "write"})
 
 
 class CleanupError(RuntimeError):
@@ -87,6 +88,16 @@ def process_event(event: dict[str, Any], repository: str, github: Any, git: Any)
         return result("RETAIN", branch=branch, number=number, sha=sha, reason=reason)
     if pull.get("state") != "closed" or pull.get("merged") is True or pull.get("merged_at") is not None or repo_name(head.get("repo")) != repository:
         return result("NOT_APPLICABLE", branch=branch, number=number, sha=sha, reason=reason)
+    sender = event.get("sender") if isinstance(event.get("sender"), dict) else {}
+    sender_login = sender.get("login")
+    if not isinstance(sender_login, str) or not sender_login.strip():
+        raise CleanupError("delete disposition requires an authenticated close-event sender")
+    permission = github.get_user_permission(sender_login)
+    if permission not in WRITE_PERMISSIONS:
+        raise CleanupError(
+            f"delete disposition requires repository write authority for close-event sender {sender_login!r}; "
+            f"live permission is {permission!r}"
+        )
     if any(part in branch.casefold() for part in RESERVED):
         raise CleanupError(f"branch {branch!r} is recovery-sensitive and cannot be auto-deleted")
 
@@ -186,6 +197,15 @@ class GitHubClient:
 
     def get_repository(self):
         return self.get(f"/repos/{self.repository}")
+
+    def get_user_permission(self, login: str) -> str:
+        value = self.get(
+            f"/repos/{self.repository}/collaborators/{urllib.parse.quote(login, safe='')}/permission"
+        )
+        permission = value.get("permission") if isinstance(value, dict) else None
+        if not isinstance(permission, str) or not permission:
+            raise ApiError(f"repository permission response is invalid for {login!r}")
+        return permission
 
     def get_pull(self, number: int):
         return self.get(f"/repos/{self.repository}/pulls/{number}")

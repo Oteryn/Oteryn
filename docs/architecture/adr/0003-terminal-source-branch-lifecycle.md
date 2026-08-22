@@ -27,13 +27,14 @@ and exactly one non-empty `Branch-Disposition-Reason: ...` line.
 `delete` is destructive authority only for that exact closed pull request head. The trusted cleanup implementation must revalidate immediately before deletion that:
 
 1. the event and live repository identities match the caller repository;
-2. the pull request remains closed, unmerged, same-repository, on the same source branch and exact head SHA;
-3. the source ref still resolves to that exact SHA;
-4. the source branch is neither the default branch nor protected;
-5. no open pull request owns the same ref;
-6. release, rollback, recovery, and backup-sensitive names are excluded;
-7. the remote used for deletion resolves to the caller repository;
-8. deletion uses an exact-SHA Git lease and the ref is verified absent afterwards; any unknown or negative post-delete verification result triggers an exact-head conditional restoration attempt before the run fails.
+2. the authenticated close-event sender has live `write`, `maintain`, or `admin` repository permission;
+3. the pull request remains closed, unmerged, same-repository, on the same source branch and exact head SHA;
+4. the source ref still resolves to that exact SHA;
+5. the source branch is neither the default branch nor protected;
+6. no open pull request owns the same ref;
+7. release, rollback, recovery, and backup-sensitive names are excluded;
+8. the remote used for deletion resolves to the caller repository;
+9. deletion uses an exact-SHA Git lease and the ref is verified absent afterwards; any unknown or negative post-delete verification result triggers an exact-head conditional restoration attempt before the run fails.
 
 `retain` is non-destructive and records the reason in cleanup evidence. Missing disposition metadata performs no destructive action. Malformed or conflicting disposition metadata fails closed.
 
