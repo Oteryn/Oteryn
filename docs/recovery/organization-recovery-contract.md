@@ -1,6 +1,6 @@
 # Oteryn organization recovery and break-glass contract
 
-Status date: 2026-08-20
+Status date: 2026-08-22
 Lifecycle authority: GitHub Issue #10
 Governance authority: `docs/architecture/adr/0002-organization-governance-operating-model.md`
 
@@ -21,7 +21,7 @@ This is an organization-level recovery contract. Provider repositories remain au
 - `LAST_RESTORE_TEST`: `UNKNOWN` for a backup covering the current heads of all four permanent repositories.
 - `RESTORE_VALIDATION`: `UNKNOWN`.
 
-`blakinio/Oteryn-v2` and bounded `blakinio/Otheryn` history are migration/reference provenance, not complete backups of later target-only history. The current machine-readable inventory still classifies the former Game migration source as retirement-pending; its final archival/source-retirement state is therefore `UNKNOWN` in this recovery contract until the manifest and live proof are reconciled.
+`blakinio/Oteryn-v2` and bounded `blakinio/Otheryn` history are migration/reference provenance, not complete backups of later target-only history. The former Game migration source `blakinio/Oteryn-v2` is now recorded as archived read-only in the reconciled machine-readable inventory. Exhaustive final tag/ref and stale-coordinate closure is still not independently proven by this recovery contract, so Game migration completion remains `UNKNOWN` rather than being inferred from archival alone.
 
 ### Platform transfer-cut Git-history artifact
 
@@ -57,7 +57,7 @@ Exact durable asset identities:
 
 Historical defect resolution: the original `SHA256SUMS.txt` embeds absolute GitHub-runner paths. The defect is preserved as provenance rather than rewritten. The durable procedure validates by asset basename using the explicit identities above and Release digest readback, so the portability defect no longer blocks recovery. The historical manifest's `head_push_rc=1` remains evidence of a failed temporary reseed attempt, not proof of target seeding.
 
-Terminal gate for `Oteryn/Oteryn-Platform-Migration-Backup-20260818`: **PARTIAL — ARCHIVED_READ_ONLY OBSERVED, MANIFEST RECONCILIATION PENDING**. Provider transfer acceptance, retention/provenance disposition and a durable checksum-portability procedure are recorded, but the current canonical inventory still says `terminal_disposition_required`. This contract does not override that machine-readable state. Reconcile the manifest against live repository evidence before declaring the terminal gate satisfied. The one-off seed workflow was removed before archival; deletion is not presumed required.
+Terminal gate for `Oteryn/Oteryn-Platform-Migration-Backup-20260818`: **DONE — ARCHIVED_READ_ONLY RECONCILED**. Live GitHub readback on 2026-08-22 confirms repository ID `1338405017` with `archived=true`, and the canonical machine-readable inventory records `lifecycle_state=ARCHIVED_READ_ONLY`. Provider transfer-cut retention/provenance and the durable checksum-portability procedure remain recorded here. This closes only the administrative repository's terminal disposition; it does not prove current Platform backup recurrence, production RPO/RTO, package recovery, or GitHub control-plane recovery. The one-off seed workflow was removed before archival; deletion is not required.
 
 ### Platform production data
 
@@ -106,4 +106,4 @@ Break-glass is for containment and recovery, never a normal bypass path. Record 
 - `GAP-RECOVERY-005`: second-owner/account-recovery redundancy is unproven.
 - `GAP-RECOVERY-006`: Platform production backup/restore RPO/RTO remains unproven; staging evidence must not be promoted to production evidence.
 
-`GAP-RECOVERY-007` is **PARTIAL**: the transfer-cut artifact and checksum-portability procedure are recorded, but the current machine-readable inventory still requires terminal-disposition reconciliation. This contract does not declare the administrative repository finally archived or the gap closed until that reconciliation has live evidence.
+`GAP-RECOVERY-007` is **DONE** for the historical Platform transfer-cut disposition: the artifact identities, checksum-portability procedure, isolated restore evidence, live `archived=true` readback and canonical inventory reconciliation are all recorded. This does not close `GAP-RECOVERY-001` through `006` and is not evidence of a recurring current-state backup.
