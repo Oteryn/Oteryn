@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 10518)
-Total output lines: 478
-
 # OTERYN-ORG-AUDIT-v3.10 — final terminal audit report
 
 Audit contract: `OTERYN-ORG-AUDIT-v3.10`
@@ -321,7 +318,20 @@ No source or rollback object is removed merely because it looks old.
 | ---: | --- | --- | --- |
 | 1 | merge terminal desired-state/drift audit | META | DONE — #37 squash-merged as `c0dbad93f791953d5efcc6b556e6be73693f0a4f`; #23 and #9 closed as superseded |
 | 2 | obtain Platform trusted-main diagnostics run/job readback | Platform | UNKNOWN until direct run evidence |
-| 3 | obtain …518 tokens truncated…audit evidence | META + provider evidence owners | PARTIAL — META exact-head/byte-bound evidence is enforced; provider evidence remains incomplete |
+| 3 | obtain permitted independent review and merge Game runner candidate | Game | BLOCKED by review authorization/surface |
+| 4 | run trusted-main Game acceptance | Game | blocked by item 3 |
+| 5 | read runner-group selected-repository ACLs | organization owner/control plane | UNKNOWN with current connector |
+| 6 | retire legacy staging runner after 2–5 PASS | organization/Platform | NOT DONE by design |
+| 7 | close migration-specific Game/Platform/Atlas evidence | each provider + META reconciliation | UNKNOWN/NO |
+| 8 | implement recurring current-state recovery/control-plane/package/secret-owner recovery evidence | organization/providers | PARTIAL |
+| 9 | terminalize stable `game-gate` / `platform-gate` transitions | Game/Platform | PARTIAL |
+| 10 | re-run v3.10 final acceptance and close remaining Issues | META | blocked by preceding items |
+| 11 | **DOCUMENTATION_IA**: complete provider path/owner/retention inventory against Matrix L | each provider + META reconciliation | UNKNOWN — direct provider inventory evidence is not complete (`V310-GAME-DOC-01`, `V310-PLATFORM-DOC-01`, `V310-ATLAS-DOC-01`) |
+| 12 | **AGENT_INSTRUCTION**: revalidate root/nested instruction precedence and remove stale mutable routing | each repository owner | UNKNOWN — provider instruction inventories remain evidence-bound gaps |
+| 13 | **PROMPT_LIFECYCLE**: classify reusable/one-shot prompts and prove unique canonical ownership | scope owner | PARTIAL — META terminal prompt disposition is recorded; provider lifecycle proof remains UNKNOWN |
+| 14 | **TASK_LIFECYCLE**: reconcile active packets, handovers, Issues and terminal archive/delete states | each repository owner | UNKNOWN — active/terminal provider task inventories require direct evidence |
+| 15 | **RUNBOOK**: inventory operations/recovery runbooks with owner, retention and tested recovery scope | provider owners + META recovery owner | UNKNOWN — current recurring recovery evidence is incomplete (`V310-RECOVERY-01`) |
+| 16 | **EVIDENCE_GOVERNANCE**: bind subject/source/SHA/time/retention for durable audit evidence | META + provider evidence owners | PARTIAL — META exact-head/byte-bound evidence is enforced; provider evidence remains incomplete |
 | 17 | **DOCS_CI**: require deterministic documentation/agent validation in governing CI | META + provider owners | PARTIAL — this report validator is required by META `meta-gate`; provider-equivalent coverage remains UNKNOWN |
 
 ## 20. Owner decisions
