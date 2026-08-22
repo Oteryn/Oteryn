@@ -80,6 +80,12 @@ def test_required_gate_trigger_rejects_path_filters() -> None:
     assert not m.core.workflow_event_unfiltered(
         'on:\n  pull_request: {"paths": [src/**]}\n', "pull_request"
     )
+    assert not m.core.workflow_event_unfiltered(
+        "on:\n  pull_request:\n    types: [opened]\n", "pull_request"
+    )
+    assert not m.core.workflow_event_unfiltered(
+        'on:\n  pull_request: {"pa\\u0074hs": [src/**]}\n', "pull_request"
+    )
 
 
 def test_required_context_sources_ignore_other_branches_and_keep_app_identity() -> None:
