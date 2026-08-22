@@ -2,6 +2,8 @@
 
 MODE: Autonomous multi-surface runner terminal proof + cleanup closeout.
 
+Lifecycle: **ONE_SHOT**. On terminal closure, archive this prompt as historical execution evidence; do not keep it as an active/reusable alias.
+
 Primary repositories:
 - `https://github.com/Oteryn/Oteryn`
 - `https://github.com/Oteryn/Oteryn-Platform`
