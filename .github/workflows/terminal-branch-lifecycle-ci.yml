@@ -1,0 +1,37 @@
+name: Terminal Branch Lifecycle CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/actions/terminal-branch-cleanup/**"
+      - ".github/workflows/terminal-branch-lifecycle.yml"
+      - ".github/workflows/terminal-branch-lifecycle-ci.yml"
+      - "tools/branch_lifecycle/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/actions/terminal-branch-cleanup/**"
+      - ".github/workflows/terminal-branch-lifecycle.yml"
+      - ".github/workflows/terminal-branch-lifecycle-ci.yml"
+      - "tools/branch_lifecycle/**"
+
+permissions:
+  contents: read
+
+jobs:
+  terminal-branch-lifecycle-test:
+    name: terminal-branch-lifecycle-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate terminal branch lifecycle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/branch_lifecycle/closed_pr_cleanup.py
+          python3 tools/branch_lifecycle/test_closed_pr_cleanup.py
+          python3 tools/branch_lifecycle/test_workflow_contract.py

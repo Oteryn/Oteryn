@@ -1,0 +1,38 @@
+name: Oteryn terminal branch cleanup
+description: Fail-closed cleanup for explicitly disposable closed-unmerged same-repository pull request branches.
+inputs:
+  token:
+    description: Repository-scoped GITHUB_TOKEN from the caller workflow.
+    required: true
+outputs:
+  evidence-path:
+    description: Machine-readable cleanup result path.
+    value: ${{ steps.cleanup.outputs.evidence-path }}
+runs:
+  using: composite
+  steps:
+    - id: cleanup
+      name: Revalidate and apply explicit terminal disposition
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+      run: |
+        set -u
+        output="${RUNNER_TEMP}/oteryn-terminal-branch-cleanup.json"
+        set +e
+        python3 "${GITHUB_ACTION_PATH}/../../../tools/branch_lifecycle/closed_pr_cleanup.py" \
+          --event "$GITHUB_EVENT_PATH" \
+          --repository "$GITHUB_REPOSITORY" \
+          --output "$output" \
+          --root "$GITHUB_WORKSPACE" \
+          --remote origin
+        status=$?
+        set -e
+        echo "evidence-path=$output" >> "$GITHUB_OUTPUT"
+        if [[ -f "$output" ]]; then
+          echo '### Terminal branch cleanup' >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat "$output" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+        fi
+        exit "$status"

@@ -1,0 +1,46 @@
+name: Terminal Branch Lifecycle
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: terminal-branch-lifecycle-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  close-event-cleanup:
+    if: >-
+      github.event.pull_request.merged == false &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    name: close-event-cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Check out trusted protected main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Apply explicit terminal branch disposition
+        id: cleanup
+        uses: ./.github/actions/terminal-branch-cleanup
+        with:
+          token: ${{ github.token }}
+
+      - name: Publish cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: terminal-branch-close-event-${{ github.run_id }}
+          path: ${{ runner.temp }}/oteryn-terminal-branch-cleanup.json
+          if-no-files-found: warn
+          retention-days: 30
