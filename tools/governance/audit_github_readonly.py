@@ -43,7 +43,7 @@ class Audit(core.Audit):
         expected: set[str],
         expected_app_id: int,
     ) -> dict[str, set[int | None]]:
-        """Prove emission from current push or one current internal PR.
+        """Prove required-gate emission from one current internal PR.
 
         pull_request checks are read from the PR head. pull_request_target
         checks are read from the current base commit and must still be bound
@@ -55,19 +55,10 @@ class Audit(core.Audit):
             return {}
 
         main_runs = self.api(f"/repos/{repo}/commits/{main_sha}/check-runs?per_page=100") or {}
-        main_sources = self._protected_flow_sources(
-            repo,
-            main_runs,
-            event="push",
-            allowed_head_shas={main_sha},
-        )
-        if expected_sources_satisfied(main_sources, expected, expected_app_id):
-            return main_sources
-
         def score(candidate: dict[str, set[int | None]]) -> int:
             return sum(candidate.get(context) == {expected_app_id} for context in expected)
 
-        best = main_sources
+        best: dict[str, set[int | None]] = {}
         pulls = self.api(
             f"/repos/{repo}/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20"
         ) or []
