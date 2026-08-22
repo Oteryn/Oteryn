@@ -141,16 +141,24 @@ def dependabot_github_actions_entry_valid(text: str) -> bool:
         directory = None
         interval = None
         schedule_indent = None
+        schedule_child_indent = None
         for offset, (child_indent, child_body) in enumerate(entry):
             body_value = child_body[1:].strip() if offset == 0 and child_body.startswith("-") else child_body
+            if schedule_indent is not None and child_indent <= schedule_indent:
+                schedule_indent = None
+                schedule_child_indent = None
             if child_indent <= item_indent + 2 and body_value.startswith("package-ecosystem:"):
                 ecosystem = _yaml_scalar(body_value.split(":", 1)[1])
             elif child_indent <= item_indent + 2 and body_value.startswith("directory:"):
                 directory = _yaml_scalar(body_value.split(":", 1)[1])
             elif child_indent <= item_indent + 2 and body_value == "schedule:":
                 schedule_indent = child_indent
-            elif schedule_indent is not None and child_indent > schedule_indent and body_value.startswith("interval:"):
-                interval = _yaml_scalar(body_value.split(":", 1)[1])
+                schedule_child_indent = None
+            elif schedule_indent is not None and child_indent > schedule_indent:
+                if schedule_child_indent is None:
+                    schedule_child_indent = child_indent
+                if child_indent == schedule_child_indent and body_value.startswith("interval:"):
+                    interval = _yaml_scalar(body_value.split(":", 1)[1])
         if ecosystem == "github-actions":
             return directory == "/" and interval in {"daily", "weekly", "monthly", "quarterly", "semiannually", "yearly"}
     return False
@@ -201,7 +209,11 @@ def workflow_text_secure(text: str) -> bool:
         match = re.match(r"(?:-\s*)?uses:\s*(.+)$", body)
         if match:
             value = _yaml_scalar(match.group(1).strip())
-            if value.startswith("./") or value.startswith("docker://"):
+            if value.startswith("./"):
+                continue
+            if value.startswith("docker://"):
+                if not re.fullmatch(r"docker://[^@\s]+@sha256:[0-9a-fA-F]{64}", value):
+                    return False
                 continue
             if "@" not in value:
                 return False
@@ -487,10 +499,16 @@ class Audit:
         )
         if not protection:
             return {"force_pushes": True, "deletions": True, "broad_bypass": True}
+        bypass_allowances = (
+            (protection.get("required_pull_request_reviews") or {}).get("bypass_pull_request_allowances") or {}
+        )
+        has_pr_bypass = any(bool(bypass_allowances.get(kind)) for kind in ("users", "teams", "apps"))
         return {
             "force_pushes": bool((protection.get("allow_force_pushes") or {}).get("enabled")),
             "deletions": bool((protection.get("allow_deletions") or {}).get("enabled")),
-            "broad_bypass": not bool((protection.get("enforce_admins") or {}).get("enabled")),
+            "broad_bypass": (
+                not bool((protection.get("enforce_admins") or {}).get("enabled")) or has_pr_bypass
+            ),
         }
 
     def private_vulnerability_reporting_enabled(self, repo: str) -> bool:

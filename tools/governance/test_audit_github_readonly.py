@@ -302,6 +302,18 @@ def test_classic_protection_controls_detect_admin_bypass() -> None:
         },
     })
     assert bypass.main_protection_controls("Oteryn/Test")["broad_bypass"] is True
+    allowance = FakeAudit({
+        "/repos/Oteryn/Test/rulesets": [],
+        "/repos/Oteryn/Test/branches/main/protection": {
+            "allow_force_pushes": {"enabled": False},
+            "allow_deletions": {"enabled": False},
+            "enforce_admins": {"enabled": True},
+            "required_pull_request_reviews": {
+                "bypass_pull_request_allowances": {"users": [{"login": "bypass-user"}], "teams": [], "apps": []},
+            },
+        },
+    })
+    assert allowance.main_protection_controls("Oteryn/Test")["broad_bypass"] is True
 
 
 def test_private_vulnerability_reporting_status() -> None:
@@ -342,6 +354,15 @@ updates:
   - package-ecosystem: github-actions
     directory: /
 """
+    interval_outside_schedule = """version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+    groups:
+      fake:
+        interval: weekly
+"""
     encode = lambda text: m.core.base64.b64encode(text.encode("utf-8")).decode("ascii")
     reordered = """version: 2
 updates:
@@ -353,7 +374,7 @@ updates:
     for valid in (good, reordered):
         enabled = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(valid)}})
         assert enabled.github_actions_dependency_updates_configured(repo)
-    for invalid in (outside, missing_directory, missing_schedule):
+    for invalid in (outside, missing_directory, missing_schedule, interval_outside_schedule):
         audit = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(invalid)}})
         assert not audit.github_actions_dependency_updates_configured(repo)
 
@@ -388,10 +409,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@0123456789abcdef0123456789abcdef01234567
+      - uses: docker://ghcr.io/example/action@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       - uses: ./local-action
 """
     assert m.core.workflow_text_secure(secure)
     assert not m.core.workflow_text_secure(secure.replace("0123456789abcdef0123456789abcdef01234567", "v4"))
+    assert not m.core.workflow_text_secure(
+        secure.replace(
+            "docker://ghcr.io/example/action@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "docker://ghcr.io/example/action:latest",
+        )
+    )
     assert not m.core.workflow_text_secure(secure.replace("permissions:\n  contents: read", "permissions: write-all"))
     assert not m.core.workflow_text_secure(secure.replace("permissions:\n  contents: read\n", ""))
 
