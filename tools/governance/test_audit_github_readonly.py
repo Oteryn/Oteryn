@@ -77,6 +77,9 @@ def test_required_gate_trigger_rejects_path_filters() -> None:
     assert not m.core.workflow_event_unfiltered(
         "on:\n  pull_request:\n    paths-ignore: ['docs/**']\n", "pull_request"
     )
+    assert not m.core.workflow_event_unfiltered(
+        'on:\n  pull_request: {"paths": [src/**]}\n', "pull_request"
+    )
 
 
 def test_required_context_sources_ignore_other_branches_and_keep_app_identity() -> None:
@@ -402,6 +405,8 @@ def test_private_vulnerability_reporting_status() -> None:
     enabled = FakeAudit({f"/repos/{repo}/private-vulnerability-reporting": {"enabled": True}})
     disabled = FakeAudit({f"/repos/{repo}/private-vulnerability-reporting": {"enabled": False}})
     assert enabled.private_vulnerability_reporting_enabled(repo)
+    no_content = FakeAudit({f"/repos/{repo}/private-vulnerability-reporting": {"_http_status": 204}})
+    assert no_content.private_vulnerability_reporting_enabled(repo)
     assert not disabled.private_vulnerability_reporting_enabled(repo)
 
 
