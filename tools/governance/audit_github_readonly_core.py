@@ -322,6 +322,47 @@ def codeowners_text_covers_paths(text: str, required_paths: list[str]) -> bool:
     return bool(rules) and all(any(codeowners_pattern_covers(pattern, path) for pattern in rules) for path in required_paths)
 
 
+def workflow_event_unfiltered(text: str, event: str) -> bool:
+    """Return whether a workflow declares an event without path filtering."""
+    rows = []
+    for raw in text.splitlines():
+        line = _strip_yaml_comment(raw)
+        if line.strip():
+            rows.append((len(line) - len(line.lstrip(" ")), line.strip()))
+    for index, (indent, body) in enumerate(rows):
+        field = _yaml_mapping_field(body)
+        if field is None or field[0] or indent != 0 or field[1] != "on":
+            continue
+        raw_value = field[2]
+        if raw_value:
+            scalar = _yaml_scalar(raw_value)
+            if scalar == event:
+                return True
+            if raw_value.startswith("[") and raw_value.endswith("]"):
+                values = [_yaml_scalar(value) for value in raw_value[1:-1].split(",")]
+                return event in values
+            return False
+        for child_index in range(index + 1, len(rows)):
+            child_indent, child_body = rows[child_index]
+            if child_indent <= indent:
+                break
+            child = _yaml_mapping_field(child_body)
+            if child is None or child[0] or child_indent != indent + 2 or child[1] != event:
+                continue
+            event_value = child[2]
+            if event_value and re.search(r'''(?:^|[,{])\s*paths(?:-ignore)?\s*:''', event_value):
+                return False
+            for nested_indent, nested_body in rows[child_index + 1:]:
+                if nested_indent <= child_indent:
+                    break
+                nested = _yaml_mapping_field(nested_body)
+                if nested is not None and nested[1] in {"paths", "paths-ignore"}:
+                    return False
+            return True
+        return False
+    return False
+
+
 def workflow_text_secure(text: str) -> bool:
     has_top_permissions = False
     permissions_indent: int | None = None
@@ -348,6 +389,8 @@ def workflow_text_secure(text: str) -> bool:
         field = _yaml_mapping_field(body)
         if field is None:
             compact = body.lstrip("- ").strip()
+            if re.match(r'''^\*[^\s:]+\s*:''', compact):
+                return False
             if re.match(r'''^"[^"\n]*\\[^"\n]*"\s*:''', compact):
                 return False
             if compact.startswith("{") and compact.endswith("}") and re.search(
@@ -548,6 +591,7 @@ class Audit:
         self.warnings: list[str] = []
         self._workflow_runs: dict[tuple[str, int], dict] = {}
         self._workflow_definitions: dict[tuple[str, int], dict | None] = {}
+        self._workflow_trigger_validity: dict[tuple[str, int, str], bool] = {}
 
     def api(self, path: str, *, allow_404: bool = False):
         req = urllib.request.Request(
@@ -603,6 +647,18 @@ class Audit:
             self._workflow_definitions[key] = payload if isinstance(payload, dict) else None
         return self._workflow_definitions[key]
 
+    def _workflow_event_unfiltered(self, repo: str, definition: dict, event: str) -> bool:
+        workflow_id = definition.get("id")
+        path = definition.get("path")
+        if not isinstance(workflow_id, int) or workflow_id <= 0 or not isinstance(path, str) or not path:
+            return False
+        key = (repo, workflow_id, event)
+        if key not in self._workflow_trigger_validity:
+            quoted_path = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
+            text = self._decoded_contents(self.api(f"/repos/{repo}/contents/{quoted_path}", allow_404=True))
+            self._workflow_trigger_validity[key] = text is not None and workflow_event_unfiltered(text, event)
+        return self._workflow_trigger_validity[key]
+
     def _protected_flow_sources(
         self,
         repo: str,
@@ -619,6 +675,8 @@ class Audit:
                 continue
             definition = self._workflow_definition(repo, workflow)
             if not definition or definition.get("state") != "active":
+                continue
+            if not self._workflow_event_unfiltered(repo, definition, event):
                 continue
             if workflow.get("event") != event or workflow.get("head_sha") not in allowed_head_shas:
                 continue
