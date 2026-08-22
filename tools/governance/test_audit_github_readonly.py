@@ -27,7 +27,7 @@ class FakeAudit(m.Audit):
             return self.responses[path]
         if path.startswith("/repos/Oteryn/Test/actions/workflows/"):
             return {"id": 1, "state": "active", "path": ".github/workflows/gate.yml"}
-        if path == "/repos/Oteryn/Test/contents/.github/workflows/gate.yml":
+        if path.startswith("/repos/Oteryn/Test/contents/.github/workflows/gate.yml"):
             return {"content": base64.b64encode(b"on: [pull_request, pull_request_target]\n").decode("ascii")}
         if allow_404:
             return None
@@ -587,6 +587,10 @@ jobs:
     assert m.core.workflow_text_secure(bounded_write)
     anchored_write_wide = block_write_wide.replace("permissions:", "permissions: &wide", 1)
     assert not m.core.workflow_text_secure(anchored_write_wide)
+    aliased_write_wide = block_write_wide.replace(
+        "permissions:\n", "env:\n  W: &wide write\npermissions:\n"
+    ).replace(": write", ": *wide")
+    assert not m.core.workflow_text_secure(aliased_write_wide)
     quoted_write_all = secure.replace("permissions:\n  contents: read", '"permissions": write-all')
     assert not m.core.workflow_text_secure(quoted_write_all)
     assert not m.core.workflow_text_secure(
