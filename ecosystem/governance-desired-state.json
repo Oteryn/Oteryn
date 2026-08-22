@@ -6,23 +6,34 @@
       "repository": "Oteryn/Oteryn",
       "repository_id": 1338152366,
       "role": "META",
-      "required_checks": ["meta-gate", "ai-review-gate"],
+      "required_checks": [
+        "meta-gate",
+        "ai-review-gate"
+      ],
       "required_check_app_id": 15368,
       "gate_mode": "stable",
       "main_protected": true,
       "squash_only": true,
       "delete_branch_on_merge": true,
       "security": {
+        "private_vulnerability_reporting": true,
         "secret_scanning": true,
         "push_protection": true,
         "dependabot_security_updates": true
+      },
+      "protection": {
+        "force_pushes": false,
+        "deletions": false,
+        "broad_bypass": false
       }
     },
     {
       "repository": "Oteryn/Oteryn-Game",
       "repository_id": 1338291140,
       "role": "GAME",
-      "required_checks": ["Merge gate / validate"],
+      "required_checks": [
+        "Merge gate / validate"
+      ],
       "required_check_app_id": 15368,
       "target_gate": "game-gate",
       "gate_mode": "transition",
@@ -30,16 +41,25 @@
       "squash_only": true,
       "delete_branch_on_merge": true,
       "security": {
+        "private_vulnerability_reporting": true,
         "secret_scanning": true,
         "push_protection": true,
         "dependabot_security_updates": true
+      },
+      "protection": {
+        "force_pushes": false,
+        "deletions": false,
+        "broad_bypass": false
       }
     },
     {
       "repository": "Oteryn/Oteryn-Platform",
       "repository_id": 1305155726,
       "role": "PLATFORM",
-      "required_checks": ["classify-changes", "test"],
+      "required_checks": [
+        "classify-changes",
+        "test"
+      ],
       "required_check_app_id": 15368,
       "target_gate": "platform-gate",
       "gate_mode": "transition",
@@ -47,25 +67,40 @@
       "squash_only": true,
       "delete_branch_on_merge": true,
       "security": {
+        "private_vulnerability_reporting": true,
         "secret_scanning": true,
         "push_protection": true,
         "dependabot_security_updates": true
+      },
+      "protection": {
+        "force_pushes": false,
+        "deletions": false,
+        "broad_bypass": false
       }
     },
     {
       "repository": "Oteryn/Oteryn-Atlas",
       "repository_id": 1337995824,
       "role": "ATLAS",
-      "required_checks": ["atlas-gate", "provenance-gate"],
+      "required_checks": [
+        "atlas-gate",
+        "provenance-gate"
+      ],
       "required_check_app_id": 15368,
       "gate_mode": "stable",
       "main_protected": true,
       "squash_only": true,
       "delete_branch_on_merge": true,
       "security": {
+        "private_vulnerability_reporting": true,
         "secret_scanning": true,
         "push_protection": true,
         "dependabot_security_updates": true
+      },
+      "protection": {
+        "force_pushes": false,
+        "deletions": false,
+        "broad_bypass": false
       }
     }
   ],
@@ -80,7 +115,9 @@
     }
   ],
   "mutable_coordinate_policy": {
-    "forbidden": ["blakinio/Oteryn-Platform"],
+    "forbidden": [
+      "blakinio/Oteryn-Platform"
+    ],
     "historical_reference_only": [
       "blakinio/Oteryn-v2",
       "blakinio/Otheryn",

@@ -54,6 +54,20 @@ def expected_sources_satisfied(sources: dict[str, set[int | None]], expected: se
     return all(sources.get(context) == {app_id} for context in expected)
 
 
+def allowed_required_checks(item: dict) -> set[str]:
+    allowed = expected_checks(item)
+    if item.get("gate_mode") == "transition":
+        target = item.get("target_gate")
+        if isinstance(target, str) and target:
+            allowed.add(target)
+    return allowed
+
+
+def required_contexts_match(item: dict, observed: set[str]) -> bool:
+    expected = expected_checks(item)
+    return expected <= observed <= allowed_required_checks(item)
+
+
 def merge_sources(*groups: dict[str, set[int | None]]) -> dict[str, set[int | None]]:
     merged: dict[str, set[int | None]] = {}
     for group in groups:
@@ -86,14 +100,21 @@ def load_desired() -> dict:
         expected_checks(item)
         expected_check_app_id(item)
         for field in ("main_protected", "squash_only", "delete_branch_on_merge"):
-            if not isinstance(item.get(field), bool):
-                raise SystemExit(f"repository lacks boolean {field}: {item}")
+            if item.get(field) is not True:
+                raise SystemExit(f"repository must require {field}=true: {item}")
+        protection = item.get("protection")
+        required_protection = {"force_pushes": False, "deletions": False, "broad_bypass": False}
+        if protection != required_protection:
+            raise SystemExit(f"repository has incomplete or weakened protection contract: {item}")
         security = item.get("security")
-        required_security = ("secret_scanning", "push_protection", "dependabot_security_updates")
+        required_security = (
+            "private_vulnerability_reporting", "secret_scanning",
+            "push_protection", "dependabot_security_updates",
+        )
         if not isinstance(security, dict) or set(security) != set(required_security):
             raise SystemExit(f"repository has incomplete security contract: {item}")
-        if not all(isinstance(security.get(field), bool) for field in required_security):
-            raise SystemExit(f"repository security controls must be booleans: {item}")
+        if not all(security.get(field) is True for field in required_security):
+            raise SystemExit(f"repository security controls must all be true: {item}")
         if item.get("gate_mode") == "transition":
             target = item.get("target_gate")
             if not isinstance(target, str) or not target:
@@ -272,6 +293,42 @@ class Audit:
                     self._add_source(sources, context, None)
         return sources
 
+    def main_protection_controls(
+        self, repo: str, *, branch: str = "main", default_branch: str = "main"
+    ) -> dict[str, bool]:
+        applicable: list[dict] = []
+        for summary in self.api(f"/repos/{repo}/rulesets") or []:
+            if summary.get("enforcement") != "active":
+                continue
+            detail = self.api(f"/repos/{repo}/rulesets/{summary['id']}")
+            if ruleset_applies_to_branch(detail, branch=branch, default_branch=default_branch):
+                applicable.append(detail)
+        if applicable:
+            rule_types = {
+                rule.get("type") for detail in applicable for rule in detail.get("rules", [])
+                if isinstance(rule, dict)
+            }
+            return {
+                "force_pushes": "non_fast_forward" not in rule_types,
+                "deletions": "deletion" not in rule_types,
+                "broad_bypass": any(bool(detail.get("bypass_actors")) for detail in applicable),
+            }
+        protection = self.api(
+            f"/repos/{repo}/branches/{urllib.parse.quote(branch, safe='')}/protection",
+            allow_404=True,
+        )
+        if not protection:
+            return {"force_pushes": True, "deletions": True, "broad_bypass": True}
+        return {
+            "force_pushes": bool((protection.get("allow_force_pushes") or {}).get("enabled")),
+            "deletions": bool((protection.get("allow_deletions") or {}).get("enabled")),
+            "broad_bypass": not bool((protection.get("enforce_admins") or {}).get("enabled")),
+        }
+
+    def private_vulnerability_reporting_enabled(self, repo: str) -> bool:
+        state = self.api(f"/repos/{repo}/private-vulnerability-reporting", allow_404=True)
+        return isinstance(state, dict) and state.get("enabled") is True
+
     def representative_check_sources(
         self,
         repo: str,
@@ -368,28 +425,29 @@ class Audit:
             default_branch=live.get("default_branch") or "main",
         )
         required_names = set(required_sources)
-        self.check(expected <= required_names, f"{repo}: required checks drift: expected {sorted(expected)}, got {sorted(required_names)}")
-        for context in expected:
+        allowed_names = allowed_required_checks(wanted)
+        self.check(required_contexts_match(wanted, required_names), f"{repo}: required checks drift: expected {sorted(expected)}, allowed {sorted(allowed_names)}, got {sorted(required_names)}")
+        proof_names = required_names & allowed_names
+        for context in proof_names:
             observed_apps = required_sources.get(context, set())
-            self.check(
-                observed_apps == {expected_app},
-                f"{repo}: required check {context!r} App binding drift: expected {expected_app}, got {sorted(str(value) for value in observed_apps)}",
-            )
-
-        emitted = self.representative_check_sources(repo, expected, expected_app)
+            self.check(observed_apps == {expected_app}, f"{repo}: required check {context!r} App binding drift: expected {expected_app}, got {sorted(str(value) for value in observed_apps)}")
+        emitted = self.representative_check_sources(repo, proof_names, expected_app)
         emitted_names = set(emitted)
-        self.check(
-            expected <= emitted_names,
-            f"{repo}: required checks not proven on current protected push or a current internal PR containing current main: expected {sorted(expected)}, observed {sorted(emitted_names)}",
-        )
-        for context in expected:
+        self.check(proof_names <= emitted_names, f"{repo}: required checks not proven on current protected push or a current internal PR containing current main: expected {sorted(proof_names)}, observed {sorted(emitted_names)}")
+        for context in proof_names:
             observed_apps = emitted.get(context, set())
-            self.check(
-                observed_apps == {expected_app},
-                f"{repo}: emitted check {context!r} App drift: expected {expected_app}, got {sorted(str(value) for value in observed_apps)}",
-            )
+            self.check(observed_apps == {expected_app}, f"{repo}: emitted check {context!r} App drift: expected {expected_app}, got {sorted(str(value) for value in observed_apps)}")
         if wanted.get("gate_mode") == "transition" and wanted.get("target_gate") and wanted["target_gate"] not in required_names:
             self.warnings.append(f"{repo}: transition target gate not required yet: {wanted['target_gate']}")
+
+        actual_protection = self.main_protection_controls(
+            repo, branch="main", default_branch=live.get("default_branch") or "main"
+        )
+        for control, expected_value in wanted["protection"].items():
+            self.check(
+                actual_protection.get(control) is expected_value,
+                f"{repo}: protection control {control} drift: expected {expected_value}, got {actual_protection.get(control)}",
+            )
 
         sec = live.get("security_and_analysis") or {}
         expected_sec = wanted.get("security") or {}
@@ -402,6 +460,11 @@ class Audit:
                 self.check((sec.get(api_key) or {}).get("status") == "enabled", f"{repo}: security baseline missing {key}")
         if expected_sec.get("dependabot_security_updates"):
             self.check(self.dependabot_security_updates_enabled(repo), f"{repo}: security baseline missing dependabot_security_updates")
+        if expected_sec.get("private_vulnerability_reporting"):
+            self.check(
+                self.private_vulnerability_reporting_enabled(repo),
+                f"{repo}: security baseline missing private_vulnerability_reporting",
+            )
         for path in ("SECURITY.md", ".github/CODEOWNERS"):
             self.check(self.file_exists(repo, path), f"{repo}: missing {path}")
 

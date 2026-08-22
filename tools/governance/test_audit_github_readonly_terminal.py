@@ -196,6 +196,30 @@ def test_desired_state_requires_complete_administrative_contract() -> None:
                 m.core.DESIRED_PATH = original_path
 
 
+def test_desired_state_requires_strict_protection_contract() -> None:
+    data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    original_path = m.core.DESIRED_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "desired.json"
+        for mutate in (
+            lambda item: item["protection"].pop("broad_bypass"),
+            lambda item: item["protection"].__setitem__("force_pushes", True),
+        ):
+            broken = json.loads(json.dumps(data))
+            mutate(broken["permanent_repositories"][0])
+            path.write_text(json.dumps(broken), encoding="utf-8")
+            m.core.DESIRED_PATH = path
+            try:
+                try:
+                    m.core.load_desired()
+                except SystemExit as exc:
+                    assert "protection contract" in str(exc)
+                else:
+                    raise AssertionError("weakened protection contract must fail closed")
+            finally:
+                m.core.DESIRED_PATH = original_path
+
+
 def test_desired_state_requires_complete_coordinate_policy() -> None:
     data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
     original_path = m.core.DESIRED_PATH

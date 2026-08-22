@@ -254,6 +254,64 @@ def test_dependabot_security_updates_treat_404_as_disabled() -> None:
     assert audit.calls == [f"/repos/{repo}/automated-security-fixes"]
 
 
+def test_required_context_contract_rejects_undeclared_contexts() -> None:
+    stable = {"required_checks": ["gate"], "gate_mode": "stable"}
+    assert m.core.required_contexts_match(stable, {"gate"})
+    assert not m.core.required_contexts_match(stable, {"gate", "stale"})
+    transition = {"required_checks": ["old-gate"], "gate_mode": "transition", "target_gate": "new-gate"}
+    assert m.core.required_contexts_match(transition, {"old-gate"})
+    assert m.core.required_contexts_match(transition, {"old-gate", "new-gate"})
+    assert not m.core.required_contexts_match(transition, {"old-gate", "stale"})
+
+
+def test_ruleset_protection_controls_require_no_bypass_force_or_delete() -> None:
+    detail = {
+        "target": "branch", "enforcement": "active", "bypass_actors": [],
+        "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+        "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}],
+    }
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/rulesets": [{"id": 1, "enforcement": "active"}],
+        "/repos/Oteryn/Test/rulesets/1": detail,
+    })
+    assert audit.main_protection_controls("Oteryn/Test") == {
+        "force_pushes": False, "deletions": False, "broad_bypass": False,
+    }
+    detail["bypass_actors"] = [{"actor_id": 1}]
+    assert audit.main_protection_controls("Oteryn/Test")["broad_bypass"] is True
+
+
+def test_classic_protection_controls_detect_admin_bypass() -> None:
+    clean = FakeAudit({
+        "/repos/Oteryn/Test/rulesets": [],
+        "/repos/Oteryn/Test/branches/main/protection": {
+            "allow_force_pushes": {"enabled": False},
+            "allow_deletions": {"enabled": False},
+            "enforce_admins": {"enabled": True},
+        },
+    })
+    assert clean.main_protection_controls("Oteryn/Test") == {
+        "force_pushes": False, "deletions": False, "broad_bypass": False,
+    }
+    bypass = FakeAudit({
+        "/repos/Oteryn/Test/rulesets": [],
+        "/repos/Oteryn/Test/branches/main/protection": {
+            "allow_force_pushes": {"enabled": False},
+            "allow_deletions": {"enabled": False},
+            "enforce_admins": {"enabled": False},
+        },
+    })
+    assert bypass.main_protection_controls("Oteryn/Test")["broad_bypass"] is True
+
+
+def test_private_vulnerability_reporting_status() -> None:
+    repo = "Oteryn/Test"
+    enabled = FakeAudit({f"/repos/{repo}/private-vulnerability-reporting": {"enabled": True}})
+    disabled = FakeAudit({f"/repos/{repo}/private-vulnerability-reporting": {"enabled": False}})
+    assert enabled.private_vulnerability_reporting_enabled(repo)
+    assert not disabled.private_vulnerability_reporting_enabled(repo)
+
+
 def search_path(repo: str, needle: str, page: int) -> str:
     q = m.urllib.parse.quote_plus(f'"{needle}" repo:{repo}')
     return f"/search/code?q={q}&per_page=100&page={page}"
