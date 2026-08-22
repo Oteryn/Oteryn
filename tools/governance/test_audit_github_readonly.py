@@ -363,6 +363,13 @@ updates:
       fake:
         interval: weekly
 """
+    fields_aligned_with_dash = """version: 2
+updates:
+  - package-ecosystem: github-actions
+  directory: /
+  schedule:
+    interval: weekly
+"""
     encode = lambda text: m.core.base64.b64encode(text.encode("utf-8")).decode("ascii")
     reordered = """version: 2
 updates:
@@ -374,7 +381,7 @@ updates:
     for valid in (good, reordered):
         enabled = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(valid)}})
         assert enabled.github_actions_dependency_updates_configured(repo)
-    for invalid in (outside, missing_directory, missing_schedule, interval_outside_schedule):
+    for invalid in (outside, missing_directory, missing_schedule, interval_outside_schedule, fields_aligned_with_dash):
         audit = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(invalid)}})
         assert not audit.github_actions_dependency_updates_configured(repo)
 
@@ -414,6 +421,13 @@ jobs:
 """
     assert m.core.workflow_text_secure(secure)
     assert not m.core.workflow_text_secure(secure.replace("0123456789abcdef0123456789abcdef01234567", "v4"))
+    quoted_mutable = secure.replace(
+        "- uses: actions/checkout@0123456789abcdef0123456789abcdef01234567",
+        '- "uses": actions/checkout@v4',
+    )
+    assert not m.core.workflow_text_secure(quoted_mutable)
+    quoted_write_all = secure.replace("permissions:\n  contents: read", '"permissions": write-all')
+    assert not m.core.workflow_text_secure(quoted_write_all)
     assert not m.core.workflow_text_secure(
         secure.replace(
             "docker://ghcr.io/example/action@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

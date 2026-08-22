@@ -106,6 +106,16 @@ def _yaml_scalar(value: str) -> str:
     return value
 
 
+def _yaml_mapping_field(body: str) -> tuple[bool, str, str] | None:
+    match = re.fullmatch(
+        r"""(?P<dash>-\s*)?(?P<key>[A-Za-z0-9_-]+|"[^"]+"|'[^']+')\s*:\s*(?P<value>.*)""",
+        body.strip(),
+    )
+    if not match:
+        return None
+    return bool(match.group("dash")), _yaml_scalar(match.group("key")), match.group("value").strip()
+
+
 def dependabot_github_actions_entry_valid(text: str) -> bool:
     rows = []
     for raw in text.splitlines():
@@ -115,10 +125,18 @@ def dependabot_github_actions_entry_valid(text: str) -> bool:
         if not line.strip():
             continue
         rows.append((len(line) - len(line.lstrip(" ")), line.strip()))
-    if (0, "version: 2") not in rows:
+    if not any(
+        indent == 0 and (field := _yaml_mapping_field(body)) is not None
+        and not field[0] and field[1] == "version" and _yaml_scalar(field[2]) == "2"
+        for indent, body in rows
+    ):
         return False
     try:
-        updates_index = next(i for i, (indent, body) in enumerate(rows) if indent == 0 and body == "updates:")
+        updates_index = next(
+            i for i, (indent, body) in enumerate(rows)
+            if indent == 0 and (field := _yaml_mapping_field(body)) is not None
+            and not field[0] and field[1] == "updates" and field[2] == ""
+        )
     except StopIteration:
         return False
     i = updates_index + 1
@@ -142,23 +160,30 @@ def dependabot_github_actions_entry_valid(text: str) -> bool:
         interval = None
         schedule_indent = None
         schedule_child_indent = None
+        field_indent = item_indent + 2
         for offset, (child_indent, child_body) in enumerate(entry):
-            body_value = child_body[1:].strip() if offset == 0 and child_body.startswith("-") else child_body
-            if schedule_indent is not None and child_indent <= schedule_indent:
+            field = _yaml_mapping_field(child_body)
+            is_inline_item = offset == 0 and field is not None and field[0] and child_indent == item_indent
+            is_item_field = field is not None and (
+                is_inline_item or (not field[0] and child_indent == field_indent)
+            )
+            if schedule_indent is not None and child_indent <= schedule_indent and not is_inline_item:
                 schedule_indent = None
                 schedule_child_indent = None
-            if child_indent <= item_indent + 2 and body_value.startswith("package-ecosystem:"):
-                ecosystem = _yaml_scalar(body_value.split(":", 1)[1])
-            elif child_indent <= item_indent + 2 and body_value.startswith("directory:"):
-                directory = _yaml_scalar(body_value.split(":", 1)[1])
-            elif child_indent <= item_indent + 2 and body_value == "schedule:":
-                schedule_indent = child_indent
-                schedule_child_indent = None
-            elif schedule_indent is not None and child_indent > schedule_indent:
-                if schedule_child_indent is None:
-                    schedule_child_indent = child_indent
-                if child_indent == schedule_child_indent and body_value.startswith("interval:"):
-                    interval = _yaml_scalar(body_value.split(":", 1)[1])
+            if is_item_field and field[1] == "package-ecosystem":
+                ecosystem = _yaml_scalar(field[2])
+            elif is_item_field and field[1] == "directory":
+                directory = _yaml_scalar(field[2])
+            elif is_item_field and field[1] == "schedule" and field[2] == "":
+                schedule_indent = field_indent if is_inline_item else child_indent
+                schedule_child_indent = schedule_indent + 2
+            elif (
+                schedule_indent is not None
+                and field is not None and not field[0]
+                and child_indent == schedule_child_indent
+                and field[1] == "interval"
+            ):
+                interval = _yaml_scalar(field[2])
         if ecosystem == "github-actions":
             return directory == "/" and interval in {"daily", "weekly", "monthly", "quarterly", "semiannually", "yearly"}
     return False
@@ -199,16 +224,16 @@ def workflow_text_secure(text: str) -> bool:
             continue
         indent = len(line) - len(line.lstrip(" "))
         body = line.strip()
-        if indent == 0 and body.startswith("permissions:"):
+        field = _yaml_mapping_field(body)
+        if field is None:
+            continue
+        is_sequence, key, raw_value = field
+        if indent == 0 and not is_sequence and key == "permissions":
             has_top_permissions = True
-            value = _yaml_scalar(body.split(":", 1)[1])
-            if value == "write-all":
-                return False
-        if re.fullmatch(r"permissions:\s*[\"']?write-all[\"']?", body):
+        if key == "permissions" and _yaml_scalar(raw_value) == "write-all":
             return False
-        match = re.match(r"(?:-\s*)?uses:\s*(.+)$", body)
-        if match:
-            value = _yaml_scalar(match.group(1).strip())
+        if key == "uses":
+            value = _yaml_scalar(raw_value)
             if value.startswith("./"):
                 continue
             if value.startswith("docker://"):
