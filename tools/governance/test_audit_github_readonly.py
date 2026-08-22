@@ -312,6 +312,30 @@ def test_private_vulnerability_reporting_status() -> None:
     assert not disabled.private_vulnerability_reporting_enabled(repo)
 
 
+def test_actions_permissions_must_be_enabled() -> None:
+    assert m.core.actions_permissions_enabled({"enabled": True})
+    assert not m.core.actions_permissions_enabled({"enabled": False})
+    assert not m.core.actions_permissions_enabled({})
+
+
+def test_github_actions_dependency_updates_require_active_dependabot_entry() -> None:
+    repo = "Oteryn/Test"
+    good = "version: 2\nupdates:\n  - package-ecosystem: github-actions\n    directory: /\n"
+    commented = "version: 2\n# package-ecosystem: github-actions\n"
+    encode = lambda text: m.core.base64.b64encode(text.encode("utf-8")).decode("ascii")
+    enabled = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(good)}})
+    disabled = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(commented)}})
+    assert enabled.github_actions_dependency_updates_configured(repo)
+    assert not disabled.github_actions_dependency_updates_configured(repo)
+
+
+def test_administrative_repo_live_coordinate_is_pinned() -> None:
+    repo = "Oteryn/Test"
+    audit = FakeAudit({f"/repos/{repo}": {"full_name": "Oteryn/Renamed", "id": 123, "archived": True}})
+    audit.audit_administrative_repo({"repository": repo, "repository_id": 123, "archived": True})
+    assert audit.errors == [f"{repo}: administrative coordinate drift"]
+
+
 def search_path(repo: str, needle: str, page: int) -> str:
     q = m.urllib.parse.quote_plus(f'"{needle}" repo:{repo}')
     return f"/search/code?q={q}&per_page=100&page={page}"

@@ -19,7 +19,8 @@
         "private_vulnerability_reporting": true,
         "secret_scanning": true,
         "push_protection": true,
-        "dependabot_security_updates": true
+        "dependabot_security_updates": true,
+        "github_actions_dependency_updates": true
       },
       "protection": {
         "force_pushes": false,
@@ -44,7 +45,8 @@
         "private_vulnerability_reporting": true,
         "secret_scanning": true,
         "push_protection": true,
-        "dependabot_security_updates": true
+        "dependabot_security_updates": true,
+        "github_actions_dependency_updates": true
       },
       "protection": {
         "force_pushes": false,
@@ -70,7 +72,8 @@
         "private_vulnerability_reporting": true,
         "secret_scanning": true,
         "push_protection": true,
-        "dependabot_security_updates": true
+        "dependabot_security_updates": true,
+        "github_actions_dependency_updates": true
       },
       "protection": {
         "force_pushes": false,
@@ -95,7 +98,8 @@
         "private_vulnerability_reporting": true,
         "secret_scanning": true,
         "push_protection": true,
-        "dependabot_security_updates": true
+        "dependabot_security_updates": true,
+        "github_actions_dependency_updates": true
       },
       "protection": {
         "force_pushes": false,

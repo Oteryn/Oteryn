@@ -7,6 +7,7 @@ it never mutates settings. A caller must provide GH_TOKEN or GITHUB_TOKEN.
 from __future__ import annotations
 
 import argparse
+import base64
 import fnmatch
 import json
 import os
@@ -68,6 +69,10 @@ def required_contexts_match(item: dict, observed: set[str]) -> bool:
     return expected <= observed <= allowed_required_checks(item)
 
 
+def actions_permissions_enabled(payload: object) -> bool:
+    return isinstance(payload, dict) and payload.get("enabled") is True
+
+
 def merge_sources(*groups: dict[str, set[int | None]]) -> dict[str, set[int | None]]:
     merged: dict[str, set[int | None]] = {}
     for group in groups:
@@ -110,6 +115,7 @@ def load_desired() -> dict:
         required_security = (
             "private_vulnerability_reporting", "secret_scanning",
             "push_protection", "dependabot_security_updates",
+            "github_actions_dependency_updates",
         )
         if not isinstance(security, dict) or set(security) != set(required_security):
             raise SystemExit(f"repository has incomplete security contract: {item}")
@@ -404,6 +410,23 @@ class Audit:
         quoted = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
         return self.api(f"/repos/{repo}/contents/{quoted}", allow_404=True) is not None
 
+    def github_actions_dependency_updates_configured(self, repo: str) -> bool:
+        payload = self.api(f"/repos/{repo}/contents/.github/dependabot.yml", allow_404=True)
+        if not isinstance(payload, dict):
+            return False
+        content = payload.get("content")
+        if not isinstance(content, str):
+            return False
+        try:
+            text = base64.b64decode(content).decode("utf-8")
+        except (ValueError, UnicodeDecodeError):
+            return False
+        for raw_line in text.splitlines():
+            line = raw_line.split("#", 1)[0].strip()
+            if re.fullmatch(r"(?:-\s*)?package-ecosystem:\s*[\"']?github-actions[\"']?", line):
+                return True
+        return False
+
     def audit_repo(self, wanted: dict) -> None:
         repo = wanted["repository"]
         live = self.api(f"/repos/{repo}")
@@ -468,16 +491,23 @@ class Audit:
                 self.private_vulnerability_reporting_enabled(repo),
                 f"{repo}: security baseline missing private_vulnerability_reporting",
             )
+        if expected_sec.get("github_actions_dependency_updates"):
+            self.check(
+                self.github_actions_dependency_updates_configured(repo),
+                f"{repo}: security baseline missing github_actions_dependency_updates",
+            )
         for path in ("SECURITY.md", ".github/CODEOWNERS"):
             self.check(self.file_exists(repo, path), f"{repo}: missing {path}")
 
         permissions = self.api(f"/repos/{repo}/actions/permissions")
+        self.check(actions_permissions_enabled(permissions), f"{repo}: GitHub Actions disabled")
         if permissions.get("allowed_actions") == "all":
             self.warnings.append(f"{repo}: Actions policy remains broad (allowed_actions=all)")
 
     def audit_administrative_repo(self, wanted: dict) -> None:
         repo = wanted["repository"]
         live = self.api(f"/repos/{repo}")
+        self.check(live.get("full_name") == repo, f"{repo}: administrative coordinate drift")
         self.check(live.get("id") == wanted["repository_id"], f"{repo}: administrative repository ID drift")
         if "archived" in wanted:
             self.check(bool(live.get("archived")) == bool(wanted["archived"]), f"{repo}: archived terminal-state drift")
