@@ -93,6 +93,8 @@ class Audit(core.Audit):
                 definition = self._workflow_definition(repo, workflow)
                 if not definition or definition.get("state") != "active":
                     continue
+                if not self._workflow_event_unfiltered(repo, definition, "pull_request_target"):
+                    continue
                 if workflow.get("head_sha") != main_sha:
                     continue
                 bound_to_current_head = any(
