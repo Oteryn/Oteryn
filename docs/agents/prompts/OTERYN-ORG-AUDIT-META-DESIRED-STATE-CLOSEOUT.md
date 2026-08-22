@@ -1,5 +1,7 @@
 # Alias: OTERYN-ORG-AUDIT-META-DESIRED-STATE-CLOSEOUT
 
+> **TERMINAL / DO NOT INVOKE.** This one-shot workstream completed when PR #37 was squash-merged as `c0dbad93f791953d5efcc6b556e6be73693f0a4f`; #23 and #9 were then closed as superseded. This file is retained solely as historical evidence.
+
 MODE: Autonomous terminal closeout.
 
 Repository: `https://github.com/Oteryn/Oteryn`
