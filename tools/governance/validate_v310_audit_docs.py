@@ -103,9 +103,12 @@ def validate(repo_root: Path) -> dict[str, int | str]:
             unknown_gate_rows += 1
         elif state != "PASS" and state != "FAIL":
             raise ValueError(f"gate row lacks PASS/FAIL/UNKNOWN vocabulary: {row}")
-    unknown_cells = re.findall(r"UNKNOWN \(([^)]*)\)", text)
-    if not unknown_cells or any("V310-" not in cell for cell in unknown_cells):
-        raise ValueError("every UNKNOWN report state must carry a V310 gap identifier")
+    table_unknown_cells = [
+        cell.strip() for line in text.splitlines() if line.startswith("|")
+        for cell in line.split("|")[1:-1] if "UNKNOWN" in cell
+    ]
+    if not table_unknown_cells or any("UNKNOWN (GAP-ID: " not in cell or "V310-" not in cell for cell in table_unknown_cells):
+        raise ValueError("every table UNKNOWN state must use UNKNOWN (GAP-ID: V310-...)")
     return {
         "report_sha256": digest,
         "report_bytes": len(report),
