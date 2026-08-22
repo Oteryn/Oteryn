@@ -137,11 +137,14 @@ class Audit:
         try:
             with urllib.request.urlopen(req, timeout=30) as response:
                 raw = response.read()
+                status = response.status
         except urllib.error.HTTPError as exc:
             if allow_404 and exc.code == 404:
                 return None
             raise RuntimeError(f"GET {path} -> HTTP {exc.code}") from exc
-        return json.loads(raw) if raw else None
+        if not raw:
+            return {"_http_status": status}
+        return json.loads(raw)
 
     def check(self, condition: bool, message: str) -> None:
         if not condition:
@@ -238,8 +241,8 @@ class Audit:
         return best
 
     def dependabot_security_updates_enabled(self, repo: str) -> bool:
-        fixes = self.api(f"/repos/{repo}/automated-security-fixes", allow_404=True) or {}
-        return fixes.get("enabled") is True
+        fixes = self.api(f"/repos/{repo}/automated-security-fixes", allow_404=True)
+        return isinstance(fixes, dict) and fixes.get("_http_status") == 204
 
     def file_exists(self, repo: str, path: str) -> bool:
         quoted = "/".join(urllib.parse.quote(part, safe="") for part in path.split("/"))
