@@ -109,7 +109,7 @@ def test_required_context_sources_reject_wrong_or_unbound_app() -> None:
     assert not m.expected_sources_satisfied(sources, {"gate"}, ACTIONS_APP_ID)
 
 
-def test_current_main_push_is_valid_emission_proof() -> None:
+def test_current_main_push_alone_does_not_prove_pr_gate_emission() -> None:
     main = "a" * 40
     audit = FakeAudit({
         "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
@@ -118,10 +118,11 @@ def test_current_main_push_is_valid_emission_proof() -> None:
         },
         "/repos/Oteryn/Test/actions/runs/101": workflow("push", main),
         "/repos/Oteryn/Test/actions/runs/102": workflow("push", main),
+        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [],
     })
     observed = audit.representative_check_sources("Oteryn/Test", {"gate-a", "gate-b"}, ACTIONS_APP_ID)
-    assert m.expected_sources_satisfied(observed, {"gate-a", "gate-b"}, ACTIONS_APP_ID)
-    assert not any("pulls?" in call for call in audit.calls)
+    assert observed == {}
+    assert any("pulls?" in call for call in audit.calls)
 
 
 def test_workflow_dispatch_on_main_does_not_prove_protected_emission() -> None:
@@ -137,18 +138,25 @@ def test_workflow_dispatch_on_main_does_not_prove_protected_emission() -> None:
     assert audit.representative_check_sources("Oteryn/Test", {"gate"}, ACTIONS_APP_ID) == {}
 
 
-def test_same_name_from_wrong_app_does_not_prove_emission() -> None:
+def test_same_name_from_wrong_app_does_not_prove_gate_emission() -> None:
     main = "a" * 40
+    head = "b" * 40
     audit = FakeAudit({
         "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
-        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {
-            "check_runs": [check_run("gate", 104, app_id=999)],
+        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {"check_runs": []},
+        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
+            "number": 7,
+            "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
+            "base": {"ref": "main"},
+        }],
+        f"/repos/Oteryn/Test/compare/{main}...{head}": {"status": "ahead", "merge_base_commit": {"sha": main}},
+        f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {
+            "check_runs": [check_run("gate", 104, app_id=999, pr_number=7)],
         },
-        "/repos/Oteryn/Test/actions/runs/104": workflow("push", main),
-        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [],
+        "/repos/Oteryn/Test/actions/runs/104": workflow("pull_request", head),
     })
     observed = audit.representative_check_sources("Oteryn/Test", {"gate"}, ACTIONS_APP_ID)
-    assert observed == {"gate": {999}}
+    assert observed == {}
     assert not m.expected_sources_satisfied(observed, {"gate"}, ACTIONS_APP_ID)
 
 
@@ -270,7 +278,12 @@ def test_ruleset_protection_controls_require_no_bypass_force_or_delete() -> None
     detail = {
         "target": "branch", "enforcement": "active", "bypass_actors": [],
         "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
-        "rules": [{"type": "deletion"}, {"type": "non_fast_forward"}, {"type": "pull_request"}],
+        "rules": [
+            {"type": "deletion"},
+            {"type": "non_fast_forward"},
+            {"type": "pull_request"},
+            {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": True}},
+        ],
     }
     audit = FakeAudit({
         "/repos/Oteryn/Test/rulesets": [{"id": 1, "enforcement": "active"}],
@@ -278,6 +291,7 @@ def test_ruleset_protection_controls_require_no_bypass_force_or_delete() -> None
     })
     assert audit.main_protection_controls("Oteryn/Test") == {
         "pull_requests": True, "force_pushes": False, "deletions": False, "broad_bypass": False,
+        "strict_required_status_checks": True,
     }
     detail["bypass_actors"] = [{"actor_id": 1}]
     assert audit.main_protection_controls("Oteryn/Test")["broad_bypass"] is True
@@ -291,6 +305,22 @@ def test_ruleset_protection_controls_require_no_bypass_force_or_delete() -> None
     assert no_pr.main_protection_controls("Oteryn/Test")["pull_requests"] is False
 
 
+def test_ruleset_protection_controls_require_strict_status_checks() -> None:
+    detail = {
+        "target": "branch", "enforcement": "active", "bypass_actors": [],
+        "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+        "rules": [
+            {"type": "deletion"}, {"type": "non_fast_forward"}, {"type": "pull_request"},
+            {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": False}},
+        ],
+    }
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/rulesets": [{"id": 1, "enforcement": "active"}],
+        "/repos/Oteryn/Test/rulesets/1": detail,
+    })
+    assert audit.main_protection_controls("Oteryn/Test")["strict_required_status_checks"] is False
+
+
 def test_classic_protection_controls_detect_admin_bypass() -> None:
     clean = FakeAudit({
         "/repos/Oteryn/Test/rulesets": [],
@@ -298,11 +328,13 @@ def test_classic_protection_controls_detect_admin_bypass() -> None:
             "allow_force_pushes": {"enabled": False},
             "allow_deletions": {"enabled": False},
             "enforce_admins": {"enabled": True},
+            "required_status_checks": {"strict": True},
             "required_pull_request_reviews": {},
         },
     })
     assert clean.main_protection_controls("Oteryn/Test") == {
         "pull_requests": True, "force_pushes": False, "deletions": False, "broad_bypass": False,
+        "strict_required_status_checks": True,
     }
     bypass = FakeAudit({
         "/repos/Oteryn/Test/rulesets": [],
@@ -335,6 +367,20 @@ def test_classic_protection_controls_detect_admin_bypass() -> None:
         },
     })
     assert no_pr.main_protection_controls("Oteryn/Test")["pull_requests"] is False
+
+
+def test_classic_protection_controls_require_strict_status_checks() -> None:
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/rulesets": [],
+        "/repos/Oteryn/Test/branches/main/protection": {
+            "allow_force_pushes": {"enabled": False},
+            "allow_deletions": {"enabled": False},
+            "enforce_admins": {"enabled": True},
+            "required_pull_request_reviews": {},
+            "required_status_checks": {"strict": False},
+        },
+    })
+    assert audit.main_protection_controls("Oteryn/Test")["strict_required_status_checks"] is False
 
 
 def test_private_vulnerability_reporting_status() -> None:
@@ -475,6 +521,11 @@ jobs:
         "- {uses: actions/checkout@v4}",
     )
     assert not m.core.workflow_text_secure(flow_mutable)
+    escaped_flow_key = secure.replace(
+        "- uses: actions/checkout@0123456789abcdef0123456789abcdef01234567",
+        'steps: [{"u\\u0073es": actions/checkout@v4}]',
+    )
+    assert not m.core.workflow_text_secure(escaped_flow_key)
     flow_write_all = secure.replace(
         "runs-on: ubuntu-latest",
         "runs-on: ubuntu-latest\n    policy: {permissions: write-all}",
