@@ -5,19 +5,24 @@ import test_verify_ai_review_evidence_compat_v1 as _v1
 
 
 def test_observed_dynamic_clean_flair_passes() -> None:
-    repo, _, final = _v1.core_tests.make_repo()
-    current = _v1.core_tests.issue_comment(
-        10, _v1.core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
-    )
-    result = _v1.core_tests.codex_result(
-        11,
-        final[:10],
-        stamp="2026-08-20T10:01:00Z",
-        text=_v1._live_clean_text(final, "Already looking forward to the next diff."),
-    )
-    found = _v1._verify_with_only_current_anchor([current, result], repo, final, current)
-    assert found["review_source_kind"] == "issue_comment_result"
-    assert found["review_source_commit_id"] == final
+    for flair in (
+        "Already looking forward to the next diff.",
+        "Another round soon, please!",
+        "Keep it up!",
+    ):
+        repo, _, final = _v1.core_tests.make_repo()
+        current = _v1.core_tests.issue_comment(
+            10, _v1.core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
+        )
+        result = _v1.core_tests.codex_result(
+            11,
+            final[:10],
+            stamp="2026-08-20T10:01:00Z",
+            text=_v1._live_clean_text(final, flair),
+        )
+        found = _v1._verify_with_only_current_anchor([current, result], repo, final, current)
+        assert found["review_source_kind"] == "issue_comment_result"
+        assert found["review_source_commit_id"] == final
 
 
 def test_every_unobserved_clean_flair_fails_closed() -> None:
