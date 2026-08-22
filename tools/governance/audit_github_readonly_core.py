@@ -362,6 +362,8 @@ def workflow_text_secure(text: str) -> bool:
             raw_value,
         ):
             return False
+        if ("{" in raw_value or "[" in raw_value) and re.search(r'''"[^"\n]*\\[^"\n]*"\s*:''', raw_value):
+            return False
         if permissions_indent is not None and not is_sequence and indent == permissions_indent + 2:
             permissions_values[key] = _yaml_scalar(raw_value)
         if key == "permissions":
@@ -432,7 +434,13 @@ def load_desired() -> dict:
             if item.get(field) is not True:
                 raise SystemExit(f"repository must require {field}=true: {item}")
         protection = item.get("protection")
-        required_protection = {"pull_requests": True, "force_pushes": False, "deletions": False, "broad_bypass": False}
+        required_protection = {
+            "pull_requests": True,
+            "force_pushes": False,
+            "deletions": False,
+            "broad_bypass": False,
+            "strict_required_status_checks": True,
+        }
         if protection != required_protection:
             raise SystemExit(f"repository has incomplete or weakened protection contract: {item}")
         security = item.get("security")
@@ -681,13 +689,29 @@ class Audit:
                 "force_pushes": "non_fast_forward" not in rule_types,
                 "deletions": "deletion" not in rule_types,
                 "broad_bypass": any(bool(detail.get("bypass_actors")) for detail in applicable),
+                "strict_required_status_checks": bool(
+                    [
+                        rule for detail in applicable for rule in detail.get("rules", [])
+                        if isinstance(rule, dict) and rule.get("type") == "required_status_checks"
+                    ]
+                ) and all(
+                    (rule.get("parameters") or {}).get("strict_required_status_checks_policy") is True
+                    for detail in applicable for rule in detail.get("rules", [])
+                    if isinstance(rule, dict) and rule.get("type") == "required_status_checks"
+                ),
             }
         protection = self.api(
             f"/repos/{repo}/branches/{urllib.parse.quote(branch, safe='')}/protection",
             allow_404=True,
         )
         if not protection:
-            return {"pull_requests": False, "force_pushes": True, "deletions": True, "broad_bypass": True}
+            return {
+                "pull_requests": False,
+                "force_pushes": True,
+                "deletions": True,
+                "broad_bypass": True,
+                "strict_required_status_checks": False,
+            }
         bypass_allowances = (
             (protection.get("required_pull_request_reviews") or {}).get("bypass_pull_request_allowances") or {}
         )
@@ -698,6 +722,9 @@ class Audit:
             "deletions": bool((protection.get("allow_deletions") or {}).get("enabled")),
             "broad_bypass": (
                 not bool((protection.get("enforce_admins") or {}).get("enabled")) or has_pr_bypass
+            ),
+            "strict_required_status_checks": (
+                (protection.get("required_status_checks") or {}).get("strict") is True
             ),
         }
 
@@ -711,25 +738,15 @@ class Audit:
         expected: set[str],
         expected_app_id: int,
     ) -> dict[str, set[int | None]]:
-        """Prove emission from a protected push or one current internal PR containing main."""
+        """Prove required gate emission from one current internal PR containing main."""
         branch = self.api(f"/repos/{repo}/branches/main") or {}
         main_sha = ((branch.get("commit") or {}).get("sha") or "").strip()
         if not main_sha:
             return {}
-        main_runs = self.api(f"/repos/{repo}/commits/{main_sha}/check-runs?per_page=100") or {}
-        main_sources = self._protected_flow_sources(
-            repo,
-            main_runs,
-            event="push",
-            allowed_head_shas={main_sha},
-        )
-        if expected_sources_satisfied(main_sources, expected, expected_app_id):
-            return main_sources
-
         def score(candidate: dict[str, set[int | None]]) -> int:
             return sum(candidate.get(context) == {expected_app_id} for context in expected)
 
-        best = main_sources
+        best: dict[str, set[int | None]] = {}
         pulls = self.api(f"/repos/{repo}/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20") or []
         for pr in pulls:
             head = pr.get("head", {})
