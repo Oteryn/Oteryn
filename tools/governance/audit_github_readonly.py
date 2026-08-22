@@ -54,6 +54,14 @@ def expected_sources_satisfied(sources: dict[str, set[int | None]], expected: se
     return all(sources.get(context) == {app_id} for context in expected)
 
 
+def merge_sources(*groups: dict[str, set[int | None]]) -> dict[str, set[int | None]]:
+    merged: dict[str, set[int | None]] = {}
+    for group in groups:
+        for context, apps in group.items():
+            merged.setdefault(context, set()).update(apps)
+    return merged
+
+
 def load_desired() -> dict:
     data = json.loads(DESIRED_PATH.read_text(encoding="utf-8"))
     if data.get("schema_version") != 1:
@@ -177,7 +185,7 @@ class Audit:
         payload: dict,
         *,
         event: str,
-        head_sha: str,
+        allowed_head_shas: set[str],
         pr_number: int | None = None,
     ) -> dict[str, set[int | None]]:
         sources: dict[str, set[int | None]] = {}
@@ -185,7 +193,7 @@ class Audit:
             workflow = self._workflow_run(repo, check_run)
             if not workflow:
                 continue
-            if workflow.get("event") != event or workflow.get("head_sha") != head_sha:
+            if workflow.get("event") != event or workflow.get("head_sha") not in allowed_head_shas:
                 continue
             if pr_number is not None:
                 associated = {
@@ -240,7 +248,7 @@ class Audit:
         expected: set[str],
         expected_app_id: int,
     ) -> dict[str, set[int | None]]:
-        """Prove emission from a protected push or a current internal PR containing main."""
+        """Prove emission from a protected push or one current internal PR containing main."""
         branch = self.api(f"/repos/{repo}/branches/main") or {}
         main_sha = ((branch.get("commit") or {}).get("sha") or "").strip()
         if not main_sha:
@@ -250,7 +258,7 @@ class Audit:
             repo,
             main_runs,
             event="push",
-            head_sha=main_sha,
+            allowed_head_shas={main_sha},
         )
         if expected_sources_satisfied(main_sources, expected, expected_app_id):
             return main_sources
@@ -275,13 +283,21 @@ class Audit:
             if comparison.get("status") not in {"ahead", "identical"} or merge_base != main_sha:
                 continue
             runs = self.api(f"/repos/{repo}/commits/{sha}/check-runs?per_page=100") or {}
-            sources = self._protected_flow_sources(
+            pr_sources = self._protected_flow_sources(
                 repo,
                 runs,
                 event="pull_request",
-                head_sha=sha,
+                allowed_head_shas={sha},
                 pr_number=pr_number,
             )
+            target_sources = self._protected_flow_sources(
+                repo,
+                runs,
+                event="pull_request_target",
+                allowed_head_shas={main_sha},
+                pr_number=pr_number,
+            )
+            sources = merge_sources(pr_sources, target_sources)
             if expected_sources_satisfied(sources, expected, expected_app_id):
                 return sources
             if score(sources) > score(best):
