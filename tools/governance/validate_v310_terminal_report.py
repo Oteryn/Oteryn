@@ -81,7 +81,9 @@ def invariant(state: str, evidence: str, gaps: list[str] | None = None) -> dict:
 
 
 def sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    # Git normalizes repository text to LF; hash canonical repository bytes.
+    data = path.read_bytes().replace(b"\r\n", b"\n")
+    return hashlib.sha256(data).hexdigest()
 def build_record() -> dict:
     text = REPORT.read_text(encoding="utf-8")
     lines = text.splitlines()

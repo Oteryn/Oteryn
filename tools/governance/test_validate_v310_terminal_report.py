@@ -59,6 +59,19 @@ def test_missing_material_classification_fails() -> None:
         restore(temp, old_root, old_report)
 
 
+def test_report_digest_is_eol_stable() -> None:
+    original = m.REPORT.read_bytes().replace(b"\r\n", b"\n")
+    temp = tempfile.TemporaryDirectory(prefix="oteryn-v310-eol-")
+    try:
+        crlf = Path(temp.name) / "report.md"
+        crlf.write_bytes(original.replace(b"\n", b"\r\n"))
+        canonical = Path(temp.name) / "canonical.md"
+        canonical.write_bytes(original)
+        assert m.sha256(crlf) == m.sha256(canonical)
+    finally:
+        temp.cleanup()
+
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:

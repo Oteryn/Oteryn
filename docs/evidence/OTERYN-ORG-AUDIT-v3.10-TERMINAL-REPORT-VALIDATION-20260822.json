@@ -2,7 +2,7 @@
   "schema_version": 2,
   "validator": "tools/governance/validate_v310_terminal_report.py",
   "report": "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
-  "report_sha256": "d499846cbb83e3728664561123ec31478b5cff8666f4b37073858e0b90a3698f",
+  "report_sha256": "0263b95fdb3bd4aec7e786520b84c1ec2bd8dc59e07cf99bf010d6f04cd713d8",
   "execution_verdict": "PASS",
   "programme_verdict": "INCOMPLETE",
   "contract_completeness": "INCOMPLETE",
