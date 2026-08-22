@@ -118,21 +118,53 @@ def process_event(event: dict[str, Any], repository: str, github: Any, git: Any)
         raise CleanupError(f"branch {branch!r} still has an open pull request")
     current = git.remote_ref_sha(branch)
     if current != sha:
-        raise CleanupError(f"branch head SHA drift before delete: expected {sha}, got {current}")
+        raise CleanupError(f"branch head SHA drift before recovery preparation: expected {sha}, got {current}")
     git.prepare_recovery(branch, sha)
-    git.delete_with_lease(branch, sha)
-    if git.remote_ref_sha(branch) is not None:
-        raise CleanupError(f"branch {branch!r} still exists after deletion")
-    if github.get_open_pulls_for_branch(branch):
-        git.restore_if_absent(branch, sha)
-        restored = git.remote_ref_sha(branch)
-        if restored != sha:
+
+    # Destructive authority is mutable until the deletion boundary. Re-read the
+    # live pull request after all non-destructive preparation so a late body edit
+    # can still revoke or invalidate the delete disposition.
+    boundary_pull = github.get_pull(number)
+    if not live_pull_matches(boundary_pull, repository, number, branch, sha):
+        raise CleanupError("live pull request identity drift at deletion boundary")
+    boundary_disposition, boundary_reason = parse_disposition(
+        boundary_pull.get("body") if isinstance(boundary_pull.get("body"), str) else ""
+    )
+    if boundary_disposition is None:
+        return result("NOT_APPLICABLE", branch=branch, number=number, sha=sha)
+    if boundary_disposition == "retain":
+        return result("RETAIN", branch=branch, number=number, sha=sha, reason=boundary_reason)
+    reason = boundary_reason
+
+    # The boundary pull revalidation is deliberately the final authority query
+    # before the destructive push. Exact branch-SHA drift is enforced atomically
+    # by the Git force-with-lease used by delete_with_lease().
+
+    # Once a delete is attempted, every unknown or negative verification result
+    # becomes a rollback condition. The recovery object prepared above makes the
+    # exact source commit locally available even after the remote ref disappears.
+    try:
+        git.delete_with_lease(branch, sha)
+        if git.remote_ref_sha(branch) is not None:
+            raise CleanupError(f"branch {branch!r} still exists after deletion")
+        if github.get_open_pulls_for_branch(branch):
+            raise CleanupError(f"branch {branch!r} acquired an open pull request during deletion")
+    except Exception as failure:
+        try:
+            git.restore_if_absent(branch, sha)
+            restored = git.remote_ref_sha(branch)
+            if restored != sha:
+                raise CleanupError(
+                    f"exact-head rollback verification mismatch: expected {sha}, got {restored or 'absent'}"
+                )
+        except Exception as rollback_failure:
             raise CleanupError(
-                f"branch {branch!r} acquired an open pull request during deletion and exact-head restoration failed"
-            )
+                f"terminal delete/verification failed for {branch!r} and exact-head rollback could not be proven: "
+                f"{failure}; rollback error: {rollback_failure}"
+            ) from failure
         raise CleanupError(
-            f"branch {branch!r} restored after an open pull request appeared during deletion"
-        )
+            f"branch {branch!r} exact head was preserved or restored after post-delete verification failed: {failure}"
+        ) from failure
     return result("DELETED", branch=branch, number=number, sha=sha, reason=reason, deleted=True)
 
 

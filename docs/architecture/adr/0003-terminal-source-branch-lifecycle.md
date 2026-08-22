@@ -33,11 +33,11 @@ and exactly one non-empty `Branch-Disposition-Reason: ...` line.
 5. no open pull request owns the same ref;
 6. release, rollback, recovery, and backup-sensitive names are excluded;
 7. the remote used for deletion resolves to the caller repository;
-8. deletion uses an exact-SHA Git lease and the ref is verified absent afterwards.
+8. deletion uses an exact-SHA Git lease and the ref is verified absent afterwards; any unknown or negative post-delete verification result triggers an exact-head conditional restoration attempt before the run fails.
 
 `retain` is non-destructive and records the reason in cleanup evidence. Missing disposition metadata performs no destructive action. Malformed or conflicting disposition metadata fails closed.
 
-The reusable implementation is owned by `Oteryn/Oteryn`. Product repositories consume it only from an immutable commit SHA. Each product executes it in its own trusted `pull_request_target: closed` workflow with that repository's own `GITHUB_TOKEN`; no organization-wide personal access token or cross-repository write token is introduced. The workflow checks out trusted `main` rather than pull-request code before invoking the action.
+The reusable implementation is owned by `Oteryn/Oteryn`. Product repositories consume it only from an immutable commit SHA. Each product executes it in its own trusted `pull_request_target: closed` workflow restricted to pull requests targeting `main`, with that repository's own `GITHUB_TOKEN`; no organization-wide personal access token or cross-repository write token is introduced. The workflow checks out the immutable `pull_request.base.sha` recorded by the close event rather than pull-request code or a later mutable `main` tip before invoking the action.
 
 `Oteryn/Oteryn-Platform` retains its existing terminal lifecycle implementation as a compatible stricter superset. The archived migration-backup repository is excluded from automatic rollout.
 

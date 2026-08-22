@@ -21,6 +21,7 @@ class WorkflowContractTests(unittest.TestCase):
         text = path.read_text(encoding='utf-8')
         self.assertIn('pull_request_target:', text)
         self.assertIn('types: [closed]', text)
+        self.assertIn('branches: [main]', text)
         self.assertIn('contents: read', text)
         self.assertIn('contents: write', text)
         self.assertIn('github.event.pull_request.merged == false', text)

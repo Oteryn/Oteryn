@@ -27,18 +27,29 @@ def live(evt):
 
 
 class GH:
-    def __init__(self, evt=None, *, protected=False, open_pulls=None, open_pull_snapshots=None, default="main"):
+    def __init__(self, evt=None, *, protected=False, open_pulls=None, open_pull_snapshots=None, pull_snapshots=None, fail_open_call=None, default="main"):
         self.evt, self.protected, self.open_pulls, self.default = evt, protected, open_pulls or [], default
         self.open_pull_snapshots = list(open_pull_snapshots) if open_pull_snapshots is not None else None
+        self.pull_snapshots = list(pull_snapshots) if pull_snapshots is not None else None
+        self.fail_open_call = fail_open_call
+        self.open_calls = 0
         self.calls = []
     def get_repository(self):
         self.calls.append("repo"); return {"full_name": "Oteryn/Demo", "default_branch": self.default}
     def get_pull(self, number):
-        self.calls.append("pull"); return live(self.evt)
+        self.calls.append("pull")
+        if self.pull_snapshots is not None:
+            if not self.pull_snapshots:
+                raise CleanupError("unexpected pull revalidation")
+            return live(self.pull_snapshots.pop(0))
+        return live(self.evt)
     def get_branch(self, branch):
         self.calls.append("branch"); return {"protected": self.protected}
     def get_open_pulls_for_branch(self, branch):
         self.calls.append("open")
+        self.open_calls += 1
+        if self.fail_open_call == self.open_calls:
+            raise CleanupError("simulated open-PR API failure")
         if self.open_pull_snapshots is not None:
             if not self.open_pull_snapshots:
                 return []
@@ -47,9 +58,15 @@ class GH:
 
 
 class Git:
-    def __init__(self, sha=SHA):
+    def __init__(self, sha=SHA, *, fail_post_delete_lookup=False):
         self.sha, self.deletes, self.prepared, self.restores = sha, [], [], []
-    def remote_ref_sha(self, branch): return self.sha
+        self.fail_post_delete_lookup = fail_post_delete_lookup
+        self.failed_post_delete_lookup = False
+    def remote_ref_sha(self, branch):
+        if self.sha is None and self.fail_post_delete_lookup and not self.failed_post_delete_lookup:
+            self.failed_post_delete_lookup = True
+            raise CleanupError("simulated post-delete ref lookup failure")
+        return self.sha
     def prepare_recovery(self, branch, expected_sha):
         if self.sha != expected_sha: raise CleanupError("recovery preparation mismatch")
         self.prepared.append((branch, expected_sha))
@@ -57,6 +74,8 @@ class Git:
         if self.sha != expected_sha: raise CleanupError("lease mismatch")
         self.deletes.append((branch, expected_sha)); self.sha = None
     def restore_if_absent(self, branch, expected_sha):
+        if self.sha == expected_sha:
+            return
         if self.sha is not None: raise CleanupError("restore target is not absent")
         self.restores.append((branch, expected_sha)); self.sha = expected_sha
 
@@ -127,11 +146,43 @@ class CleanupTests(unittest.TestCase):
             with self.subTest(message=message), self.assertRaisesRegex(CleanupError, message):
                 process_event(candidate, "Oteryn/Demo", gh, Git())
 
+    def test_live_disposition_is_revalidated_at_delete_boundary(self):
+        evt = self.delete_event()
+        retained = self.delete_event()
+        retained["pull_request"]["body"] = "Branch-Disposition: retain\nBranch-Disposition-Reason: revoked at deletion boundary"
+        gh = GH(evt, pull_snapshots=[evt, retained])
+        git = Git()
+        out = process_event(evt, "Oteryn/Demo", gh, git)
+        self.assertEqual(out["result"], "RETAIN")
+        self.assertEqual(out["reason"], "revoked at deletion boundary")
+        self.assertEqual(git.deletes, [])
+        self.assertEqual(gh.calls.count("pull"), 2)
+
+    def test_post_delete_ref_lookup_failure_restores_exact_head(self):
+        evt = self.delete_event()
+        gh = GH(evt)
+        git = Git(fail_post_delete_lookup=True)
+        with self.assertRaisesRegex(CleanupError, "restored after post-delete verification failed"):
+            process_event(evt, "Oteryn/Demo", gh, git)
+        self.assertEqual(git.deletes, [("feat/demo", SHA)])
+        self.assertEqual(git.restores, [("feat/demo", SHA)])
+        self.assertEqual(git.sha, SHA)
+
+    def test_post_delete_api_failure_restores_exact_head(self):
+        evt = self.delete_event()
+        gh = GH(evt, fail_open_call=2)
+        git = Git()
+        with self.assertRaisesRegex(CleanupError, "restored after post-delete verification failed"):
+            process_event(evt, "Oteryn/Demo", gh, git)
+        self.assertEqual(git.deletes, [("feat/demo", SHA)])
+        self.assertEqual(git.restores, [("feat/demo", SHA)])
+        self.assertEqual(git.sha, SHA)
+
     def test_open_pr_race_after_delete_restores_exact_head_and_blocks(self):
         evt = self.delete_event()
         gh = GH(evt, open_pull_snapshots=[[], [{"number": 9}]])
         git = Git()
-        with self.assertRaisesRegex(CleanupError, "restored after an open pull request appeared"):
+        with self.assertRaisesRegex(CleanupError, "preserved or restored after post-delete verification failed"):
             process_event(evt, "Oteryn/Demo", gh, git)
         self.assertEqual(git.prepared, [("feat/demo", SHA)])
         self.assertEqual(git.deletes, [("feat/demo", SHA)])
