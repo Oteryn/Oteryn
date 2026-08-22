@@ -83,6 +83,7 @@ class Audit(core.Audit):
                 head_runs,
                 event="pull_request",
                 allowed_head_shas={sha},
+                workflow_ref=sha,
                 pr_number=pr_number,
             )
             target_sources: dict[str, set[int | None]] = {}
@@ -93,7 +94,9 @@ class Audit(core.Audit):
                 definition = self._workflow_definition(repo, workflow)
                 if not definition or definition.get("state") != "active":
                     continue
-                if not self._workflow_event_unfiltered(repo, definition, "pull_request_target"):
+                if not self._workflow_event_unfiltered(
+                    repo, definition, "pull_request_target", ref=main_sha
+                ):
                     continue
                 if workflow.get("head_sha") != main_sha:
                     continue
