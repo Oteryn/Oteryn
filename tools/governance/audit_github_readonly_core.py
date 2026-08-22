@@ -241,6 +241,7 @@ def dependabot_github_actions_entry_valid(text: str) -> bool:
         interval = None
         schedule_indent = None
         schedule_child_indent = None
+        seen_item_fields: set[str] = set()
         field_indent = item_indent + 2
         for offset, (child_indent, child_body) in enumerate(entry):
             field = _yaml_mapping_field(child_body)
@@ -251,6 +252,10 @@ def dependabot_github_actions_entry_valid(text: str) -> bool:
             if schedule_indent is not None and child_indent <= schedule_indent and not is_inline_item:
                 schedule_indent = None
                 schedule_child_indent = None
+            if is_item_field:
+                if field[1] in seen_item_fields:
+                    return False
+                seen_item_fields.add(field[1])
             if is_item_field and field[1] == "package-ecosystem":
                 ecosystem = _yaml_scalar(field[2])
             elif is_item_field and field[1] == "directory":

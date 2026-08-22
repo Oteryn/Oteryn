@@ -399,6 +399,14 @@ updates:
       schedule:
         interval: weekly
 """
+    duplicate_schedule = """version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    schedule: {}
+"""
     encode = lambda text: m.core.base64.b64encode(text.encode("utf-8")).decode("ascii")
     reordered = """version: 2
 updates:
@@ -410,7 +418,7 @@ updates:
     for valid in (good, reordered):
         enabled = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(valid)}})
         assert enabled.github_actions_dependency_updates_configured(repo)
-    for invalid in (outside, missing_directory, missing_schedule, interval_outside_schedule, fields_aligned_with_dash, wrapped_item):
+    for invalid in (outside, missing_directory, missing_schedule, interval_outside_schedule, fields_aligned_with_dash, wrapped_item, duplicate_schedule):
         audit = FakeAudit({f"/repos/{repo}/contents/.github/dependabot.yml": {"content": encode(invalid)}})
         assert not audit.github_actions_dependency_updates_configured(repo)
 
