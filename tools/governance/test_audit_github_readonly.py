@@ -180,17 +180,18 @@ def test_current_internal_pr_can_prove_required_checks_only_after_ancestry() -> 
     assert m.expected_sources_satisfied(observed, {"gate-a", "gate-b"}, ACTIONS_APP_ID)
 
 
-def test_dependabot_security_updates_use_automated_security_fixes_endpoint() -> None:
+def test_dependabot_security_updates_treat_204_as_enabled() -> None:
     repo = "Oteryn/Test"
-    audit = FakeAudit({f"/repos/{repo}/automated-security-fixes": {"enabled": True}})
+    audit = FakeAudit({f"/repos/{repo}/automated-security-fixes": {"_http_status": 204}})
     assert audit.dependabot_security_updates_enabled(repo)
     assert audit.calls == [f"/repos/{repo}/automated-security-fixes"]
 
 
-def test_dependabot_security_updates_fail_closed_when_not_enabled() -> None:
+def test_dependabot_security_updates_treat_404_as_disabled() -> None:
     repo = "Oteryn/Test"
-    audit = FakeAudit({f"/repos/{repo}/automated-security-fixes": {"enabled": False}})
+    audit = FakeAudit({})
     assert not audit.dependabot_security_updates_enabled(repo)
+    assert audit.calls == [f"/repos/{repo}/automated-security-fixes"]
 
 
 def test_desired_state_binds_all_required_checks_to_github_actions_app() -> None:
