@@ -1,9 +1,9 @@
 name: Probe Atlas Runner Group Deny
 
 on:
-  push:
+  pull_request:
     branches:
-      - probe/atlas-group-deny-meta-20260822
+      - main
     paths:
       - .github/workflows/probe-atlas-runner-group-deny.yml
 
