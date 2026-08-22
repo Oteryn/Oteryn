@@ -25,6 +25,11 @@ class FakeAudit(m.Audit):
         self.calls.append(path)
         if path in self.responses:
             return self.responses[path]
+        if "?per_page=100&page=" in path:
+            base, page = path.rsplit("?per_page=100&page=", 1)
+            if page == "1" and base in self.responses:
+                return self.responses[base]
+            return []
         if path.startswith("/repos/Oteryn/Test/actions/workflows/"):
             return {"id": 1, "state": "active", "path": ".github/workflows/gate.yml"}
         if path.startswith("/repos/Oteryn/Test/contents/.github/workflows/gate.yml"):
@@ -116,6 +121,23 @@ def test_required_context_sources_ignore_other_branches_and_keep_app_identity() 
         },
     })
     assert audit.required_context_sources("Oteryn/Test") == {"main-gate": {ACTIONS_APP_ID}}
+
+
+def test_required_context_sources_paginates_all_rulesets() -> None:
+    first_page = [{"id": i, "enforcement": "disabled"} for i in range(1, 101)]
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/rulesets?per_page=100&page=1": first_page,
+        "/repos/Oteryn/Test/rulesets?per_page=100&page=2": [{"id": 101, "enforcement": "active"}],
+        "/repos/Oteryn/Test/rulesets/101": {
+            "target": "branch", "enforcement": "active",
+            "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+            "rules": [{"type": "required_status_checks", "parameters": {"required_status_checks": [
+                {"context": "late-page-gate", "integration_id": ACTIONS_APP_ID},
+            ]}}],
+        },
+    })
+    assert audit.required_context_sources("Oteryn/Test") == {"late-page-gate": {ACTIONS_APP_ID}}
+    assert "/repos/Oteryn/Test/rulesets?per_page=100&page=2" in audit.calls
 
 
 def test_required_context_sources_reject_wrong_or_unbound_app() -> None:

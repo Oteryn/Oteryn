@@ -669,6 +669,19 @@ class Audit:
             return {"_http_status": status}
         return json.loads(raw)
 
+    def api_list(self, path: str) -> list[dict]:
+        items: list[dict] = []
+        page = 1
+        separator = "&" if "?" in path else "?"
+        while True:
+            payload = self.api(f"{path}{separator}per_page=100&page={page}")
+            if not isinstance(payload, list):
+                raise RuntimeError(f"GET {path} -> expected list payload")
+            items.extend(item for item in payload if isinstance(item, dict))
+            if len(payload) < 100:
+                return items
+            page += 1
+
     def check(self, condition: bool, message: str) -> None:
         if not condition:
             self.errors.append(message)
@@ -755,7 +768,7 @@ class Audit:
         default_branch: str = "main",
     ) -> dict[str, set[int | None]]:
         sources: dict[str, set[int | None]] = {}
-        rulesets = self.api(f"/repos/{repo}/rulesets") or []
+        rulesets = self.api_list(f"/repos/{repo}/rulesets")
         for summary in rulesets:
             if summary.get("enforcement") != "active":
                 continue
@@ -787,7 +800,7 @@ class Audit:
         self, repo: str, *, branch: str = "main", default_branch: str = "main"
     ) -> dict[str, bool]:
         applicable: list[dict] = []
-        for summary in self.api(f"/repos/{repo}/rulesets") or []:
+        for summary in self.api_list(f"/repos/{repo}/rulesets"):
             if summary.get("enforcement") != "active":
                 continue
             detail = self.api(f"/repos/{repo}/rulesets/{summary['id']}")
