@@ -1,0 +1,23 @@
+name: Probe Atlas Runner Group Deny
+
+on:
+  push:
+    branches:
+      - probe/atlas-group-deny-meta-20260822
+    paths:
+      - .github/workflows/probe-atlas-runner-group-deny.yml
+
+permissions: {}
+
+jobs:
+  must-not-run:
+    name: Atlas runner group must reject META
+    runs-on:
+      group: atlas-runners
+      labels: oteryn-atlas
+    steps:
+      - name: Fail if unauthorized repository reaches Atlas runner
+        shell: bash
+        run: |
+          echo "SECURITY_FAILURE: atlas-runners accepted ${GITHUB_REPOSITORY}" >&2
+          exit 97
