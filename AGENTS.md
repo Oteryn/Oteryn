@@ -16,6 +16,28 @@ Before declaring a task blocked because of access limitations, agents must disco
 
 Completion claims require verified evidence. `UNKNOWN` is not automatically a `BLOCKER`, and a generic access disclaimer without capability discovery is invalid.
 
+## GitHub-first execution gate
+
+GitHub is the authoritative repository control plane for repo identity, default branch, Issue/task, PR, task branch, exact remote SHA, checks, reviews and merge state.
+
+Agents MUST complete the GitHub preflight defined in `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` before mutating any local/remote checkout or starting host-local implementation/execution that can change repository or external state. If GitHub preflight is genuinely unavailable, host-local tools may still be used for the safe read-only analysis and patch/handoff preparation permitted by the central contract, but not to mutate or bypass GitHub lifecycle authority.
+
+Host-local filesystems, clones, worktrees, containers and shells are execution/cache planes only. They MUST NOT be used to select authoritative repository state or bypass GitHub lifecycle. Durable local changes receive no completion credit until committed, pushed to the approved GitHub branch/PR and verified against the remote exact head.
+
+## Organization runner routing
+
+Product-owned host-local GitHub Actions workloads MUST use the product-isolated organization runner group and product label together:
+
+- Platform: `platform-runners` + `oteryn-platform`;
+- Atlas: `atlas-runners` + `oteryn-atlas`;
+- Game: `game-runners` + `oteryn-game`.
+
+Agents MUST NOT route new workloads by a custom label alone, MUST NOT add generic `self-hosted` eligibility, and MUST NOT introduce new workflow dependencies on the legacy `oteryn-staging` selector. `oteryn-synology-staging` is rollback-only while the organization-runner migration remains open and may be retired only after the provider closeout gates prove that it has no retained workload owner. META remains GitHub-hosted unless a separate host-local META workload is explicitly proven and authorized.
+
+When migrating an existing `oteryn-staging` workflow, replace it with the owning product's group+label selector; do not preserve the legacy selector as a fallback in new code.
+
+The detailed operational contract and live rollout evidence are provider-owned in `Oteryn/Oteryn-Platform/docs/operations/SYNOLOGY_ORGANIZATION_RUNNERS.md`; live GitHub organization state and provider workflow state outrank stale documentation.
+
 ## Authority and repository scope
 
 - Autonomous write operations governed by this file are limited to `Oteryn/Oteryn` unless the repository owner explicitly authorizes another repository for the current task.

@@ -51,12 +51,19 @@ jobs:
               Path('AGENTS.md'),
               Path('CONTRIBUTING.md'),
               Path('SECURITY.md'),
+              Path('.github/CODEOWNERS'),
+              Path('.github/dependabot.yml'),
               Path('docs/architecture/adr/0001-ecosystem-topology-authority.md'),
               Path('docs/ci/CI_CONTRACT.md'),
               Path('docs/testing/ECOSYSTEM_TEST_STRATEGY.md'),
               Path('docs/release/RELEASE_COORDINATION.md'),
               Path('ecosystem/repositories.json'),
+              Path('ecosystem/governance-desired-state.json'),
               Path('ecosystem/compatibility.schema.json'),
+              Path('tools/governance/audit_github_readonly.py'),
+              Path('tools/governance/audit_github_readonly_core.py'),
+              Path('tools/governance/test_audit_github_readonly.py'),
+              Path('tools/governance/test_audit_github_readonly_terminal.py'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
           if missing:
@@ -159,6 +166,14 @@ jobs:
               f'{len(repositories)} repository entries and {len(release_files)} release manifests.'
           )
           PY
+
+      - name: Validate governance desired state offline
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/governance/audit_github_readonly.py --offline
+          python3 tools/governance/test_audit_github_readonly.py
+          python3 tools/governance/test_audit_github_readonly_terminal.py
 
       - name: Validate AI review risk policy
         shell: bash
