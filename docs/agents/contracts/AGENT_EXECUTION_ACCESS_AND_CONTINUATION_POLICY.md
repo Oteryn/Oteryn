@@ -26,13 +26,15 @@ Agents MUST NOT use filesystem discovery, a convenient existing clone, a Desktop
 
 Before editing a local checkout, verify its remote URL, branch/worktree identity, HEAD and working-tree state against the GitHub-resolved task. Preserve unrelated dirty work and never silently reset, clean, overwrite or absorb another agent's changes.
 
-After every durable local mutation, the agent MUST:
+After completing a coherent local change set, or when reaching an explicit durable checkpoint that is intended to be published, the agent MUST:
 
 1. commit on the authorized task branch;
 2. push to the approved GitHub remote;
 3. verify that the remote branch head equals the intended local commit;
 4. update the live PR/task state when applicable;
 5. use GitHub exact-head CI/check/review/merge state for readiness and completion decisions.
+
+Intermediate file saves inside the same coherent change set do not require partial commits or pushes.
 
 Local-only commits, patches, test logs or working-tree state do not count as completed repository work until the durable result is present on the approved GitHub branch/PR. Host-local evidence may support verification but cannot replace GitHub lifecycle evidence.
 
