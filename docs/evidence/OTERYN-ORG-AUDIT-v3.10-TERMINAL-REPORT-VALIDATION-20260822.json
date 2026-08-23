@@ -170,7 +170,7 @@
     },
     "meta_material_surface_inventory": {
       "state": "PASS",
-      "evidence": "54/54 tracked META material files covered by section 4"
+      "evidence": "55/55 tracked META material files covered by section 4"
     },
     "provider_material_snapshot_inventory": {
       "state": "PASS",
