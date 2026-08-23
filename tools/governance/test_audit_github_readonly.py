@@ -817,13 +817,22 @@ def test_desired_state_binds_all_required_checks_to_github_actions_app() -> None
     assert {item["required_check_app_id"] for item in desired["permanent_repositories"]} == {ACTIONS_APP_ID}
 
 
-def test_game_desired_state_models_gate_transition() -> None:
+def test_game_desired_state_uses_terminal_stable_gate() -> None:
     desired = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
     game = next(item for item in desired["permanent_repositories"] if item["repository"] == "Oteryn/Oteryn-Game")
-    assert game["required_checks"] == ["Merge gate / validate"]
+    assert game["required_checks"] == ["game-gate"]
     assert game["required_check_app_id"] == ACTIONS_APP_ID
-    assert game["gate_mode"] == "transition"
-    assert game["target_gate"] == "game-gate"
+    assert game["gate_mode"] == "stable"
+    assert "target_gate" not in game
+
+
+def test_platform_desired_state_uses_terminal_stable_gate() -> None:
+    desired = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    platform = next(item for item in desired["permanent_repositories"] if item["repository"] == "Oteryn/Oteryn-Platform")
+    assert platform["required_checks"] == ["platform-gate"]
+    assert platform["required_check_app_id"] == ACTIONS_APP_ID
+    assert platform["gate_mode"] == "stable"
+    assert "target_gate" not in platform
 
 
 def main() -> int:

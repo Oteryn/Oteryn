@@ -41,11 +41,10 @@
       "repository_id": 1338291140,
       "role": "GAME",
       "required_checks": [
-        "Merge gate / validate"
+        "game-gate"
       ],
       "required_check_app_id": 15368,
-      "target_gate": "game-gate",
-      "gate_mode": "transition",
+      "gate_mode": "stable",
       "main_protected": true,
       "squash_only": true,
       "delete_branch_on_merge": true,
@@ -75,12 +74,10 @@
       "repository_id": 1305155726,
       "role": "PLATFORM",
       "required_checks": [
-        "classify-changes",
-        "test"
+        "platform-gate"
       ],
       "required_check_app_id": 15368,
-      "target_gate": "platform-gate",
-      "gate_mode": "transition",
+      "gate_mode": "stable",
       "main_protected": true,
       "squash_only": true,
       "delete_branch_on_merge": true,
