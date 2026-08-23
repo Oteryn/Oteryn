@@ -2,7 +2,7 @@
   "schema_version": 3,
   "validator": "tools/governance/validate_v310_terminal_report.py",
   "report": "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
-  "report_sha256": "47512c5e6a7cdf5077d49d3205447ce696bda25dea00208b039e5b85f705dc54",
+  "report_sha256": "312b8c3b812d6a6ef7ccb5974252828f8dbe87e1ce555c87ef5282ddd3376639",
   "execution_verdict": "PASS",
   "programme_verdict": "INCOMPLETE",
   "contract_completeness": "INCOMPLETE",
@@ -58,7 +58,7 @@
     "Platform": 22,
     "Atlas": 22
   },
-  "material_inventory_rows": 78,
+  "material_inventory_rows": 80,
   "operational_primary_classes": [
     "ARCHITECTURE_ADR",
     "CI_POLICY",
@@ -82,7 +82,7 @@
     "TEST_STRATEGY",
     "UNKNOWN"
   ],
-  "section_15_disposition_rows": 78,
+  "section_15_disposition_rows": 80,
   "section_19_documentation_backlog_types": [
     "DOCUMENTATION_IA",
     "AGENT_INSTRUCTION",
@@ -104,7 +104,7 @@
     },
     "material_artifacts_have_primary_class": {
       "state": "PASS",
-      "evidence": "78 material artifact records using section-10A operational taxonomy"
+      "evidence": "80 material artifact records using section-10A operational taxonomy"
     },
     "normative_artifacts_have_single_authority": {
       "state": "PASS",
@@ -112,11 +112,11 @@
     },
     "meta_github_governance_surface_inventory": {
       "state": "PASS",
-      "evidence": "4/4 META workflow/action files covered by section 4"
+      "evidence": "5/5 META workflow/action files covered by section 4"
     },
     "meta_material_surface_inventory": {
       "state": "PASS",
-      "evidence": "51/51 tracked META material files covered by section 4"
+      "evidence": "54/54 tracked META material files covered by section 4"
     },
     "retained_reusable_prompts_have_identity_version_status": {
       "state": "UNKNOWN",
@@ -190,7 +190,7 @@
     },
     "section_15_file_dispositions_present": {
       "state": "PASS",
-      "evidence": "78/78 section-4 material families mapped exactly once"
+      "evidence": "80/80 section-4 material families mapped exactly once"
     },
     "section_19_required_backlog_categories_present": {
       "state": "PASS",
