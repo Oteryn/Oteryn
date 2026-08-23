@@ -2,7 +2,7 @@
   "schema_version": 4,
   "validator": "tools/governance/validate_v310_terminal_report.py",
   "report": "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
-  "report_sha256": "7ac503a34cd209d8ec475bed6d4c0fdb23eb5ce8b189fd0360108d96ecbe5cd4",
+  "report_sha256": "8e79811e6587046bd6c7d3c35b9a9716b6f6dd9129d3560c4d817eff89589986",
   "execution_verdict": "PASS",
   "programme_verdict": "INCOMPLETE",
   "contract_completeness": "INCOMPLETE",
@@ -47,7 +47,7 @@
     "G6": "UNKNOWN (GAP-MIGRATION-001: Game/Platform completion evidence is missing and exhaustive stale-coordinate/ref/source disposition is not closed)",
     "G7": "FAIL",
     "G8": "PASS",
-    "G9": "PASS",
+    "G9": "UNKNOWN (GAP-DOCS-ATLAS-ARCH-001: exact Atlas canonical targets remain unresolved pending evidence-backed provider decisions)",
     "G10": "PASS",
     "G11": "UNKNOWN (GAP-DOCS-IA-001: Matrix L exposes unresolved provider classes, especially Atlas architecture/contracts/governance/test/recovery and selected Game/Platform prompt/operations/release classifications)"
   },
@@ -102,6 +102,12 @@
     "REC-DOCS-007"
   ],
   "section_19_recommendation_quality_rows": 7,
+  "recommendation_target_gap_ids": [
+    "GAP-DOCS-ATLAS-ARCH-001",
+    "GAP-DOCS-ATLAS-CONTRACT-001",
+    "GAP-DOCS-ATLAS-GOV-001",
+    "GAP-DOCS-ATLAS-TEST-001"
+  ],
   "meta_live_tree_baseline": "64371aa0d1548e92376c8e8952def4a9332bd3e7",
   "runner_capture_sha256": "4d4c9c41d9b1e200e403f2607ea1a630453d25384fa42c1fa12050c15ad5c1d3",
   "mechanical_invariants": {
@@ -210,6 +216,16 @@
     "section_19_recommendation_quality_records_present": {
       "state": "PASS",
       "evidence": "7/7 section-32A quality records mapped 1:1"
+    },
+    "g9_implementation_readiness_respects_unresolved_targets": {
+      "state": "UNKNOWN",
+      "evidence": "UNKNOWN (GAP-DOCS-ATLAS-ARCH-001: exact Atlas canonical targets remain unresolved pending evidence-backed provider decisions)",
+      "gap_ids": [
+        "GAP-DOCS-ATLAS-ARCH-001",
+        "GAP-DOCS-ATLAS-CONTRACT-001",
+        "GAP-DOCS-ATLAS-GOV-001",
+        "GAP-DOCS-ATLAS-TEST-001"
+      ]
     },
     "meta_inventory_bound_to_reconciled_baseline": {
       "state": "PASS",

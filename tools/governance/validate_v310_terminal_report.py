@@ -151,6 +151,17 @@ def sha256(path: Path) -> str:
     # Git normalizes repository text to LF; hash canonical repository bytes.
     data = path.read_bytes().replace(b"\r\n", b"\n")
     return hashlib.sha256(data).hexdigest()
+def git_tracked_paths(*pathspecs: str) -> tuple[list[str], str | None]:
+    cmd = ["git", "ls-files", "-z"]
+    if pathspecs:
+        cmd.extend(["--", *pathspecs])
+    try:
+        raw = subprocess.run(cmd, cwd=REPO_STRUCTURE_ROOT, check=True, capture_output=True).stdout
+        return [path for path in raw.decode("utf-8").split("\0") if path], None
+    except (subprocess.CalledProcessError, UnicodeDecodeError, OSError) as exc:
+        return [], str(exc)
+
+
 def build_record() -> dict:
     text = REPORT.read_text(encoding="utf-8")
     lines = text.splitlines()
@@ -264,15 +275,13 @@ def build_record() -> dict:
         if row[1] not in inventory_families[row[0]]:
             errors.append(f"material Matrix L class missing from section 4 inventory: {row[0]}:{row[1]}")
 
+    tracked_github, tracked_github_error = git_tracked_paths(".github/workflows", ".github/actions")
+    if tracked_github_error:
+        errors.append(f"unable to enumerate tracked META .github governance surface: {tracked_github_error}")
     required_meta_github = sorted(
-        str(path.relative_to(REPO_STRUCTURE_ROOT)).replace("\\", "/")
-        for path in [
-            *list((REPO_STRUCTURE_ROOT / ".github/workflows").glob("*.yml")),
-            *list((REPO_STRUCTURE_ROOT / ".github/workflows").glob("*.yaml")),
-            *list((REPO_STRUCTURE_ROOT / ".github/actions").rglob("action.yml")),
-            *list((REPO_STRUCTURE_ROOT / ".github/actions").rglob("action.yaml")),
-        ]
-        if path.is_file()
+        path for path in tracked_github
+        if re.fullmatch(r"\.github/workflows/[^/]+\.ya?ml", path)
+        or re.fullmatch(r"\.github/actions/.+/action\.ya?ml", path)
     )
     meta_specs = [spec for spec, _primary, _current in selector_records["META"]]
     missing_meta_github = []
@@ -293,17 +302,9 @@ def build_record() -> dict:
         "ecosystem/", "tools/governance/",
     )
     material_root_files = {"AGENTS.md", "README.md", "CONTRIBUTING.md", "SECURITY.md"}
-    try:
-        tracked_raw = subprocess.run(
-            ["git", "ls-files", "-z"],
-            cwd=REPO_STRUCTURE_ROOT,
-            check=True,
-            capture_output=True,
-        ).stdout
-        tracked = tracked_raw.decode("utf-8").split("\0")
-    except (subprocess.CalledProcessError, UnicodeDecodeError, OSError) as exc:
-        errors.append(f"unable to enumerate tracked META material surface: {exc}")
-        tracked = []
+    tracked, tracked_error = git_tracked_paths()
+    if tracked_error:
+        errors.append(f"unable to enumerate tracked META material surface: {tracked_error}")
     meta_material = sorted(
         path for path in tracked
         if path and (path in material_root_files or path.startswith(material_roots))
@@ -394,6 +395,20 @@ def build_record() -> dict:
         if len(row) != 15 or any(not cell for cell in row):
             errors.append(f"invalid recommendation quality row: {row}")
 
+    recommendation_target_gap_ids = sorted({
+        m.group(0)
+        for row in quality_rows if len(row) == 15
+        for cell in (row[3], row[11])
+        for m in re.finditer(r"GAP-[A-Z0-9-]+", cell)
+    })
+    g9_state = grows.get("G9", "")
+    if recommendation_target_gap_ids and g9_state == "PASS":
+        errors.append(f"G9 cannot PASS while recommendation canonical targets remain unresolved: {recommendation_target_gap_ids}")
+    if recommendation_target_gap_ids:
+        g9_quality_state = "UNKNOWN" if g9_state.startswith("UNKNOWN") and "GAP-" in g9_state else ("PASS" if g9_state == "FAIL" else "FAIL")
+    else:
+        g9_quality_state = "PASS"
+
     baseline_match = re.search(r"META_LIVE_TREE_BASELINE = ([0-9a-f]{40})", text)
     meta_baseline = baseline_match.group(1) if baseline_match else ""
     meta_baseline_short = meta_baseline[:8] if meta_baseline else ""
@@ -471,6 +486,10 @@ def build_record() -> dict:
         ),
         "section_19_required_backlog_categories_present": invariant("PASS" if backlog_types == BACKLOG_TYPES else "FAIL", ", ".join(backlog_types)),
         "section_19_recommendation_quality_records_present": invariant("PASS" if backlog_ids == BACKLOG_REC_IDS and quality_ids == BACKLOG_REC_IDS and not any("recommendation quality" in e or "REC_ID mismatch" in e for e in errors) else "FAIL", f"{len(quality_rows)}/7 section-32A quality records mapped 1:1"),
+        "g9_implementation_readiness_respects_unresolved_targets": invariant(
+            g9_quality_state, grows.get("G9", "missing"),
+            recommendation_target_gap_ids if g9_quality_state == "UNKNOWN" else None,
+        ),
         "meta_inventory_bound_to_reconciled_baseline": invariant("PASS" if meta_baseline and baseline_ancestor_ok and not stale_meta_inventory_evidence and not stale_meta_matrix_evidence else "FAIL", meta_baseline or "missing"),
     }
     hard_fail = bool(errors) or any(item["state"] == "FAIL" for item in invariants.values())
@@ -495,6 +514,7 @@ def build_record() -> dict:
         "section_19_documentation_backlog_types": backlog_types,
         "section_19_recommendation_ids": backlog_ids,
         "section_19_recommendation_quality_rows": len(quality_rows),
+        "recommendation_target_gap_ids": recommendation_target_gap_ids,
         "meta_live_tree_baseline": meta_baseline,
         "runner_capture_sha256": actual_runner,
         "mechanical_invariants": invariants,

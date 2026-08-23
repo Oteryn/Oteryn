@@ -219,6 +219,25 @@ def test_meta_inventory_evidence_uses_reconciled_baseline() -> None:
         assert record["mechanical_invariants"]["meta_inventory_bound_to_reconciled_baseline"]["state"] == "FAIL"
     finally: restore(temp, old_root, old_report)
 
+def test_untracked_github_workflow_does_not_change_exact_head_validation() -> None:
+    note=m.REPO_STRUCTURE_ROOT / ".github/workflows/.codex-local.yml"
+    assert not note.exists(); note.write_text("name: local scratch\n", encoding="utf-8")
+    try:
+        record=m.build_record(); assert record["execution_verdict"] == "PASS"
+        assert record["mechanical_invariants"]["meta_github_governance_surface_inventory"]["state"] == "PASS"
+    finally: note.unlink(missing_ok=True)
+
+def test_g9_cannot_pass_with_unresolved_recommendation_targets() -> None:
+    text=m.REPORT.read_text(encoding="utf-8"); lines=text.splitlines()
+    for i,line in enumerate(lines):
+        if line.startswith("| G9 Implementation readiness |"):
+            cells=line.split("|"); cells[2]=" PASS "; lines[i]="|".join(cells); break
+    temp, old_root, old_report=with_report("\n".join(lines)+"\n")
+    try:
+        record=m.build_record(); assert record["execution_verdict"] == "FAIL"
+        assert any("G9 cannot PASS" in e for e in record["errors"])
+    finally: restore(temp, old_root, old_report)
+
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
     for test in tests:
