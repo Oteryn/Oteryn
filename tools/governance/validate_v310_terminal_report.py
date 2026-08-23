@@ -373,9 +373,15 @@ def build_record() -> dict:
         if stale_provider_evidence:
             errors.append(f"provider inventory rows not bound to frozen manifest snapshot: {repo}:{stale_provider_evidence}")
             provider_manifest_valid = False
+        observed_head = data.get("observed_default_branch_head_at_capture", "")
+        if not re.fullmatch(r"[0-9a-f]{40}", observed_head):
+            errors.append(f"provider observed default-branch head invalid: {repo}:{observed_head}")
+            provider_manifest_valid = False
         provider_manifest_coverage[repo] = {
             "audited_commit_sha": commit_sha,
             "audited_tree_sha": tree_sha,
+            "observed_default_branch_head_at_capture": observed_head,
+            "current_head_matches_audited_snapshot": observed_head == commit_sha,
             "material_entry_count": len(entries),
             "material_entries_sha256": entries_digest,
             "missing_inventory_paths": missing_provider_paths,
@@ -454,8 +460,8 @@ def build_record() -> dict:
 
     recommendation_target_gap_ids = sorted({
         m.group(0)
-        for row in matrix_l + lifecycle_rows + inventory + backlog + quality_rows
-        for cell in row
+        for row in quality_rows if len(row) == 15
+        for cell in (row[3], row[11])
         for m in re.finditer(r"GAP-[A-Z0-9-]+", cell)
         if m.group(0) != "GAP-ID"
     })
@@ -529,9 +535,14 @@ def build_record() -> dict:
             "PASS" if not missing_meta_material else "FAIL",
             f"{len(meta_material) - len(missing_meta_material)}/{len(meta_material)} tracked META material files covered by section 4",
         ),
-        "provider_material_snapshot_inventory": invariant(
+        "provider_frozen_snapshot_inventory": invariant(
             "PASS" if provider_manifest_valid else "FAIL",
             "; ".join(f"{repo}:{data.get('material_entry_count', 0)}" for repo, data in provider_manifest_coverage.items()) or "provider manifest unavailable",
+        ),
+        "provider_current_material_inventory": invariant(
+            "FAIL" if not provider_manifest_valid else ("PASS" if provider_manifest_coverage and all(data.get("current_head_matches_audited_snapshot") for data in provider_manifest_coverage.values()) else "UNKNOWN"),
+            "; ".join(f"{repo}:{data.get('audited_commit_sha', '')[:8]}->{data.get('observed_default_branch_head_at_capture', '')[:8]}" for repo, data in provider_manifest_coverage.items()) or "provider manifest unavailable",
+            ["GAP-DOCS-PROVIDER-CURRENT-001"] if provider_manifest_valid and provider_manifest_coverage and not all(data.get("current_head_matches_audited_snapshot") for data in provider_manifest_coverage.values()) else None,
         ),
         "retained_reusable_prompts_have_identity_version_status": invariant(prompt_state, "section 7 lifecycle verification", prompt_gaps),
         "active_task_packets_have_lifecycle_authority": invariant(task_state, "section 7 lifecycle verification", task_gaps),

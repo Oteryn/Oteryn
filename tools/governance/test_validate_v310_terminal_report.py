@@ -240,7 +240,7 @@ def test_g9_cannot_pass_with_unresolved_recommendation_targets() -> None:
 
 def test_provider_manifest_covers_all_frozen_provider_material_paths() -> None:
     record=m.build_record()
-    invariant=record["mechanical_invariants"]["provider_material_snapshot_inventory"]
+    invariant=record["mechanical_invariants"]["provider_frozen_snapshot_inventory"]
     assert invariant["state"] == "PASS"
     coverage=record["provider_material_snapshot_coverage"]
     assert {repo: coverage[repo]["material_entry_count"] for repo in coverage} == {"Game": 422, "Platform": 829, "Atlas": 55}
@@ -258,13 +258,28 @@ def test_game_provider_contract_omission_is_caught_by_frozen_manifest() -> None:
     finally: restore(temp, old_root, old_report)
 
 
-def test_g9_gap_set_includes_all_backlog_and_matrix_target_gaps() -> None:
+def test_g9_gap_set_is_readiness_only() -> None:
     record=m.build_record()
     gaps=set(record["recommendation_target_gap_ids"])
-    required={"GAP-DOCS-GAME-OPS-001","GAP-DOCS-GAME-RELEASE-001","GAP-DOCS-ATLAS-POLICY-001","GAP-DOCS-ATLAS-OPS-001","GAP-DOCS-ATLAS-RECOVERY-001"}
-    assert required <= gaps, (required-gaps, sorted(gaps))
-    assert "GAP-ID" not in gaps
+    expected={
+        "GAP-DOCS-ATLAS-ARCH-001", "GAP-DOCS-ATLAS-CONTRACT-001",
+        "GAP-DOCS-ATLAS-GOV-001", "GAP-DOCS-ATLAS-POLICY-001",
+        "GAP-DOCS-ATLAS-TEST-001", "GAP-DOCS-GAME-OPS-001",
+        "GAP-DOCS-ATLAS-OPS-001", "GAP-DOCS-ATLAS-RECOVERY-001",
+        "GAP-DOCS-GAME-RELEASE-001",
+    }
+    assert gaps == expected, (sorted(expected-gaps), sorted(gaps-expected))
+    assert not any(gap.startswith(("GAP-PROMPT-", "GAP-TASK-", "GAP-HANDOVER-")) for gap in gaps)
 
+
+def test_provider_current_coverage_is_unknown_when_snapshot_is_behind_observed_head() -> None:
+    record=m.build_record()
+    assert record["mechanical_invariants"]["provider_frozen_snapshot_inventory"]["state"] == "PASS"
+    current=record["mechanical_invariants"]["provider_current_material_inventory"]
+    assert current["state"] == "UNKNOWN"
+    assert current.get("gap_ids") == ["GAP-DOCS-PROVIDER-CURRENT-001"]
+    coverage=record["provider_material_snapshot_coverage"]
+    assert all(data["current_head_matches_audited_snapshot"] is False for data in coverage.values())
 
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]

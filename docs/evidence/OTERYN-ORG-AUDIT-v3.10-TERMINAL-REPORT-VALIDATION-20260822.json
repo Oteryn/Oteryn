@@ -2,7 +2,7 @@
   "schema_version": 4,
   "validator": "tools/governance/validate_v310_terminal_report.py",
   "report": "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
-  "report_sha256": "cacc012c0c52e7176da432344dea2576daf39fe4a1d6fa0e05c5c1aa848153ff",
+  "report_sha256": "8a85ed86b1ce0eeb5a4eba32e179480ccd751eefe3414c8c615449c8e6d2c456",
   "execution_verdict": "PASS",
   "programme_verdict": "INCOMPLETE",
   "contract_completeness": "INCOMPLETE",
@@ -49,7 +49,7 @@
     "G8": "PASS",
     "G9": "UNKNOWN (GAP-DOCS-ATLAS-ARCH-001: exact Atlas canonical targets remain unresolved pending evidence-backed provider decisions)",
     "G10": "PASS",
-    "G11": "UNKNOWN (GAP-DOCS-IA-001: Matrix L exposes unresolved provider classes, especially Atlas architecture/contracts/governance/test/recovery and selected Game/Platform prompt/operations/release classifications)"
+    "G11": "UNKNOWN (GAP-DOCS-IA-001: unresolved provider classes remain and current provider-head material completeness is separately unknown under GAP-DOCS-PROVIDER-CURRENT-001)"
   },
   "matrix_l_rows": 88,
   "matrix_l_rows_by_repo": {
@@ -111,21 +111,14 @@
     "GAP-DOCS-ATLAS-RECOVERY-001",
     "GAP-DOCS-ATLAS-TEST-001",
     "GAP-DOCS-GAME-OPS-001",
-    "GAP-DOCS-GAME-RELEASE-001",
-    "GAP-DOCS-PLATFORM-PROMPT-001",
-    "GAP-HANDOVER-GAME-001",
-    "GAP-HANDOVER-PLATFORM-001",
-    "GAP-PROMPT-ATLAS-001",
-    "GAP-PROMPT-GAME-001",
-    "GAP-PROMPT-PLATFORM-001",
-    "GAP-TASK-ATLAS-001",
-    "GAP-TASK-GAME-001",
-    "GAP-TASK-PLATFORM-001"
+    "GAP-DOCS-GAME-RELEASE-001"
   ],
   "provider_material_snapshot_coverage": {
     "Game": {
       "audited_commit_sha": "fd39c6aa026e82062a8b29af24811d467c115f19",
       "audited_tree_sha": "176b748c4c010f8f5d71bf703cdbbfa9e6da2d9b",
+      "observed_default_branch_head_at_capture": "8fedbee08b7e3b0621aae52980958362bc0f36c5",
+      "current_head_matches_audited_snapshot": false,
       "material_entry_count": 422,
       "material_entries_sha256": "44cf79d98ebdaa5e3a317a453f60de671a1007dbe2b152b822edb2ab3034dd81",
       "missing_inventory_paths": []
@@ -133,6 +126,8 @@
     "Platform": {
       "audited_commit_sha": "8e609f05278816102a08fcbeb9d102642c8380a0",
       "audited_tree_sha": "56e755728240fb65a638058ebe1b8bb4c2f24e40",
+      "observed_default_branch_head_at_capture": "39a6a3e1ddeb955f066ab2933274adaf7d46c002",
+      "current_head_matches_audited_snapshot": false,
       "material_entry_count": 829,
       "material_entries_sha256": "a3a7fa59c2b6213c791dcd6ee24d4170c4d5175dbe9a28a23fd88e68ef3ac8e4",
       "missing_inventory_paths": []
@@ -140,6 +135,8 @@
     "Atlas": {
       "audited_commit_sha": "a1b5fea166b8dd72586ce676be7f33c57081cea8",
       "audited_tree_sha": "7b3f1207108ace13ae44638a933f3f14cf503396",
+      "observed_default_branch_head_at_capture": "c36f93bd5a20032547687f5936ab66ed1e7d4339",
+      "current_head_matches_audited_snapshot": false,
       "material_entry_count": 55,
       "material_entries_sha256": "5568a6276405c4e96b4d87e47d9e89d8545a3359f502cf3546ad81084e220a23",
       "missing_inventory_paths": []
@@ -172,9 +169,16 @@
       "state": "PASS",
       "evidence": "55/55 tracked META material files covered by section 4"
     },
-    "provider_material_snapshot_inventory": {
+    "provider_frozen_snapshot_inventory": {
       "state": "PASS",
       "evidence": "Game:422; Platform:829; Atlas:55"
+    },
+    "provider_current_material_inventory": {
+      "state": "UNKNOWN",
+      "evidence": "Game:fd39c6aa->8fedbee0; Platform:8e609f05->39a6a3e1; Atlas:a1b5fea1->c36f93bd",
+      "gap_ids": [
+        "GAP-DOCS-PROVIDER-CURRENT-001"
+      ]
     },
     "retained_reusable_prompts_have_identity_version_status": {
       "state": "UNKNOWN",
@@ -242,7 +246,7 @@
     },
     "g11_result_present": {
       "state": "PASS",
-      "evidence": "UNKNOWN (GAP-DOCS-IA-001: Matrix L exposes unresolved provider classes, especially Atlas architecture/contracts/governance/test/recovery and selected Game/Platform prompt/operations/release classifications)"
+      "evidence": "UNKNOWN (GAP-DOCS-IA-001: unresolved provider classes remain and current provider-head material completeness is separately unknown under GAP-DOCS-PROVIDER-CURRENT-001)"
     },
     "section_15_file_dispositions_present": {
       "state": "PASS",
@@ -268,16 +272,7 @@
         "GAP-DOCS-ATLAS-RECOVERY-001",
         "GAP-DOCS-ATLAS-TEST-001",
         "GAP-DOCS-GAME-OPS-001",
-        "GAP-DOCS-GAME-RELEASE-001",
-        "GAP-DOCS-PLATFORM-PROMPT-001",
-        "GAP-HANDOVER-GAME-001",
-        "GAP-HANDOVER-PLATFORM-001",
-        "GAP-PROMPT-ATLAS-001",
-        "GAP-PROMPT-GAME-001",
-        "GAP-PROMPT-PLATFORM-001",
-        "GAP-TASK-ATLAS-001",
-        "GAP-TASK-GAME-001",
-        "GAP-TASK-PLATFORM-001"
+        "GAP-DOCS-GAME-RELEASE-001"
       ]
     },
     "meta_inventory_bound_to_reconciled_baseline": {
@@ -296,6 +291,7 @@
     "GAP-DOCS-GAME-OPS-001",
     "GAP-DOCS-GAME-RELEASE-001",
     "GAP-DOCS-PLATFORM-PROMPT-001",
+    "GAP-DOCS-PROVIDER-CURRENT-001",
     "GAP-HANDOVER-GAME-001",
     "GAP-HANDOVER-PLATFORM-001",
     "GAP-PROMPT-ATLAS-001",
