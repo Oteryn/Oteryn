@@ -164,6 +164,72 @@ def git_tracked_paths(*pathspecs: str) -> tuple[list[str], str | None]:
         return [], str(exc)
 
 
+def parse_full_tree_snapshot(path: Path) -> list[tuple[str, str, str, str]]:
+    rows: list[tuple[str, str, str, str]] = []
+    seen: set[str] = set()
+    pattern = re.compile(r"^([0-7]{6}) (blob|tree|commit) ([0-9a-f]{40})\t(.+)$")
+    for number, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), start=1):
+        match = pattern.fullmatch(line)
+        if match is None:
+            raise ValueError(f"invalid ls-tree row {number}: {line!r}")
+        mode, kind, object_sha, relative = match.groups()
+        if relative in seen:
+            raise ValueError(f"duplicate ls-tree path: {relative}")
+        seen.add(relative)
+        rows.append((relative, mode, kind, object_sha))
+    if not rows:
+        raise ValueError("empty full-tree snapshot")
+    return rows
+
+
+def git_tree_sha(entries: list[tuple[str, str, str]]) -> str:
+    body = bytearray()
+    for mode, name, object_sha in entries:
+        serialized_mode = mode.lstrip("0") or "0"
+        body.extend(serialized_mode.encode("ascii"))
+        body.extend(b" ")
+        body.extend(name.encode("utf-8"))
+        body.extend(b"\0")
+        body.extend(bytes.fromhex(object_sha))
+    header = f"tree {len(body)}\0".encode("ascii")
+    return hashlib.sha1(header + body).hexdigest()
+
+def verify_full_tree_snapshot(rows: list[tuple[str, str, str, str]], expected_root: str) -> tuple[bool, list[str]]:
+    by_parent: dict[str, list[tuple[str, str, str]]] = {}
+    tree_rows: dict[str, str] = {}
+    for relative, mode, kind, object_sha in rows:
+        parent, _, name = relative.rpartition("/")
+        by_parent.setdefault(parent, []).append((mode, name, object_sha))
+        if kind == "tree":
+            tree_rows[relative] = object_sha
+    errors: list[str] = []
+    for relative, expected in tree_rows.items():
+        actual = git_tree_sha(by_parent.get(relative, []))
+        if actual != expected:
+            errors.append(f"subtree SHA mismatch: {relative}:{actual}!={expected}")
+    actual_root = git_tree_sha(by_parent.get("", []))
+    if actual_root != expected_root:
+        errors.append(f"root tree SHA mismatch: {actual_root}!={expected_root}")
+    return not errors, errors
+
+
+def derived_provider_material(
+    rows: list[tuple[str, str, str, str]], scope: dict, repo: str
+) -> list[tuple[str, str, str]]:
+    roots = set(scope.get("root_files", []))
+    prefixes = [*scope.get("common_prefixes", []), *scope.get("provider_extra_prefixes", {}).get(repo, [])]
+    exact = set(scope.get("provider_exact_paths", {}).get(repo, []))
+    include_nested_agents = scope.get("include_nested_agent_instructions") is True
+    result: list[tuple[str, str, str]] = []
+    for relative, mode, kind, object_sha in rows:
+        if kind != "blob":
+            continue
+        nested_agent = include_nested_agents and (relative.endswith("/AGENTS.md") or relative.endswith("/AGENTS.override.md"))
+        if relative in roots or relative in exact or any(relative.startswith(prefix) for prefix in prefixes) or nested_agent:
+            result.append((relative, mode, object_sha))
+    return sorted(result)
+
+
 def build_record() -> dict:
     text = REPORT.read_text(encoding="utf-8")
     lines = text.splitlines()
@@ -334,7 +400,7 @@ def build_record() -> dict:
         provider_manifest = {}
         provider_manifest_valid = False
     providers = provider_manifest.get("providers", {}) if isinstance(provider_manifest, dict) else {}
-    if provider_manifest.get("schema_version") != 1 or set(providers) != set(PROVIDER_REPOSITORIES):
+    if provider_manifest.get("schema_version") != 2 or set(providers) != set(PROVIDER_REPOSITORIES):
         errors.append(f"provider material-tree manifest contract mismatch: schema={provider_manifest.get('schema_version')}, providers={sorted(providers)}")
         provider_manifest_valid = False
     for repo, coordinate in PROVIDER_REPOSITORIES.items():
@@ -362,6 +428,39 @@ def build_record() -> dict:
         if data.get("material_entry_count") != len(entries) or data.get("material_entries_sha256") != entries_digest:
             errors.append(f"provider material-tree count/digest mismatch: {repo}:{data.get('material_entry_count')}/{len(entries)}:{data.get('material_entries_sha256')}/{entries_digest}")
             provider_manifest_valid = False
+        full_tree_verified = False
+        derived_material_matches_manifest = False
+        snapshot_rel = data.get("full_tree_snapshot", "")
+        full_tree_rows: list[tuple[str, str, str, str]] = []
+        if not isinstance(snapshot_rel, str) or not snapshot_rel.startswith("docs/evidence/provider-trees/"):
+            errors.append(f"provider full-tree snapshot path invalid: {repo}:{snapshot_rel!r}")
+            provider_manifest_valid = False
+        else:
+            snapshot_path = ROOT / snapshot_rel
+            try:
+                snapshot_path.resolve().relative_to(ROOT.resolve())
+                full_tree_rows = parse_full_tree_snapshot(snapshot_path)
+            except (FileNotFoundError, OSError, UnicodeDecodeError, ValueError) as exc:
+                errors.append(f"provider full-tree snapshot invalid: {repo}:{exc}")
+                provider_manifest_valid = False
+                full_tree_rows = []
+            if full_tree_rows:
+                snapshot_digest = sha256(snapshot_path)
+                full_tree_verified, tree_errors = verify_full_tree_snapshot(full_tree_rows, tree_sha)
+                if data.get("full_tree_entry_count") != len(full_tree_rows) or data.get("full_tree_snapshot_sha256") != snapshot_digest:
+                    errors.append(f"provider full-tree count/digest mismatch: {repo}:{data.get('full_tree_entry_count')}/{len(full_tree_rows)}:{data.get('full_tree_snapshot_sha256')}/{snapshot_digest}")
+                    provider_manifest_valid = False
+                if not full_tree_verified:
+                    errors.extend(f"provider full-tree proof failed: {repo}:{error}" for error in tree_errors)
+                    provider_manifest_valid = False
+                expected_material = derived_provider_material(full_tree_rows, provider_manifest.get("material_scope", {}), repo)
+                actual_material = sorted((entry.get("path"), entry.get("mode"), entry.get("sha")) for entry in entries if isinstance(entry, dict))
+                derived_material_matches_manifest = expected_material == actual_material
+                if not derived_material_matches_manifest:
+                    expected_paths = {item[0] for item in expected_material}
+                    actual_paths = {item[0] for item in actual_material}
+                    errors.append(f"provider material scope does not equal full audited tree derivation: {repo}:missing={sorted(expected_paths-actual_paths)},extra={sorted(actual_paths-expected_paths)}")
+                    provider_manifest_valid = False
         repo_specs = [spec for spec, _primary, _current in selector_records[repo]]
         missing_provider_paths = [path for path in paths if not any(spec_covers_path(spec, path) for spec in repo_specs)]
         if missing_provider_paths:
@@ -384,6 +483,10 @@ def build_record() -> dict:
             "current_head_matches_audited_snapshot": observed_head == commit_sha,
             "material_entry_count": len(entries),
             "material_entries_sha256": entries_digest,
+            "full_tree_entry_count": len(full_tree_rows),
+            "full_tree_snapshot_sha256": sha256(ROOT / snapshot_rel) if full_tree_rows else "",
+            "full_tree_verified": full_tree_verified,
+            "derived_material_matches_manifest": derived_material_matches_manifest,
             "missing_inventory_paths": missing_provider_paths,
         }
     lifecycle_rows = table_rows(text, "| Repository | Artifact family | Required invariant | Verification state | Lifecycle authority / supersession |")

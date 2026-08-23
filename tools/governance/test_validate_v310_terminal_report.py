@@ -238,12 +238,31 @@ def test_g9_cannot_pass_with_unresolved_recommendation_targets() -> None:
         assert any("G9 cannot PASS" in e for e in record["errors"])
     finally: restore(temp, old_root, old_report)
 
+def test_full_tree_proof_rejects_omitted_nested_agent_blob() -> None:
+    manifest=__import__("json").loads(m.PROVIDER_MANIFEST.read_text(encoding="utf-8"))
+    game=manifest["providers"]["Game"]
+    rows=m.parse_full_tree_snapshot(m.ROOT / game["full_tree_snapshot"])
+    target="apps/game-server/AGENTS.md"
+    assert any(row[0] == target for row in rows)
+    modified=[row for row in rows if row[0] != target]
+    ok, errors=m.verify_full_tree_snapshot(modified, game["audited_tree_sha"])
+    assert ok is False
+    assert any("subtree SHA mismatch" in error or "root tree SHA mismatch" in error for error in errors)
+
+
+def test_provider_manifest_is_bound_to_complete_audited_tree() -> None:
+    record=m.build_record()
+    coverage=record["provider_material_snapshot_coverage"]
+    assert all(data.get("full_tree_verified") is True for data in coverage.values())
+    assert all(data.get("derived_material_matches_manifest") is True for data in coverage.values())
+
+
 def test_provider_manifest_covers_all_frozen_provider_material_paths() -> None:
     record=m.build_record()
     invariant=record["mechanical_invariants"]["provider_frozen_snapshot_inventory"]
     assert invariant["state"] == "PASS"
     coverage=record["provider_material_snapshot_coverage"]
-    assert {repo: coverage[repo]["material_entry_count"] for repo in coverage} == {"Game": 422, "Platform": 829, "Atlas": 55}
+    assert {repo: coverage[repo]["material_entry_count"] for repo in coverage} == {"Game": 424, "Platform": 829, "Atlas": 55}
     assert all(not coverage[repo]["missing_inventory_paths"] for repo in coverage)
 
 

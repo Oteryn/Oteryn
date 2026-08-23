@@ -119,8 +119,12 @@
       "audited_tree_sha": "176b748c4c010f8f5d71bf703cdbbfa9e6da2d9b",
       "observed_default_branch_head_at_capture": "8fedbee08b7e3b0621aae52980958362bc0f36c5",
       "current_head_matches_audited_snapshot": false,
-      "material_entry_count": 422,
-      "material_entries_sha256": "44cf79d98ebdaa5e3a317a453f60de671a1007dbe2b152b822edb2ab3034dd81",
+      "material_entry_count": 424,
+      "material_entries_sha256": "df25bbf2801eecb88864403376f00915fefb5546f3b81192ce5be71d0e0ac1dc",
+      "full_tree_entry_count": 611,
+      "full_tree_snapshot_sha256": "24d6e0692534276c4edf421d35f02cdfb49783731b9a8c36cf99430d36f15356",
+      "full_tree_verified": true,
+      "derived_material_matches_manifest": true,
       "missing_inventory_paths": []
     },
     "Platform": {
@@ -130,6 +134,10 @@
       "current_head_matches_audited_snapshot": false,
       "material_entry_count": 829,
       "material_entries_sha256": "a3a7fa59c2b6213c791dcd6ee24d4170c4d5175dbe9a28a23fd88e68ef3ac8e4",
+      "full_tree_entry_count": 2518,
+      "full_tree_snapshot_sha256": "9008f4a3f402cb004ab60ce007192d9611125315625d410e53adb55604063a19",
+      "full_tree_verified": true,
+      "derived_material_matches_manifest": true,
       "missing_inventory_paths": []
     },
     "Atlas": {
@@ -139,6 +147,10 @@
       "current_head_matches_audited_snapshot": false,
       "material_entry_count": 55,
       "material_entries_sha256": "5568a6276405c4e96b4d87e47d9e89d8545a3359f502cf3546ad81084e220a23",
+      "full_tree_entry_count": 245,
+      "full_tree_snapshot_sha256": "d1b9f328bd533932d077bee9edb496edc7216e36a6333fd75704d8395b3a7cad",
+      "full_tree_verified": true,
+      "derived_material_matches_manifest": true,
       "missing_inventory_paths": []
     }
   },
@@ -171,7 +183,7 @@
     },
     "provider_frozen_snapshot_inventory": {
       "state": "PASS",
-      "evidence": "Game:422; Platform:829; Atlas:55"
+      "evidence": "Game:424; Platform:829; Atlas:55"
     },
     "provider_current_material_inventory": {
       "state": "UNKNOWN",

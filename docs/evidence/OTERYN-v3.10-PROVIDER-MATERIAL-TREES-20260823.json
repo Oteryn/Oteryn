@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "captured_at_utc": "2026-08-23T09:16:18.198775+00:00",
   "purpose": "Frozen tracked-tree evidence for the v3.10 documentation/agent material inventory; audited commits are historical snapshots and observed default-branch heads record later drift.",
   "material_scope": {
@@ -39,7 +39,8 @@
         "e2e/README.md",
         "web/semantic-search/index.json"
       ]
-    }
+    },
+    "include_nested_agent_instructions": true
   },
   "providers": {
     "Game": {
@@ -48,8 +49,8 @@
       "audited_tree_sha": "176b748c4c010f8f5d71bf703cdbbfa9e6da2d9b",
       "observed_default_branch_head_at_capture": "8fedbee08b7e3b0621aae52980958362bc0f36c5",
       "tree_api_truncated": false,
-      "material_entry_count": 422,
-      "material_entries_sha256": "44cf79d98ebdaa5e3a317a453f60de671a1007dbe2b152b822edb2ab3034dd81",
+      "material_entry_count": 424,
+      "material_entries_sha256": "df25bbf2801eecb88864403376f00915fefb5546f3b81192ce5be71d0e0ac1dc",
       "material_entries": [
         {
           "path": ".github/CODEOWNERS",
@@ -227,6 +228,13 @@
           "size": 1270
         },
         {
+          "path": "apps/game-server/AGENTS.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "dc02791cbf78a197f6543532b29951c0e99c1d30",
+          "size": 972
+        },
+        {
           "path": "crates/platform-contracts/Cargo.toml",
           "mode": "100644",
           "type": "blob",
@@ -239,6 +247,13 @@
           "type": "blob",
           "sha": "25e71d5dc628cbbcb158d31fd89dc9cc236599ec",
           "size": 2447
+        },
+        {
+          "path": "crates/simulation-determinism/AGENTS.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "7a63e8399c3aa4e0891699f0b4ee60333cd7105e",
+          "size": 1252
         },
         {
           "path": "docs/agents/AGENTS.md",
@@ -3005,7 +3020,10 @@
           "sha": "164b5a00a1bbfc58ea308065886d043f6870fb6a",
           "size": 1887
         }
-      ]
+      ],
+      "full_tree_snapshot": "docs/evidence/provider-trees/Game-176b748c4c010f8f5d71bf703cdbbfa9e6da2d9b.ls-tree",
+      "full_tree_entry_count": 611,
+      "full_tree_snapshot_sha256": "24d6e0692534276c4edf421d35f02cdfb49783731b9a8c36cf99430d36f15356"
     },
     "Platform": {
       "repository": "Oteryn/Oteryn-Platform",
@@ -8819,7 +8837,10 @@
           "sha": "f10605ac4998292880fe7d685a3a740a47564b79",
           "size": 41100
         }
-      ]
+      ],
+      "full_tree_snapshot": "docs/evidence/provider-trees/Platform-56e755728240fb65a638058ebe1b8bb4c2f24e40.ls-tree",
+      "full_tree_entry_count": 2518,
+      "full_tree_snapshot_sha256": "9008f4a3f402cb004ab60ce007192d9611125315625d410e53adb55604063a19"
     },
     "Atlas": {
       "repository": "Oteryn/Oteryn-Atlas",
@@ -9215,7 +9236,10 @@
           "sha": "8462a835edca9e94a656ee575f2633cdd71df67e",
           "size": 60160
         }
-      ]
+      ],
+      "full_tree_snapshot": "docs/evidence/provider-trees/Atlas-7b3f1207108ace13ae44638a933f3f14cf503396.ls-tree",
+      "full_tree_entry_count": 245,
+      "full_tree_snapshot_sha256": "d1b9f328bd533932d077bee9edb496edc7216e36a6333fd75704d8395b3a7cad"
     }
   }
 }
