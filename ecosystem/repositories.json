@@ -19,10 +19,10 @@
       "product": "game",
       "target_coordinate": "Oteryn/Oteryn-Game",
       "current_coordinate": "Oteryn/Oteryn-Game",
-      "migration_state": "target_authoritative_source_archived_final_ref_proof_incomplete",
-      "migration_verdict": "MIGRATION_COMPLETE=UNKNOWN",
+      "migration_state": "target_authoritative_source_archived_retirement_verified",
+      "migration_verdict": "MIGRATION_COMPLETE=YES",
       "authority_owner": "Game provider",
-      "notes": "Target is authoritative and legacy source blakinio/Oteryn-v2 is archived read-only. The previously source-only PROD-ENTITLEMENTS branch at 6f83c16305a4c7fb8d0303deb55a4ab8ee5827e8 was intentionally carried forward through merged Oteryn/Oteryn-Game PR #20 (merge d40a225e5fedca0396f34b4f2b6c1e343161e6ff). Final exhaustive tag/ref and stale-coordinate closure is not independently proven in this META audit, so YES is not inferred."
+      "notes": "Target is authoritative and legacy source blakinio/Oteryn-v2 is archived read-only. Live terminal reconciliation proves all 34 source branch refs match the retained retirement manifest exactly, 32 disposable target mirror refs are absent, source main 16afdf31a15bd49d454cdbcdd98fa7ec72213ef9 is an ancestor of current Game main, and source-only PROD-ENTITLEMENTS work is preserved through merged Game PR #20 (d40a225e5fedca0396f34b4f2b6c1e343161e6ff). Current main merge enforcement is the active Protect main ruleset requiring strict game-gate. Migration is terminal; ongoing product feature work does not reopen source retirement."
     },
     {
       "product": "platform",
