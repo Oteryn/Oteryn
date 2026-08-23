@@ -211,8 +211,8 @@ def test_recommendation_quality_fields_required() -> None:
 
 def test_meta_inventory_evidence_uses_reconciled_baseline() -> None:
     text=m.REPORT.read_text(encoding="utf-8")
-    assert "live tree `64371aa0`" in text
-    text=text.replace("live tree `64371aa0`", "live tree `c0dbad93`", 1)
+    assert "live tree `5f3c2e57`" in text
+    text=text.replace("live tree `5f3c2e57`", "live tree `c0dbad93`", 1)
     temp, old_root, old_report = with_report(text)
     try:
         record=m.build_record(); assert record["execution_verdict"] == "FAIL"
@@ -237,6 +237,34 @@ def test_g9_cannot_pass_with_unresolved_recommendation_targets() -> None:
         record=m.build_record(); assert record["execution_verdict"] == "FAIL"
         assert any("G9 cannot PASS" in e for e in record["errors"])
     finally: restore(temp, old_root, old_report)
+
+def test_provider_manifest_covers_all_frozen_provider_material_paths() -> None:
+    record=m.build_record()
+    invariant=record["mechanical_invariants"]["provider_material_snapshot_inventory"]
+    assert invariant["state"] == "PASS"
+    coverage=record["provider_material_snapshot_coverage"]
+    assert {repo: coverage[repo]["material_entry_count"] for repo in coverage} == {"Game": 422, "Platform": 829, "Atlas": 55}
+    assert all(not coverage[repo]["missing_inventory_paths"] for repo in coverage)
+
+
+def test_game_provider_contract_omission_is_caught_by_frozen_manifest() -> None:
+    text=m.REPORT.read_text(encoding="utf-8")
+    text=without_row(text, "| Game | `docs/contracts/**`; `crates/platform-contracts/**` | contracts | PROVIDER_CONTRACT |")
+    text=without_row(text, "| Game | `docs/contracts/**`; `crates/platform-contracts/**` | PROVIDER_CONTRACT |")
+    temp, old_root, old_report=with_report(text)
+    try:
+        record=m.build_record(); assert record["execution_verdict"] == "FAIL"
+        assert any("provider tracked-tree manifest paths missing from section 4 inventory: Game:" in e for e in record["errors"])
+    finally: restore(temp, old_root, old_report)
+
+
+def test_g9_gap_set_includes_all_backlog_and_matrix_target_gaps() -> None:
+    record=m.build_record()
+    gaps=set(record["recommendation_target_gap_ids"])
+    required={"GAP-DOCS-GAME-OPS-001","GAP-DOCS-GAME-RELEASE-001","GAP-DOCS-ATLAS-POLICY-001","GAP-DOCS-ATLAS-OPS-001","GAP-DOCS-ATLAS-RECOVERY-001"}
+    assert required <= gaps, (required-gaps, sorted(gaps))
+    assert "GAP-ID" not in gaps
+
 
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]

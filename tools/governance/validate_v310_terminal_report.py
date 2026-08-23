@@ -16,6 +16,8 @@ REPORT = ROOT / "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-RE
 RECORD = ROOT / "docs/evidence/OTERYN-ORG-AUDIT-v3.10-TERMINAL-REPORT-VALIDATION-20260822.json"
 RUNNER_CAPTURE = ROOT / "docs/evidence/OTERYN-ORG-RUNNER-ACL-LIVE-CLOSEOUT-20260822.json"
 RUNNER_DIGEST = ROOT / "docs/evidence/OTERYN-ORG-RUNNER-ACL-LIVE-CLOSEOUT-20260822.json.sha256"
+PROVIDER_MANIFEST = ROOT / "docs/evidence/OTERYN-v3.10-PROVIDER-MATERIAL-TREES-20260823.json"
+PROVIDER_REPOSITORIES = {"Game": "Oteryn/Oteryn-Game", "Platform": "Oteryn/Oteryn-Platform", "Atlas": "Oteryn/Oteryn-Atlas"}
 
 REPOS = ["META", "Game", "Platform", "Atlas"]
 CLASSES = [
@@ -323,6 +325,61 @@ def build_record() -> dict:
     if missing_meta_material:
         errors.append(f"tracked META material surface missing from section 4 inventory: {missing_meta_material}")
 
+    provider_manifest_coverage: dict[str, dict] = {}
+    provider_manifest_valid = True
+    try:
+        provider_manifest = json.loads(PROVIDER_MANIFEST.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        errors.append(f"provider material-tree manifest missing/invalid: {exc}")
+        provider_manifest = {}
+        provider_manifest_valid = False
+    providers = provider_manifest.get("providers", {}) if isinstance(provider_manifest, dict) else {}
+    if provider_manifest.get("schema_version") != 1 or set(providers) != set(PROVIDER_REPOSITORIES):
+        errors.append(f"provider material-tree manifest contract mismatch: schema={provider_manifest.get('schema_version')}, providers={sorted(providers)}")
+        provider_manifest_valid = False
+    for repo, coordinate in PROVIDER_REPOSITORIES.items():
+        data = providers.get(repo, {}) if isinstance(providers, dict) else {}
+        entries = data.get("material_entries", []) if isinstance(data, dict) else []
+        commit_sha = data.get("audited_commit_sha", "") if isinstance(data, dict) else ""
+        tree_sha = data.get("audited_tree_sha", "") if isinstance(data, dict) else ""
+        if data.get("repository") != coordinate or not re.fullmatch(r"[0-9a-f]{40}", commit_sha) or not re.fullmatch(r"[0-9a-f]{40}", tree_sha):
+            errors.append(f"provider material-tree identity invalid: {repo}:{data.get('repository')}:{commit_sha}:{tree_sha}")
+            provider_manifest_valid = False
+        if data.get("tree_api_truncated") is not False or not isinstance(entries, list):
+            errors.append(f"provider material-tree capture incomplete: {repo}")
+            provider_manifest_valid = False
+            entries = []
+        paths = [entry.get("path") for entry in entries if isinstance(entry, dict)]
+        if len(paths) != len(entries) or len(paths) != len(set(paths)) or paths != sorted(paths):
+            errors.append(f"provider material-tree paths invalid/non-unique/unsorted: {repo}")
+            provider_manifest_valid = False
+        invalid_entries = [entry for entry in entries if not isinstance(entry, dict) or not isinstance(entry.get("path"), str) or not re.fullmatch(r"[0-9a-f]{40}", str(entry.get("sha", ""))) or entry.get("type") != "blob" or not isinstance(entry.get("mode"), str)]
+        if invalid_entries:
+            errors.append(f"provider material-tree entries invalid: {repo}:{len(invalid_entries)}")
+            provider_manifest_valid = False
+        payload = "".join(f"{entry.get('path')}\0{entry.get('mode')}\0{entry.get('sha')}\0{entry.get('size')}\n" for entry in entries).encode()
+        entries_digest = hashlib.sha256(payload).hexdigest()
+        if data.get("material_entry_count") != len(entries) or data.get("material_entries_sha256") != entries_digest:
+            errors.append(f"provider material-tree count/digest mismatch: {repo}:{data.get('material_entry_count')}/{len(entries)}:{data.get('material_entries_sha256')}/{entries_digest}")
+            provider_manifest_valid = False
+        repo_specs = [spec for spec, _primary, _current in selector_records[repo]]
+        missing_provider_paths = [path for path in paths if not any(spec_covers_path(spec, path) for spec in repo_specs)]
+        if missing_provider_paths:
+            errors.append(f"provider tracked-tree manifest paths missing from section 4 inventory: {repo}:{missing_provider_paths}")
+            provider_manifest_valid = False
+        audited_short = commit_sha[:8]
+        repo_inventory_rows = [row for row in inventory if len(row) == 21 and row[0] == repo]
+        stale_provider_evidence = [row[1] for row in repo_inventory_rows if f"audited tree `{audited_short}`" not in row[19] or "provider material-tree manifest" not in row[19]]
+        if stale_provider_evidence:
+            errors.append(f"provider inventory rows not bound to frozen manifest snapshot: {repo}:{stale_provider_evidence}")
+            provider_manifest_valid = False
+        provider_manifest_coverage[repo] = {
+            "audited_commit_sha": commit_sha,
+            "audited_tree_sha": tree_sha,
+            "material_entry_count": len(entries),
+            "material_entries_sha256": entries_digest,
+            "missing_inventory_paths": missing_provider_paths,
+        }
     lifecycle_rows = table_rows(text, "| Repository | Artifact family | Required invariant | Verification state | Lifecycle authority / supersession |")
     prompt_state, prompt_gaps = state_from_rows(lifecycle_rows, "reusable prompts")
     task_state, task_gaps = state_from_rows(lifecycle_rows, "active task packets")
@@ -397,9 +454,10 @@ def build_record() -> dict:
 
     recommendation_target_gap_ids = sorted({
         m.group(0)
-        for row in quality_rows if len(row) == 15
-        for cell in (row[3], row[11])
+        for row in matrix_l + lifecycle_rows + inventory + backlog + quality_rows
+        for cell in row
         for m in re.finditer(r"GAP-[A-Z0-9-]+", cell)
+        if m.group(0) != "GAP-ID"
     })
     g9_state = grows.get("G9", "")
     if recommendation_target_gap_ids and g9_state == "PASS":
@@ -471,6 +529,10 @@ def build_record() -> dict:
             "PASS" if not missing_meta_material else "FAIL",
             f"{len(meta_material) - len(missing_meta_material)}/{len(meta_material)} tracked META material files covered by section 4",
         ),
+        "provider_material_snapshot_inventory": invariant(
+            "PASS" if provider_manifest_valid else "FAIL",
+            "; ".join(f"{repo}:{data.get('material_entry_count', 0)}" for repo, data in provider_manifest_coverage.items()) or "provider manifest unavailable",
+        ),
         "retained_reusable_prompts_have_identity_version_status": invariant(prompt_state, "section 7 lifecycle verification", prompt_gaps),
         "active_task_packets_have_lifecycle_authority": invariant(task_state, "section 7 lifecycle verification", task_gaps),
         "handovers_are_non_authoritative_and_expire": invariant(handover_state, "section 7 lifecycle verification", handover_gaps),
@@ -515,6 +577,7 @@ def build_record() -> dict:
         "section_19_recommendation_ids": backlog_ids,
         "section_19_recommendation_quality_rows": len(quality_rows),
         "recommendation_target_gap_ids": recommendation_target_gap_ids,
+        "provider_material_snapshot_coverage": provider_manifest_coverage,
         "meta_live_tree_baseline": meta_baseline,
         "runner_capture_sha256": actual_runner,
         "mechanical_invariants": invariants,
