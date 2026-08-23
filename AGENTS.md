@@ -14,6 +14,14 @@ Before declaring a task blocked because of access limitations, agents must disco
 
 Completion claims require verified evidence. `UNKNOWN` is not automatically a `BLOCKER`, and a generic access disclaimer without capability discovery is invalid.
 
+## GitHub-first execution gate
+
+GitHub is the authoritative repository control plane for repo identity, default branch, Issue/task, PR, task branch, exact remote SHA, checks, reviews and merge state.
+
+Agents MUST complete the GitHub preflight defined in `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` before mutating any local/remote checkout or using Remote Desktop/Desktop Commander, Synology, WSL, Docker or another host-local execution path for repository work.
+
+Host-local filesystems, clones, worktrees, containers and shells are execution/cache planes only. They MUST NOT be used to select authoritative repository state or bypass GitHub lifecycle. Durable local changes receive no completion credit until committed, pushed to the approved GitHub branch/PR and verified against the remote exact head.
+
 ## Organization runner routing
 
 Product-owned host-local GitHub Actions workloads MUST use the product-isolated organization runner group and product label together:
