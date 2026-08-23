@@ -18,7 +18,7 @@ Completion claims require verified evidence. `UNKNOWN` is not automatically a `B
 
 GitHub is the authoritative repository control plane for repo identity, default branch, Issue/task, PR, task branch, exact remote SHA, checks, reviews and merge state.
 
-Agents MUST complete the GitHub preflight defined in `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` before mutating any local/remote checkout or using Remote Desktop/Desktop Commander, Synology, WSL, Docker or another host-local execution path for repository work.
+Agents MUST complete the GitHub preflight defined in `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` before mutating any local/remote checkout or starting host-local implementation/execution that can change repository or external state. If GitHub preflight is genuinely unavailable, host-local tools may still be used for the safe read-only analysis and patch/handoff preparation permitted by the central contract, but not to mutate or bypass GitHub lifecycle authority.
 
 Host-local filesystems, clones, worktrees, containers and shells are execution/cache planes only. They MUST NOT be used to select authoritative repository state or bypass GitHub lifecycle. Durable local changes receive no completion credit until committed, pushed to the approved GitHub branch/PR and verified against the remote exact head.
 
