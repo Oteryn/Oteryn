@@ -45,6 +45,7 @@ PLACEMENT_QUESTIONS = [
     "Which remain provider-local?", "Which paths are checked by CI?",
 ]
 BACKLOG_TYPES = ["DOCUMENTATION_IA", "AGENT_INSTRUCTION", "PROMPT_LIFECYCLE", "TASK_LIFECYCLE", "RUNBOOK", "EVIDENCE_GOVERNANCE", "DOCS_CI"]
+BACKLOG_REC_IDS = [f"REC-DOCS-{i:03d}" for i in range(1, 8)]
 ALLOWED_PLACEMENT = {"KEEP", "MOVE", "NEW", "GENERATED", "OPTIONAL", "REMOVE_AFTER_MIGRATION", "NOT_NEEDED"}
 ALLOWED_H = {"CONFIRMED", "RESOLVED", "CHANGED", "UNKNOWN"}
 def table_rows(text: str, marker: str) -> list[list[str]]:
@@ -374,13 +375,45 @@ def build_record() -> dict:
     if missing_dispositions or extra_dispositions or duplicate_dispositions:
         errors.append(f"section 15 inventory mapping mismatch: missing={missing_dispositions}, extra={extra_dispositions}, duplicates={duplicate_dispositions}")
 
-    backlog = table_rows(text, "| Order | Type | CURRENT_PATHS | TARGET_PATHS | AUTHORITY_OWNER | MIGRATION/DISPOSITION | BACKWARD_LINK_OR_REDIRECT_PLAN | ACCEPTANCE_CRITERIA | DETERMINISTIC_VALIDATION | ROLLBACK |")
-    backlog_types = [row[1] for row in backlog if len(row) == 10]
+    backlog = table_rows(text, "| Order | REC_ID | Type | CURRENT_PATHS | TARGET_PATHS | AUTHORITY_OWNER | MIGRATION/DISPOSITION | BACKWARD_LINK_OR_REDIRECT_PLAN | ACCEPTANCE_CRITERIA | DETERMINISTIC_VALIDATION | ROLLBACK |")
+    backlog_ids = [row[1] for row in backlog if len(row) == 11]
+    backlog_types = [row[2] for row in backlog if len(row) == 11]
+    if backlog_ids != BACKLOG_REC_IDS:
+        errors.append(f"mandatory recommendation REC_ID mismatch: {backlog_ids}")
     if backlog_types != BACKLOG_TYPES:
         errors.append(f"mandatory documentation backlog mismatch: {backlog_types}")
     for row in backlog:
-        if len(row) != 10 or any(not cell for cell in row):
+        if len(row) != 11 or any(not cell for cell in row):
             errors.append(f"invalid documentation backlog row: {row}")
+
+    quality_rows = table_rows(text, "| REC_ID | WHY | AUTHORITY_OWNER | CANONICAL_LOCATION_OR_GITHUB_SETTING | CONSUMER | ENFORCEMENT | DRIFT_PREVENTION | MIGRATION_IMPACT | TRADE_OFF | ARTIFACT_CLASS | CURRENT_PATHS | TARGET_PATH | LIFECYCLE_RETENTION | DUPLICATION_OVERRIDE_RULE | DETERMINISTIC_VALIDATION |")
+    quality_ids = [row[0] for row in quality_rows if len(row) == 15]
+    if quality_ids != BACKLOG_REC_IDS:
+        errors.append(f"recommendation quality REC_ID mismatch: {quality_ids}")
+    for row in quality_rows:
+        if len(row) != 15 or any(not cell for cell in row):
+            errors.append(f"invalid recommendation quality row: {row}")
+
+    baseline_match = re.search(r"META_LIVE_TREE_BASELINE = ([0-9a-f]{40})", text)
+    meta_baseline = baseline_match.group(1) if baseline_match else ""
+    meta_baseline_short = meta_baseline[:8] if meta_baseline else ""
+    baseline_ancestor_ok = False
+    if not meta_baseline:
+        errors.append("META live-tree baseline marker missing")
+    else:
+        try:
+            baseline_ancestor_ok = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", meta_baseline, "HEAD"],
+                cwd=REPO_STRUCTURE_ROOT, check=False, capture_output=True
+            ).returncode == 0
+        except OSError as exc:
+            errors.append(f"unable to verify META live-tree baseline ancestry: {exc}")
+        if not baseline_ancestor_ok:
+            errors.append(f"META live-tree baseline is not an ancestor of HEAD: {meta_baseline}")
+    stale_meta_inventory_evidence = [row for row in inventory if len(row) == 21 and row[0] == "META" and "live tree" in row[19] and meta_baseline_short not in row[19]]
+    stale_meta_matrix_evidence = [row for row in matrix_l if len(row) == 12 and row[0] == "META" and "live tree" in row[11] and meta_baseline_short not in row[11]]
+    if stale_meta_inventory_evidence or stale_meta_matrix_evidence:
+        errors.append(f"META inventory evidence not bound to baseline {meta_baseline_short}: inventory={stale_meta_inventory_evidence}, matrix={stale_meta_matrix_evidence}")
 
     matrix_access_gaps = sorted({
         m.group(0)
@@ -437,11 +470,13 @@ def build_record() -> dict:
             f"{len(set(disposition_keys))}/{len(set(inventory_keys))} section-4 material families mapped exactly once",
         ),
         "section_19_required_backlog_categories_present": invariant("PASS" if backlog_types == BACKLOG_TYPES else "FAIL", ", ".join(backlog_types)),
+        "section_19_recommendation_quality_records_present": invariant("PASS" if backlog_ids == BACKLOG_REC_IDS and quality_ids == BACKLOG_REC_IDS and not any("recommendation quality" in e or "REC_ID mismatch" in e for e in errors) else "FAIL", f"{len(quality_rows)}/7 section-32A quality records mapped 1:1"),
+        "meta_inventory_bound_to_reconciled_baseline": invariant("PASS" if meta_baseline and baseline_ancestor_ok and not stale_meta_inventory_evidence and not stale_meta_matrix_evidence else "FAIL", meta_baseline or "missing"),
     }
     hard_fail = bool(errors) or any(item["state"] == "FAIL" for item in invariants.values())
     unresolved = sorted({gap for item in invariants.values() for gap in item.get("gap_ids", [])})
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "validator": "tools/governance/validate_v310_terminal_report.py",
         "report": str(REPORT.relative_to(ROOT)).replace("\\", "/"),
         "report_sha256": sha256(REPORT),
@@ -458,6 +493,9 @@ def build_record() -> dict:
         "operational_primary_classes": sorted({row[3] for row in inventory if len(row) == 21}),
         "section_15_disposition_rows": len(dispositions),
         "section_19_documentation_backlog_types": backlog_types,
+        "section_19_recommendation_ids": backlog_ids,
+        "section_19_recommendation_quality_rows": len(quality_rows),
+        "meta_live_tree_baseline": meta_baseline,
         "runner_capture_sha256": actual_runner,
         "mechanical_invariants": invariants,
         "explicit_gap_ids": unresolved,

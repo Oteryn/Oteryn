@@ -1,8 +1,8 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "validator": "tools/governance/validate_v310_terminal_report.py",
   "report": "docs/governance/audits/OTERYN-ORG-AUDIT-v3.10-FINAL-TERMINAL-REPORT.md",
-  "report_sha256": "312b8c3b812d6a6ef7ccb5974252828f8dbe87e1ce555c87ef5282ddd3376639",
+  "report_sha256": "7ac503a34cd209d8ec475bed6d4c0fdb23eb5ce8b189fd0360108d96ecbe5cd4",
   "execution_verdict": "PASS",
   "programme_verdict": "INCOMPLETE",
   "contract_completeness": "INCOMPLETE",
@@ -92,6 +92,17 @@
     "EVIDENCE_GOVERNANCE",
     "DOCS_CI"
   ],
+  "section_19_recommendation_ids": [
+    "REC-DOCS-001",
+    "REC-DOCS-002",
+    "REC-DOCS-003",
+    "REC-DOCS-004",
+    "REC-DOCS-005",
+    "REC-DOCS-006",
+    "REC-DOCS-007"
+  ],
+  "section_19_recommendation_quality_rows": 7,
+  "meta_live_tree_baseline": "64371aa0d1548e92376c8e8952def4a9332bd3e7",
   "runner_capture_sha256": "4d4c9c41d9b1e200e403f2607ea1a630453d25384fa42c1fa12050c15ad5c1d3",
   "mechanical_invariants": {
     "matrix_l_exists": {
@@ -195,6 +206,14 @@
     "section_19_required_backlog_categories_present": {
       "state": "PASS",
       "evidence": "DOCUMENTATION_IA, AGENT_INSTRUCTION, PROMPT_LIFECYCLE, TASK_LIFECYCLE, RUNBOOK, EVIDENCE_GOVERNANCE, DOCS_CI"
+    },
+    "section_19_recommendation_quality_records_present": {
+      "state": "PASS",
+      "evidence": "7/7 section-32A quality records mapped 1:1"
+    },
+    "meta_inventory_bound_to_reconciled_baseline": {
+      "state": "PASS",
+      "evidence": "64371aa0d1548e92376c8e8952def4a9332bd3e7"
     }
   },
   "explicit_gap_ids": [

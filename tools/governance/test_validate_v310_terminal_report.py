@@ -36,7 +36,7 @@ def test_current_report_executes_cleanly() -> None:
 
 
 def test_missing_docs_ci_backlog_fails() -> None:
-    text = m.REPORT.read_text(encoding="utf-8").replace("| 17 | DOCS_CI |", "| 17 | DOCS_CI_MISSING |", 1)
+    text = m.REPORT.read_text(encoding="utf-8").replace("| 17 | REC-DOCS-007 | DOCS_CI |", "| 17 | REC-DOCS-007 | DOCS_CI_MISSING |", 1)
     temp, old_root, old_report = with_report(text)
     try:
         record = m.build_record()
@@ -191,17 +191,33 @@ def test_untracked_meta_file_does_not_change_exact_head_validation() -> None:
         note.unlink(missing_ok=True)
 
 
-def test_untracked_meta_file_does_not_change_exact_head_validation() -> None:
-    note = m.REPO_STRUCTURE_ROOT / "docs/agents/.codex-local-note.md"
-    assert not note.exists()
-    note.write_text("local scratch only\n", encoding="utf-8")
+def test_recommendation_rec_ids_required() -> None:
+    text=m.REPORT.read_text(encoding="utf-8").replace("| 11 | REC-DOCS-001 | DOCUMENTATION_IA |", "| 11 | REC-DOCS-999 | DOCUMENTATION_IA |", 1)
+    temp, old_root, old_report = with_report(text)
     try:
-        record = m.build_record()
-        assert record["execution_verdict"] == "PASS"
-        assert record["mechanical_invariants"]["meta_material_surface_inventory"]["state"] == "PASS"
-    finally:
-        note.unlink(missing_ok=True)
+        record=m.build_record(); assert record["execution_verdict"] == "FAIL"
+        assert any("REC_ID mismatch" in e for e in record["errors"])
+    finally: restore(temp, old_root, old_report)
 
+def test_recommendation_quality_fields_required() -> None:
+    text=m.REPORT.read_text(encoding="utf-8")
+    prefix="| REC-DOCS-001 | Atlas has unresolved IA classes and must not invent empty taxonomy |"
+    assert prefix in text; text=text.replace(prefix, "| REC-DOCS-001 |  |", 1)
+    temp, old_root, old_report = with_report(text)
+    try:
+        record=m.build_record(); assert record["execution_verdict"] == "FAIL"
+        assert any("invalid recommendation quality row" in e for e in record["errors"])
+    finally: restore(temp, old_root, old_report)
+
+def test_meta_inventory_evidence_uses_reconciled_baseline() -> None:
+    text=m.REPORT.read_text(encoding="utf-8")
+    assert "live tree `64371aa0`" in text
+    text=text.replace("live tree `64371aa0`", "live tree `c0dbad93`", 1)
+    temp, old_root, old_report = with_report(text)
+    try:
+        record=m.build_record(); assert record["execution_verdict"] == "FAIL"
+        assert record["mechanical_invariants"]["meta_inventory_bound_to_reconciled_baseline"]["state"] == "FAIL"
+    finally: restore(temp, old_root, old_report)
 
 def main() -> int:
     tests = [value for name, value in sorted(globals().items()) if name.startswith("test_") and callable(value)]
