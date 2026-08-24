@@ -1,8 +1,8 @@
 # Oteryn organization audit v3.9 — remediation closeout
 
-**Original audit contract:** `OTERYN-ORG-GOVERNANCE-ARCHITECTURE-ULTRA-AUDIT-v3.9-EXECUTION-OPTIMIZED-FINAL`  
-**Historical audit authority:** `docs/architecture/adr/0002-organization-governance-operating-model.md`  
-**Remediation closeout authority:** META Issue #55  
+**Original audit contract:** `OTERYN-ORG-GOVERNANCE-ARCHITECTURE-ULTRA-AUDIT-v3.9-EXECUTION-OPTIMIZED-FINAL`
+**Historical audit authority:** `docs/architecture/adr/0002-organization-governance-operating-model.md`
+**Remediation closeout authority:** META Issue #55
 **Closeout date:** 2026-08-24
 
 ## Terminal state
