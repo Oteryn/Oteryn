@@ -1,20 +1,34 @@
 # Oteryn
 
-Oteryn is the ecosystem **META / coordination plane** for the Oteryn project.
+Oteryn ecosystem coordination, compatibility and release authority.
 
-This repository owns cross-repository topology authority, ecosystem-level architecture decisions, compatibility and release coordination metadata, and shared governance contracts. Product runtime implementation remains in the product repositories.
+This repository is the thin **META / coordination plane** for the Oteryn ecosystem. It does **not** contain Game, Platform or Atlas runtime source code.
 
-## Ecosystem repositories
+## Repository topology
 
-- `Oteryn/Oteryn` — META / coordination
-- `Oteryn/Oteryn-Game` — Game runtime and client
-- `Oteryn/Oteryn-Platform` — Platform and infrastructure
-- `Oteryn/Oteryn-Atlas` — Atlas
+| Responsibility | Target repository | Current transition state |
+| --- | --- | --- |
+| META / ecosystem coordination | `Oteryn/Oteryn` | canonical authority active |
+| Game product | `Oteryn/Oteryn-Game` | target authoritative; legacy source archived; final exhaustive migration proof remains incomplete |
+| Web / application platform | `Oteryn/Oteryn-Platform` | stable repository ID `1305155726` transferred; backup archived; post-transfer revalidation remains incomplete |
+| Spatial / map product | `Oteryn/Oteryn-Atlas` | target authoritative; selective extraction/provenance closure remains incomplete |
 
-## Agent tooling
+Provider-owned schemas, generated product artifacts and runtime implementation remain in their provider repositories. META may reference provider contracts by immutable coordinate/version/digest but must not duplicate provider ownership. Repository presence, archive state, or owner transfer alone does not imply `MIGRATION_COMPLETE=YES`; missing required proof remains `UNKNOWN`, while a proven open completion gate remains `NO`.
 
-Agents can consult `docs/agents/AVAILABLE_TOOLS.md` for the coordination and development tools available to them in supported execution environments.
+## Canonical authority
 
-## Source of truth
+`docs/architecture/adr/0001-ecosystem-topology-authority.md` is the canonical ecosystem-topology authority after merge `a2672baac544ada81c526e92f0517903865a9ad0`. The machine-readable repository inventory is `ecosystem/repositories.json`.
 
-Live GitHub state and provider-owned repository content remain authoritative for technical facts. Coordination metadata must stay aligned with those sources.
+## CI, testing and releases
+
+- `docs/ci/CI_CONTRACT.md` defines the stable META required-check contract.
+- `docs/testing/ECOSYSTEM_TEST_STRATEGY.md` defines ecosystem metadata and compatibility proof layers.
+- `docs/release/RELEASE_COORDINATION.md` defines release-manifest ownership and immutable identity rules.
+- `ecosystem/compatibility.schema.json` defines the machine-readable shape for future compatible release sets.
+- `ecosystem/governance-desired-state.json` and `tools/governance/audit_github_readonly.py` define the read-only desired-state/drift validation surface.
+
+META CI deliberately validates coordination metadata only. Product builds and product-specific tests remain in Game, Platform and Atlas.
+
+## Security
+
+No secrets, credentials, private deployment state, production/live-state data, proprietary runtime assets, database dumps or product runtime source belong in this repository. See `SECURITY.md`.
