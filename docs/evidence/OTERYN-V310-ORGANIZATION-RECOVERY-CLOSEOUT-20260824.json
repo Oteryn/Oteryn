@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "prompt_id": "OTERYN-V310-ORGANIZATION-RECOVERY-CLOSEOUT",
+  "programme": "OTERYN-ORG-AUDIT-v3.10",
+  "issue": {
+    "repository": "Oteryn/Oteryn",
+    "number": 59,
+    "url": "https://github.com/Oteryn/Oteryn/issues/59"
+  },
+  "observed_at": "2026-08-24T17:31:13Z",
+  "contains_secret_values": false,
+  "repository_heads": {
+    "Oteryn/Oteryn": {
+      "main_sha": "3f154b32ab1dc9fd3437fb4976691b16f50e2e5d",
+      "protected": true
+    },
+    "Oteryn/Oteryn-Game": {
+      "main_sha": "e1a942675f98b4a42ce9d021773702e727c23574",
+      "protected": true
+    },
+    "Oteryn/Oteryn-Platform": {
+      "main_sha": "a4f786afc04703161731546590bc9b9d62e1e77c",
+      "protected": true
+    },
+    "Oteryn/Oteryn-Atlas": {
+      "main_sha": "7130bea8e95016aa821eefd51b3dba9c18be09c7",
+      "protected": true
+    }
+  },
+  "observations": {
+    "organization_owners": {
+      "count": 1,
+      "source": "GitHub REST orgs/Oteryn/members?role=admin",
+      "classification": "DIRECT_LIVE_READBACK"
+    },
+    "github_secret_metadata_counts": {
+      "organization_actions": 1,
+      "repositories": {
+        "Oteryn/Oteryn": {"actions": 0, "environments": 0, "environment_secrets": 0},
+        "Oteryn/Oteryn-Game": {"actions": 0, "environments": 0, "environment_secrets": 0},
+        "Oteryn/Oteryn-Platform": {"actions": 3, "environments": 3, "environment_secrets": 15},
+        "Oteryn/Oteryn-Atlas": {"actions": 0, "environments": 0, "environment_secrets": 0}
+      },
+      "note": "Counts only; no secret names or values were retained. GitHub APIs cannot recover secret values."
+    },
+    "permanent_repository_releases": {
+      "Oteryn/Oteryn": 0,
+      "Oteryn/Oteryn-Game": 0,
+      "Oteryn/Oteryn-Platform": 0,
+      "Oteryn/Oteryn-Atlas": 0
+    },
+    "package_inventory_api": {
+      "status": "UNKNOWN_PERMISSION_403_READ_PACKAGES_REQUIRED",
+      "note": "The authenticated gh token lacks read:packages; credentials/scopes were not changed."
+    },
+    "registry_anonymous_readback": {
+      "ghcr.io/oteryn/oteryn-platform:main": "UNAUTHORIZED",
+      "ghcr.io/oteryn/oteryn-game-gateway:main": "UNAUTHORIZED",
+      "ghcr.io/oteryn/oteryn-deploy-runner:main": "UNAUTHORIZED"
+    },
+    "historical_platform_ghcr_transfer_evidence": {
+      "observed_at": "2026-08-20T06:28:00Z",
+      "classification": "HISTORICAL_NOT_CURRENT_INVENTORY_OR_BACKUP",
+      "images": {
+        "ghcr.io/oteryn/oteryn-game-gateway": "sha256:323fd66336b3de62f82fda69c4c299c78444dfe93481d26420bbc65b1c9b90f7",
+        "ghcr.io/oteryn/oteryn-platform": "sha256:1d1e8f367a2006d117224577cc678a60aee4ed08aae304a49f78b4e7097f07c2",
+        "ghcr.io/oteryn/oteryn-deploy-runner": "sha256:1eb10741adf42262834825e8e2c50dec4edf8e0f2791935727e75a798f83b520"
+      }
+    },
+    "synology_backup_discovery": {
+      "method": "read-only bounded filename search under /volume1 with maxdepth 5",
+      "result": "NO_MATCHING_OTERYN_GIT_OR_GITHUB_BACKUP_PATH_FOUND",
+      "limitation": "Bounded negative evidence only; it does not prove absence outside the searched namespace."
+    },
+    "platform_production_recovery": {
+      "provider_head": "a4f786afc04703161731546590bc9b9d62e1e77c",
+      "production_verification": "NOT_STARTED",
+      "production_go_live_gate": "PENDING_PRODUCTION_VERIFICATION",
+      "backup_policy": "UNKNOWN",
+      "dated_production_restore_test": "UNKNOWN",
+      "production_rpo": "UNKNOWN",
+      "production_rto": "UNKNOWN",
+      "required_production_restore_evidence_present": false,
+      "provider_evidence": [
+        "docs/operations/PRODUCTION_READINESS_CHECKLIST.md",
+        "docs/operations/PRODUCTION_VERIFICATION_EVIDENCE.md"
+      ]
+    },
+    "existing_meta_recovery_contract": {
+      "path": "docs/recovery/organization-recovery-contract.md",
+      "status_date": "2026-08-22",
+      "open_gaps": [
+        "GAP-RECOVERY-001",
+        "GAP-RECOVERY-002",
+        "GAP-RECOVERY-003",
+        "GAP-RECOVERY-004",
+        "GAP-RECOVERY-005",
+        "GAP-RECOVERY-006"
+      ]
+    }
+  },
+  "recovery_gaps": {
+    "GAP-RECOVERY-001": {
+      "status": "BLOCKED_OWNER_DECISION",
+      "evidence": [
+        "The canonical META recovery contract states that no independent recurring restore-tested backup covers the current heads of all four permanent repositories.",
+        "Current GitHub heads were refreshed live and the bounded Synology search found no matching independent Oteryn Git/GitHub backup path; the bounded search is not treated as exhaustive proof of absence.",
+        "The historical Platform transfer-cut bundle is explicitly one-off historical recovery evidence and does not cover current repository heads."
+      ],
+      "owner_decisions_required": [
+        "Select and authorize an independent backup destination/operator outside the canonical GitHub failure domain.",
+        "Approve retention and recurring schedule/RPO intent for all four permanent repository histories.",
+        "Authorize creation of the recurring backup mechanism and an isolated restore drill against measured backup-generation heads."
+      ]
+    },
+    "GAP-RECOVERY-002": {
+      "status": "BLOCKED_OWNER_DECISION",
+      "evidence": [
+        "The canonical META recovery contract states that GitHub control-plane, Issue and PR metadata backup/reconstruction is unproven.",
+        "Repository desired-state and branch-protection data exist in GitHub/META, but the governing contract explicitly rejects desired-state manifests as backup evidence.",
+        "No independently retained metadata export plus reconstruction/readback drill was proven during this invocation."
+      ],
+      "owner_decisions_required": [
+        "Select and authorize an independent retention destination, retention period and recurring schedule for sanitized GitHub control-plane/lifecycle exports.",
+        "Authorize the minimum read credentials/scopes and a non-destructive reconstruction/readback drill for the covered settings and Issue/PR metadata."
+      ]
+    },
+    "GAP-RECOVERY-003": {
+      "status": "BLOCKED_OWNER_DECISION",
+      "evidence": [
+        "All four permanent repositories returned zero current GitHub Releases, so no release assets are present on those repository release surfaces at the observation time.",
+        "Current organization package inventory could not be read: the authenticated gh token returned HTTP 403 because read:packages is absent, and anonymous reads of the three known Platform GHCR coordinates returned unauthorized.",
+        "Platform retains historical 2026-08-20 GHCR build/push/digest/pull evidence, but it is not a current package inventory and does not prove an independent recovery source or republish drill."
+      ],
+      "owner_decisions_required": [
+        "Authorize a read-only package inventory capability such as read:packages, or another approved inventory path, without broadening credentials beyond what is required.",
+        "Select and authorize an independent package/artifact recovery source, retention policy and non-destructive recovery/republish validation for any retained package content."
+      ]
+    },
+    "GAP-RECOVERY-004": {
+      "status": "BLOCKED_OWNER_DECISION",
+      "evidence": [
+        "Live metadata proves organization and Platform GitHub secret objects exist, but no secret values were read or retained.",
+        "GitHub secret APIs do not provide the stored values, so metadata cannot be used as a secret backup.",
+        "No independently governed source of truth for the required secret values was proven."
+      ],
+      "owner_decisions_required": [
+        "Select and authorize an independently governed secret-value source of truth outside GitHub metadata.",
+        "Authorize controlled population/rotation ownership and a recovery procedure/drill that proves recoverability without exposing values."
+      ]
+    },
+    "GAP-RECOVERY-005": {
+      "status": "BLOCKED_OWNER_DECISION",
+      "evidence": [
+        "Live GitHub organization readback returned exactly one organization owner/admin member.",
+        "A policy sentence or account recovery documentation cannot substitute for an actually independent second owner/recovery path."
+      ],
+      "owner_decisions_required": [
+        "Designate the independent second owner or approved account-recovery identity/path.",
+        "Explicitly authorize the resulting organization ownership/account-recovery mutation and verify it by live readback."
+      ]
+    },
+    "GAP-RECOVERY-006": {
+      "status": "BLOCKED_OWNER_DECISION",
+      "evidence": [
+        "At Platform main a4f786afc04703161731546590bc9b9d62e1e77c, Production Verification is NOT STARTED and the Production Go-Live Gate is PENDING PRODUCTION VERIFICATION.",
+        "Platform production backup policy/schedule/retention and dated production restore test remain UNKNOWN; required production restore evidence is explicitly NO.",
+        "The measured staging restore is explicitly not production RPO/RTO evidence."
+      ],
+      "owner_decisions_required": [
+        "Approve the actual Platform production backup mechanism, scope, schedule, retention, encryption/access policy and operational owner.",
+        "Approve production RPO and RTO targets based on business impact rather than inventing them from staging measurements.",
+        "Authorize a safe dated production restore test/evidence procedure that records recovery time and data-loss observation without destructive uncontrolled production mutation."
+      ]
+    }
+  },
+  "completion_status": "BLOCKED",
+  "merge_eligible": false,
+  "owner_decisions_required_count": 14,
+  "out_of_scope_findings": [],
+  "blockers": [
+    "External independent recovery storage/mechanisms are not authorized by the current task without owner decisions.",
+    "Package inventory requires an approved read-only capability not present on the current authenticated token.",
+    "Secret-value recovery, organization owner redundancy and Platform production recovery require explicit owner/provider decisions and cannot be self-authorized."
+  ],
+  "scope_confirmation": "No work outside v3.10 organization recovery GAP-RECOVERY-001..006 was performed."
+}
