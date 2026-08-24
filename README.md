@@ -9,11 +9,11 @@ This repository is the thin **META / coordination plane** for the Oteryn ecosyst
 | Responsibility | Target repository | Current transition state |
 | --- | --- | --- |
 | META / ecosystem coordination | `Oteryn/Oteryn` | canonical authority active |
-| Game product | `Oteryn/Oteryn-Game` | target authoritative; legacy source archived; final exhaustive migration proof remains incomplete |
-| Web / application platform | `Oteryn/Oteryn-Platform` | stable repository ID `1305155726` transferred; backup archived; post-transfer revalidation remains incomplete |
-| Spatial / map product | `Oteryn/Oteryn-Atlas` | target authoritative; selective extraction/provenance closure remains incomplete |
+| Game product | `Oteryn/Oteryn-Game` | migration terminal; legacy source archived read-only; source work/refs reconciled |
+| Web / application platform | `Oteryn/Oteryn-Platform` | migration terminal; stable repository ID `1305155726`; post-transfer control plane and GHCR linkage revalidated; backup archived |
+| Spatial / map product | `Oteryn/Oteryn-Atlas` | migration terminal; bounded selective extraction/provenance and publication-rights closeout complete |
 
-Provider-owned schemas, generated product artifacts and runtime implementation remain in their provider repositories. META may reference provider contracts by immutable coordinate/version/digest but must not duplicate provider ownership. Repository presence, archive state, or owner transfer alone does not imply `MIGRATION_COMPLETE=YES`; missing required proof remains `UNKNOWN`, while a proven open completion gate remains `NO`.
+Provider-owned schemas, generated product artifacts and runtime implementation remain in their provider repositories. META may reference provider contracts by immutable coordinate/version/digest but must not duplicate provider ownership. `ecosystem/repositories.json` applies the ADR 0002 completion invariant and now records `MIGRATION_COMPLETE=YES` for Game, Platform and Atlas from terminal provider evidence; this does not rewrite the historical v3.9 audit snapshot or the later v3.10 audit/addendum state.
 
 ## Canonical authority
 
