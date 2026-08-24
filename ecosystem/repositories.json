@@ -19,10 +19,10 @@
       "product": "game",
       "target_coordinate": "Oteryn/Oteryn-Game",
       "current_coordinate": "Oteryn/Oteryn-Game",
-      "migration_state": "target_authoritative_source_archived_final_ref_proof_incomplete",
-      "migration_verdict": "MIGRATION_COMPLETE=UNKNOWN",
+      "migration_state": "target_authoritative_source_archived_refs_reconciled",
+      "migration_verdict": "MIGRATION_COMPLETE=YES",
       "authority_owner": "Game provider",
-      "notes": "Target is authoritative and legacy source blakinio/Oteryn-v2 is archived read-only. The previously source-only PROD-ENTITLEMENTS branch at 6f83c16305a4c7fb8d0303deb55a4ab8ee5827e8 was intentionally carried forward through merged Oteryn/Oteryn-Game PR #20 (merge d40a225e5fedca0396f34b4f2b6c1e343161e6ff). Final exhaustive tag/ref and stale-coordinate closure is not independently proven in this META audit, so YES is not inferred."
+      "notes": "Terminal provider evidence: Oteryn/Oteryn-Game Issue #18 is closed completed; blakinio/Oteryn-v2 is archived read-only with 0 open Issues/PRs; all 34 live source branches match the retirement manifest with 0 SHA mismatches; unique PROD-ENTITLEMENTS work was carried through target PR #20; target PR #23 merged as 19debbba5d4e8f2db22e44d0c90720d39dcbc17f and the target is the sole current Game write authority."
     },
     {
       "product": "platform",
@@ -30,19 +30,19 @@
       "current_coordinate": "Oteryn/Oteryn-Platform",
       "previous_coordinate": "blakinio/Oteryn-Platform",
       "stable_repository_id": 1305155726,
-      "migration_state": "identity_transferred_backup_archived_post_transfer_revalidation_incomplete",
-      "migration_verdict": "MIGRATION_COMPLETE=UNKNOWN",
+      "migration_state": "identity_transferred_post_transfer_revalidated_backup_archived",
+      "migration_verdict": "MIGRATION_COMPLETE=YES",
       "authority_owner": "Platform provider",
-      "notes": "Stable repository identity is transferred to Oteryn and the transfer-cut backup repository is archived read-only with a durable release/restore contract. Organization-level evidence still does not prove every package/GHCR, deployment/environment, App/webhook/deploy-key, external owner/repo-sensitive identity and migration-machinery retirement obligation, so YES is not inferred."
+      "notes": "Terminal provider evidence: Issue #1155 is closed completed; current coordinates, platform-gate protection, isolated runner group, GitHub App installation, environments/deployments and current-owner GHCR publication are reconciled. Read-only Actions proof run 32733560602 directly proved all three private Platform-owned GHCR package objects and readable versions link to Oteryn/Oteryn-Platform repository ID 1305155726. PR #1258 merged as ae0735bcc02b78c8398971f7b404b175764c147d; terminal task archival PR #1259 merged as b930d2782e1d2fe01f66cde5c28b1c2486541cec. Transfer-cut backup remains terminal ARCHIVED_READ_ONLY with durable recovery evidence."
     },
     {
       "product": "atlas",
       "target_coordinate": "Oteryn/Oteryn-Atlas",
       "current_coordinate": "Oteryn/Oteryn-Atlas",
-      "migration_state": "target_active_selective_extraction_incomplete",
-      "migration_verdict": "MIGRATION_COMPLETE=NO",
+      "migration_state": "target_authoritative_selective_extraction_terminal",
+      "migration_verdict": "MIGRATION_COMPLETE=YES",
       "authority_owner": "Atlas provider",
-      "notes": "Target repository is authoritative for Atlas product work, but selective extraction remains incomplete until source-boundary provenance mapping, source-only work/branch disposition, protected-main/stable-gate proof and publication/provenance/rights decisions are closed."
+      "notes": "Terminal provider evidence: Issue #102 is closed completed and PR #103 merged as e35efcc3e518aff61458ef7aa1b154f9f267a5e4; bounded legacy selection is mapped 144/144 with 0 missing paths, 0 blob identity mismatches and 0 extra rows; source work is CLOSED_UNMERGED_HISTORICAL_PROVENANCE / NON_AUTHORITATIVE_READ_ONLY; exact-head atlas-gate and provenance-gate passed; exact 15.32 asset publication rights are recorded in the digest-scoped attestation."
     }
   ],
   "administrative_repositories": [
@@ -74,7 +74,7 @@
     },
     {
       "coordinate": "blakinio/Otheryn",
-      "classification": "legacy_parent_with_bounded_atlas_extraction_and_retirement_pending",
+      "classification": "legacy_parent_with_terminal_bounded_atlas_extraction",
       "normative_target_authority": false
     }
   ],

@@ -21,7 +21,7 @@ This is an organization-level recovery contract. Provider repositories remain au
 - `LAST_RESTORE_TEST`: `UNKNOWN` for a backup covering the current heads of all four permanent repositories.
 - `RESTORE_VALIDATION`: `UNKNOWN`.
 
-`blakinio/Oteryn-v2` and bounded `blakinio/Otheryn` history are migration/reference provenance, not complete backups of later target-only history. The former Game migration source `blakinio/Oteryn-v2` is now recorded as archived read-only in the reconciled machine-readable inventory. Exhaustive final tag/ref and stale-coordinate closure is still not independently proven by this recovery contract, so Game migration completion remains `UNKNOWN` rather than being inferred from archival alone.
+`blakinio/Oteryn-v2` and bounded `blakinio/Otheryn` history are migration/reference provenance, not complete backups of later target-only history. The former Game migration source `blakinio/Oteryn-v2` is archived read-only. Terminal provider evidence in `Oteryn/Oteryn-Game#18` directly reconciles all 34 live source branches with zero SHA mismatches/extra live refs, records zero open source Issues/PRs, preserves the unique `PROD-ENTITLEMENTS` lineage in the target, and identifies `Oteryn/Oteryn-Game` as the sole current Game write authority; retirement PR #23 merged as `19debbba5d4e8f2db22e44d0c90720d39dcbc17f`. This supersedes the former migration-verdict `UNKNOWN` in this recovery contract. It does not prove an independent current-history backup or change the `RPO`/`RTO`/restore `UNKNOWN`s above.
 
 ### Platform transfer-cut Git-history artifact
 
