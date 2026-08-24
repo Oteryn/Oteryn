@@ -12,19 +12,6 @@ Agents MUST follow `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATIO
 
 Agents MAY use the `synology oteryn` developer MCP when it is available and the current task authorizes the relevant operation. They MUST follow `docs/agents/contracts/SYNOLOGY_MCP_EXECUTION_POLICY.md`: Synology MCP is an additional runtime/local evidence and execution path, not a replacement for GitHub. GitHub live state remains authoritative for repository, branch, commit, PR, issue, review, CI/check and release facts, and required GitHub verification/workflows MUST NOT be skipped because MCP access exists.
 
-### Available coordination and development tools
-
-When available in the current execution environment, agents MAY use the following tools to improve planning, implementation and coordination:
-
-- **GitHub** — authoritative repository control plane and source of truth for repository identity, branches, commits, PRs, issues, reviews, CI/checks and releases.
-- **Superpowers** — development methodology and execution skills for brainstorming/design, implementation planning, TDD, systematic debugging, git worktrees, parallel/subagent workflows, code review and verification-before-completion. Agents SHOULD use relevant Superpowers skills when they apply and the environment exposes them.
-- **Notion** — coordination and knowledge layer for roadmap, task/agent tracking, backlog and high-level architecture decisions. The workspace contains an `Oteryn Command Center` intended for this purpose. Notion MUST NOT override live GitHub repository state or provider-owned canonical ADRs/contracts.
-- **Synology / host-local tools** — runtime evidence and authorized execution paths, subject to the existing Synology MCP and GitHub-first policies.
-
-Tool availability does not grant additional authorization. Agents MUST NOT infer cross-repository write permission, production mutation authority, secret access or lifecycle bypass from the mere presence of a connector, plugin, MCP, skill or host-local execution path.
-
-For technical facts, precedence is: **live GitHub/provider-owned source > repository documentation > Notion coordination metadata > agent narrative**. If Notion and GitHub disagree about a technical state, agents MUST verify GitHub/provider state and update or report the stale coordination record rather than treating Notion as authoritative.
-
 Before declaring a task blocked because of access limitations, agents must discover available capabilities, distinguish tool absence from permission/policy restrictions, and continue useful work when any safe execution path remains.
 
 Completion claims require verified evidence. `UNKNOWN` is not automatically a `BLOCKER`, and a generic access disclaimer without capability discovery is invalid.
