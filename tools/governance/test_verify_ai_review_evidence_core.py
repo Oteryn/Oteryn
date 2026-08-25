@@ -5,6 +5,7 @@ import importlib.util
 import hashlib
 import json
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -296,6 +297,122 @@ def test_merge_commit_after_review_fails_even_when_paths_are_neutral() -> None:
     git(repo, "merge", "--no-ff", "side", "-m", "merge evidence")
     final = git(repo, "rev-parse", "HEAD")
     expect_fail(lambda: run_verify(attestation(reviewed, "abc"), source(reviewed, "abc"), repo, final))
+
+
+def test_clean_trusted_integration_merge_after_review_is_neutral() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "task")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream.py"; upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "independent upstream")
+    integration_base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "task")
+    git(repo, "merge", "--no-ff", "master", "-m", "merge current main")
+    final = git(repo, "rev-parse", "HEAD")
+    policy = dict(POLICY)
+    policy["_trusted_integration_base_sha"] = integration_base
+    assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
+
+
+def test_repeated_merge_up_reuse_requires_a_new_integration_base() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "task-double")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-double.py"; upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "independent upstream double")
+    integration_base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "task-double")
+    git(repo, "merge", "--no-ff", "master", "-m", "first trusted-base merge")
+    first_merge = git(repo, "rev-parse", "HEAD")
+    tree = git(repo, "rev-parse", f"{first_merge}^{{tree}}")
+    second_merge = git(repo, "commit-tree", tree, "-p", first_merge, "-p", integration_base, "-m", "second trusted-base merge")
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    policy["_trusted_integration_base_sha"] = integration_base
+    assert not m.post_review_commits_are_neutral(repo, reviewed, second_merge, policy)
+
+
+def test_repeated_clean_merge_ups_reuse_one_review_when_main_advances() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "task-repeated")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-first.py"; upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "first independent upstream")
+    git(repo, "checkout", "task-repeated")
+    git(repo, "merge", "--no-ff", "master", "-m", "first merge current main")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-second.py"; upstream.write_text("VALUE = 2\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "second independent upstream")
+    integration_base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "task-repeated")
+    git(repo, "merge", "--no-ff", "master", "-m", "second merge current main")
+    final = git(repo, "rev-parse", "HEAD")
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    policy["_trusted_integration_base_sha"] = integration_base
+    assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
+
+
+def test_repeated_clean_merge_ups_allow_neutral_evidence_between_merges() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "task-repeated-neutral")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-first.py"; upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "first independent upstream")
+    git(repo, "checkout", "task-repeated-neutral")
+    git(repo, "merge", "--no-ff", "master", "-m", "first merge current main")
+    evidence = repo / "docs/evidence/refresh.md"; evidence.parent.mkdir(parents=True, exist_ok=True)
+    evidence.write_text("PASS\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "neutral evidence refresh")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-second.py"; upstream.write_text("VALUE = 2\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "second independent upstream")
+    integration_base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "task-repeated-neutral")
+    git(repo, "merge", "--no-ff", "master", "-m", "second merge current main")
+    final = git(repo, "rev-parse", "HEAD")
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    policy["_trusted_integration_base_sha"] = integration_base
+    assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
+
+
+def test_long_neutral_chain_reuse_is_not_recursion_limited() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    evidence = repo / "docs/evidence/long-chain.md"
+    evidence.parent.mkdir(parents=True, exist_ok=True)
+    for index in range(100):
+        evidence.write_text(f"PASS {index}\n", encoding="utf-8")
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", f"neutral evidence {index}")
+    final = git(repo, "rev-parse", "HEAD")
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    previous_limit = sys.getrecursionlimit()
+    try:
+        sys.setrecursionlimit(80)
+        assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
+    finally:
+        sys.setrecursionlimit(previous_limit)
+
+
+def test_exact_head_integration_merge_review_is_neutral() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "side-exact")
+    f = repo / "side.txt"; f.write_text("side\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "side")
+    git(repo, "checkout", "master")
+    git(repo, "merge", "--no-ff", "side-exact", "-m", "integration merge")
+    final = git(repo, "rev-parse", "HEAD")
+    assert m.post_review_commits_are_neutral(repo, final, final, POLICY)
+
+
+def test_clean_integration_merge_reuse_requires_policy_flag() -> None:
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    policy["activation"]["allow_clean_trusted_base_merge_reuse"] = False
+    assert policy["activation"]["allow_clean_trusted_base_merge_reuse"] is False
 
 
 ISSUE_FP = "f" * 64
@@ -652,6 +769,64 @@ def test_issue_comment_stale_result_followed_by_new_request_fails() -> None:
         issue_comment(12, request_body(final, "e" * 64), stamp="2026-08-20T10:02:00Z"),
     ]
     expect_fail(lambda: run_issue(comments, repo, final))
+
+
+def test_exact_head_review_supersedes_older_merge_reuse_finding() -> None:
+    repo, reviewed, final = make_repo()
+    old_request = issue_comment(
+        10, request_body(reviewed), stamp="2026-08-20T10:00:00Z",
+    )
+    current_request = issue_comment(
+        12, request_body(final), stamp="2026-08-20T10:02:00Z",
+    )
+    reviews = [
+        request_anchor(old_request, reviewed),
+        request_anchor(current_request, final),
+        codex_review(90, reviewed),
+        codex_review(91, final),
+    ]
+    inline = [codex_inline(90, "P1 Badge prior finding")]
+    assert not m._blocking_findings_for_current_generation(
+        comments=[old_request, current_request],
+        reviews=reviews,
+        review_comments=inline,
+        policy=POLICY,
+        repo_root=repo,
+        tier="R2",
+        head=final,
+        repository="Oteryn/Test",
+        pr_number=7,
+    )
+
+
+def test_wrong_tier_exact_head_review_cannot_supersede_prior_finding() -> None:
+    repo, reviewed, final = make_repo()
+    old_request = issue_comment(
+        10, request_body(reviewed), stamp="2026-08-20T10:00:00Z",
+    )
+    wrong_tier_request = issue_comment(
+        12,
+        request_body(final, tier="R1", klass="fast", reviewer="codex_spark"),
+        stamp="2026-08-20T10:02:00Z",
+    )
+    reviews = [
+        request_anchor(old_request, reviewed),
+        request_anchor(wrong_tier_request, final),
+        codex_review(90, reviewed),
+        codex_review(91, final),
+    ]
+    inline = [codex_inline(90, "P1 Badge prior finding")]
+    assert m._blocking_findings_for_current_generation(
+        comments=[old_request, wrong_tier_request],
+        reviews=reviews,
+        review_comments=inline,
+        policy=POLICY,
+        repo_root=repo,
+        tier="R2",
+        head=final,
+        repository="Oteryn/Test",
+        pr_number=7,
+    )
 
 
 def test_issue_comment_p1_inline_finding_fails() -> None:
