@@ -19,7 +19,7 @@
 - `main` movement alone is `UPSTREAM_ADVANCED`, never automatic work invalidation.
 - Published task branches use non-destructive merge-up refresh by default; no generic reset/restart/force-push to chase `main`.
 - Changed governing authority must be reloaded before further mutation when upstream changes touch it.
-- Exact-head CI/review evidence must be regenerated after a refresh when the task head changes.
+- After a refresh, renew deterministic exact-head CI. Reuse AI review only when the trusted review gate proves the configured clean-reuse conditions on the new task head; otherwise obtain fresh exact-head AI review. A changed head alone does not authorize duplicate review invocation when the gate-valid reuse path applies.
 - Only verified task supersession, incompatible authority/safety change, semantic conflict or failed reconciliation invalidates affected work.
 
 ---
