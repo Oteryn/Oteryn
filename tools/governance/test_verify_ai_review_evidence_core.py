@@ -706,6 +706,29 @@ def test_issue_comment_stale_result_followed_by_new_request_fails() -> None:
     expect_fail(lambda: run_issue(comments, repo, final))
 
 
+def test_exact_head_review_supersedes_older_merge_reuse_finding() -> None:
+    repo, reviewed, final = make_repo()
+    old_request = issue_comment(
+        10, request_body(reviewed), stamp="2026-08-20T10:00:00Z",
+    )
+    current_request = issue_comment(
+        12, request_body(final), stamp="2026-08-20T10:02:00Z",
+    )
+    reviews = [codex_review(90, reviewed), codex_review(91, final)]
+    inline = [codex_inline(90, "P1 Badge prior finding")]
+    assert not m._blocking_findings_for_current_generation(
+        comments=[old_request, current_request],
+        reviews=reviews,
+        review_comments=inline,
+        policy=POLICY,
+        repo_root=repo,
+        tier="R2",
+        head=final,
+        repository="Oteryn/Test",
+        pr_number=7,
+    )
+
+
 def test_issue_comment_p1_inline_finding_fails() -> None:
     repo, _, final = make_repo()
     reviews = [codex_review(90, final)]
