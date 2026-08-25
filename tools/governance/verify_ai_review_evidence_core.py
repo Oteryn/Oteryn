@@ -226,7 +226,8 @@ def _git_lines(repo_root: str | Path, *args: str) -> list[str]:
 
 def post_review_commits_are_neutral(
     repo_root: str | Path, reviewed_head: str, head: str, policy: dict,
-    *, _merge_reuse_consumed: bool = False,
+    *, _seen_trusted_integration_bases: frozenset[str] = frozenset(),
+    _requires_current_trusted_base: bool = True,
 ) -> bool:
     try:
         if reviewed_head == head:
@@ -235,9 +236,17 @@ def post_review_commits_are_neutral(
         parents = head_parents[0].split() if len(head_parents) == 1 else []
         trusted_base = str(policy.get("_trusted_integration_base_sha") or "")
         merge_reuse_enabled = bool(policy.get("activation", {}).get("allow_clean_trusted_base_merge_reuse"))
+        second_parent_is_trusted = len(parents) == 2 and (
+            parents[1] == trusted_base
+            if _requires_current_trusted_base
+            else is_ancestor(repo_root, parents[1], trusted_base)
+        )
         if (
-            merge_reuse_enabled and not _merge_reuse_consumed
-            and len(parents) == 2 and trusted_base and parents[1] == trusted_base
+            merge_reuse_enabled
+            and len(parents) == 2
+            and trusted_base
+            and second_parent_is_trusted
+            and parents[1] not in _seen_trusted_integration_bases
         ):
             if not is_ancestor(repo_root, reviewed_head, parents[0]):
                 return False
@@ -251,7 +260,12 @@ def post_review_commits_are_neutral(
             if merge_tree.returncode != 0 or merged_tree != [expected_tree]:
                 return False
             return post_review_commits_are_neutral(
-                repo_root, reviewed_head, parents[0], policy, _merge_reuse_consumed=True
+                repo_root,
+                reviewed_head,
+                parents[0],
+                policy,
+                _seen_trusted_integration_bases=_seen_trusted_integration_bases | {parents[1]},
+                _requires_current_trusted_base=False,
             )
         commits = _git_lines(repo_root, "rev-list", "--reverse", f"{reviewed_head}..{head}")
         for commit in commits:
