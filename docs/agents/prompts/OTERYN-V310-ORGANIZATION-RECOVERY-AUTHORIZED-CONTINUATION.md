@@ -200,12 +200,14 @@ Allowed behavior:
 - discover an already authorized readable source of the required secret values;
 - create/update an encrypted independent recovery copy on Synology or another already authorized independent recovery store;
 - validate decryptability/recovery in a way that does not print values;
-- validate identity/count/fingerprint metadata only through non-reversible digests or safe existence checks;
+- validate identity/count metadata only through non-secret identifiers/counts or safe existence checks;
+- if secret-value equality must be proven, use only a keyed HMAC whose key is independently held outside the evidence and is never persisted with the same recovery artifact;
 - document key custody/recovery procedure without committing keys or values.
 
 Forbidden:
 - printing or logging secret values;
 - putting secret values in GitHub Issues/PRs/artifacts/repository files;
+- persisting raw or unkeyed secret-value digests/fingerprints in logs, artifacts, recovery evidence or Git history;
 - treating GitHub secret names as recoverable values;
 - extracting values from systems where the current authorization does not permit reading them.
 
