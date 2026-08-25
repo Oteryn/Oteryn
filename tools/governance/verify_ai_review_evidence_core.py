@@ -519,7 +519,7 @@ def _blocking_findings_for_current_generation(
         ):
             return True
 
-    pull_url = f"https://api.github.com/repos/${repository}/pulls/${pr_number}"
+    pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
     has_exact_head_review = any(
         str((review.get("user") or {}).get("login", "")).casefold() in trusted_logins
         and review.get("pull_request_url") == pull_url
