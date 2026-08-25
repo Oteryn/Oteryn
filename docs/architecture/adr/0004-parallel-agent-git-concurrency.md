@@ -1,6 +1,6 @@
 # ADR 0004: Parallel-agent Git concurrency and late integration
 
-- Status: Proposed
+- Status: Accepted upon merge to `main`; owner approved 2026-08-25
 - Date: 2026-08-25
 - Decision owner: repository owner
 - Lifecycle issue: #61
@@ -184,7 +184,7 @@ Rejected. It burns validation/review capacity during normal parallel progress, r
 
 ## Rollout plan
 
-After this ADR is approved:
+After owner approval:
 
 1. update META `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` with the canonical normative protocol;
 2. add thin compatible root `AGENTS.md` sections to Game, Platform and Atlas;
@@ -232,6 +232,6 @@ Costs:
 
 ## Authority and precedence
 
-If accepted, this ADR extends ADR 0002's one-task/one-branch/one-PR operating model and is canonical for organization-wide parallel-agent Git concurrency semantics.
+Upon merge, this ADR extends ADR 0002's one-task/one-branch/one-PR operating model and is canonical for organization-wide parallel-agent Git concurrency semantics.
 
 The central execution/continuation contract contains the normative agent procedure. Provider repositories retain implementation/test/runtime authority and may impose stricter local validation/safety requirements. Live GitHub Issue/PR/check/protection state remains authoritative for current lifecycle and merge truth.
