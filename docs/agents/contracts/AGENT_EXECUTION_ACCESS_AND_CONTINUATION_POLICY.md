@@ -144,6 +144,8 @@ A no-op/retrigger commit is forbidden. Agents MUST NOT create an empty commit, s
 
 Durable execution/checkpoint state SHOULD live outside the qualified candidate diff when the repository provides a task record/control-room mechanism. Updating agent bookkeeping does not justify invalidating otherwise-current exact-head evidence.
 
+The machine-readable durable checkpoint contract is `docs/agents/EXECUTION_STATE_CONTRACT.json`. In repositories that persist task/checkpoint records, every new or materially updated substantial task record after this policy is active MUST emit the bounded execution fields defined there. Legacy records remain readable until they are materially updated. Repository-local schemas may add stricter fields or transitions but MUST NOT weaken the central `RUNNING`/`WAITING_EXTERNAL`/`STALLED`, candidate-freeze, or retry-exhaustion invariants.
+
 ## Access discovery before blocking
 
 Before reporting:

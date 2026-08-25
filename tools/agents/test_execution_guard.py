@@ -1,4 +1,5 @@
-﻿import json
+import ast
+import json
 import subprocess
 import sys
 import tempfile
@@ -84,6 +85,43 @@ class ExecutionGuardTests(unittest.TestCase):
         proc = subprocess.run([sys.executable, str(root / "tools/agents/execution_guard.py"), "--input", path], cwd=root, capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         self.assertEqual(json.loads(proc.stdout)["decision"], "WAIT")
+
+    def test_cli_reads_stdin(self):
+        root = Path(__file__).resolve().parents[2]
+        proc = subprocess.run(
+            [sys.executable, str(root / "tools/agents/execution_guard.py")],
+            cwd=root,
+            input=json.dumps(snap()),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(json.loads(proc.stdout)["next_state"], "WAITING_EXTERNAL")
+
+    def test_cli_invalid_schema_is_fail_closed(self):
+        root = Path(__file__).resolve().parents[2]
+        proc = subprocess.run(
+            [sys.executable, str(root / "tools/agents/execution_guard.py")],
+            cwd=root,
+            input=json.dumps({"schema_version": 1}),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertIn("snapshot fields mismatch", proc.stderr)
+
+    def test_guard_has_no_network_or_mutating_file_calls(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / "tools/agents/execution_guard.py").read_text(encoding="utf-8-sig")
+        tree = ast.parse(source)
+        forbidden_import_roots = {"http", "requests", "socket", "urllib"}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                self.assertTrue(all(alias.name.split(".", 1)[0] not in forbidden_import_roots for alias in node.names))
+            elif isinstance(node, ast.ImportFrom):
+                self.assertNotIn((node.module or "").split(".", 1)[0], forbidden_import_roots)
+            elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                self.assertNotIn(node.func.attr, {"write_text", "write_bytes", "unlink", "rename", "replace", "mkdir", "touch"})
 
 
 if __name__ == "__main__":
