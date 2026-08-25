@@ -35,7 +35,18 @@ def review_event(actor="chatgpt-codex-connector[bot]", review_commit=HEAD, head=
     }
 
 
-def issue_comment_event(actor="chatgpt-codex-connector[bot]"):
+def issue_comment_event(
+    actor="chatgpt-codex-connector[bot]",
+    *,
+    reviewed_commit=HEAD[:10],
+    include_reviewed_commit=True,
+    extra_reviewed_commit=None,
+):
+    body = "Codex review result"
+    if include_reviewed_commit:
+        body += f"\n\n**Reviewed commit:** `{reviewed_commit}`"
+    if extra_reviewed_commit is not None:
+        body += f"\n\n**Reviewed commit:** `{extra_reviewed_commit}`"
     return {
         "sender": {"login": actor},
         "issue": {
@@ -44,6 +55,7 @@ def issue_comment_event(actor="chatgpt-codex-connector[bot]"):
                 "url": f"https://api.github.com/repos/Oteryn/Oteryn/pulls/{PR_NUMBER}"
             },
         },
+        "comment": {"body": body},
     }
 
 
@@ -164,6 +176,45 @@ class EventTests(unittest.TestCase):
         self.assertEqual(client.get_pr_calls, [PR_NUMBER])
         self.assertEqual(client.rerun_calls, [321])
         self.assertEqual(client.list_gate_run_calls, [(HEAD, PR_NUMBER)])
+
+    def test_issue_comment_result_for_old_head_is_noop(self):
+        client = FakeClient(runs=[run_payload(321)])
+        result = process_event(
+            "issue_comment",
+            issue_comment_event(reviewed_commit=("b" * 40)[:10]),
+            REPOSITORY,
+            POLICY,
+            client,
+        )
+        self.assertEqual(result.action, "NOOP_STALE_REVIEW")
+        self.assertEqual(client.list_gate_run_calls, [])
+        self.assertEqual(client.rerun_calls, [])
+
+    def test_issue_comment_without_reviewed_commit_is_not_a_result(self):
+        client = FakeClient(runs=[run_payload(321)])
+        result = process_event(
+            "issue_comment",
+            issue_comment_event(include_reviewed_commit=False),
+            REPOSITORY,
+            POLICY,
+            client,
+        )
+        self.assertEqual(result.action, "NOOP_NOT_REVIEW_RESULT")
+        self.assertEqual(client.list_gate_run_calls, [])
+        self.assertEqual(client.rerun_calls, [])
+
+    def test_issue_comment_with_multiple_reviewed_commits_is_ambiguous(self):
+        client = FakeClient(runs=[run_payload(321)])
+        result = process_event(
+            "issue_comment",
+            issue_comment_event(extra_reviewed_commit=HEAD[:10]),
+            REPOSITORY,
+            POLICY,
+            client,
+        )
+        self.assertEqual(result.action, "NOOP_AMBIGUOUS_REVIEW_RESULT")
+        self.assertEqual(client.list_gate_run_calls, [])
+        self.assertEqual(client.rerun_calls, [])
 
     def test_cross_repository_pr_fails_closed(self):
         client = FakeClient(runs=[run_payload()])

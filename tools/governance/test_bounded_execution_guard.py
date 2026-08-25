@@ -5,7 +5,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from bounded_execution_guard import decide, progress_fingerprint  # noqa: E402
+from bounded_execution_guard import (  # noqa: E402
+    GuardError,
+    decide,
+    progress_fingerprint,
+)
 
 
 POLICY = {
@@ -31,6 +35,7 @@ POLICY = {
     "candidate_freeze": {
         "forbidden_actions_without_material_change": ["mutate", "retrigger"]
     },
+    "session_release_states": ["WAITING_EXTERNAL", "BLOCKED", "STALLED", "DONE"],
 }
 
 
@@ -88,6 +93,15 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(result.state, "READY")
         self.assertIn("frozen", result.reason.lower())
 
+    def test_frozen_denial_releases_blocked_and_stalled_sessions(self):
+        for state in ("BLOCKED", "STALLED"):
+            with self.subTest(state=state):
+                current = snapshot(candidate_frozen=True, state=state)
+                result = decide(None, current, "retrigger", POLICY)
+                self.assertFalse(result.allowed)
+                self.assertEqual(result.state, state)
+                self.assertTrue(result.release_session)
+
     def test_external_dependency_becomes_waiting_and_releases_session(self):
         previous = snapshot(
             candidate_frozen=True,
@@ -117,6 +131,11 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(result.state, "STALLED")
         self.assertTrue(result.release_session)
 
+    def test_unverified_done_snapshot_is_invalid_for_every_action(self):
+        current = snapshot(state="DONE", completion_verified=False)
+        with self.assertRaises(GuardError):
+            decide(None, current, "observe", POLICY)
+
     def test_done_requires_verified_completion(self):
         current = snapshot(state="READY", completion_verified=False)
         result = decide(None, current, "complete", POLICY)
@@ -127,6 +146,15 @@ class DecisionTests(unittest.TestCase):
         result = decide(None, verified, "complete", POLICY)
         self.assertTrue(result.allowed)
         self.assertEqual(result.state, "DONE")
+
+    def test_rejected_completion_preserves_release_states(self):
+        for state in ("WAITING_EXTERNAL", "BLOCKED", "STALLED"):
+            with self.subTest(state=state):
+                current = snapshot(state=state, completion_verified=False)
+                result = decide(None, current, "complete", POLICY)
+                self.assertFalse(result.allowed)
+                self.assertEqual(result.state, state)
+                self.assertTrue(result.release_session)
 
     def test_external_review_budget_prevents_duplicate_invocation(self):
         current = snapshot(external_review_invocations=1)
