@@ -16,6 +16,8 @@ Before declaring a task blocked because of access limitations, agents must disco
 
 Completion claims require verified evidence. `UNKNOWN` is not automatically a `BLOCKER`, and a generic access disclaimer without capability discovery is invalid.
 
+For substantial autonomous work, agents MUST apply the central bounded-execution/no-progress rules: a `WAITING_EXTERNAL` task must not remain active, a frozen candidate must not be mutated merely to provoke re-evaluation, and a no-op/retrigger commit is forbidden. Repeated unchanged failures must transition through the contract's bounded retry and `STALLED` rules rather than loop indefinitely.
+
 ## GitHub-first execution gate
 
 GitHub is the authoritative repository control plane for repo identity, default branch, Issue/task, PR, task branch, exact remote SHA, checks, reviews and merge state.

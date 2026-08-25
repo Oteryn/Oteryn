@@ -197,6 +197,14 @@ jobs:
           print('AI review policy contract PASS')
           PY
 
+      - name: Validate bounded autonomous execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tools.agents.test_execution_guard -v
+          python3 -m unittest tools.agents.test_execution_contract -v
+          python3 -m unittest tools.governance.test_ai_review_recheck_workflow -v
+
       - name: Emit exact pull-request AI review classification
         if: ${{ github.event_name == 'pull_request' }}
         shell: bash
