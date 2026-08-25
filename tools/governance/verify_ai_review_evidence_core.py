@@ -505,19 +505,27 @@ def _blocking_findings_for_current_generation(
                 "id": anchor["REQUEST_COMMENT_ID"],
             }, request_logins))
 
+    latest_request = max(eligible_requests, key=lambda item: _created_at(item[0]), default=None)
     for comment in comments:
         if not _issue_comment_identity(comment, repository, pr_number):
             continue
         if not BLOCKING_FINDING_RE.search(str(comment.get("body") or "")):
             continue
         login = str((comment.get("user") or {}).get("login", "")).casefold()
-        if any(
-            login in request_logins and _created_at(comment) > _created_at(request_comment)
-            for request_comment, request_logins in eligible_requests
+        if (
+            latest_request is not None
+            and login in latest_request[1]
+            and _created_at(comment) > _created_at(latest_request[0])
         ):
             return True
 
-    pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
+    pull_url = f"https://api.github.com/repos/${repository}/pulls/${pr_number}"
+    has_exact_head_review = any(
+        str((review.get("user") or {}).get("login", "")).casefold() in trusted_logins
+        and review.get("pull_request_url") == pull_url
+        and review.get("commit_id") == head
+        for review in reviews
+    )
     eligible_review_ids: set[int] = set()
     for review in reviews:
         login = str((review.get("user") or {}).get("login", "")).casefold()
@@ -525,6 +533,8 @@ def _blocking_findings_for_current_generation(
         if login not in trusted_logins or review.get("pull_request_url") != pull_url:
             continue
         if not FULL_SHA.fullmatch(reviewed_head):
+            continue
+        if has_exact_head_review and reviewed_head != head:
             continue
         if not is_ancestor(repo_root, reviewed_head, head):
             continue
