@@ -353,6 +353,30 @@ def test_repeated_clean_merge_ups_reuse_one_review_when_main_advances() -> None:
     assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
 
 
+def test_repeated_clean_merge_ups_allow_neutral_evidence_between_merges() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "task-repeated-neutral")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-first.py"; upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "first independent upstream")
+    git(repo, "checkout", "task-repeated-neutral")
+    git(repo, "merge", "--no-ff", "master", "-m", "first merge current main")
+    evidence = repo / "docs/evidence/refresh.md"; evidence.parent.mkdir(parents=True, exist_ok=True)
+    evidence.write_text("PASS\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "neutral evidence refresh")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-second.py"; upstream.write_text("VALUE = 2\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "second independent upstream")
+    integration_base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "task-repeated-neutral")
+    git(repo, "merge", "--no-ff", "master", "-m", "second merge current main")
+    final = git(repo, "rev-parse", "HEAD")
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    policy["_trusted_integration_base_sha"] = integration_base
+    assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
+
+
 def test_exact_head_integration_merge_review_is_neutral() -> None:
     repo, reviewed, _ = make_repo()
     git(repo, "reset", "--hard", reviewed)
