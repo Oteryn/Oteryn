@@ -5,6 +5,7 @@ import importlib.util
 import hashlib
 import json
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -375,6 +376,25 @@ def test_repeated_clean_merge_ups_allow_neutral_evidence_between_merges() -> Non
     policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
     policy["_trusted_integration_base_sha"] = integration_base
     assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
+
+
+def test_long_neutral_chain_reuse_is_not_recursion_limited() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    evidence = repo / "docs/evidence/long-chain.md"
+    evidence.parent.mkdir(parents=True, exist_ok=True)
+    for index in range(100):
+        evidence.write_text(f"PASS {index}\n", encoding="utf-8")
+        git(repo, "add", ".")
+        git(repo, "commit", "-m", f"neutral evidence {index}")
+    final = git(repo, "rev-parse", "HEAD")
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    previous_limit = sys.getrecursionlimit()
+    try:
+        sys.setrecursionlimit(80)
+        assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
+    finally:
+        sys.setrecursionlimit(previous_limit)
 
 
 def test_exact_head_integration_merge_review_is_neutral() -> None:

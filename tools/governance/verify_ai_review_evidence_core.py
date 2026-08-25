@@ -230,62 +230,57 @@ def post_review_commits_are_neutral(
     _requires_current_trusted_base: bool = True,
 ) -> bool:
     try:
-        if reviewed_head == head:
-            return True
-        head_parents = _git_lines(repo_root, "show", "-s", "--format=%P", head)
-        parents = head_parents[0].split() if len(head_parents) == 1 else []
+        current = head
+        seen_trusted_integration_bases = set(_seen_trusted_integration_bases)
+        requires_current_trusted_base = _requires_current_trusted_base
         trusted_base = str(policy.get("_trusted_integration_base_sha") or "")
-        merge_reuse_enabled = bool(policy.get("activation", {}).get("allow_clean_trusted_base_merge_reuse"))
-        second_parent_is_trusted = len(parents) == 2 and (
-            parents[1] == trusted_base
-            if _requires_current_trusted_base
-            else is_ancestor(repo_root, parents[1], trusted_base)
+        merge_reuse_enabled = bool(
+            policy.get("activation", {}).get("allow_clean_trusted_base_merge_reuse")
         )
-        if (
-            merge_reuse_enabled
-            and len(parents) == 2
-            and trusted_base
-            and second_parent_is_trusted
-            and parents[1] not in _seen_trusted_integration_bases
-        ):
-            if not is_ancestor(repo_root, reviewed_head, parents[0]):
-                return False
-            merged_tree = _git_lines(repo_root, "show", "-s", "--format=%T", head)
-            merge_tree = subprocess.run(
-                ["git", "merge-tree", "--write-tree", parents[0], parents[1]],
-                cwd=Path(repo_root), text=True, encoding="utf-8",
-                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+        while current != reviewed_head:
+            head_parents = _git_lines(repo_root, "show", "-s", "--format=%P", current)
+            parents = head_parents[0].split() if len(head_parents) == 1 else []
+            second_parent_is_trusted = bool(trusted_base) and len(parents) == 2 and (
+                parents[1] == trusted_base
+                if requires_current_trusted_base
+                else is_ancestor(repo_root, parents[1], trusted_base)
             )
-            expected_tree = merge_tree.stdout.splitlines()[0].strip() if merge_tree.stdout else ""
-            if merge_tree.returncode != 0 or merged_tree != [expected_tree]:
+            if (
+                merge_reuse_enabled
+                and len(parents) == 2
+                and second_parent_is_trusted
+                and parents[1] not in seen_trusted_integration_bases
+            ):
+                if not is_ancestor(repo_root, reviewed_head, parents[0]):
+                    return False
+                merged_tree = _git_lines(repo_root, "show", "-s", "--format=%T", current)
+                merge_tree = subprocess.run(
+                    ["git", "merge-tree", "--write-tree", parents[0], parents[1]],
+                    cwd=Path(repo_root), text=True, encoding="utf-8",
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+                )
+                expected_tree = (
+                    merge_tree.stdout.splitlines()[0].strip() if merge_tree.stdout else ""
+                )
+                if merge_tree.returncode != 0 or merged_tree != [expected_tree]:
+                    return False
+                seen_trusted_integration_bases.add(parents[1])
+                current = parents[0]
+                requires_current_trusted_base = False
+                continue
+            if len(parents) != 1:
                 return False
-            return post_review_commits_are_neutral(
-                repo_root,
-                reviewed_head,
-                parents[0],
-                policy,
-                _seen_trusted_integration_bases=_seen_trusted_integration_bases | {parents[1]},
-                _requires_current_trusted_base=False,
-            )
-        if len(parents) != 1:
-            return False
-        parent = parents[0]
-        paths = risk_policy.changed_paths(repo_root, parent, head)
-        patch = risk_policy.patch_for(repo_root, parent, head)
-        commit_tier, _ = risk_policy.classify(paths, patch, policy)
-        if commit_tier != "R0" or any(
-            not risk_policy.safe_r0_path(path, policy["review_neutral_globs"], policy)
-            for path in paths
-        ):
-            return False
-        return post_review_commits_are_neutral(
-            repo_root,
-            reviewed_head,
-            parent,
-            policy,
-            _seen_trusted_integration_bases=_seen_trusted_integration_bases,
-            _requires_current_trusted_base=_requires_current_trusted_base,
-        )
+            parent = parents[0]
+            paths = risk_policy.changed_paths(repo_root, parent, current)
+            patch = risk_policy.patch_for(repo_root, parent, current)
+            commit_tier, _ = risk_policy.classify(paths, patch, policy)
+            if commit_tier != "R0" or any(
+                not risk_policy.safe_r0_path(path, policy["review_neutral_globs"], policy)
+                for path in paths
+            ):
+                return False
+            current = parent
+        return True
     except (RuntimeError, subprocess.SubprocessError):
         return False
 
