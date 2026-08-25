@@ -298,6 +298,58 @@ def test_merge_commit_after_review_fails_even_when_paths_are_neutral() -> None:
     expect_fail(lambda: run_verify(attestation(reviewed, "abc"), source(reviewed, "abc"), repo, final))
 
 
+def test_clean_trusted_integration_merge_after_review_is_neutral() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "task")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream.py"; upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "independent upstream")
+    integration_base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "task")
+    git(repo, "merge", "--no-ff", "master", "-m", "merge current main")
+    final = git(repo, "rev-parse", "HEAD")
+    policy = dict(POLICY)
+    policy["_trusted_integration_base_sha"] = integration_base
+    assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
+
+
+def test_second_trusted_base_merge_reuse_fails() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "task-double")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-double.py"; upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "independent upstream double")
+    integration_base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "task-double")
+    git(repo, "merge", "--no-ff", "master", "-m", "first trusted-base merge")
+    first_merge = git(repo, "rev-parse", "HEAD")
+    tree = git(repo, "rev-parse", f"{first_merge}^{{tree}}")
+    second_merge = git(repo, "commit-tree", tree, "-p", first_merge, "-p", integration_base, "-m", "second trusted-base merge")
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    policy["_trusted_integration_base_sha"] = integration_base
+    assert not m.post_review_commits_are_neutral(repo, reviewed, second_merge, policy)
+
+
+def test_exact_head_integration_merge_review_is_neutral() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "side-exact")
+    f = repo / "side.txt"; f.write_text("side\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "side")
+    git(repo, "checkout", "master")
+    git(repo, "merge", "--no-ff", "side-exact", "-m", "integration merge")
+    final = git(repo, "rev-parse", "HEAD")
+    assert m.post_review_commits_are_neutral(repo, final, final, POLICY)
+
+
+def test_clean_integration_merge_reuse_requires_policy_flag() -> None:
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    policy["activation"]["allow_clean_trusted_base_merge_reuse"] = False
+    assert policy["activation"]["allow_clean_trusted_base_merge_reuse"] is False
+
+
 ISSUE_FP = "f" * 64
 
 
