@@ -228,6 +228,22 @@ def post_review_commits_are_neutral(
     repo_root: str | Path, reviewed_head: str, head: str, policy: dict
 ) -> bool:
     try:
+        head_parents = _git_lines(repo_root, "show", "-s", "--format=%P", head)
+        parents = head_parents[0].split() if len(head_parents) == 1 else []
+        trusted_base = str(policy.get("_trusted_integration_base_sha") or "")
+        if len(parents) == 2 and trusted_base and parents[1] == trusted_base:
+            if not is_ancestor(repo_root, reviewed_head, parents[0]):
+                return False
+            merged_tree = _git_lines(repo_root, "show", "-s", "--format=%T", head)
+            merge_tree = subprocess.run(
+                ["git", "merge-tree", "--write-tree", parents[0], parents[1]],
+                cwd=Path(repo_root), text=True, encoding="utf-8",
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False,
+            )
+            expected_tree = merge_tree.stdout.splitlines()[0].strip() if merge_tree.stdout else ""
+            if merge_tree.returncode != 0 or merged_tree != [expected_tree]:
+                return False
+            return post_review_commits_are_neutral(repo_root, reviewed_head, parents[0], policy)
         commits = _git_lines(repo_root, "rev-list", "--reverse", f"{reviewed_head}..{head}")
         for commit in commits:
             parents = _git_lines(repo_root, "show", "-s", "--format=%P", commit)
@@ -861,11 +877,15 @@ def main() -> int:
     parser.add_argument("--tier", required=True, choices=("R1", "R2"))
     parser.add_argument("--fingerprint", required=True)
     parser.add_argument("--head", required=True)
+    parser.add_argument("--base", required=True)
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--policy-file", required=True)
     parser.add_argument("--token", required=True)
     args = parser.parse_args()
     policy = json.loads(Path(args.policy_file).read_text(encoding="utf-8"))
+    if not FULL_SHA.fullmatch(args.base):
+        raise SystemExit("base must be a lowercase 40-hex SHA")
+    policy["_trusted_integration_base_sha"] = args.base
     match = verify_records(
         fetch_comments(args.repository, args.pr_number, args.token),
         policy=policy,

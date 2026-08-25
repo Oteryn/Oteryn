@@ -72,6 +72,7 @@ runs:
       env:
         BASE_SHA: ${{ steps.bind.outputs.base }}
         HEAD_SHA: ${{ steps.bind.outputs.head }}
+        BASE_SHA: ${{ steps.bind.outputs.base }}
         REPO_ROOT_INPUT: ${{ inputs.repo-root }}
       run: |
         set -euo pipefail
@@ -124,4 +125,5 @@ runs:
           --tier "$REVIEW_TIER" \
           --fingerprint "$REVIEW_FINGERPRINT" \
           --head "$HEAD_SHA" \
+          --base "$BASE_SHA" \
           --token "$GH_TOKEN"

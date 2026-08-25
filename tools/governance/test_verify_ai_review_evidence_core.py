@@ -298,6 +298,22 @@ def test_merge_commit_after_review_fails_even_when_paths_are_neutral() -> None:
     expect_fail(lambda: run_verify(attestation(reviewed, "abc"), source(reviewed, "abc"), repo, final))
 
 
+def test_clean_trusted_integration_merge_after_review_is_neutral() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "task")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream.py"; upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "independent upstream")
+    integration_base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "task")
+    git(repo, "merge", "--no-ff", "master", "-m", "merge current main")
+    final = git(repo, "rev-parse", "HEAD")
+    policy = dict(POLICY)
+    policy["_trusted_integration_base_sha"] = integration_base
+    assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
+
+
 ISSUE_FP = "f" * 64
 
 
