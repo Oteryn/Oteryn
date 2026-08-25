@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "policy_id": "oteryn-bounded-autonomous-execution-v1",
+  "lifecycle_authority": "Oteryn/Oteryn#69",
+  "states": [
+    "RUNNING",
+    "WAITING_EXTERNAL",
+    "BLOCKED",
+    "STALLED",
+    "READY",
+    "DONE"
+  ],
+  "progress_fingerprint_fields": [
+    "repository",
+    "task_id",
+    "task_head_sha",
+    "phase",
+    "blocking_dependency",
+    "dependency_kind",
+    "gate_state",
+    "review_generation",
+    "first_material_failure"
+  ],
+  "retry_budgets": {
+    "identical_failure_cycles": 2,
+    "heavy_validation_attempts": 2,
+    "external_review_invocations_per_fingerprint": 1,
+    "same_head_gate_rechecks_per_evidence_generation": 1
+  },
+  "candidate_freeze": {
+    "forbidden_actions_without_material_change": [
+      "mutate",
+      "retrigger"
+    ],
+    "material_change_reasons": [
+      "review_finding",
+      "failing_required_test",
+      "semantic_reconciliation",
+      "changed_governing_authority"
+    ]
+  },
+  "dependency_kinds": [
+    "external",
+    "local",
+    "owner",
+    "permission",
+    "policy"
+  ],
+  "session_release_states": [
+    "WAITING_EXTERNAL",
+    "BLOCKED",
+    "STALLED",
+    "DONE"
+  ]
+}
