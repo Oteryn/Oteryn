@@ -35,15 +35,15 @@
 - Consumes: ADR 0004 terminology and lifecycle semantics.
 - Produces: canonical organization-wide agent execution procedure referenced by META root instructions and provider bootstrap rules.
 
-- [ ] **Step 1: Refresh META authority and overlap state**
+- [x] **Step 1: Refresh META authority and overlap state**
 
 Read current protected `main`, Issue #61, PR #62, open PR changed-file overlap and the current contract blob SHA. If `main` advanced, classify the delta under ADR 0004 rather than recreating the task.
 
-- [ ] **Step 2: Add the normative concurrency section**
+- [x] **Step 2: Add the normative concurrency section**
 
 Add a focused section that defines the three revision coordinates, `UPSTREAM_ADVANCED`, authority reload triggers, one-agent/one-writable-worktree ownership, durable checkpoints, late merge-up integration, lost-merge-race handling, evidence supersession and material invalidation criteria.
 
-- [ ] **Step 3: Verify the exact diff**
+- [x] **Step 3: Verify the exact diff**
 
 Use GitHub compare/PR diff to prove the META PR changes only the ADR, implementation plan and central execution contract. Confirm there are no runner/recovery/provider-runtime changes.
 
