@@ -19,6 +19,9 @@ from pathlib import Path
 from typing import Any, Protocol
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+REVIEWED_COMMIT_RE = re.compile(
+    r"\*\*Reviewed commit:\*\*\s*`([0-9a-f]{10,40})`"
+)
 
 
 class RecheckError(ValueError):
@@ -91,9 +94,24 @@ def _current_head(pr: dict[str, Any], repository: str) -> str:
 
 def _run_links_pr(run: dict[str, Any], pr_number: int) -> bool:
     linked = run.get("pull_requests")
-    if not isinstance(linked, list) or not all(isinstance(item, dict) for item in linked):
+    if not isinstance(linked, list) or not all(
+        isinstance(item, dict) for item in linked
+    ):
         raise RecheckError("matching workflow run pull_requests is malformed")
     return any(item.get("number") == pr_number for item in linked)
+
+
+def _issue_comment_reviewed_prefix(event: dict[str, Any]) -> tuple[str, str | None]:
+    comment = event.get("comment")
+    body = comment.get("body") if isinstance(comment, dict) else None
+    if not isinstance(body, str):
+        return "NOOP_NOT_REVIEW_RESULT", None
+    matches = REVIEWED_COMMIT_RE.findall(body)
+    if not matches:
+        return "NOOP_NOT_REVIEW_RESULT", None
+    if len(matches) != 1:
+        return "NOOP_AMBIGUOUS_REVIEW_RESULT", None
+    return "MATCH", matches[0]
 
 
 def select_rerun_run_id(
@@ -182,6 +200,17 @@ def process_event(
                 "NOOP_NOT_PULL_REQUEST",
                 "trusted reviewer comment is not on a pull request",
             )
+        match_state, reviewed_prefix = _issue_comment_reviewed_prefix(event)
+        if match_state == "NOOP_NOT_REVIEW_RESULT":
+            return Result(
+                match_state,
+                "trusted reviewer comment has no unambiguous reviewed-commit result",
+            )
+        if match_state == "NOOP_AMBIGUOUS_REVIEW_RESULT":
+            return Result(
+                match_state,
+                "trusted reviewer comment contains multiple reviewed-commit identities",
+            )
         number = issue.get("number")
         if not isinstance(number, int) or isinstance(number, bool) or number < 1:
             raise RecheckError("issue_comment pull request number is invalid")
@@ -191,6 +220,12 @@ def process_event(
             raise RecheckError("issue_comment pull request identity mismatch")
         pr_number = number
         head_sha = _current_head(pr, repository)
+        if reviewed_prefix is None or not head_sha.startswith(reviewed_prefix):
+            return Result(
+                "NOOP_STALE_REVIEW",
+                "review result is bound to an older pull-request head",
+                head_sha=head_sha,
+            )
     else:
         raise RecheckError(f"unsupported event name: {event_name!r}")
 

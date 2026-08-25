@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import Any
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+CANONICAL_STATES = {"RUNNING", "WAITING_EXTERNAL", "BLOCKED", "STALLED", "READY", "DONE"}
+CANONICAL_RELEASE_STATES = {"WAITING_EXTERNAL", "BLOCKED", "STALLED", "DONE"}
 
 
 class GuardError(ValueError):
@@ -44,11 +46,23 @@ def validate_policy(policy: dict[str, Any]) -> None:
     if policy.get("schema_version") != 1:
         raise GuardError("bounded execution policy schema_version must be 1")
     states = policy.get("states")
-    expected_states = {"RUNNING", "WAITING_EXTERNAL", "BLOCKED", "STALLED", "READY", "DONE"}
-    if not isinstance(states, list) or set(states) != expected_states or len(states) != len(expected_states):
+    if (
+        not isinstance(states, list)
+        or set(states) != CANONICAL_STATES
+        or len(states) != len(CANONICAL_STATES)
+    ):
         raise GuardError("bounded execution states do not match the canonical state set")
+    release_states = policy.get("session_release_states")
+    if (
+        not isinstance(release_states, list)
+        or set(release_states) != CANONICAL_RELEASE_STATES
+        or len(release_states) != len(CANONICAL_RELEASE_STATES)
+    ):
+        raise GuardError("session_release_states do not match the canonical release-state set")
     fields = policy.get("progress_fingerprint_fields")
-    if not isinstance(fields, list) or not fields or not all(isinstance(item, str) and item for item in fields):
+    if not isinstance(fields, list) or not fields or not all(
+        isinstance(item, str) and item for item in fields
+    ):
         raise GuardError("progress_fingerprint_fields must be a non-empty string list")
     budgets = policy.get("retry_budgets")
     required_budgets = {
@@ -59,11 +73,22 @@ def validate_policy(policy: dict[str, Any]) -> None:
     }
     if not isinstance(budgets, dict) or set(budgets) != required_budgets:
         raise GuardError("retry_budgets fields do not match the canonical policy")
-    if any(not isinstance(budgets[key], int) or budgets[key] < 1 for key in required_budgets):
+    if any(
+        not isinstance(budgets[key], int)
+        or isinstance(budgets[key], bool)
+        or budgets[key] < 1
+        for key in required_budgets
+    ):
         raise GuardError("all retry budgets must be positive integers")
     freeze = policy.get("candidate_freeze")
-    forbidden = freeze.get("forbidden_actions_without_material_change") if isinstance(freeze, dict) else None
-    if not isinstance(forbidden, list) or not forbidden or not all(isinstance(item, str) and item for item in forbidden):
+    forbidden = (
+        freeze.get("forbidden_actions_without_material_change")
+        if isinstance(freeze, dict)
+        else None
+    )
+    if not isinstance(forbidden, list) or not forbidden or not all(
+        isinstance(item, str) and item for item in forbidden
+    ):
         raise GuardError("candidate_freeze forbidden action list is invalid")
 
 
@@ -88,6 +113,8 @@ def validate_snapshot(snapshot: dict[str, Any], policy: dict[str, Any]) -> None:
     for key in ("candidate_frozen", "completion_verified", "material_change"):
         if not isinstance(snapshot.get(key), bool):
             raise GuardError(f"snapshot.{key} must be boolean")
+    if state == "DONE" and not snapshot["completion_verified"]:
+        raise GuardError("snapshot state DONE requires completion_verified=true")
     for key in (
         "blocking_dependency",
         "dependency_kind",
@@ -106,14 +133,24 @@ def validate_snapshot(snapshot: dict[str, Any], policy: dict[str, Any]) -> None:
         value = snapshot.get(key)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             raise GuardError(f"snapshot.{key} must be a non-negative integer")
-    if snapshot["dependency_kind"] not in {"", "external", "local", "owner", "permission", "policy"}:
+    if snapshot["dependency_kind"] not in {
+        "",
+        "external",
+        "local",
+        "owner",
+        "permission",
+        "policy",
+    }:
         raise GuardError("snapshot.dependency_kind is invalid")
 
 
 def progress_fingerprint(snapshot: dict[str, Any], policy: dict[str, Any]) -> str:
     validate_policy(policy)
     validate_snapshot(snapshot, policy)
-    selected = {field: snapshot.get(field, "") for field in policy["progress_fingerprint_fields"]}
+    selected = {
+        field: snapshot.get(field, "")
+        for field in policy["progress_fingerprint_fields"]
+    }
     return _canonical_digest(selected)
 
 
@@ -161,7 +198,10 @@ def decide(
     validate_snapshot(current, policy)
     if previous is not None:
         validate_snapshot(previous, policy)
-        if previous["repository"] != current["repository"] or previous["task_id"] != current["task_id"]:
+        if (
+            previous["repository"] != current["repository"]
+            or previous["task_id"] != current["task_id"]
+        ):
             raise GuardError("previous/current snapshots must describe the same task")
 
     supported_actions = {
@@ -180,15 +220,20 @@ def decide(
     progress = progress_fingerprint(current, policy)
     failure = failure_fingerprint(current)
     budgets = policy["retry_budgets"]
+    release_states = set(policy["session_release_states"])
 
     if requested_action == "complete":
         if not current["completion_verified"]:
-            fallback = "WAITING_EXTERNAL" if current["dependency_kind"] == "external" else "READY"
+            fallback = (
+                current["state"]
+                if current["state"] in release_states
+                else "READY"
+            )
             return _decision(
                 allowed=False,
                 state=fallback,
                 reason="DONE is forbidden until completion is independently verified",
-                release_session=fallback == "WAITING_EXTERNAL",
+                release_session=fallback in release_states,
                 progress=progress,
                 failure=failure,
             )
@@ -201,20 +246,27 @@ def decide(
             failure=failure,
         )
 
-    forbidden_when_frozen = set(policy["candidate_freeze"]["forbidden_actions_without_material_change"])
+    forbidden_when_frozen = set(
+        policy["candidate_freeze"]["forbidden_actions_without_material_change"]
+    )
     if (
         current["candidate_frozen"]
         and requested_action in forbidden_when_frozen
         and not current["material_change"]
     ):
-        state = "WAITING_EXTERNAL" if current["dependency_kind"] == "external" else current["state"]
-        if state == "RUNNING":
+        if current["state"] in release_states:
+            state = current["state"]
+        elif current["dependency_kind"] == "external":
+            state = "WAITING_EXTERNAL"
+        elif current["state"] == "RUNNING":
             state = "READY"
+        else:
+            state = current["state"]
         return _decision(
             allowed=False,
             state=state,
             reason="candidate is frozen; mutation/retrigger without a material change is forbidden",
-            release_session=state == "WAITING_EXTERNAL",
+            release_session=state in release_states,
             progress=progress,
             failure=failure,
         )
@@ -257,8 +309,14 @@ def decide(
             failure=failure,
         )
 
-    same_progress = previous is not None and progress == progress_fingerprint(previous, policy)
-    same_failure = previous is not None and failure == failure_fingerprint(previous)
+    same_progress = (
+        previous is not None
+        and progress == progress_fingerprint(previous, policy)
+    )
+    same_failure = (
+        previous is not None
+        and failure == failure_fingerprint(previous)
+    )
 
     if current["dependency_kind"] == "external" and current["blocking_dependency"]:
         return _decision(
@@ -290,7 +348,7 @@ def decide(
         allowed=True,
         state=current["state"],
         reason="requested action remains within the bounded execution policy",
-        release_session=current["state"] in {"WAITING_EXTERNAL", "BLOCKED", "STALLED", "DONE"},
+        release_session=current["state"] in release_states,
         progress=progress,
         failure=failure,
     )
@@ -304,7 +362,9 @@ def _load_json(path: str) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Evaluate bounded autonomous execution state")
+    parser = argparse.ArgumentParser(
+        description="Evaluate bounded autonomous execution state"
+    )
     parser.add_argument("--policy", required=True)
     parser.add_argument("--current", required=True)
     parser.add_argument("--previous")
