@@ -42,6 +42,71 @@ If GitHub state cannot be read or written because of a real capability/permissio
 
 This gate does not prohibit Remote Desktop/Desktop Commander, Synology, WSL, Docker or local tooling. It constrains their role: execution after GitHub preflight, never authority in place of GitHub.
 
+## Parallel-agent Git concurrency and late integration
+
+For substantial mutating work in permanent Oteryn repositories, agents MUST distinguish three revision coordinates:
+
+- `admission_main_sha`: the exact protected default-branch SHA from which the task branch was admitted. It is immutable historical provenance for that task.
+- `task_head_sha`: the current exact SHA of the task branch. It changes only through authorized work on that branch, including a later integration refresh.
+- `integration_main_sha`: the exact current protected default-branch SHA selected when the task enters final integration. It may equal `admission_main_sha`, but it commonly advances when another task merges first.
+
+A default-branch advance after task admission is normal parallel progress. The agent MUST classify this as `UPSTREAM_ADVANCED` (or an equivalent local state), not as automatic task invalidation.
+
+Solely because `main` moved, an agent MUST NOT:
+
+- restart completed or still-applicable implementation from the new `main`;
+- reset, recreate or silently replace the task branch;
+- discard commits, files, investigation or targeted test evidence that remains applicable;
+- copy the work onto a fresh branch as a substitute for reconciliation;
+- stop useful implementation that is independent of the upstream change.
+
+If the upstream delta changes an applicable `AGENTS.md`, organization/repository policy, safety/security/provenance rule, architecture authority or compatibility contract, the agent MUST reload that changed governing authority before further mutation. The agent then reconciles the task against the new authority and preserves every unaffected part of the existing work. A governing-rule change is a trigger for review, not permission to erase the task blindly.
+
+For active mutating work:
+
+- one independently mergeable task maps to one canonical task branch and one PR;
+- one active worker owns one writable worktree for that branch;
+- active agents do not share a writable branch or worktree concurrently;
+- unrelated dirty state is preserved rather than absorbed, reset or cleaned;
+- durable checkpoints intended to survive a session/agent change are pushed to the authorized remote branch and verified there;
+- path/task ownership remains an overlap detector, not authorization to edit another task.
+
+Once a task branch has been pushed or a PR exists, the organization default is non-destructive **merge-up refresh**, not published-history rewriting. An agent MUST NOT use reset/recreate/rebase/force-push merely to chase a moving `main`.
+
+When the task enters final integration, the agent MUST:
+
+1. refresh live GitHub Issue/PR/protection state and read the current protected default-branch SHA;
+2. record that SHA as `integration_main_sha`;
+3. when it differs from the current integrated base, merge that exact current default branch into the task branch through a normal non-force update;
+4. resolve only conflicts that are inside the task's authorization and reconcile material semantic overlaps against live authority/ownership;
+5. verify the remote branch head equals the intended resulting `task_head_sha`;
+6. review the complete post-refresh changed-file set and diff;
+7. rerun every validation/review layer invalidated by the new task head;
+8. use exact-`task_head_sha` GitHub checks/reviews for merge readiness.
+
+A merge-up commit on the task branch does not change the repository's normal squash-only integration policy for protected `main`.
+
+If another PR wins the merge race after this refresh and repository protection requires a newer base, the task returns to the integration step. The agent refreshes again, reconciles the new upstream delta and renews invalidated exact-head evidence. It does not return to implementation from scratch unless the work itself was materially invalidated.
+
+Agents MUST distinguish:
+
+- `WORK_VALID`: the implementation still applies;
+- `EVIDENCE_SUPERSEDED`: proof bound to an older `task_head_sha` must be regenerated where required;
+- `RECONCILIATION_REQUIRED`: upstream changes materially intersect task assumptions or semantics;
+- `TASK_INVALIDATED`: the governing task or affected implementation can no longer be truthfully preserved.
+
+`TASK_INVALIDATED` requires verified evidence of at least one of:
+
+- the governing Issue/task was cancelled, superseded or materially re-scoped;
+- an applicable authority, safety, security, provenance or compatibility contract changed incompatibly;
+- upstream changes altered the same semantics, data contract, API, schema or invariant on which the task depends;
+- reconciliation exposes a semantic conflict that cannot be resolved within current task authorization;
+- required tests prove that prior task assumptions no longer hold.
+
+A textual overlap or changed filename alone is not proof of semantic invalidation, and a disjoint filename set is not proof of semantic independence when shared contracts are involved. When only part of the task is invalidated, preserve unaffected work and rework the smallest affected portion.
+
+Repository-local instructions may impose stricter safety, review, validation or integration rules, but MUST NOT weaken these minimum non-invalidation and late-integration semantics.
+
 ## Access discovery before blocking
 
 Before reporting:
