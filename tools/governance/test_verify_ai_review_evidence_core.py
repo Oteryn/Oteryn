@@ -314,6 +314,24 @@ def test_clean_trusted_integration_merge_after_review_is_neutral() -> None:
     assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
 
 
+def test_second_trusted_base_merge_reuse_fails() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "task-double")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-double.py"; upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "independent upstream double")
+    integration_base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "task-double")
+    git(repo, "merge", "--no-ff", "master", "-m", "first trusted-base merge")
+    first_merge = git(repo, "rev-parse", "HEAD")
+    tree = git(repo, "rev-parse", f"{first_merge}^{{tree}}")
+    second_merge = git(repo, "commit-tree", tree, "-p", first_merge, "-p", integration_base, "-m", "second trusted-base merge")
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    policy["_trusted_integration_base_sha"] = integration_base
+    assert not m.post_review_commits_are_neutral(repo, reviewed, second_merge, policy)
+
+
 def test_exact_head_integration_merge_review_is_neutral() -> None:
     repo, reviewed, _ = make_repo()
     git(repo, "reset", "--hard", reviewed)

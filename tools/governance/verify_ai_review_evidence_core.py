@@ -225,7 +225,8 @@ def _git_lines(repo_root: str | Path, *args: str) -> list[str]:
 
 
 def post_review_commits_are_neutral(
-    repo_root: str | Path, reviewed_head: str, head: str, policy: dict
+    repo_root: str | Path, reviewed_head: str, head: str, policy: dict,
+    *, _merge_reuse_consumed: bool = False,
 ) -> bool:
     try:
         if reviewed_head == head:
@@ -234,7 +235,10 @@ def post_review_commits_are_neutral(
         parents = head_parents[0].split() if len(head_parents) == 1 else []
         trusted_base = str(policy.get("_trusted_integration_base_sha") or "")
         merge_reuse_enabled = bool(policy.get("activation", {}).get("allow_clean_trusted_base_merge_reuse"))
-        if merge_reuse_enabled and len(parents) == 2 and trusted_base and parents[1] == trusted_base:
+        if (
+            merge_reuse_enabled and not _merge_reuse_consumed
+            and len(parents) == 2 and trusted_base and parents[1] == trusted_base
+        ):
             if not is_ancestor(repo_root, reviewed_head, parents[0]):
                 return False
             merged_tree = _git_lines(repo_root, "show", "-s", "--format=%T", head)
@@ -246,7 +250,9 @@ def post_review_commits_are_neutral(
             expected_tree = merge_tree.stdout.splitlines()[0].strip() if merge_tree.stdout else ""
             if merge_tree.returncode != 0 or merged_tree != [expected_tree]:
                 return False
-            return post_review_commits_are_neutral(repo_root, reviewed_head, parents[0], policy)
+            return post_review_commits_are_neutral(
+                repo_root, reviewed_head, parents[0], policy, _merge_reuse_consumed=True
+            )
         commits = _git_lines(repo_root, "rev-list", "--reverse", f"{reviewed_head}..{head}")
         for commit in commits:
             parents = _git_lines(repo_root, "show", "-s", "--format=%P", commit)
