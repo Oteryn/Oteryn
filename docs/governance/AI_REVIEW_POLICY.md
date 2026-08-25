@@ -73,8 +73,10 @@ A previous external review remains valid for a later final head only when all of
 1. the reviewed commit is an ancestor of the final head;
 2. the final classifier emits the same review tier;
 3. the final classifier emits exactly the same `review_fingerprint`;
-4. every commit after the reviewed head changes only paths explicitly classified `review_neutral`;
+4. every commit after the reviewed head changes only paths explicitly classified `review_neutral`, except for the configured clean trusted-base integration merge described below;
 5. all required deterministic checks pass on the final head.
+
+When `activation.allow_clean_trusted_base_merge_reuse` is enabled, one final two-parent merge may reuse the review only when its second parent is the exact trusted PR base, its first parent descends from the reviewed head, Git can reproduce the merge tree conflict-free from those two parents, and all first-parent commits after review are otherwise review-neutral. An exact-head review of that merge is valid without ancestry traversal.
 
 This allows evidence/report/checksum refreshes after review without paying for another Codex invocation while preventing runtime, contract, workflow, policy, or ordinary documentation changes from hiding behind an older review.
 
@@ -145,4 +147,4 @@ META additionally owns `.github/workflows/governance-ai-review.yml`, triggered b
 
 A structured legacy record is only a maintainer pointer to an external review; the referenced Pull Request Review remains the authority and is fetched server-side. For Codex issue-comment interoperability, the structured request is likewise only request metadata; the trusted Codex issue comment is fetched server-side and paired fail-closed to the single eligible request generation. The configured reviewer login and allowed source kind are always read from trusted-base policy. Candidate code cannot choose reviewer identity, evidence grammar, source kinds or authorization.
 
-For review reuse after review-neutral commits, `REVIEWED_HEAD` may be an ancestor of the final head only when the final fingerprint remains identical. The gate verifies ancestry and fingerprint and traverses every intervening commit; each must be a single-parent commit touching only safe review-neutral data paths.
+For review reuse after review-neutral commits, `REVIEWED_HEAD` may be an ancestor of the final head only when the final fingerprint remains identical. The gate verifies ancestry and fingerprint and traverses intervening first-parent task commits; each ordinary intervening commit must be single-parent and touch only safe review-neutral data paths. When the configured clean trusted-base merge exception is enabled, the final integration merge is additionally accepted only under the exact second-parent and reproducible conflict-free tree conditions above.

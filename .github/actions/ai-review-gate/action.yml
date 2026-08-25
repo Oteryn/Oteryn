@@ -108,6 +108,7 @@ runs:
         REVIEW_TIER: ${{ steps.classify.outputs.tier }}
         REVIEW_FINGERPRINT: ${{ steps.classify.outputs.fingerprint }}
         HEAD_SHA: ${{ steps.bind.outputs.head }}
+        BASE_SHA: ${{ steps.bind.outputs.base }}
         REPOSITORY: ${{ steps.bind.outputs.repository }}
         PR_NUMBER: ${{ steps.bind.outputs.pr }}
         GH_TOKEN: ${{ inputs.github-token }}
@@ -124,4 +125,5 @@ runs:
           --tier "$REVIEW_TIER" \
           --fingerprint "$REVIEW_FINGERPRINT" \
           --head "$HEAD_SHA" \
+          --base "$BASE_SHA" \
           --token "$GH_TOKEN"
