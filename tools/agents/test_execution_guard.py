@@ -64,6 +64,37 @@ class ExecutionGuardTests(unittest.TestCase):
         new = evaluate_snapshot(snap(current_action="integrate_main", integration_main_sha=MAIN2, waiting_reason="", failure_code="base_advanced", external_event_can_change=False, retry_limit=1, previous_progress_fingerprint=old["progress_fingerprint"], identical_cycle_count=3))
         self.assertEqual(new["decision"], "CONTINUE")
 
+    def test_unfrozen_prequalification_allows_empty_revision_coordinates(self):
+        result = evaluate_snapshot(
+            snap(
+                candidate_frozen=False,
+                candidate_head_sha="",
+                integration_main_sha="",
+                current_action="implement",
+                waiting_reason="",
+                failure_code="",
+                external_event_can_change=False,
+                retry_limit=1,
+            )
+        )
+        self.assertEqual(result["decision"], "CONTINUE")
+        self.assertEqual(result["next_state"], "RUNNING")
+
+    def test_integration_action_requires_integration_main_sha(self):
+        with self.assertRaisesRegex(ValueError, "integration_main_sha must be set"):
+            evaluate_snapshot(
+                snap(
+                    candidate_frozen=False,
+                    candidate_head_sha="",
+                    integration_main_sha="",
+                    current_action="integrate_main",
+                    waiting_reason="",
+                    failure_code="",
+                    external_event_can_change=False,
+                    retry_limit=1,
+                )
+            )
+
     def test_noop_retrigger_is_blocked(self):
         result = evaluate_snapshot(snap(noop_retrigger_intent=True))
         self.assertEqual(result["decision"], "BLOCK")

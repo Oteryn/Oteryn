@@ -44,9 +44,13 @@ def _validate(snapshot: dict[str, Any]) -> None:
         raise ValueError("repository must use owner/name")
     if not isinstance(snapshot["pr_number"], int) or snapshot["pr_number"] < 1:
         raise ValueError("pr_number must be positive")
-    for key in ("task_head_sha", "integration_main_sha", "candidate_head_sha"):
-        if not isinstance(snapshot[key], str) or not SHA_RE.fullmatch(snapshot[key]):
-            raise ValueError(f"{key} must be a 40-hex SHA")
+    task_head = snapshot["task_head_sha"]
+    if not isinstance(task_head, str) or not SHA_RE.fullmatch(task_head):
+        raise ValueError("task_head_sha must be a 40-hex SHA")
+    for key in ("integration_main_sha", "candidate_head_sha"):
+        value = snapshot[key]
+        if not isinstance(value, str) or (value and not SHA_RE.fullmatch(value)):
+            raise ValueError(f"{key} must be empty or a 40-hex SHA")
     for key in ("candidate_frozen", "external_event_can_change", "material_repository_change", "terminal_verified", "blocked", "noop_retrigger_intent"):
         if not isinstance(snapshot[key], bool):
             raise ValueError(f"{key} must be boolean")
@@ -56,8 +60,10 @@ def _validate(snapshot: dict[str, Any]) -> None:
     for key in ("current_action", "waiting_reason", "failure_code", "previous_progress_fingerprint"):
         if not isinstance(snapshot[key], str):
             raise ValueError(f"{key} must be a string")
-    if snapshot["candidate_frozen"] and snapshot["candidate_head_sha"] != snapshot["task_head_sha"]:
+    if snapshot["candidate_frozen"] and snapshot["candidate_head_sha"] != task_head:
         raise ValueError("frozen candidate head must equal task head")
+    if snapshot["current_action"] == "integrate_main" and not SHA_RE.fullmatch(snapshot["integration_main_sha"]):
+        raise ValueError("integration_main_sha must be set for integrate_main")
 
 
 def _fingerprint(payload: dict[str, Any]) -> str:

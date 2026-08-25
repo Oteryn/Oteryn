@@ -69,27 +69,37 @@ jobs:
           if head_repo != repository or len(head_sha) != 40 or len(live_base_sha) != 40:
               raise SystemExit("live PR head/base identity is invalid or cross-repository")
 
-          runs = api(
-              f"/repos/{repository}/actions/workflows/governance-ai-review.yml/runs"
-              "?event=pull_request_target&per_page=100"
-          )
           candidates = []
-          for run in runs.get("workflow_runs", []):
-              if run.get("event") != "pull_request_target":
-                  continue
-              linked = run.get("pull_requests") or []
-              exact_link = False
-              for item in linked:
-                  if int(item.get("number") or 0) != pr_number:
+          page = 1
+          while True:
+              runs = api(
+                  f"/repos/{repository}/actions/workflows/governance-ai-review.yml/runs"
+                  f"?event=pull_request_target&per_page=100&page={page}"
+              )
+              batch = runs.get("workflow_runs") if isinstance(runs, dict) else None
+              if not isinstance(batch, list):
+                  raise SystemExit("trusted gate workflow-run list is malformed")
+              for run in batch:
+                  if run.get("event") != "pull_request_target":
                       continue
-                  linked_head = str((item.get("head") or {}).get("sha") or "")
-                  linked_base = str((item.get("base") or {}).get("sha") or "")
-                  if linked_head == head_sha and linked_base == live_base_sha:
-                      exact_link = True
-                      break
-              if not exact_link:
-                  continue
-              candidates.append(run)
+                  linked = run.get("pull_requests") or []
+                  exact_link = False
+                  for item in linked:
+                      if int(item.get("number") or 0) != pr_number:
+                          continue
+                      linked_head = str((item.get("head") or {}).get("sha") or "")
+                      linked_base = str((item.get("base") or {}).get("sha") or "")
+                      if linked_head == head_sha and linked_base == live_base_sha:
+                          exact_link = True
+                          break
+                  if exact_link:
+                      candidates.append(run)
+              if len(batch) < 100:
+                  break
+              page += 1
+              if page > 100:
+                  raise SystemExit("trusted gate history exceeds bounded 10000-run scan")
+
           if not candidates:
               print(
                   f"no trusted gate run found for PR #{pr_number} "
