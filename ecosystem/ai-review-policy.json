@@ -31,7 +31,8 @@
     "required_ci_must_be_green": true,
     "review_only_stable_fingerprint": true,
     "max_primary_invocations_per_fingerprint": 1,
-    "quota_unavailable_result": "WAITING_REVIEW_QUOTA"
+    "quota_unavailable_result": "WAITING_REVIEW_QUOTA",
+    "allow_clean_trusted_base_merge_reuse": true
   },
   "review_neutral_globs": [
     "docs/evidence/**",

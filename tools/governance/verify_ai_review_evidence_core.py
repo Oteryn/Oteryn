@@ -228,10 +228,13 @@ def post_review_commits_are_neutral(
     repo_root: str | Path, reviewed_head: str, head: str, policy: dict
 ) -> bool:
     try:
+        if reviewed_head == head:
+            return True
         head_parents = _git_lines(repo_root, "show", "-s", "--format=%P", head)
         parents = head_parents[0].split() if len(head_parents) == 1 else []
         trusted_base = str(policy.get("_trusted_integration_base_sha") or "")
-        if len(parents) == 2 and trusted_base and parents[1] == trusted_base:
+        merge_reuse_enabled = bool(policy.get("activation", {}).get("allow_clean_trusted_base_merge_reuse"))
+        if merge_reuse_enabled and len(parents) == 2 and trusted_base and parents[1] == trusted_base:
             if not is_ancestor(repo_root, reviewed_head, parents[0]):
                 return False
             merged_tree = _git_lines(repo_root, "show", "-s", "--format=%T", head)
