@@ -18,6 +18,12 @@ from typing import Any
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 CANONICAL_STATES = {"RUNNING", "WAITING_EXTERNAL", "BLOCKED", "STALLED", "READY", "DONE"}
 CANONICAL_RELEASE_STATES = {"WAITING_EXTERNAL", "BLOCKED", "STALLED", "DONE"}
+RETRY_COUNTER_FIELDS = (
+    "identical_failure_cycles",
+    "heavy_validation_runs",
+    "external_review_invocations",
+    "same_head_gate_rechecks",
+)
 
 
 class GuardError(ValueError):
@@ -124,12 +130,7 @@ def validate_snapshot(snapshot: dict[str, Any], policy: dict[str, Any]) -> None:
     ):
         if not isinstance(snapshot.get(key), str):
             raise GuardError(f"snapshot.{key} must be a string")
-    for key in (
-        "identical_failure_cycles",
-        "heavy_validation_runs",
-        "external_review_invocations",
-        "same_head_gate_rechecks",
-    ):
+    for key in RETRY_COUNTER_FIELDS:
         value = snapshot.get(key)
         if not isinstance(value, int) or isinstance(value, bool) or value < 0:
             raise GuardError(f"snapshot.{key} must be a non-negative integer")
@@ -221,6 +222,54 @@ def decide(
     failure = failure_fingerprint(current)
     budgets = policy["retry_budgets"]
     release_states = set(policy["session_release_states"])
+    previous_progress = (
+        progress_fingerprint(previous, policy) if previous is not None else None
+    )
+    same_progress = previous is not None and progress == previous_progress
+    same_failure = (
+        previous is not None
+        and failure == failure_fingerprint(previous)
+    )
+
+    if same_progress and previous is not None:
+        for field in RETRY_COUNTER_FIELDS:
+            if current[field] < previous[field]:
+                raise GuardError(
+                    f"snapshot.{field} cannot decrease without material progress"
+                )
+
+    if current["dependency_kind"] == "external" and current["blocking_dependency"]:
+        return _decision(
+            allowed=requested_action == "observe",
+            state="WAITING_EXTERNAL",
+            reason=(
+                "external dependency is pending; only observation is allowed until a material fact changes"
+            ),
+            release_session=True,
+            progress=progress,
+            failure=failure,
+        )
+
+    if previous is not None and previous["state"] in {"BLOCKED", "STALLED"} and same_progress:
+        if requested_action != "complete":
+            return _decision(
+                allowed=requested_action == "observe",
+                state=previous["state"],
+                reason="released task cannot resume operational work without material progress",
+                release_session=True,
+                progress=progress,
+                failure=failure,
+            )
+
+    if current["state"] in {"BLOCKED", "STALLED"} and requested_action not in {"observe", "complete"}:
+        return _decision(
+            allowed=False,
+            state=current["state"],
+            reason="blocked or stalled task is non-actionable until material progress is recorded",
+            release_session=True,
+            progress=progress,
+            failure=failure,
+        )
 
     if requested_action == "complete":
         if not current["completion_verified"]:
@@ -304,25 +353,6 @@ def decide(
             allowed=False,
             state="STALLED",
             reason="heavy-validation budget is exhausted; isolate the failure before another full run",
-            release_session=True,
-            progress=progress,
-            failure=failure,
-        )
-
-    same_progress = (
-        previous is not None
-        and progress == progress_fingerprint(previous, policy)
-    )
-    same_failure = (
-        previous is not None
-        and failure == failure_fingerprint(previous)
-    )
-
-    if current["dependency_kind"] == "external" and current["blocking_dependency"]:
-        return _decision(
-            allowed=True,
-            state="WAITING_EXTERNAL",
-            reason="external dependency is pending; persist state and release the worker session",
             release_session=True,
             progress=progress,
             failure=failure,
