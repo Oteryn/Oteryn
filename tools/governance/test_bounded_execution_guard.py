@@ -118,6 +118,28 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(result.state, "WAITING_EXTERNAL")
         self.assertTrue(result.release_session)
 
+    def test_external_dependency_denies_operational_actions_until_fact_changes(self):
+        current = snapshot(
+            state="WAITING_EXTERNAL",
+            blocking_dependency="external_review",
+            dependency_kind="external",
+            gate_state="failure",
+            first_material_failure="review evidence not ready",
+        )
+        for action in (
+            "mutate",
+            "retry",
+            "retrigger",
+            "run_heavy_validation",
+            "request_external_review",
+            "same_head_gate_recheck",
+        ):
+            with self.subTest(action=action):
+                result = decide(current, copy.deepcopy(current), action, POLICY)
+                self.assertFalse(result.allowed)
+                self.assertEqual(result.state, "WAITING_EXTERNAL")
+                self.assertTrue(result.release_session)
+
     def test_second_identical_local_failure_stalls_instead_of_retrying_again(self):
         previous = snapshot(
             gate_state="failure",
@@ -130,6 +152,32 @@ class DecisionTests(unittest.TestCase):
         self.assertFalse(result.allowed)
         self.assertEqual(result.state, "STALLED")
         self.assertTrue(result.release_session)
+
+    def test_retry_counters_cannot_regress_without_material_progress(self):
+        counter_names = (
+            "identical_failure_cycles",
+            "heavy_validation_runs",
+            "external_review_invocations",
+            "same_head_gate_rechecks",
+        )
+        for counter in counter_names:
+            with self.subTest(counter=counter):
+                previous = snapshot(**{counter: 1})
+                current = snapshot(**{counter: 0})
+                with self.assertRaises(GuardError):
+                    decide(previous, current, "observe", POLICY)
+
+    def test_retry_counters_may_restart_after_material_progress(self):
+        previous = snapshot(
+            task_head_sha="a" * 40,
+            identical_failure_cycles=2,
+            heavy_validation_runs=2,
+            external_review_invocations=1,
+            same_head_gate_rechecks=1,
+        )
+        current = snapshot(task_head_sha="b" * 40)
+        result = decide(previous, current, "observe", POLICY)
+        self.assertTrue(result.allowed)
 
     def test_unverified_done_snapshot_is_invalid_for_every_action(self):
         current = snapshot(state="DONE", completion_verified=False)
@@ -155,6 +203,20 @@ class DecisionTests(unittest.TestCase):
                 self.assertFalse(result.allowed)
                 self.assertEqual(result.state, state)
                 self.assertTrue(result.release_session)
+
+    def test_unchanged_blocked_or_stalled_task_cannot_resume_operational_work(self):
+        for state in ("BLOCKED", "STALLED"):
+            previous = snapshot(state=state, first_material_failure="unchanged failure")
+            current = snapshot(
+                state="RUNNING",
+                first_material_failure="unchanged failure",
+            )
+            for action in ("mutate", "retry", "run_heavy_validation"):
+                with self.subTest(state=state, action=action):
+                    result = decide(previous, current, action, POLICY)
+                    self.assertFalse(result.allowed)
+                    self.assertEqual(result.state, state)
+                    self.assertTrue(result.release_session)
 
     def test_external_review_budget_prevents_duplicate_invocation(self):
         current = snapshot(external_review_invocations=1)
