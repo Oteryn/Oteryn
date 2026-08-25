@@ -62,10 +62,12 @@ jobs:
               print("PR is no longer open; no recheck needed")
               raise SystemExit(0)
           head = pr.get("head") or {}
+          base = pr.get("base") or {}
           head_repo = (head.get("repo") or {}).get("full_name")
           head_sha = str(head.get("sha") or "")
-          if head_repo != repository or len(head_sha) != 40:
-              raise SystemExit("live PR head identity is invalid or cross-repository")
+          live_base_sha = str(base.get("sha") or "")
+          if head_repo != repository or len(head_sha) != 40 or len(live_base_sha) != 40:
+              raise SystemExit("live PR head/base identity is invalid or cross-repository")
 
           runs = api(
               f"/repos/{repository}/actions/workflows/governance-ai-review.yml/runs"
@@ -73,14 +75,26 @@ jobs:
           )
           candidates = []
           for run in runs.get("workflow_runs", []):
-              if run.get("event") != "pull_request_target" or run.get("head_sha") != head_sha:
+              if run.get("event") != "pull_request_target":
                   continue
               linked = run.get("pull_requests") or []
-              if not any(int(item.get("number") or 0) == pr_number for item in linked):
+              exact_link = False
+              for item in linked:
+                  if int(item.get("number") or 0) != pr_number:
+                      continue
+                  linked_head = str((item.get("head") or {}).get("sha") or "")
+                  linked_base = str((item.get("base") or {}).get("sha") or "")
+                  if linked_head == head_sha and linked_base == live_base_sha:
+                      exact_link = True
+                      break
+              if not exact_link:
                   continue
               candidates.append(run)
           if not candidates:
-              print(f"no trusted gate run found for PR #{pr_number} head_sha={head_sha}")
+              print(
+                  f"no trusted gate run found for PR #{pr_number} "
+                  f"head_sha={head_sha} base_sha={live_base_sha}"
+              )
               raise SystemExit(0)
 
           latest = max(candidates, key=lambda item: (str(item.get("created_at") or ""), int(item.get("id") or 0)))
@@ -98,12 +112,18 @@ jobs:
 
           current = api(f"/repos/{repository}/pulls/{pr_number}")
           current_head = (current.get("head") or {}).get("sha")
-          if current.get("state") != "open" or current_head != head_sha:
-              raise SystemExit("PR head changed before same-head recheck; refusing stale rerun")
+          current_base = (current.get("base") or {}).get("sha")
+          if (
+              current.get("state") != "open"
+              or current_head != head_sha
+              or current_base != live_base_sha
+          ):
+              raise SystemExit("PR head/base changed before same-head recheck; refusing stale rerun")
 
           api(f"/repos/{repository}/actions/runs/{latest['id']}/rerun", method="POST")
           print(
               f"requested same-head pull_request_target rerun for PR #{pr_number} "
-              f"head_sha={head_sha} source_event={event_name} run_id={latest['id']}"
+              f"head_sha={head_sha} base_sha={live_base_sha} "
+              f"source_event={event_name} run_id={latest['id']}"
           )
           PY

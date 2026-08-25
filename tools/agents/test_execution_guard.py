@@ -69,6 +69,11 @@ class ExecutionGuardTests(unittest.TestCase):
         self.assertEqual(result["decision"], "BLOCK")
         self.assertEqual(result["next_state"], "BLOCKED")
 
+    def test_noop_retrigger_precedes_terminal_done(self):
+        result = evaluate_snapshot(snap(terminal_verified=True, noop_retrigger_intent=True, waiting_reason="", failure_code=""))
+        self.assertEqual(result["decision"], "BLOCK")
+        self.assertEqual(result["next_state"], "BLOCKED")
+
     def test_terminal_verified_is_done(self):
         result = evaluate_snapshot(snap(terminal_verified=True, waiting_reason="", failure_code=""))
         self.assertEqual(result["decision"], "DONE")

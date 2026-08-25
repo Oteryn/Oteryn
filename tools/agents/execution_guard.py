@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 from __future__ import annotations
 
 import argparse
@@ -88,11 +88,11 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, str]:
     progress = _fingerprint(progress_payload)
     failure = _fingerprint(failure_payload) if snapshot["failure_code"] else ""
 
-    if snapshot["terminal_verified"]:
-        decision, state, reason = "DONE", "DONE", "terminal completion is verified"
-    elif snapshot["blocked"] or snapshot["noop_retrigger_intent"]:
+    if snapshot["blocked"] or snapshot["noop_retrigger_intent"]:
         reason = "no-op/retrigger mutation is prohibited" if snapshot["noop_retrigger_intent"] else "task is explicitly blocked"
         decision, state = "BLOCK", "BLOCKED"
+    elif snapshot["terminal_verified"]:
+        decision, state, reason = "DONE", "DONE", "terminal completion is verified"
     elif snapshot["material_repository_change"]:
         decision, state, reason = "CONTINUE", "RUNNING", "material repository change starts a new execution generation"
     elif snapshot["external_event_can_change"] and snapshot["waiting_reason"]:
