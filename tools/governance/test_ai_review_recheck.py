@@ -16,11 +16,12 @@ POLICY = {
 
 REPOSITORY = "Oteryn/Oteryn"
 HEAD = "a" * 40
+PR_NUMBER = 69
 
 
-def pr_payload(head=HEAD, repo=REPOSITORY):
+def pr_payload(head=HEAD, repo=REPOSITORY, number=PR_NUMBER):
     return {
-        "number": 69,
+        "number": number,
         "head": {"sha": head, "repo": {"full_name": repo}},
         "base": {"ref": "main"},
     }
@@ -38,9 +39,9 @@ def issue_comment_event(actor="chatgpt-codex-connector[bot]"):
     return {
         "sender": {"login": actor},
         "issue": {
-            "number": 69,
+            "number": PR_NUMBER,
             "pull_request": {
-                "url": "https://api.github.com/repos/Oteryn/Oteryn/pulls/69"
+                "url": f"https://api.github.com/repos/Oteryn/Oteryn/pulls/{PR_NUMBER}"
             },
         },
     }
@@ -58,8 +59,8 @@ class FakeClient:
         self.get_pr_calls.append(number)
         return self.pr
 
-    def list_gate_runs(self, head_sha):
-        self.list_gate_run_calls.append(head_sha)
+    def list_gate_runs(self, head_sha, pr_number):
+        self.list_gate_run_calls.append((head_sha, pr_number))
         return list(self.runs)
 
     def rerun(self, run_id):
@@ -70,6 +71,7 @@ def run_payload(
     run_id=100,
     *,
     head=HEAD,
+    pr_number=PR_NUMBER,
     status="completed",
     conclusion="failure",
     attempt=1,
@@ -83,17 +85,22 @@ def run_payload(
         "conclusion": conclusion,
         "run_attempt": attempt,
         "created_at": created,
+        "pull_requests": [{"number": pr_number}],
     }
 
 
 class SelectorTests(unittest.TestCase):
-    def test_selects_latest_failed_attempt_one_for_exact_head(self):
+    def test_selects_latest_failed_attempt_one_for_exact_head_and_pr(self):
         runs = [
             run_payload(100, created="2026-08-25T13:00:00Z"),
             run_payload(101, created="2026-08-25T14:00:00Z"),
             run_payload(102, head="b" * 40, created="2026-08-25T15:00:00Z"),
         ]
-        self.assertEqual(select_rerun_run_id(runs, HEAD), 101)
+        self.assertEqual(select_rerun_run_id(runs, HEAD, PR_NUMBER), 101)
+
+    def test_same_head_run_for_other_pr_is_not_eligible(self):
+        runs = [run_payload(200, pr_number=70)]
+        self.assertIsNone(select_rerun_run_id(runs, HEAD, PR_NUMBER))
 
     def test_does_not_rerun_success_in_progress_or_attempt_two(self):
         for run in (
@@ -102,7 +109,7 @@ class SelectorTests(unittest.TestCase):
             run_payload(status="completed", conclusion="failure", attempt=2),
         ):
             with self.subTest(run=run):
-                self.assertIsNone(select_rerun_run_id([run], HEAD))
+                self.assertIsNone(select_rerun_run_id([run], HEAD, PR_NUMBER))
 
 
 class EventTests(unittest.TestCase):
@@ -130,7 +137,7 @@ class EventTests(unittest.TestCase):
         self.assertEqual(result.action, "RERUN")
         self.assertEqual(result.run_id, 123)
         self.assertEqual(client.rerun_calls, [123])
-        self.assertEqual(client.list_gate_run_calls, [HEAD])
+        self.assertEqual(client.list_gate_run_calls, [(HEAD, PR_NUMBER)])
 
     def test_stale_review_commit_does_not_rerun_current_head(self):
         client = FakeClient(runs=[run_payload(123)])
@@ -154,8 +161,9 @@ class EventTests(unittest.TestCase):
             client,
         )
         self.assertEqual(result.action, "RERUN")
-        self.assertEqual(client.get_pr_calls, [69])
+        self.assertEqual(client.get_pr_calls, [PR_NUMBER])
         self.assertEqual(client.rerun_calls, [321])
+        self.assertEqual(client.list_gate_run_calls, [(HEAD, PR_NUMBER)])
 
     def test_cross_repository_pr_fails_closed(self):
         client = FakeClient(runs=[run_payload()])
