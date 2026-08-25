@@ -267,26 +267,27 @@ def post_review_commits_are_neutral(
                 _seen_trusted_integration_bases=_seen_trusted_integration_bases | {parents[1]},
                 _requires_current_trusted_base=False,
             )
-        commits = _git_lines(repo_root, "rev-list", "--reverse", f"{reviewed_head}..{head}")
-        for commit in commits:
-            parents = _git_lines(repo_root, "show", "-s", "--format=%P", commit)
-            parent_shas = parents[0].split() if len(parents) == 1 else []
-            if len(parent_shas) != 1:
-                return False
-            parent = parent_shas[0]
-            paths = risk_policy.changed_paths(repo_root, parent, commit)
-            patch = risk_policy.patch_for(repo_root, parent, commit)
-            commit_tier, _ = risk_policy.classify(paths, patch, policy)
-            if commit_tier != "R0":
-                return False
-            if any(
-                not risk_policy.safe_r0_path(path, policy["review_neutral_globs"], policy)
-                for path in paths
-            ):
-                return False
+        if len(parents) != 1:
+            return False
+        parent = parents[0]
+        paths = risk_policy.changed_paths(repo_root, parent, head)
+        patch = risk_policy.patch_for(repo_root, parent, head)
+        commit_tier, _ = risk_policy.classify(paths, patch, policy)
+        if commit_tier != "R0" or any(
+            not risk_policy.safe_r0_path(path, policy["review_neutral_globs"], policy)
+            for path in paths
+        ):
+            return False
+        return post_review_commits_are_neutral(
+            repo_root,
+            reviewed_head,
+            parent,
+            policy,
+            _seen_trusted_integration_bases=_seen_trusted_integration_bases,
+            _requires_current_trusted_base=_requires_current_trusted_base,
+        )
     except (RuntimeError, subprocess.SubprocessError):
         return False
-    return True
 
 
 def fetch_json(url: str, token: str) -> dict:
