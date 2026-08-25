@@ -314,7 +314,7 @@ def test_clean_trusted_integration_merge_after_review_is_neutral() -> None:
     assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
 
 
-def test_second_trusted_base_merge_reuse_fails() -> None:
+def test_repeated_merge_up_reuse_requires_a_new_integration_base() -> None:
     repo, reviewed, _ = make_repo()
     git(repo, "reset", "--hard", reviewed)
     git(repo, "checkout", "-b", "task-double")
@@ -330,6 +330,27 @@ def test_second_trusted_base_merge_reuse_fails() -> None:
     policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
     policy["_trusted_integration_base_sha"] = integration_base
     assert not m.post_review_commits_are_neutral(repo, reviewed, second_merge, policy)
+
+
+def test_repeated_clean_merge_ups_reuse_one_review_when_main_advances() -> None:
+    repo, reviewed, _ = make_repo()
+    git(repo, "reset", "--hard", reviewed)
+    git(repo, "checkout", "-b", "task-repeated")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-first.py"; upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "first independent upstream")
+    git(repo, "checkout", "task-repeated")
+    git(repo, "merge", "--no-ff", "master", "-m", "first merge current main")
+    git(repo, "checkout", "master")
+    upstream = repo / "upstream-second.py"; upstream.write_text("VALUE = 2\n", encoding="utf-8")
+    git(repo, "add", "."); git(repo, "commit", "-m", "second independent upstream")
+    integration_base = git(repo, "rev-parse", "HEAD")
+    git(repo, "checkout", "task-repeated")
+    git(repo, "merge", "--no-ff", "master", "-m", "second merge current main")
+    final = git(repo, "rev-parse", "HEAD")
+    policy = dict(POLICY); policy["activation"] = dict(POLICY["activation"])
+    policy["_trusted_integration_base_sha"] = integration_base
+    assert m.post_review_commits_are_neutral(repo, reviewed, final, policy)
 
 
 def test_exact_head_integration_merge_review_is_neutral() -> None:
