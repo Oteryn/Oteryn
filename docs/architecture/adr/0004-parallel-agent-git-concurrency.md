@@ -50,6 +50,8 @@ The agent MUST NOT solely because `main` moved:
 
 The admission SHA remains valid provenance even when it is no longer the current integration base.
 
+The worker must still inspect whether the upstream delta changed a governing instruction or authority surface material to the task. If the delta includes applicable `AGENTS.md`/override instructions, safety/security policy, lifecycle authority, provenance authority, or a contract/invariant the task depends on, the agent reloads and reconciles that changed authority before further mutation. A changed authority surface may require focused rework or blocking, but it still does not justify blindly discarding unaffected work.
+
 ### 3. One active worker owns one branch/worktree
 
 For substantial mutating work:
@@ -92,7 +94,7 @@ A task enters final integration only after its own implementation is coherent an
 6. obtains repository-required exact-`task_head_sha` CI/review evidence;
 7. attempts merge only through the normal protected repository gate.
 
-This deliberately serializes expensive reconciliation to the integration boundary while allowing implementation to remain parallel.
+This concentrates expensive reconciliation at the integration boundary while allowing implementation to remain parallel.
 
 ### 6. Lost merge races return to integration, not implementation
 
@@ -145,6 +147,7 @@ Because root `AGENTS.md` does not inherit across repositories, each permanent pr
 - one active agent per task branch/worktree;
 - `main` movement alone does not invalidate work;
 - no reset/restart solely to chase the moving default branch;
+- reload changed governing instruction/authority surfaces before further mutation when the upstream delta touches them;
 - perform late merge-up refresh to current `integration_main_sha`;
 - rerun invalidated exact-head validation on the resulting `task_head_sha`;
 - treat only verified semantic/authority conflict or task supersession as invalidation.
@@ -202,6 +205,7 @@ The rollout must prove:
 - the META contract explicitly distinguishes admission, task-head and integration revisions;
 - no rule instructs an agent to discard/restart work solely because protected `main` moved;
 - published task branches use non-destructive normal refresh by default;
+- changed governing instructions/authority are reloaded before further mutation when material;
 - exact-head validation remains required after the final refresh;
 - no provider runtime/product behavior changes;
 - exact changed-file lists, diffs, CI and review state are verified on every final PR head.
