@@ -27,7 +27,7 @@ class RecheckError(ValueError):
 
 class RecheckClient(Protocol):
     def get_pull_request(self, number: int) -> dict[str, Any]: ...
-    def list_gate_runs(self) -> list[dict[str, Any]]: ...
+    def list_gate_runs(self, head_sha: str) -> list[dict[str, Any]]: ...
     def rerun(self, run_id: int) -> None: ...
 
 
@@ -167,7 +167,7 @@ def process_event(
     else:
         raise RecheckError(f"unsupported event name: {event_name!r}")
 
-    run_id = select_rerun_run_id(client.list_gate_runs(), head_sha)
+    run_id = select_rerun_run_id(client.list_gate_runs(head_sha), head_sha)
     if run_id is None:
         return Result(
             "NOOP_NO_ELIGIBLE_RUN",
@@ -239,19 +239,19 @@ class GitHubClient:
             raise RecheckError("GitHub pull request response is malformed")
         return payload
 
-    def list_gate_runs(self) -> list[dict[str, Any]]:
+    def list_gate_runs(self, head_sha: str) -> list[dict[str, Any]]:
+        if SHA_RE.fullmatch(head_sha) is None:
+            raise RecheckError("head_sha must be lowercase 40-hex")
         workflow = urllib.parse.quote(self.workflow, safe="")
+        query = urllib.parse.urlencode(
+            {"event": "pull_request_target", "head_sha": head_sha, "per_page": "100"}
+        )
         payload = self._request(
-            f"/repos/{self.repository}/actions/workflows/{workflow}/runs"
-            "?event=pull_request_target&per_page=100"
+            f"/repos/{self.repository}/actions/workflows/{workflow}/runs?{query}"
         )
         runs = payload.get("workflow_runs") if isinstance(payload, dict) else None
         if not isinstance(runs, list) or not all(isinstance(item, dict) for item in runs):
             raise RecheckError("GitHub workflow-run response is malformed")
-        if len(runs) >= 100:
-            raise RecheckError(
-                "AI review workflow returned 100 runs; exact-head selection is ambiguous"
-            )
         return runs
 
     def rerun(self, run_id: int) -> None:
