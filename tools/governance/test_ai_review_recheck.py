@@ -39,7 +39,9 @@ def issue_comment_event(actor="chatgpt-codex-connector[bot]"):
         "sender": {"login": actor},
         "issue": {
             "number": 69,
-            "pull_request": {"url": "https://api.github.com/repos/Oteryn/Oteryn/pulls/69"},
+            "pull_request": {
+                "url": "https://api.github.com/repos/Oteryn/Oteryn/pulls/69"
+            },
         },
     }
 
@@ -50,12 +52,14 @@ class FakeClient:
         self.runs = list(runs or [])
         self.rerun_calls = []
         self.get_pr_calls = []
+        self.list_gate_run_calls = []
 
     def get_pull_request(self, number):
         self.get_pr_calls.append(number)
         return self.pr
 
-    def list_gate_runs(self):
+    def list_gate_runs(self, head_sha):
+        self.list_gate_run_calls.append(head_sha)
         return list(self.runs)
 
     def rerun(self, run_id):
@@ -117,11 +121,16 @@ class EventTests(unittest.TestCase):
     def test_trusted_review_for_current_exact_head_reruns_once(self):
         client = FakeClient(runs=[run_payload(123)])
         result = process_event(
-            "pull_request_review", review_event(), REPOSITORY, POLICY, client
+            "pull_request_review",
+            review_event(),
+            REPOSITORY,
+            POLICY,
+            client,
         )
         self.assertEqual(result.action, "RERUN")
         self.assertEqual(result.run_id, 123)
         self.assertEqual(client.rerun_calls, [123])
+        self.assertEqual(client.list_gate_run_calls, [HEAD])
 
     def test_stale_review_commit_does_not_rerun_current_head(self):
         client = FakeClient(runs=[run_payload(123)])
@@ -138,7 +147,11 @@ class EventTests(unittest.TestCase):
     def test_issue_comment_result_resolves_current_pr_then_reruns(self):
         client = FakeClient(runs=[run_payload(321)])
         result = process_event(
-            "issue_comment", issue_comment_event(), REPOSITORY, POLICY, client
+            "issue_comment",
+            issue_comment_event(),
+            REPOSITORY,
+            POLICY,
+            client,
         )
         self.assertEqual(result.action, "RERUN")
         self.assertEqual(client.get_pr_calls, [69])
@@ -154,6 +167,20 @@ class EventTests(unittest.TestCase):
                 POLICY,
                 client,
             )
+
+
+class WorkflowSafetyTests(unittest.TestCase):
+    def test_workflow_checks_out_trusted_base_not_event_sha(self):
+        root = Path(__file__).resolve().parents[2]
+        workflow = (
+            root / ".github/workflows/governance-ai-review-recheck.yml"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("ref: ${{ github.sha }}", workflow)
+        self.assertIn("github.event.pull_request.base.sha", workflow)
+        self.assertIn("github.event.repository.default_branch", workflow)
+        self.assertIn("actions: write", workflow)
+        self.assertIn("contents: read", workflow)
+        self.assertNotIn("contents: write", workflow)
 
 
 if __name__ == "__main__":
