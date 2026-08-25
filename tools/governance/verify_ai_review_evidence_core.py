@@ -520,7 +520,22 @@ def _blocking_findings_for_current_generation(
             return True
 
     pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
-    has_exact_head_review = any(
+    has_valid_exact_head_generation = any(
+        anchor["REQUEST_VALID"] == "true"
+        and anchor["DISPATCH_HEAD"] == head
+        and anchor["REVIEWED_HEAD"] == head
+        and anchor["REVIEW_TIER"] == tier
+        and reviewer_allowed(policy, anchor["REVIEWER_CLASS"], anchor["REVIEWER_ID"])
+        for _, anchor in _eligible_request_anchors(
+            reviews=reviews,
+            policy=policy,
+            repo_root=repo_root,
+            head=head,
+            repository=repository,
+            pr_number=pr_number,
+        )
+    )
+    has_exact_head_review = has_valid_exact_head_generation and any(
         str((review.get("user") or {}).get("login", "")).casefold() in trusted_logins
         and review.get("pull_request_url") == pull_url
         and review.get("commit_id") == head
