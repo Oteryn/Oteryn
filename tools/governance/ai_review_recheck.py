@@ -27,7 +27,7 @@ class RecheckError(ValueError):
 
 class RecheckClient(Protocol):
     def get_pull_request(self, number: int) -> dict[str, Any]: ...
-    def list_gate_runs(self, head_sha: str) -> list[dict[str, Any]]: ...
+    def list_gate_runs(self, head_sha: str, pr_number: int) -> list[dict[str, Any]]: ...
     def rerun(self, run_id: int) -> None: ...
 
 
@@ -62,6 +62,15 @@ def trusted_reviewer_logins(policy: dict[str, Any]) -> frozenset[str]:
     return frozenset(result)
 
 
+def _pr_number(pr: dict[str, Any]) -> int:
+    if not isinstance(pr, dict):
+        raise RecheckError("pull request payload is not an object")
+    number = pr.get("number")
+    if not isinstance(number, int) or isinstance(number, bool) or number < 1:
+        raise RecheckError("pull request number is missing or malformed")
+    return number
+
+
 def _current_head(pr: dict[str, Any], repository: str) -> str:
     if not isinstance(pr, dict):
         raise RecheckError("pull request payload is not an object")
@@ -80,11 +89,22 @@ def _current_head(pr: dict[str, Any], repository: str) -> str:
     return sha
 
 
-def select_rerun_run_id(runs: list[dict[str, Any]], head_sha: str) -> int | None:
-    """Select only the latest exact-head failed attempt-1 trusted gate run."""
+def _run_links_pr(run: dict[str, Any], pr_number: int) -> bool:
+    linked = run.get("pull_requests")
+    if not isinstance(linked, list) or not all(isinstance(item, dict) for item in linked):
+        raise RecheckError("matching workflow run pull_requests is malformed")
+    return any(item.get("number") == pr_number for item in linked)
+
+
+def select_rerun_run_id(
+    runs: list[dict[str, Any]], head_sha: str, pr_number: int
+) -> int | None:
+    """Select the latest failed attempt-1 gate bound to exact PR and exact head."""
 
     if SHA_RE.fullmatch(head_sha) is None:
         raise RecheckError("head_sha must be lowercase 40-hex")
+    if not isinstance(pr_number, int) or isinstance(pr_number, bool) or pr_number < 1:
+        raise RecheckError("pr_number must be a positive integer")
     if not isinstance(runs, list) or not all(isinstance(item, dict) for item in runs):
         raise RecheckError("workflow runs must be an object list")
 
@@ -92,8 +112,10 @@ def select_rerun_run_id(runs: list[dict[str, Any]], head_sha: str) -> int | None
     for run in runs:
         if run.get("head_sha") != head_sha or run.get("event") != "pull_request_target":
             continue
+        if not _run_links_pr(run, pr_number):
+            continue
         run_id = run.get("id")
-        if not isinstance(run_id, int) or run_id < 1:
+        if not isinstance(run_id, int) or isinstance(run_id, bool) or run_id < 1:
             raise RecheckError("matching workflow run has invalid id")
         candidates.append(run)
     if not candidates:
@@ -108,7 +130,7 @@ def select_rerun_run_id(runs: list[dict[str, Any]], head_sha: str) -> int | None
     if latest.get("conclusion") != "failure":
         return None
     attempt = latest.get("run_attempt")
-    if not isinstance(attempt, int) or attempt != 1:
+    if not isinstance(attempt, int) or isinstance(attempt, bool) or attempt != 1:
         return None
     return int(latest["id"])
 
@@ -139,6 +161,7 @@ def process_event(
         pr = event.get("pull_request")
         if not isinstance(pr, dict):
             raise RecheckError("pull_request_review event is missing pull_request")
+        pr_number = _pr_number(pr)
         head_sha = _current_head(pr, repository)
         review = event.get("review")
         review_commit = review.get("commit_id") if isinstance(review, dict) else None
@@ -160,25 +183,30 @@ def process_event(
                 "trusted reviewer comment is not on a pull request",
             )
         number = issue.get("number")
-        if not isinstance(number, int) or number < 1:
+        if not isinstance(number, int) or isinstance(number, bool) or number < 1:
             raise RecheckError("issue_comment pull request number is invalid")
         pr = client.get_pull_request(number)
+        resolved_number = _pr_number(pr)
+        if resolved_number != number:
+            raise RecheckError("issue_comment pull request identity mismatch")
+        pr_number = number
         head_sha = _current_head(pr, repository)
     else:
         raise RecheckError(f"unsupported event name: {event_name!r}")
 
-    run_id = select_rerun_run_id(client.list_gate_runs(head_sha), head_sha)
+    runs = client.list_gate_runs(head_sha, pr_number)
+    run_id = select_rerun_run_id(runs, head_sha, pr_number)
     if run_id is None:
         return Result(
             "NOOP_NO_ELIGIBLE_RUN",
-            "no exact-head completed failed attempt-1 AI review gate run is eligible",
+            "no exact-PR exact-head completed failed attempt-1 AI review gate run is eligible",
             head_sha=head_sha,
         )
 
     client.rerun(run_id)
     return Result(
         "RERUN",
-        "trusted reviewer result triggered one bounded same-head gate re-evaluation",
+        "trusted reviewer result triggered one bounded exact-PR same-head gate re-evaluation",
         run_id=run_id,
         head_sha=head_sha,
     )
@@ -239,9 +267,11 @@ class GitHubClient:
             raise RecheckError("GitHub pull request response is malformed")
         return payload
 
-    def list_gate_runs(self, head_sha: str) -> list[dict[str, Any]]:
+    def list_gate_runs(self, head_sha: str, pr_number: int) -> list[dict[str, Any]]:
         if SHA_RE.fullmatch(head_sha) is None:
             raise RecheckError("head_sha must be lowercase 40-hex")
+        if not isinstance(pr_number, int) or isinstance(pr_number, bool) or pr_number < 1:
+            raise RecheckError("pr_number must be a positive integer")
         workflow = urllib.parse.quote(self.workflow, safe="")
         query = urllib.parse.urlencode(
             {"event": "pull_request_target", "head_sha": head_sha, "per_page": "100"}
