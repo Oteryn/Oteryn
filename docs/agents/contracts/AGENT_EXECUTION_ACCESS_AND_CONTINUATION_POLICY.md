@@ -140,31 +140,64 @@ A textual overlap or changed filename alone is not proof of semantic invalidatio
 
 Repository-local instructions may impose stricter safety, review, validation or integration rules, but MUST NOT weaken these minimum non-invalidation and late-integration semantics.
 
-## Access discovery before blocking
+## Capability truthfulness and tool discovery before blocking
 
-Before reporting:
+Available tools, connectors and exposed actions in the **current session** are the source of truth for technical execution capability. UI mode labels, assumptions about Chat/Work/Codex, a previously rejected handoff, a missing local checkout, a missing `gh` binary, an unauthenticated local CLI, or an earlier agent statement are not capability evidence.
 
-- "I don't have access";
-- "I cannot inspect the repository";
-- "execution is blocked";
+Before reporting that repository work cannot continue, GitHub is read-only, commit/push/PR is unavailable, a mode switch is required, or another execution capability is missing, an agent MUST:
 
-an agent MUST:
+1. inspect all currently exposed **relevant** tools/connectors and discover the actions needed for the requested operation, including write actions that may be separate from read actions;
+2. inspect current authentication/context and repository permissions when the available connector exposes that evidence;
+3. prefer repository-native operations for repository state and lifecycle work, especially GitHub repository/file/branch/commit/PR/Issue/review/check actions;
+4. if the preferred operation is unavailable or fails, evaluate every safe, authorized fallback that can legitimately perform the same task before asking the owner to switch modes, repeat work manually, or take over the operation;
+5. classify the exact limitation as one of: missing tool/action, unauthenticated context, permission denied, operation unsupported, repository/policy restriction, transient transport/service failure, or another specifically observed condition;
+6. continue any remaining useful authorized work that is not blocked by that exact limitation.
 
-1. inspect available tools and execution capabilities;
-2. check available authentication/context;
-3. determine whether the limitation is:
-   - missing tool;
-   - missing permission;
-   - temporary failure;
-   - repository policy restriction.
+A rejected request to enter Work mode or another UI mode does **not** revoke or disable other tools that remain exposed in the session. An agent MUST NOT infer that it lost GitHub write access, repository access, terminal access, or another capability solely because a handoff or mode change was declined.
 
-A generic access disclaimer without capability discovery is invalid.
+### Repository-native first
+
+For repository inspection, file changes, branches, commits, pushes, pull requests, Issues, reviews, checks and merge state, use an available repository-native connector/action before routing ordinary work through Remote Desktop/Desktop Commander or a host-local clone. Local `git`/`gh` may be used when authorized and genuinely needed, but a missing or unauthenticated local CLI is not proof that the repository connector is unavailable.
+
+Remote Desktop/Desktop Commander remains governed by the default-deny host-exception policy above. It MUST NOT become the routine fallback for normal repository work merely because it is technically reachable.
+
+### Non-destructive capability discovery
+
+Capability discovery itself MUST be observational and least-mutating. Agents MUST NOT create throwaway branches, files, commits, comments, PRs, workflow runs, deployments, or other durable state merely to prove that write access exists.
+
+Use connector registration/action discovery, authenticated identity, permission metadata and harmless reads first. When a write operation is actually part of the authorized task, successful execution of that real task mutation may establish the capability; do not manufacture a no-op probe.
+
+### Prohibited unverified blocker claims
+
+The following statements are invalid unless directly supported by current-session evidence from the applicable tools/actions:
+
+- "I only have read access to GitHub."
+- "I cannot commit/push/create a PR from this session."
+- "This requires Work mode."
+- "Because Work mode was rejected, I cannot continue."
+- "There is no write channel."
+- "I need Remote Desktop to edit the repository."
+- "The repository cannot be modified from Chat mode."
+
+Equivalent wording is equally invalid. If the exact capability has not been checked, report it as `UNKNOWN` and perform the required discovery rather than presenting it as a blocker.
+
+### Required blocker evidence
+
+A genuine capability blocker report MUST identify:
+
+- the exact operation required;
+- the exact tool/connector/action inspected or attempted;
+- the observed authentication, permission, unsupported-operation, policy, transport or service failure;
+- the relevant safe authorized fallback paths that were checked and why they could not complete the operation;
+- the smallest missing capability or permission needed to proceed.
+
+Do not generalize one failed action into a broader claim such as "GitHub is read-only" unless the broader limitation was actually verified.
 
 Capability and authentication discovery is observational only. Tool availability, authentication, repository visibility, a successful check, or apparent technical ability to perform an action NEVER grants or broadens authority to perform that action.
 
 ## Capability classification
 
-Agents must classify the current environment:
+Agents must classify the current environment from verified evidence rather than assumptions about the UI mode:
 
 ### Execution available
 
@@ -172,11 +205,11 @@ The agent may inspect, modify, test and perform repository operations only withi
 
 ### Read-only
 
-The agent may inspect, audit and report findings but MUST NOT claim implementation completion.
+Use this classification only after the relevant write capability has been checked and the current tool/auth/permission evidence proves that mutation is unavailable or prohibited. The agent may inspect, audit and report findings but MUST NOT claim implementation completion.
 
 ### No external capability
 
-The agent may prepare patches, commands and handoff instructions, but must state the exact missing capability.
+Use this classification only after relevant tool/action discovery shows no usable external execution path. The agent may prepare patches, commands and handoff instructions, but must state the exact missing capability.
 
 ## Autonomous continuation mode
 
