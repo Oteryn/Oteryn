@@ -33,6 +33,7 @@ Before doing anything, load from current protected META `main`:
 - `docs/architecture/adr/0004-parallel-agent-git-concurrency.md`;
 - `docs/architecture/adr/0005-unified-world-atlas-surfaces-and-reuse.md`;
 - `docs/superpowers/plans/2026-08-26-unified-world-atlas-convergence.md`;
+- `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`;
 - `docs/agents/prompts/OTERYN-WORLD-ATLAS-PARALLEL-AGENT-SUITE.md`;
 - root/current applicable `AGENTS.md` in every repo touched.
 
@@ -74,7 +75,7 @@ Before local work or mutation:
 
 1. Resolve current protected `main` SHAs and required checks for META, Game and Atlas.
 2. Read current root and nearer applicable `AGENTS.md` in all three repositories.
-3. Verify ADR 0005, the implementation plan and this prompt are on protected META `main`. If they exist only on a planning branch/PR, do not start provider runtime work; return `WAITING_EXTERNAL: META_ARCHITECTURE_NOT_CANONICAL` with exact PR/head.
+3. Verify ADR 0005, the implementation plan, the release compatibility contract and this prompt are on protected META `main`. If they exist only on a planning branch/PR, do not start provider runtime work; return `WAITING_EXTERNAL: META_ARCHITECTURE_NOT_CANONICAL` with exact PR/head.
 4. Refresh lifecycle Issues #75-#81, Game #191 and Atlas #188.
 5. Search current open PRs/Issues/branches for semantic/path overlap.
 6. In Game, resolve the current implementation coordinator/allocation state and any current durability/client/renderer/Cargo ownership blockers, including successors to historical #187/#162.
@@ -254,18 +255,21 @@ Require the cross-surface journeys and failure injections defined in the impleme
 
 ## Wave 7 — cutover
 
-Under #79:
+Under #79 and `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`:
 
-1. freeze exact Game export/profile/revision evidence;
-2. freeze Atlas Core/API and embedded bundle version/digest;
-3. freeze bridge protocol/profile;
-4. freeze Game client identity pinning that Atlas bundle;
-5. complete provider late integration + exact-head protected merges independently;
-6. run Atlas merged-main live acceptance under current Atlas policy;
-7. run Game native-client candidate/release acceptance under current Game policy;
-8. record compatible non-floating tuple in META using existing release/compatibility mechanisms.
+1. freeze exact Game export profile/version and producer revision;
+2. freeze the exact immutable digest of the produced Game→Atlas export manifest and the exact payload digest/root consumed by Atlas; producer/profile/world revision alone is insufficient artifact identity;
+3. freeze exact world/content revision;
+4. freeze Atlas Core/API and embedded bundle version/digest and prove that the bundle's accepted input is the exact Game export artifact from step 2;
+5. freeze bridge protocol/profile;
+6. freeze Game client identity pinning that exact Atlas bundle digest;
+7. complete provider late integration + exact-head protected merges independently;
+8. run Atlas merged-main live acceptance under current Atlas policy;
+9. run Game native-client candidate/release acceptance under current Game policy;
+10. create the final compatibility record at the canonical META compatibility/release path using only immutable identities and evidence;
+11. require the compatibility-record META PR to pass current exact-head checks/review, protected-squash-merge it, read it back from the exact merge SHA, and require post-merge `meta-gate` success on that exact protected-main SHA.
 
-Do not force public Atlas and Game client into one release transaction merely because they are compatible.
+An Issue #79 comment, local file, Draft or unmerged PR is not the final compatibility record. Do not force public Atlas and Game client into one release transaction merely because they are compatible.
 
 ## Wave 8 — legacy retirement
 
@@ -325,10 +329,10 @@ Reject if any applies:
 Return `DONE` only when ALL of the following are true:
 
 1. the Definition of Done in the plan is proven;
-2. #79 records an exact compatible non-floating tuple; and
+2. the complete exact compatibility tuple defined by `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` is canonical on protected META `main`, with recorded canonical path, exact compatibility PR/head, required exact-head check/review evidence, squash-merge SHA, protected-main readback, and post-merge `meta-gate` evidence; and
 3. a fresh independent invocation of `OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR` has audited the final protected provider/META state and returned `FINAL_VERDICT: DONE` with the required immutable evidence references.
 
-The coordinator's own assessment, provider success narration or completion of #79 alone is never sufficient to emit terminal `DONE`.
+The coordinator's own assessment, provider success narration, completion of #79, an Issue-only tuple or an unmerged compatibility PR is never sufficient to emit terminal `DONE`.
 
 Return `WAITING_EXTERNAL` when a dependency/ownership/review/CI/host-selection fact must change externally and no useful dependency-ready work remains in that lane.
 
@@ -340,7 +344,11 @@ Final report must include:
 
 - exact META/Game/Atlas main SHAs;
 - all implementation PRs/merge SHAs;
-- exact export/core/bundle/bridge/client/public-Atlas identities;
+- exact Game export profile/version and producer revision;
+- exact produced Game export manifest digest and payload digest/root consumed by Atlas;
+- exact Atlas Core/API and bundle version/digest;
+- exact bridge/client/public-Atlas identities;
+- canonical META compatibility-record path, PR/head, required check/review refs, squash-merge SHA and post-merge `meta-gate` ref;
 - security/performance/E2E evidence;
 - rollback evidence;
 - retained legacy paths with reasons;
