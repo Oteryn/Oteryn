@@ -87,7 +87,7 @@ Issue #79 is not terminal authority by itself. Require #84 dedicated schema/vali
 
 ### I. Provider final gates
 
-For every final provider PR/candidate require exact branch/head, bounded diff, exact-head required checks/reviews, protected squash merge, resulting main SHA, required post-merge checks, Atlas live acceptance bound to the exact public deployed bundle, and Game native-client acceptance bound to the exact embedded bundle.
+For every final provider PR/candidate require exact branch/head, bounded diff, exact-head required checks/reviews, protected squash merge, resulting main SHA, required post-merge checks, Atlas live acceptance bound to the exact public deployed bundle, and Game native-client acceptance bound to the exact embedded bundle. Record immutable accepted exact-head review evidence separately for Game and Atlas provider PRs; provider PR/merge identity or check success alone does not prove the required review occurred on the accepted head.
 
 ### J. Parallel-agent hygiene
 
@@ -112,7 +112,9 @@ GAME_MAIN_SHA:
 ATLAS_MAIN_SHA:
 META_ARCHITECTURE_PR_MERGE_SHA:
 GAME_PROVIDER_PRS_AND_MERGE_SHAS:
+GAME_PROVIDER_REVIEW_EVIDENCE_REFS:
 ATLAS_PROVIDER_PRS_AND_MERGE_SHAS:
+ATLAS_PROVIDER_REVIEW_EVIDENCE_REFS:
 GAME_ATLAS_EXPORT_PROFILE_VERSION:
 GAME_ATLAS_EXPORT_PRODUCER_REVISION:
 GAME_ATLAS_EXPORT_ARTIFACT_MANIFEST_DIGEST:
@@ -163,4 +165,4 @@ FINAL_VERDICT: DONE|NOT_DONE
 REQUIRED_NEXT_ACTIONS:
 ```
 
-A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable evidence in all applicable fields, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
+A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable evidence in all applicable fields including provider exact-head review evidence, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
