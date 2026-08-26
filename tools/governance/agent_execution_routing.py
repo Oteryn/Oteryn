@@ -108,6 +108,13 @@ def _policy_errors(policy: dict[str, object]) -> list[str]:
     if not _is_unique_string_list(runners_value):
         errors.append("policy runner_classes must be a non-empty list of unique strings")
 
+    if not _is_unique_string_list(policy.get("remote_desktop_actions")):
+        errors.append("policy remote_desktop_actions must be a non-empty list of unique strings")
+
+    lane_rules = policy.get("parallel_lane_rules")
+    if not isinstance(lane_rules, dict) or lane_rules.get("unique_branch_and_worktree") is not True:
+        errors.append("policy parallel_lane_rules.unique_branch_and_worktree must be true")
+
     required_fields = policy.get("resume_preflight_required_fields")
     if required_fields != list(_CANONICAL_RESUME_PREFLIGHT_FIELDS):
         errors.append(
@@ -299,6 +306,7 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
     required_lane_fields = {value for value in _list(rules.get("required_lane_fields")) if isinstance(value, str)}
     lane_ids: set[str] = set()
     lane_paths: list[tuple[str, list[str]]] = []
+    branch_and_worktrees: dict[str, list[str]] = {}
     lease_claims: dict[str, list[tuple[str, object, object, bool]]] = {}
     for lane in lanes:
         identifier = lane.get("id")
@@ -328,6 +336,8 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
         branch_and_worktree = lane.get("branch_and_worktree")
         if not isinstance(branch_and_worktree, str) or not branch_and_worktree.strip():
             errors.append(f"lane '{display_identifier}' requires branch_and_worktree")
+        else:
+            branch_and_worktrees.setdefault(branch_and_worktree, []).append(display_identifier)
         if not isinstance(lane.get("shared_leases", []), list):
             errors.append(f"lane '{display_identifier}' shared_leases must be a list")
         for lease in _list(lane.get("shared_leases")):
@@ -352,6 +362,11 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
                     (display_identifier, holder, release_condition, valid_structure)
                 )
         lane_paths.append((display_identifier, owned_paths))
+
+    if rules.get("unique_branch_and_worktree") is True:
+        for lane_identifiers in branch_and_worktrees.values():
+            if len(lane_identifiers) > 1:
+                errors.append("parallel lanes cannot share branch_and_worktree")
 
     for lane in lanes:
         identifier = lane.get("id") if isinstance(lane.get("id"), str) else "<unnamed>"
@@ -480,13 +495,14 @@ def validate_packet(
         errors.append("equivalent_ci must be null or a non-empty workflow identifier string")
     equivalent_ci_exists = isinstance(equivalent_ci, str) and bool(equivalent_ci.strip())
     forbidden_actions = _closed_values(policy, "forbidden_remote_desktop_actions_when_equivalent_ci")
+    permitted_host_actions = _closed_values(policy, "remote_desktop_actions")
     requested_actions_value = execution.get("requested_host_actions")
     requested_actions = _list(requested_actions_value)
     if requested_actions_value is not None and (
         not isinstance(requested_actions_value, list)
-        or any(not isinstance(action, str) or action not in forbidden_actions for action in requested_actions)
+        or any(not isinstance(action, str) or action not in permitted_host_actions for action in requested_actions)
     ):
-        errors.append("requested_host_actions must be a list of supported action strings")
+        errors.append("requested_host_actions must be a list of permitted host action strings")
     polling_actions = (
         [requested_actions_value]
         if isinstance(requested_actions_value, str)
@@ -498,11 +514,13 @@ def validate_packet(
         errors.append("equivalent_ci prohibits RDC polling")
     if remote_desktop == "exception" and equivalent_ci is not None:
         errors.append("remote_desktop exception requires no equivalent_ci")
-    if requested_actions:
-        if remote_desktop != "exception":
-            errors.append("requested_host_actions require remote_desktop=exception")
+    if remote_desktop == "exception":
+        if not isinstance(requested_actions_value, list) or not requested_actions:
+            errors.append("remote_desktop exception requires non-empty requested_host_actions")
         elif equivalent_ci is not None:
             errors.append("requested_host_actions require equivalent_ci=null")
+    elif requested_actions:
+        errors.append("requested_host_actions require remote_desktop=exception")
 
     _validate_preflight(execution, _mapping(live_state), policy, errors)
     parallel = packet.get("parallel_execution")

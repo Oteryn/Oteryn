@@ -60,7 +60,7 @@ def lane(identifier: str, paths: list[str], *, depends_on: list[str] | None = No
         "id": identifier,
         "owned_paths": paths,
         "depends_on": depends_on or [],
-        "branch_and_worktree": "required",
+        "branch_and_worktree": f"governance/{identifier}:worktrees/{identifier}",
         "shared_leases": [],
     }
 
@@ -87,7 +87,21 @@ def exception_packet(reason: str) -> dict[str, object]:
     packet = default_packet()
     execution = packet["execution_routing"]
     assert isinstance(execution, dict)
-    execution.update({"execution_target": "host_exception", "remote_desktop": "exception", "remote_desktop_reason": reason, "equivalent_ci": None})
+    actions_by_reason = {
+        "host_only_service": ["inspect_host_only_service"],
+        "lan_or_hardware": ["perform_lan_or_hardware_acceptance"],
+        "self_hosted_runner_diagnosis": ["diagnose_self_hosted_runner"],
+    }
+    execution.update(
+        {
+            "execution_target": "host_exception",
+            "runner_class": "not_applicable",
+            "remote_desktop": "exception",
+            "remote_desktop_reason": reason,
+            "equivalent_ci": None,
+            "requested_host_actions": actions_by_reason.get(reason, ["inspect_host_only_service"]),
+        }
+    )
     return packet
 
 
@@ -260,6 +274,49 @@ def test_remote_desktop_exception_requires_no_equivalent_ci() -> None:
     assert "remote_desktop exception requires no equivalent_ci" in routing.validate_packet(
         packet, live_state=live_state(), policy=policy()
     )
+
+
+def test_parallel_lanes_cannot_share_a_writable_branch_and_worktree() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    first = lane("first", ["docs/first/**"])
+    second = lane("second", ["src/second/**"])
+    second["branch_and_worktree"] = first["branch_and_worktree"]
+    parallel["lanes"] = [first, second]
+    parallel["integration_order"] = ["first", "second"]
+
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+
+    assert "parallel lanes cannot share branch_and_worktree" in errors
+
+
+def test_host_exception_requires_a_non_empty_permitted_action_record() -> None:
+    packet = exception_packet("host_only_service")
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    del execution["requested_host_actions"]
+
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+
+    assert "remote_desktop exception requires non-empty requested_host_actions" in errors
+
+
+def test_host_exception_rejects_actions_outside_the_policy_list() -> None:
+    packet = exception_packet("host_only_service")
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    execution["requested_host_actions"] = ["change_host_configuration"]
+
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+
+    assert "requested_host_actions must be a list of permitted host action strings" in errors
+
+
+def test_host_exception_accepts_a_policy_permitted_least_privilege_action() -> None:
+    packet = exception_packet("lan_or_hardware")
+
+    assert routing.validate_packet(packet, live_state=live_state(), policy=policy()) == []
 
 
 def test_missing_resume_preflight_fails() -> None:
@@ -613,7 +670,7 @@ def test_requested_host_actions_must_be_a_supported_string_list() -> None:
     assert isinstance(execution, dict)
     execution["requested_host_actions"] = "poll_docker_logs"
     errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
-    assert "requested_host_actions must be a list of supported action strings" in errors
+    assert "requested_host_actions must be a list of permitted host action strings" in errors
     assert "equivalent_ci prohibits RDC polling" in errors
 
     for malformed_actions in ({"action": "poll_docker_logs"}, ["poll_docker_logs", {}], ["unknown_action"]):
@@ -622,7 +679,7 @@ def test_requested_host_actions_must_be_a_supported_string_list() -> None:
         assert isinstance(execution, dict)
         execution["requested_host_actions"] = malformed_actions
         errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
-        assert "requested_host_actions must be a list of supported action strings" in errors
+        assert "requested_host_actions must be a list of permitted host action strings" in errors
 
 
 def test_integration_order_requires_dependencies_first() -> None:
@@ -688,6 +745,63 @@ def test_cli_returns_zero_for_valid_packet_and_one_for_invalid_packet() -> None:
         failed = subprocess.run(command, check=False, capture_output=True, text=True)
         assert failed.returncode == 1
         assert "execution_target is not allowed" in failed.stdout
+
+
+def test_cli_enforces_lane_isolation_and_remote_desktop_action_scope() -> None:
+    script = Path(__file__).with_name("agent_execution_routing.py")
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        directory = Path(temporary_directory)
+        policy_path = directory / "policy.json"
+        packet_path = directory / "packet.json"
+        live_state_path = directory / "live-state.json"
+        policy_path.write_text(json.dumps(policy()), encoding="utf-8")
+        live_state_path.write_text(json.dumps(live_state()), encoding="utf-8")
+        command = [
+            sys.executable,
+            str(script),
+            "--policy",
+            str(policy_path),
+            "--packet",
+            str(packet_path),
+            "--live-state",
+            str(live_state_path),
+        ]
+
+        duplicate_worktree = default_packet()
+        parallel = duplicate_worktree["parallel_execution"]
+        assert isinstance(parallel, dict)
+        first = lane("first", ["docs/first/**"])
+        second = lane("second", ["src/second/**"])
+        second["branch_and_worktree"] = first["branch_and_worktree"]
+        parallel["lanes"] = [first, second]
+        parallel["integration_order"] = ["first", "second"]
+        packet_path.write_text(json.dumps(duplicate_worktree), encoding="utf-8")
+        duplicate_result = subprocess.run(command, check=False, capture_output=True, text=True)
+        assert duplicate_result.returncode == 1
+        assert "parallel lanes cannot share branch_and_worktree" in duplicate_result.stdout
+
+        missing_actions = exception_packet("host_only_service")
+        missing_execution = missing_actions["execution_routing"]
+        assert isinstance(missing_execution, dict)
+        del missing_execution["requested_host_actions"]
+        packet_path.write_text(json.dumps(missing_actions), encoding="utf-8")
+        missing_result = subprocess.run(command, check=False, capture_output=True, text=True)
+        assert missing_result.returncode == 1
+        assert "remote_desktop exception requires non-empty requested_host_actions" in missing_result.stdout
+
+        unrecognized_action = exception_packet("host_only_service")
+        unrecognized_execution = unrecognized_action["execution_routing"]
+        assert isinstance(unrecognized_execution, dict)
+        unrecognized_execution["requested_host_actions"] = ["change_host_configuration"]
+        packet_path.write_text(json.dumps(unrecognized_action), encoding="utf-8")
+        unrecognized_result = subprocess.run(command, check=False, capture_output=True, text=True)
+        assert unrecognized_result.returncode == 1
+        assert "requested_host_actions must be a list of permitted host action strings" in unrecognized_result.stdout
+
+        permitted_action = exception_packet("self_hosted_runner_diagnosis")
+        packet_path.write_text(json.dumps(permitted_action), encoding="utf-8")
+        permitted_result = subprocess.run(command, check=False, capture_output=True, text=True)
+        assert permitted_result.returncode == 0
 
 
 def test_cli_rejects_partial_and_long_wildcard_segments() -> None:

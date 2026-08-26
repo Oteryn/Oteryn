@@ -31,6 +31,11 @@
     "lan_or_hardware",
     "self_hosted_runner_diagnosis"
   ],
+  "remote_desktop_actions": [
+    "inspect_host_only_service",
+    "perform_lan_or_hardware_acceptance",
+    "diagnose_self_hosted_runner"
+  ],
   "resume_preflight_required_fields": [
     "verified_at",
     "repository",
@@ -58,6 +63,7 @@
       "shared_leases"
     ],
     "one_writer_per_lane": true,
+    "unique_branch_and_worktree": true,
     "overlap_requires_lease": true,
     "constrained_resource_requires_lease": true,
     "serial_requires_reason": true,
