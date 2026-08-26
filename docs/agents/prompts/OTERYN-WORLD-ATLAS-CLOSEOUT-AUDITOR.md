@@ -31,7 +31,20 @@ From providers read current protected Game/Atlas main, Game #191 and Atlas #188 
 
 ### A0. Architecture packet canonicalization
 
-Require proof that the exact World Atlas architecture packet was admitted through the current META protected lifecycle rather than an admin/bypass or stale review path. Record the architecture PR number and exact accepted head, immutable required-check references for that head, immutable accepted review evidence for that same head, the protected squash-merge SHA, and readback of ADR 0005 plus the executable plan/coordinator from that merge SHA. Any mismatch between reviewed/gated head and merged packet is `CONFLICT_BLOCKING`; missing architecture PR check/review evidence is `UNKNOWN_BLOCKING`.
+Require proof that the exact World Atlas architecture packet was admitted through the current META protected lifecycle rather than an admin/bypass or stale review path. Record the architecture PR number and exact accepted head, immutable required-check references for that head, immutable accepted review evidence for that same head, the protected squash-merge SHA, and an immutable `PROTECTED_MAIN_PACKET_READBACK_REF` proving that the complete canonical packet is readable from that exact protected-main squash-merge SHA.
+
+The protected-main packet readback must cover all eight canonical artifacts, not a representative subset:
+
+1. `docs/architecture/adr/0005-unified-world-atlas-surfaces-and-reuse.md`;
+2. `docs/superpowers/plans/2026-08-26-unified-world-atlas-convergence.md`;
+3. `docs/architecture/WORLD_ATLAS_RISK_REGISTER.md`;
+4. `docs/architecture/WORLD_ATLAS_PROGRAMME_INDEX.md`;
+5. `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`;
+6. `docs/agents/prompts/OTERYN-WORLD-ATLAS-PROGRAMME-COORDINATOR.md`;
+7. `docs/agents/prompts/OTERYN-WORLD-ATLAS-PARALLEL-AGENT-SUITE.md`;
+8. `docs/agents/prompts/OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR.md`.
+
+The readback evidence must bind those exact paths to `META_ARCHITECTURE_PR_MERGE_SHA`; a floating `main`, partial path sample, or later commit is insufficient. Any mismatch between reviewed/gated head and merged packet, or any missing/changed packet artifact at that exact merge SHA, is `CONFLICT_BLOCKING`; missing architecture PR check/review/readback evidence is `UNKNOWN_BLOCKING`.
 
 ### A. Authority boundary
 
@@ -121,6 +134,7 @@ META_ARCHITECTURE_PR_HEAD_SHA:
 META_ARCHITECTURE_PR_REQUIRED_CHECK_REFS:
 META_ARCHITECTURE_PR_REVIEW_EVIDENCE_REFS:
 META_ARCHITECTURE_PR_MERGE_SHA:
+PROTECTED_MAIN_PACKET_READBACK_REF:
 GAME_PROVIDER_PRS_AND_MERGE_SHAS:
 GAME_PROVIDER_REVIEW_EVIDENCE_REFS:
 ATLAS_PROVIDER_PRS_AND_MERGE_SHAS:
@@ -176,4 +190,4 @@ FINAL_VERDICT: DONE|NOT_DONE
 REQUIRED_NEXT_ACTIONS:
 ```
 
-A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable architecture-packet exact-head check/review/merge evidence, complete immutable evidence in all applicable provider fields including provider exact-head review evidence, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
+A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable architecture-packet exact-head check/review/merge evidence, `PROTECTED_MAIN_PACKET_READBACK_REF` proving all eight canonical packet artifacts at the exact `META_ARCHITECTURE_PR_MERGE_SHA`, complete immutable evidence in all applicable provider fields including provider exact-head review evidence, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, partial, later-commit, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
