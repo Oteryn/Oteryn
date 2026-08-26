@@ -12,6 +12,8 @@
 
 **Release contract:** `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`
 
+**Risk register:** `docs/architecture/WORLD_ATLAS_RISK_REGISTER.md`
+
 ## Global constraints
 
 - `Oteryn-Game` remains canonical World/Content/gameplay-fact authority.
@@ -29,6 +31,7 @@
 - Shared Cargo/workspace files, shared app composition, shared Atlas FullWorld shell, workflow/CI files, release manifests and final integration are serialized leases.
 - Current planning SHAs are provenance only: META `d79df968c1aba98373455399732fc71ab71e6a5d`, Game `2019d501d22614720ef37718e16913d81728e0a2`, Atlas `fc2a952169e15c070b4a2bc66095624d63798435`.
 - Planning-time blockers/overlaps must be re-resolved, especially Game #187/#162 and Atlas #179/#162/#170/#185 or their successors.
+- `WORLD_ATLAS_RISK_REGISTER.md` is a mandatory execution input, not closeout-only prose. Re-read it at provider design freeze, embedded-host selection, candidate freeze and final cutover. A triggered unresolved Critical risk blocks the dependent decision/cutover; a triggered High risk requires exact mitigation evidence before the dependent decision is accepted. Successful CI alone never closes an architectural/security/performance risk.
 - No provider production/live deployment from this META planning lifecycle.
 
 ---
@@ -205,6 +208,8 @@ Review all five handoffs. Freeze exact contract conflicts, ownership, host candi
 
 Game and Atlas design lanes may run concurrently because repositories differ.
 
+Before either provider design is accepted as frozen, re-read `WORLD_ATLAS_RISK_REGISTER.md` against the exact design evidence. Record immutable dispositions for every triggered High/Critical risk. Any triggered unresolved Critical risk blocks provider design freeze; a triggered High risk requires exact mitigation evidence before acceptance.
+
 ### Task 1A — Game producer + client design
 
 Create provider-owned design/plan under Game #191. Define exact export identities/gaps, client host adapter, native minimap independence, bridge API/capability profile, packaging of exact embedded bundle digest, failure behavior, dependency direction, tests and shared Cargo/client composition leases. Reconcile the live Game coordinator and any durability/client ownership blocker first.
@@ -231,7 +236,7 @@ Run only when Wave 0/1 proves a concrete gap. Deliver Game-owned profile/schema 
 
 ### Task 2C — embedded host prototype
 
-Prototype realistic host candidates in isolated Game paths and measure local content, navigation isolation, startup, RSS/CPU/GPU, input/focus, crash/hang isolation, offline operation, packaging and dependency/license security. Select only a host satisfying the frozen security/product criteria.
+Prototype realistic host candidates in isolated Game paths and measure local content, navigation isolation, startup, RSS/CPU/GPU, input/focus, crash/hang isolation, offline operation, packaging and dependency/license security. Before selecting/promoting a host, re-read `WORLD_ATLAS_RISK_REGISTER.md`, record exact triggered-risk dispositions, block selection on any triggered unresolved Critical risk and require exact mitigation evidence for every triggered High risk affecting host acceptance. Select only a host satisfying the frozen security/product criteria.
 
 ---
 
@@ -295,7 +300,9 @@ Integrate only narrow local UX semantics such as a validated Atlas waypoint; nat
 
 # 12. Wave 6 — qualification
 
-Freeze exact candidate heads/artifact digests before expensive qualification. Code/config changes require a new freeze.
+Before the candidate freeze is accepted as qualification authority, re-read `WORLD_ATLAS_RISK_REGISTER.md` against the exact candidate heads/artifact digests and current evidence. Record immutable dispositions for every triggered High/Critical risk. A triggered unresolved Critical risk blocks candidate-freeze acceptance; a triggered High risk requires exact mitigation evidence. CI success alone is not risk closure.
+
+Freeze exact candidate heads/artifact digests before expensive qualification. Code/config changes require a new freeze and reapplication of the risk checkpoint.
 
 ### Task 6A — security
 
@@ -314,6 +321,8 @@ Lifecycle #78. On compatible immutable world/export evidence prove same public e
 # 13. Wave 7 — release compatibility and cutover
 
 **Lifecycle:** META #79 + #84 + `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`.
+
+Before Task 7A or terminal compatibility-record creation, execute the final-cutover risk checkpoint: re-read `WORLD_ATLAS_RISK_REGISTER.md`, record immutable dispositions for every triggered High/Critical risk, and stop cutover while any triggered unresolved Critical risk remains. Triggered High risks require exact mitigation evidence before the dependent cutover decision; successful checks alone do not close them.
 
 ### Task 7A — freeze exact compatible tuple
 
@@ -403,6 +412,7 @@ The programme is not `DONE` until immutable evidence proves all of the following
 - Cross-surface user and failure journeys pass.
 - Exact performance/resource evidence exists for migrated paths and selected host.
 - Provider exact-head/protected-main checks and reviews are green.
+- Every triggered risk has the disposition/evidence required by `WORLD_ATLAS_RISK_REGISTER.md`, with no unresolved cutover-blocking risk.
 - Public Atlas live acceptance binds the named public deployment to its exact deployed bundle version/digest.
 - Native client acceptance binds the client identity to its exact embedded bundle digest.
 - When public and embedded bundles differ, their relation is explicitly `COMPATIBLE_INDEPENDENT` with immutable compatibility evidence; otherwise it is `SAME_BUNDLE` with digest equality.
@@ -431,6 +441,7 @@ The final coordinator returns:
 - #84 schema/validator paths and final compatibility record path/PR/head/merge/post-merge-gate refs;
 - verification/security/performance evidence references;
 - rollback evidence;
+- risk-register disposition evidence;
 - deliberately retained legacy paths and reasons;
 - independent closeout auditor verdict;
 - final verdict `DONE`, `WAITING_EXTERNAL`, `BLOCKED`, or `STALLED` with exact material reason.
