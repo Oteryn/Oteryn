@@ -12,11 +12,13 @@ Status: proposed until the architecture packet is protected-merged to META `main
    - `docs/superpowers/plans/2026-08-26-unified-world-atlas-convergence.md`
 3. Cross-repository risk register:
    - `docs/architecture/WORLD_ATLAS_RISK_REGISTER.md`
-4. Autonomous programme coordinator:
+4. Release compatibility / cutover evidence contract:
+   - `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`
+5. Autonomous programme coordinator:
    - `docs/agents/prompts/OTERYN-WORLD-ATLAS-PROGRAMME-COORDINATOR.md`
-5. Parallel role prompt pack:
+6. Parallel role prompt pack:
    - `docs/agents/prompts/OTERYN-WORLD-ATLAS-PARALLEL-AGENT-SUITE.md`
-6. Independent terminal auditor:
+7. Independent terminal auditor:
    - `docs/agents/prompts/OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR.md`
 
 ## Lifecycle graph
@@ -42,6 +44,8 @@ After this packet is canonical on protected META `main`, the normal owner invoca
 Recommended reasoning effort: **Extra High**.
 
 The coordinator resolves current GitHub state, ownership and dependencies before releasing provider work. Do not manually start mutating worker roles merely because this planning packet exists.
+
+For release/cutover, `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` is the canonical exact tuple/evidence contract. Its required produced Game export artifact digests and protected-main META compatibility-record evidence refine the shorthand Wave 7 tuple in the implementation plan and may not be omitted.
 
 ## Optional manual Wave 0 parallel scouts
 
@@ -76,4 +80,4 @@ After provider implementation/cutover claims completion, run independently:
 
 Recommended reasoning effort: **Extra High**.
 
-Only the auditor's `DONE` verdict backed by exact provider evidence permits the programme coordinator to report terminal completion.
+Only the auditor's `DONE` verdict backed by exact provider evidence and the canonical protected-main compatibility record permits the programme coordinator to report terminal completion.
