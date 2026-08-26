@@ -1,89 +1,92 @@
 # Unified Oteryn World Atlas Convergence Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: use an isolated task/worktree workflow and execute this plan task-by-task. Parallel workers are allowed only where the dependency/ownership table explicitly permits them.
+> Execute task-by-task with isolated branches/worktrees and the current repository governance. Parallel work is allowed only when the dependency and ownership rules below permit it.
 
-**Goal:** Evolve Oteryn World Atlas into one reusable product capability: Game-owned authoritative exports feed an Atlas-owned Rust Core and one web product bundle that serves both the public Atlas and a locally embedded native-client Atlas, while the gameplay minimap remains native Rust/wgpu and private live state stays local.
+**Goal:** converge Oteryn World Atlas into one reusable product capability: Game-owned authoritative exports feed an Atlas-owned Rust Core and one web product lineage that serves both public Atlas and a locally packaged embedded native-client Atlas, while gameplay minimap/HUD stays native Rust/wgpu and private live state stays local.
 
-**Architecture:** Game remains canonical World/Content/gameplay authority and publishes explicit versioned public-safe Atlas artifacts. Atlas introduces a strangler-migrated Rust computational core, compiles a reusable web/WASM bundle, and keeps web UI ownership in the browser stack. The Game client embeds a pinned local Atlas bundle through a security-bounded host/bridge while retaining an independent native minimap/HUD.
+**Architecture:** Game remains canonical World/Content/gameplay authority and publishes explicit versioned public-safe Atlas artifacts. Atlas introduces a strangler-migrated Rust derived core, bounded WASM adapters where justified, and one web UI/product bundle. The Game client embeds a pinned local Atlas bundle through a security-bounded host/bridge. META coordinates architecture, compatibility and immutable evidence only.
 
-**Tech Stack:** Rust 2024 in Game; Rust for new Atlas Core; WASM for browser reuse where accepted; existing Atlas JS/HTML/CSS/WebGL/Playwright during migration; existing Game wgpu/native client; immutable provider artifacts/digests; GitHub protected-branch lifecycle.
-
-**Spec:** `docs/architecture/adr/0005-unified-world-atlas-surfaces-and-reuse.md`
+**Canonical spec:** `docs/architecture/adr/0005-unified-world-atlas-surfaces-and-reuse.md`
 
 **Release contract:** `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`
 
 **Risk register:** `docs/architecture/WORLD_ATLAS_RISK_REGISTER.md`
 
-## Global constraints
+## 1. Global invariants
 
-- `Oteryn-Game` remains canonical World/Content/gameplay-fact authority.
-- `Oteryn-Atlas` remains the derived Atlas product and independent release/failure domain.
-- Game→Atlas stays provider-owned, explicit, versioned, public-safe and artifact-first.
-- META coordinates compatibility and sequencing; it never copies provider schemas or runtime source.
-- No direct Atlas dependency on arbitrary Game-internal Rust crates.
-- No big-bang rewrite. Every migrated Atlas capability is parity-first and separately reversible.
-- Full embedded Atlas content is local/pinned/digest-bound; a remote public Atlas is not a gameplay dependency.
-- Native gameplay minimap/HUD remains native and usable when embedded Atlas is unavailable.
-- Private/live client state is local-session-only and never becomes a public Atlas publication input.
-- The first bridge profile is non-authoritative UI integration only; no movement/combat/use/server-mutation commands.
-- Every task resolves fresh protected `main`, instructions, Issues/PRs, branch protection, active path ownership and required checks before mutation.
-- Every substantial new or resumed task packet must be validated against a freshly obtained GitHub snapshot with the canonical `ecosystem/agent-execution-routing-policy.json` and `tools/governance/agent_execution_routing.py` before local work or mutation is released. The validated packet must truthfully bind execution target/runner, equivalent CI, Remote Desktop disposition, lane ownership, branch/worktree, dependencies, leases/release conditions and integration order; missing or stale routing validation is a fail-closed dispatch blocker.
-- Wave-0 discovery is provider-read-only but not lifecycle-free: each independently launched scout owns a real META evidence Issue/branch/worktree/PR/task head and exactly one disjoint report under `docs/evidence/world-atlas/wave0/` (or recorded equivalent), uses normal PR-backed routing validation, mutates only that report, and never mutates Game/Atlas/provider/runtime/config/Cargo/workflow/shared-shell/production paths. There is no PR-less Wave-0 route.
-- Follow ADR 0004: immutable admission SHA, one task/branch/worktree/PR, no restart because `main` moved, late merge-up integration, exact-head proof.
-- Shared Cargo/workspace files, shared app composition, shared Atlas FullWorld shell, workflow/CI files, release manifests and final integration are serialized leases.
-- Current planning SHAs are provenance only: META `d79df968c1aba98373455399732fc71ab71e6a5d`, Game `2019d501d22614720ef37718e16913d81728e0a2`, Atlas `fc2a952169e15c070b4a2bc66095624d63798435`.
-- Planning-time blockers/overlaps must be re-resolved, especially Game #187/#162 and Atlas #179/#162/#170/#185 or their successors.
-- `WORLD_ATLAS_RISK_REGISTER.md` is a mandatory execution input, not closeout-only prose. Re-read it at provider design freeze, embedded-host selection, candidate freeze and final cutover. A triggered unresolved Critical risk blocks the dependent decision/cutover; a triggered High risk requires exact mitigation evidence before the dependent decision is accepted. Successful CI alone never closes an architectural/security/performance risk.
-- No provider production/live deployment from this META planning lifecycle.
+- `Oteryn/Oteryn-Game` is the sole canonical World/Content/gameplay-fact authority.
+- `Oteryn/Oteryn-Atlas` is the derived Atlas product and independent release/failure domain.
+- Game→Atlas remains provider-owned, explicit, versioned, public-safe and artifact-first.
+- META never copies provider schemas/runtime or becomes a second content database.
+- Atlas does not depend on arbitrary Game-internal Rust crates.
+- No big-bang rewrite: every migrated Atlas capability is parity-first, independently reversible and benchmarked.
+- Full embedded Atlas content is local/pinned/digest-bound; public Atlas availability is not a gameplay dependency.
+- Native gameplay minimap/HUD remains native and usable when the embedded Atlas host is absent, incompatible, crashed or disabled.
+- Private/live client state is local-session-only and never a public Atlas publication input.
+- Bridge V1 is non-authoritative UI integration only; no movement/combat/item-use/arbitrary server mutation.
+- Every substantial new/resumed task gets a fresh GitHub snapshot and a passing canonical execution-routing packet before work is released.
+- One mutating task = one Issue, one branch/worktree, one PR, exact owned paths and immutable `admission_main_sha`.
+- Moving `main` is `UPSTREAM_ADVANCED`, not a reason to restart; integrate late and rerun only invalidated proof.
+- Shared Cargo/workspace/toolchain, Game client composition, Atlas FullWorld/shared shell, workflows/CI, META compatibility record and final integration are serialized leases.
+- `WORLD_ATLAS_RISK_REGISTER.md` is re-read at provider design freeze, host selection, candidate freeze and final cutover. Triggered unresolved Critical risks block; triggered High risks require explicit mitigation evidence.
+- No provider production/live deployment is authorized by this META architecture packet itself.
 
----
+Planning SHAs in this document are provenance only. All execution resolves live state.
 
-## 1. Programme lifecycle and authority map
+## 2. Lifecycle graph
 
-| Scope | Lifecycle | Authority |
+| Scope | Lifecycle | Owner |
 | --- | --- | --- |
-| cross-repo architecture/programme | `Oteryn/Oteryn#75` | META coordination only |
-| prompt/orchestration pack | `Oteryn/Oteryn#76` | META agent coordination |
-| embedded bridge threat model | `Oteryn/Oteryn#77` | cross-product security acceptance envelope |
-| cross-surface verification | `Oteryn/Oteryn#78` | composition of immutable provider evidence |
-| release/cutover | `Oteryn/Oteryn#79` | cross-repo compatibility tuple/cutover coordination |
-| performance/resource evidence | `Oteryn/Oteryn#80` | ecosystem comparison, provider benchmarks remain local |
-| architecture packet validation | `Oteryn/Oteryn#81` | META planning packet proof |
-| World Atlas Compatibility Record V1 | `Oteryn/Oteryn#84` | dedicated schema/validator/meta-gate mechanism |
-| Game producer/client programme | `Oteryn/Oteryn-Game#191` | Game provider implementation |
-| Atlas Rust/reuse programme | `Oteryn/Oteryn-Atlas#188` | Atlas provider implementation |
+| architecture/programme | `Oteryn/Oteryn#75` | META |
+| prompt/orchestration pack | `Oteryn/Oteryn#76` | META |
+| embedded bridge security | `Oteryn/Oteryn#77` | META composition / provider evidence |
+| cross-surface verification | `Oteryn/Oteryn#78` | META composition / provider evidence |
+| release/cutover | `Oteryn/Oteryn#79` | META |
+| performance/resource evidence | `Oteryn/Oteryn#80` | META composition / provider evidence |
+| architecture packet validation | `Oteryn/Oteryn#81` | META |
+| World Atlas Compatibility Record V1 | `Oteryn/Oteryn#84` | META mechanism |
+| Game programme | `Oteryn/Oteryn-Game#191` | Game |
+| Atlas programme | `Oteryn/Oteryn-Atlas#188` | Atlas |
 
-The coordinator may create additional provider child Issues only after a worker domain is dependency-ready and exact ownership is known. Do not create speculative runtime branches just to reserve work. Issue #84 is the sole lifecycle for the dedicated World Atlas compatibility-record mechanism; do not duplicate it.
+#84 is the single lifecycle for the dedicated World Atlas compatibility schema/validator. Do not duplicate it.
 
-## 2. Target product decomposition
+## 3. Required immutable identity model
 
-### Game-owned producer/runtime side
-
-Game owns canonical world/content/gameplay facts, the public Atlas export contract/profile/allowlist, deterministic producer/provenance, native gameplay minimap/HUD, client embedded-host integration, local live-state source/validation, bridge native endpoint and client packaging of an exact Atlas embedded bundle digest.
-
-### Atlas-owned side
-
-Atlas owns validated ingestion, the Rust derived core, spatial/search/query/index products, derived publication, Rust/WASM adapter where selected, existing web product UI/DOM/accessibility, reusable embedded-web bundle construction, embedded-mode bridge endpoint, and public Atlas deployment/release.
-
-### META-owned side
-
-META owns only architecture/sequencing, compatibility identity composition, immutable provider evidence references, the dedicated World Atlas compatibility record mechanism and final compatible release tuple. META does not copy provider schemas/runtime.
-
-## 3. Compatibility identities
-
-The programme preserves independent immutable identities for:
+Keep the stages below separate for **each provider**:
 
 ```text
+provider_pr_head_sha
+        |
+        +--> exact-head required checks
+        +--> exact-head accepted review
+        |
+        v
+immutable provider_merge_evidence_ref
+        |
+        v
+provider_main_or_release_commit_sha
+        |
+        +--> post-merge checks/live acceptance/deployment evidence as applicable
+```
+
+Never bind pre-squash check/review evidence to the resulting squash/main SHA. Never let a reviewed PR head prove a different merge result. The final record therefore preserves, independently:
+
+```text
+game_provider_pr_head_sha
+game_main_or_release_commit_sha
+game_provider_merge_evidence_ref
+atlas_provider_pr_head_sha
+atlas_main_or_release_commit_sha
+atlas_provider_merge_evidence_ref
+
 game_atlas_export_profile_version
 game_atlas_export_producer_revision
 game_atlas_export_artifact_manifest_digest
 game_atlas_export_payload_digest_or_root
 game_world_content_revision
-game_main_or_release_commit_sha
 atlas_core_api_identity
 atlas_web_embedded_bundle_version
 atlas_web_embedded_bundle_digest
-atlas_main_or_release_commit_sha
 public_atlas_deployed_bundle_version
 public_atlas_deployed_bundle_digest
 public_atlas_bundle_relation_to_embedded
@@ -94,371 +97,300 @@ game_client_release_identity
 public_atlas_release_or_deployment_identity
 ```
 
-Rules:
+Additional chain-of-custody evidence is mandatory:
 
-- no floating branch/latest alias is a release identity;
-- producer version, world revision and produced artifact digest are distinct;
-- embedded bundle version and digest are distinct;
-- public deployed bundle identity is distinct from client-embedded bundle identity because public Atlas can advance/rollback independently;
-- Game provider required-check/review evidence must resolve to the exact recorded final Game provider SHA; Atlas provider required-check/review evidence must resolve to the exact recorded final Atlas provider SHA; older/stale-head or cross-provider evidence is invalid;
-- bridge protocol/profile is valid only with immutable compatibility/handshake evidence binding the exact recorded Game client, exact pinned embedded bundle version/digest, supported bridge range/profile and world/content compatibility identity;
-- bridge incompatibility disables the bridge/live overlay fail-closed;
-- META records combinations, not provider schema copies.
+- Game export-build evidence binds producer revision + export profile/version + world/content revision → exact produced manifest/payload digests.
+- Atlas embedded-bundle build evidence binds exact accepted Game digests + Atlas Core/API identity → exact embedded bundle version/digest.
+- Game client pins the exact embedded bundle digest.
+- Bridge compatibility/handshake evidence binds exact client identity + pinned embedded bundle version/digest + supported bridge range/profile + selected protocol/profile + world/content compatibility identity.
+- Public deployment evidence binds the named public deployment identity → exact public deployed bundle version/digest.
 
 ## 4. Stable conceptual interfaces
 
-### 4.1 Game → Atlas public artifact envelope
+### 4.1 Game → Atlas artifact
 
-Must convey producer revision, export profile version, world/content revision, public capabilities, payload manifest, payload digests, provenance and minimum consumer requirements. It contains only Game-selected public-safe facts. Provider evidence must retain an immutable Game export-build/manifest identity proving that the recorded producer revision/profile/world revision produced the exact manifest and payload digests used by Atlas.
+Must carry producer revision, export profile version, world/content revision, public capabilities, payload manifest/digests, provenance and minimum consumer requirements. Only Game-selected public-safe facts are allowed.
 
-### 4.2 Atlas Core surface
+### 4.2 Atlas Core
 
-Provider design freezes exact types/signatures for deterministic operations equivalent to:
+Provider design freezes bounded deterministic operations equivalent to verified artifact ingestion, world/spatial queries, search/intelligence, entity/location resolution, routing/path products and capability-state reporting. DOM/browser state is not a second authority.
 
-```text
-load_verified_public_artifact(...)
-query_world(...)
-query_spatial(...)
-search(...)
-resolve_entity(...)
-resolve_map_location(...)
-route_or_path_product(...)
-capability_state(...)
-```
+### 4.3 Embedded bundle
 
-Browser/DOM state is not a second authority inside the core.
-
-### 4.3 Embedded bundle manifest
-
-Must identify bundle version/digest, Atlas Core/API identity, supported Game export profiles, supported bridge range, required host capabilities, file/asset digests and security profile. Provider evidence must retain an immutable Atlas build/manifest identity binding the exact accepted Game manifest/payload digests plus Atlas Core/API identity to the exact embedded bundle version/digest.
+Manifest identifies exact bundle version/digest, Atlas Core/API identity, supported Game export profiles, supported bridge range/profile, required host capabilities and file/asset digests.
 
 ### 4.4 Local bridge
 
-Handshake semantically binds protocol version, capability profile, client release identity, Atlas bundle identity and world/content revision. Immutable compatibility/handshake evidence must bind those selected values to the client/bundle supported protocol/profile range. Mismatch yields explicit incompatible/degraded state.
+Handshake binds protocol, capability profile, exact Game client identity, exact pinned Atlas bundle and world/content compatibility identity. Mismatch disables the bridge/live overlay fail-closed.
 
-Client→Atlas V1 candidates are current player position/floor, route progress, privacy-approved party positions, locale presentation and separately accepted bounded quest context.
+Candidate V1 client→Atlas state: player position/floor, route progress, privacy-approved party positions, locale and separately accepted bounded quest context. Candidate Atlas→client intents: validated set/clear waypoint and focus coordinate/entity only.
 
-Atlas→Client V1 candidates are set/clear waypoint and validated focus coordinate/entity. No direct movement, attack, item use, arbitrary server command, filesystem/process API or credentials.
-
----
-
-# 5. Execution DAG
+## 5. Execution DAG
 
 ```text
-META architecture packet merge
+canonical META architecture packet
         |
         v
-Wave 0 provider-read-only / META evidence-only discovery (5 parallel scouts)
+Wave 0: five provider-read-only / META evidence-only scouts
         |
         v
-Wave 1 Game + Atlas provider design freeze
+Wave 1: Game + Atlas provider design freeze
         |
         +-------------------+
         v                   v
-Wave 2 Game foundations   Atlas Rust workspace foundation
+Wave 2 Game foundations   Atlas Rust foundation
         |                   |
-        |            Wave 3 ingest/spatial/search
+        |            Wave 3 Atlas Core lanes
         |                   |
         |            Wave 4 WASM/web + bundle
         +---------+---------+
                   v
-             Wave 5 client host + bridge
+Wave 5 native host + bridge
                   v
-        Wave 6 security/perf/cross-surface E2E
+Wave 6 qualification evidence lane + provider qualification
                   v
-        Wave 7 provider cutover + #84 V1 record
+Wave 7 provider integration/cutover + #84 V1 record
                   v
-        independent closeout audit
+independent closeout auditor
                   v
-        Wave 8 later legacy retirement
+Wave 8 legacy retirement
 ```
 
-## Concurrency policy
+Normal maximum reasoning/scout lanes: 5. Normal mutating provider lanes: 2–3 disjoint lanes.
 
-Recommended maximum active reasoning/scout leads: **5**. Recommended mutation: **2–3 disjoint provider lanes**. Programme coordinator, Game/Atlas architecture leads, native host/bridge lead, security lead, final integrator and independent closeout auditor use Extra High reasoning; bounded implementation/parity workers use High unless their provider task requires stricter reasoning.
+## 6. Wave 0 — provider-read-only / META evidence-only discovery
 
-Root Cargo/workspace/composition/CI, Game client composition, Atlas shared FullWorld shell, META compatibility-record implementation and final release/cutover mutation are serialized leases. Heavy Atlas browser/Molehill qualification follows the current live slot policy.
+Wave 0 starts only after the architecture packet is canonical on protected META `main`.
 
----
+Each independently launched WA-0A..WA-0E gets:
 
-# 6. Wave 0 — provider-read-only / META evidence-only discovery
+- fresh META child Issue under #75;
+- dedicated META branch/worktree and PR/task head;
+- exactly one disjoint `docs/evidence/world-atlas/wave0/<role>.md` report path or coordinator-recorded equivalent;
+- normal PR-backed routing packet validated against fresh GitHub state;
+- write authority only to that META report.
 
-Wave 0 begins only after this packet is canonical on protected META `main`. No provider runtime mutation. Each independently launched scout must first receive a fresh META evidence child Issue, dedicated branch/worktree and PR/task head, exactly one disjoint evidence-report path, and a passing normal PR-backed execution-routing packet. Only that assigned META report may be mutated.
+Game/Atlas/provider runtime/config/Cargo/workflow/shared-shell/production paths remain read-only. There is no PR-less Wave-0 route.
 
-### Task 0A — Game public export inventory
+### 0A Game contract scout
 
-Read Game #191. Record exact current public Atlas products/versions, owning contracts/producer paths, public-safe capabilities/gaps, identity/revision fields, fixtures, possible public codec-crate value and active ownership conflicts. Do not invent fields or edit Game/Cargo. Persist only the assigned META evidence report.
+Inventory current public Atlas contracts/profiles, deterministic producer/provenance, world/content identities, fixtures, gaps, optional public Rust codec value and active ownership conflicts. Persist only the META report.
 
-### Task 0B — Atlas Rust migration inventory
+### 0B Atlas migration scout
 
-Read Atlas #188. Inventory relevant generators, `src/browser/**`, `web/**`, publication paths and tests. Classify material components as `KEEP_WEB_UI`, `KEEP_JS_GLUE`, `MIGRATE_RUST_CLI`, `MIGRATE_RUST_CORE`, `MIGRATE_RUST_WASM_CANDIDATE`, `WAIT_FOR_BENCHMARK` or `DO_NOT_MIGRATE`. Record exact parity oracles, interfaces and shared leases. Persist only the assigned META evidence report.
+Trace relevant `tools/**`, `src/browser/**`, `web/**`, publication and tests. Classify components as keep web/UI/glue, Rust CLI/Core/WASM candidate, benchmark-gated or do-not-migrate. Identify parity oracles, interfaces and shared leases.
 
-### Task 0C — native client host feasibility
+### 0C Client-host scout
 
-Read Game #191. Identify the client composition boundary and realistic embedded-host candidates. Record local-origin support, navigation controls, CSP/resource controls, JS↔native messaging, crash isolation, packaging, input/focus/accessibility, offline behavior and benchmark/security matrix. Do not select a host from preference alone. Persist only the assigned META evidence report.
+Identify client composition boundary and viable embedded web hosts. Compare local origin, navigation/CSP/resource controls, JS↔native messaging, crash isolation, packaging, accessibility/input, offline behavior, license/supply chain and benchmark plan.
 
-### Task 0D — security/privacy discovery
+### 0D Security scout
 
-Lifecycle #77. Threat model malicious/corrupt bundle, XSS, arbitrary navigation, bridge spoof/replay/flood/oversize, privilege escalation, credential leakage, private-state publication/log leakage, stale/incompatible artifacts, host crash/hang/resource exhaustion and dependency compromise. Provider repos remain read-only; persist only the assigned META evidence report.
+Threat-model malicious/corrupt bundle, XSS/navigation, bridge spoof/replay/flood, privilege escalation, credential leakage, private-state publication/log leakage, stale artifacts, host crash/resource exhaustion and dependency compromise.
 
-### Task 0E — verification/performance baseline
+### 0E Verification/performance scout
 
-Lifecycle #78/#80. Record exact current Atlas and Game verification gates, representative full-world fixtures, cross-surface journey oracles, constrained runner resources and benchmark evidence format. Provider repos remain read-only; persist only the assigned META evidence report.
+Map current provider gates, representative full-world/parity fixtures, cross-surface journeys, heavy-runner constraints and benchmark evidence format.
 
-### Wave 0 gate
+Wave-0 gate: review all five META evidence PR handoffs and freeze real gaps/unknowns before provider design mutation.
 
-Review all five evidence PR handoffs. Freeze exact contract conflicts, ownership, host candidates, migration priority and decision blockers before provider design mutation.
+## 7. Wave 1 — provider design freeze
 
----
+Game and Atlas designs may run concurrently. Before acceptance, execute the design-freeze risk checkpoint.
 
-# 7. Wave 1 — provider design freeze
+### 1A Game design
 
-Game and Atlas design lanes may run concurrently because repositories differ.
+Freeze export gaps/identities, embedded-host adapter, native minimap independence, bridge native endpoint/profile, bundle pinning, failure behavior, tests and serialized Cargo/client-composition leases.
 
-Before either provider design is accepted as frozen, re-read `WORLD_ATLAS_RISK_REGISTER.md` against the exact design evidence. Record immutable dispositions for every triggered High/Critical risk. Any triggered unresolved Critical risk blocks provider design freeze; a triggered High risk requires exact mitigation evidence before acceptance.
+### 1B Atlas design
 
-### Task 1A — Game producer + client design
+Freeze Rust workspace/crates, pure-core dependency direction, Game artifact consumer boundary, parity seams, Core/WASM APIs, embedded bundle manifest, bridge web endpoint, Production UI Shell integration, rollback/capability flags, tests and FullWorld/workflow leases.
 
-Create provider-owned design/plan under Game #191. Define exact export identities/gaps, client host adapter, native minimap independence, bridge API/capability profile, packaging of exact embedded bundle digest, failure behavior, dependency direction, tests and shared Cargo/client composition leases. Reconcile the live Game coordinator and any durability/client ownership blocker first.
+### 1C Security profile
 
-### Task 1B — Atlas Rust Core + reusable bundle design
+Freeze trusted origin, network/navigation/CSP policy, capability allowlist, message framing/version/size/rate validation, privacy/retention, crash behavior, supply-chain policy and negative tests. Reject hosts that cannot satisfy it.
 
-Create provider-owned design/plan under Atlas #188. Define Rust workspace/crates, pure-core dependency direction, Game export consumer boundary, legacy parity seams, Core/WASM APIs, embedded bundle manifest, bridge web endpoint, Production UI Shell integration, rollback/capability flags, tests and shared FullWorld/workflow leases. Reconcile live #179/#162/#170/#185 successors first.
+## 8. Wave 2 — foundations
 
-### Task 1C — security profile freeze
+### 2A Atlas Rust foundation
 
-Under #77 define trusted origin, network/navigation/CSP policy, native capability allowlist, message framing/version/size/rate validation, privacy/retention, crash/restart behavior, supply-chain policy and negative tests. Reject any host that cannot meet the profile.
+Under serialized root lease add the Atlas Rust workspace/core/model foundation, deterministic bounded errors/resources, unit/property tests and CI/lint/security checks. No production capability cutover yet.
 
----
+### 2B Game export gaps
 
-# 8. Wave 2 — foundations
+Run only for proven gaps. Deliver provider-owned profile/schema evolution, producer changes, permanent tests, exact fixtures and Game export-build evidence. If no gap, record `NO_CHANGE_REQUIRED`; do not create a cosmetic branch.
 
-### Task 2A — Atlas Rust workspace/core foundation
+### 2C Embedded host prototype
 
-Serialized Atlas root workspace/dependency/CI lease. Deliver toolchain/workspace policy, pure core/model crates, deterministic errors, bounded resource-limit surface, Rust unit/property tests and CI/lint/security checks without cutting over production capabilities.
+Prototype only isolated Game paths. Measure local content, navigation isolation, startup, RSS/CPU/GPU, input/focus, crash/hang isolation, offline operation, packaging and dependency security. Execute host-selection risk checkpoint before accepting a host.
 
-### Task 2B — Game export gap implementation
+## 9. Wave 3 — Atlas Core lanes
 
-Run only when Wave 0/1 proves a concrete gap. Deliver Game-owned profile/schema evolution, deterministic producer changes, compatibility/negative tests, immutable export-build/manifest evidence binding producer/profile/world inputs to exact output digests, and exact fixture/publication evidence. If no gap, record `NO_CHANGE_REQUIRED`; no cosmetic branch.
+After the foundation/API is canonical, release up to three disjoint Atlas lanes:
 
-### Task 2C — embedded host prototype
+- 3A verified ingestion/compiler/index parity;
+- 3B spatial/query core;
+- 3C search/intelligence core.
 
-Prototype realistic host candidates in isolated Game paths and measure local content, navigation isolation, startup, RSS/CPU/GPU, input/focus, crash/hang isolation, offline operation, packaging and dependency/license security. Before selecting/promoting a host, re-read `WORLD_ATLAS_RISK_REGISTER.md`, record exact triggered-risk dispositions, block selection on any triggered unresolved Critical risk and require exact mitigation evidence for every triggered High risk affecting host acceptance. Select only a host satisfying the frozen security/product criteria.
+Every lane uses RED→GREEN permanent tests, current accepted oracle/parity, deterministic results, bounded resources, benchmark evidence and rollback/shadow path. Shared shell/CI edits require serialized leases.
 
----
+## 10. Wave 4 — Web/WASM + reusable bundle
 
-# 9. Wave 3 — Atlas Core capability lanes
+- Expose reusable core behavior through bounded WASM only where justified.
+- Keep DOM/accessibility/UI in web technology.
+- Cut over capability-by-capability with shadow/parity proof and rollback retained.
+- Produce one deterministic public/embedded bundle lineage with exact manifest/file digests.
+- Public mode has no private bridge dependency; embedded mode enables only accepted local bridge.
+- Preserve immutable Atlas build evidence linking exact accepted Game digests + Core identity → exact embedded bundle version/digest.
 
-After root workspace/core interfaces are canonical, up to three disjoint Atlas lanes may run concurrently:
+## 11. Wave 5 — native client integration
 
-### Task 3A — verified ingestion/compiler/index parity
+Requires accepted host, immutable embedded bundle candidate and frozen bridge/security profile.
 
-RED→GREEN tests for accepted Game input, malformed/oversized/incompatible rejection, deterministic repeated build, logical/byte parity where promised, provenance/digest continuity and wall-time/RSS/output benchmark. Keep legacy generator as rollback/shadow comparator.
+- production host loads only pinned local bundle and contains failures;
+- native bridge validates handshake/source/size/rate/capabilities and exposes no gameplay mutation/credentials;
+- Atlas embedded endpoint keeps local state ephemeral and unavailable in public mode;
+- native minimap/waypoint interop stays narrow and native-minimap independent;
+- produce immutable bridge handshake/compatibility evidence usable by final release record.
 
-### Task 3B — spatial/query core
+## 12. Wave 6 — qualification
 
-Test coordinates/floors/bounds, overflow rejection, deterministic ordering, current-oracle parity, property invariants and large-world performance. No DOM/WebGL edits.
+Before expensive qualification, freeze exact provider candidate PR heads/artifact digests and execute the candidate-freeze risk checkpoint.
 
-### Task 3C — search/intelligence core
+### 12.1 WA-6Q qualification-evidence lifecycle
 
-Test stable normalization/results, public authority preservation, truthful missing/partial capabilities, parity with accepted search journeys and resource performance. Never invent canonical gameplay facts.
+`OTERYN-WORLD-ATLAS-QUALIFICATION-LEAD` is provider-read-only over frozen candidates but not lifecycle-free. Each qualification cycle gets:
 
-Each lane merges through normal Atlas protected lifecycle; workers never share one writable integration branch.
+- fresh META qualification-evidence child Issue under #78/#80;
+- dedicated META branch/worktree and PR/task head;
+- exactly one `docs/evidence/world-atlas/qualification/<candidate-or-role>.md` report path or recorded equivalent;
+- normal PR-backed routing packet validated against fresh GitHub state;
+- write authority only to that META report.
 
----
+Game/Atlas frozen candidate code/config remains read-only for WA-6Q. If provider-owned test/evidence code must change, create a separate provider child Issue/branch/worktree/PR/routing packet, invalidate affected frozen evidence and return the candidate to integration. There is no PR-less WA-6Q route.
 
-# 10. Wave 4 — Web/WASM and reusable bundle
+### 12.2 Qualification proof
 
-### Task 4A — WASM adapter
+- #77 security: origin/navigation/CSP, bridge limits/allowlist, secret/private-state protections, malicious input/host/dependency failures.
+- #80 performance: exact machine/profile, Rust migration comparisons, WASM/bundle startup, host RSS/CPU/GPU/input and native minimap baseline.
+- #78 cross-surface E2E: compatible public facts/location/floor/camera/routing, embedded-only local state, public no-private-state, host failure/minimap independence and negative bundle/export/bridge cases.
 
-Expose stable Core behavior through bounded serialization/error mapping. Keep browser DOM/accessibility in web technology and collect startup/payload/runtime evidence.
+Any product/config change creates a new candidate and invalidates affected evidence.
 
-### Task 4B — capability-level shadow/cutover
+## 13. Wave 7 — provider integration, cutover and V1 record
 
-For every migrated capability compare current and Rust/WASM paths on the same fixtures/actions, promote failures to regressions, cut over only after parity/performance/browser proof and retain rollback until separate removal gate.
+Execute final-cutover risk checkpoint first.
 
-### Task 4C — web/embedded bundle V1
+### 7A Candidate evidence freeze
 
-Produce deterministic local static bundle with manifest, exact Core/export/bridge identities, file digests, public/embedded modes without codebase duplication, default-deny embedded remote navigation and a bridge endpoint disabled in public mode. Retain immutable build/manifest evidence proving the exact accepted Game export digests and exact Atlas Core/API identity that produced the exact embedded bundle version/digest.
+Freeze pre-integration identities that already exist:
 
----
+- exact Game provider PR-head candidate and its exact-head checks/review;
+- exact Atlas provider PR-head candidate and its exact-head checks/review;
+- Game export profile/producer/world revision + export-build evidence + exact produced digests;
+- Atlas accepted Game digests + Core identity + embedded-bundle build evidence + exact bundle;
+- candidate Game client + pinned bundle;
+- bridge protocol/profile + immutable candidate handshake evidence;
+- security/performance/E2E/rollback evidence.
 
-# 11. Wave 5 — native client integration
+Do not invent resulting squash/main SHAs or terminal public deployment identities before they exist.
 
-Starts after host acceptance and immutable Atlas bundle candidate.
+### 7B Provider final integration
 
-### Task 5A — Game host production adapter
+For **each provider independently**:
 
-Load only the pinned local embedded bundle, expose open/close/degraded UI, clean resources, contain failure to Atlas capability and keep gameplay/native minimap usable.
+1. refresh protected `main`, merge-up if needed and rerun invalidated exact-head proof;
+2. freeze the exact **pre-squash provider PR head SHA** that passed required checks/review;
+3. record immutable required-check/review evidence resolving to that exact PR head;
+4. protected-squash-merge the PR;
+5. record the exact resulting protected `main`/release commit SHA;
+6. record immutable provider merge evidence proving `provider_pr_head_sha -> provider_main_or_release_commit_sha`;
+7. run required post-merge checks/live acceptance against the resulting main/release SHA.
 
-### Task 5B — Game local bridge endpoint
+Checks/reviews bound only to the post-squash SHA are invalid because that SHA was not the reviewed PR head. Conversely, a reviewed PR head without merge-binding evidence does not prove which protected-main commit was produced. Old/stale/cross-provider evidence is blocking.
 
-Implement version/capability handshake, allowlisted events/intents, source/size/rate validation, mismatch/reconnect behavior, privacy-safe diagnostics, no credentials and no gameplay/server mutation commands. Produce immutable handshake/compatibility manifest evidence that can later bind exact client identity, pinned embedded bundle version/digest, supported bridge protocol/profile range and world/content compatibility identity.
+### 7C Public Atlas cutover
 
-### Task 5C — Atlas embedded-mode bridge endpoint
+Atlas performs merged-main deployment/live acceptance. Record exact public deployment identity, exact deployed public bundle version/digest, immutable deployment→bundle evidence, rollback artifact and declared relation to embedded bundle.
 
-Keep local state ephemeral, validate intents/messages, perform no public publication writes and keep bridge code unavailable in public mode.
+### 7D Native client acceptance
 
-### Task 5D — native minimap/waypoint interop
+Game acceptance runs against exact embedded bundle digest and final bridge tuple. Preserve immutable handshake evidence binding accepted client + pinned bundle + supported/selected bridge protocol/profile + world/content identity.
 
-Integrate only narrow local UX semantics such as a validated Atlas waypoint; native minimap remains native Rust/wgpu.
+### 7E Terminal refreeze + dedicated META World Atlas Compatibility Record V1
 
----
+1. Refresh/reconcile #84; do not duplicate it.
+2. Require canonical #84 schema, validator, deterministic regressions and `meta-gate` integration.
+3. If absent, return `WAITING_EXTERNAL: WORLD_ATLAS_COMPATIBILITY_RECORD_MECHANISM_NOT_CANONICAL`.
+4. After 7B–7D, terminally refreeze for Game and Atlas separately:
+   - provider PR head SHA;
+   - provider exact-head required-check refs;
+   - provider exact-head review refs;
+   - provider resulting protected-main/release SHA;
+   - immutable head→resulting-main merge evidence;
+   - provider post-merge/live evidence.
+5. Refreeze exact Game export-build chain, Atlas embedded-bundle build chain, exact client+bundle bridge handshake chain and exact public deployment→bundle chain.
+6. Create final record only at `ecosystem/world-atlas/releases/<release_id>.json` under the #84 schema.
+7. Validate every cross-link and reject wrong-stage squash evidence, stale heads, wrong merge result, cross-provider substitution or floating refs.
+8. Deliver the record through a dedicated META PR with exact-head checks/review.
+9. Protected-squash-merge it, read exact record path back from exact merge SHA and require post-merge `meta-gate` on that SHA.
 
-# 12. Wave 6 — qualification
+Issue #79 narration, generic releases, Draft/unmerged PRs or Markdown tuples are not terminal records.
 
-Before the candidate freeze is accepted as qualification authority, re-read `WORLD_ATLAS_RISK_REGISTER.md` against the exact candidate heads/artifact digests and current evidence. Record immutable dispositions for every triggered High/Critical risk. A triggered unresolved Critical risk blocks candidate-freeze acceptance; a triggered High risk requires exact mitigation evidence. CI success alone is not risk closure.
+## 14. Wave 8 — legacy retirement
 
-Freeze exact candidate heads/artifact digests before expensive qualification. Code/config changes require a new freeze and reapplication of the risk checkpoint.
+Open separate bounded Atlas removal lifecycles only after the new default has parity/browser/live acceptance, rollback evidence, acceptable performance/security and zero active consumers. No opportunistic cleanup.
 
-### Task 6A — security
+## 15. Rollback matrix
 
-Lifecycle #77. Prove trusted local origin, default-deny navigation/network, CSP/resource restrictions, bridge validation/limits/allowlist, forbidden command rejection, no secret exposure, no private-state publication leakage, malicious bundle handling, host isolation and dependency posture. Independent reviewer required.
-
-### Task 6B — performance/resources
-
-Lifecycle #80. Record exact machine/profile and compare current/Rust generators, selected JS/WASM hot paths, bundle startup/payload, embedded host RSS/CPU/GPU/input, large-world paths and native minimap unaffected baseline.
-
-### Task 6C — cross-surface E2E
-
-Lifecycle #78. On compatible immutable world/export evidence prove same public entity facts/location/floor/camera semantics, route/waypoint where supported, embedded local state only in client mode, public no-private-state behavior, host failure/minimap independence and negative bridge/export/bundle cases.
-
----
-
-# 13. Wave 7 — release compatibility and cutover
-
-**Lifecycle:** META #79 + #84 + `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`.
-
-Before Task 7A or terminal compatibility-record creation, execute the final-cutover risk checkpoint: re-read `WORLD_ATLAS_RISK_REGISTER.md`, record immutable dispositions for every triggered High/Critical risk, and stop cutover while any triggered unresolved Critical risk remains. Triggered High risks require exact mitigation evidence before the dependent cutover decision; successful checks alone do not close them.
-
-### Task 7A — freeze pre-cutover candidate identities
-
-This is a **candidate-only freeze**, not the terminal compatibility tuple. Freeze only identities and evidence that already exist before provider merge/deployment:
-
-```text
-Game export profile/version + producer revision
-Game world/content revision
-Game export-build/manifest evidence binding those inputs to exact produced manifest/payload digests
-Game produced export manifest digest + payload digest/root
-Atlas Core/API identity
-Atlas accepted Game manifest/payload digests
-Atlas embedded-bundle build/manifest evidence binding accepted digests + Core identity to exact bundle
-embedded bundle version + digest
-bridge protocol/profile
-bridge compatibility/handshake evidence binding candidate client + pinned embedded bundle + supported protocol/profile + world/content identity
-Game client candidate identity + pinned embedded bundle digest
-separate Game/Atlas provider required-check refs for the candidate heads
-separate Game/Atlas provider review-evidence refs for the candidate heads
-security/performance/cross-surface/rollback evidence refs available at candidate freeze
-```
-
-Do **not** freeze `public_atlas_deployed_bundle_version`, `public_atlas_deployed_bundle_digest`, `public_atlas_release_or_deployment_identity`, final `public_atlas_bundle_relation_to_embedded`, or immutable public deployment-to-bundle evidence in Task 7A. Those terminal identities do not exist until the merged-main public deployment/live acceptance in Task 7C. Any earlier deployment values are historical evidence only and must not be carried forward as the final tuple.
-
-No candidate identity contains a floating ref.
-
-### Task 7B — provider final integration
-
-Each provider independently refreshes current protected `main`, merge-ups normally, reviews the complete diff, reruns invalidated exact-head tests, obtains required review, protected-squash-merges and verifies resulting main/post-merge checks. After integration, freeze exact final `game.main_or_release_commit_sha` and `atlas.main_or_release_commit_sha`. Every required-check and review-evidence reference retained for Game must resolve to the exact recorded final Game SHA; every corresponding Atlas reference must resolve to the exact recorded final Atlas SHA. Old/stale-head or cross-provider evidence is rejected and cannot be carried from Task 7A.
-
-### Task 7C — public Atlas cutover
-
-Atlas follows its normal merged-main deployment/live acceptance. Record exact deployed revision, exact deployed public bundle version/digest, immutable evidence binding the deployment to that digest, the declared relation to the client-embedded bundle and rollback artifact. If the public deployment intentionally uses a different but compatible bundle, prove compatibility using provider evidence defined by the release contract.
-
-### Task 7D — native client candidate acceptance
-
-Game runs provider-owned native-client acceptance against the exact embedded bundle digest. Prove offline/local startup, bridge behavior, native minimap fallback, and immutable bridge compatibility/handshake evidence binding the accepted final Game client identity + pinned embedded bundle version/digest + supported bridge range/profile + selected protocol/profile + recorded world/content compatibility identity.
-
-### Task 7E — terminal tuple refreeze + dedicated META World Atlas Compatibility Record V1
-
-1. Refresh/reconcile existing lifecycle `Oteryn/Oteryn#84`; do not create a duplicate compatibility schema/validator task.
-2. Require #84 to have protected-merged the dedicated mechanism:
-   - `ecosystem/world-atlas/compatibility.schema.json`;
-   - `tools/governance/validate_world_atlas_compatibility.py`;
-   - deterministic positive/negative validator regressions;
-   - integration into stable `meta-gate`.
-3. If that mechanism is not canonical, return `WAITING_EXTERNAL: WORLD_ATLAS_COMPATIBILITY_RECORD_MECHANISM_NOT_CANONICAL` for Task 7E while other dependency-ready work may continue.
-4. **After Tasks 7B–7D are complete, perform a mandatory terminal refreeze** that supersedes Task 7A for release authority. It must bind the exact final Game and Atlas provider main/release SHAs; separate provider required-check/review refs that resolve to those exact final SHAs; immutable Game export-build evidence; exact produced and Atlas-accepted Game manifest/payload digests; Atlas Core/API identity; immutable Atlas embedded-bundle build evidence; exact embedded bundle version/digest; exact final Game client identity; immutable bridge compatibility/handshake evidence binding that exact client + bundle + supported/selected bridge protocol/profile + world/content compatibility identity; exact public deployment identity; exact public deployed bundle version/digest; immutable deployment-to-bundle evidence; and final `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT` relation.
-5. Create the final record only at `ecosystem/world-atlas/releases/<release_id>.json` from that terminal refreeze using the separately typed identities required by the release contract. Generic `ecosystem/releases/*.json`, Issue comments, Markdown tables or opaque fields are not substitutes.
-6. Validate exact cross-links: Game producer/profile/world inputs == Game export-build evidence == produced Game manifest/payload digests; produced Game export == Atlas accepted export; Atlas accepted export + Core identity == Atlas embedded-bundle build evidence == embedded bundle; Game client pinned digest == embedded bundle digest; exact client+bundle == bridge compatibility/handshake evidence == selected supported protocol/profile + world/content identity; Game/Atlas check/review evidence == their corresponding exact recorded final provider SHA; and public deployment identity is bound to its exact public deployed bundle under the declared `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT` mode.
-7. Deliver the final record through a dedicated META PR with exact head, current required checks/review and `meta-gate` validation.
-8. Protected-squash-merge the record, read it back from the exact merge SHA and require post-merge `meta-gate` success on that exact protected-main SHA.
-
-Task 7E is not complete merely because #79 contains a candidate tuple or a compatibility PR exists. A terminal refreeze after public deployment/live acceptance is mandatory.
-
----
-
-# 14. Wave 8 — legacy path retirement
-
-Legacy Python/JS computational paths are not removed during first Rust implementation unless their exact removal gate is already satisfied. Separate Atlas cleanup PRs require the Rust path to be accepted default, parity/browser/live acceptance, documented rollback, zero active consumers, acceptable performance/security evidence and bounded diff review.
-
----
-
-# 15. Rollback matrix
-
-| Failure | Rollback/fallback |
+| Failure | Response |
 | --- | --- |
-| Rust compiler/index regression | capability-level previous accepted generator until removal gate |
-| WASM adapter failure | retained compatible JS/current path for that capability |
-| public Atlas deployment regression | Atlas deployment rollback to prior exact accepted public bundle/deployment pair |
-| embedded Atlas bundle incompatible/corrupt | disable panel or repin prior compatible bundle in a new client candidate; native minimap remains |
-| bridge mismatch/failure | disable live overlay/native intents; no guessed compatibility |
-| embedded host crash/hang | tear down/disable host; gameplay/native minimap remains |
-| private-state leak | fail release, disable bridge profile, sanitize evidence/logging, security requalification |
-| Game export incompatibility | Atlas rejects/marks unavailable; no legacy-runtime truth fallback |
-| bad META compatibility record | keep prior canonical record; do not report DONE until corrected record is reviewed, merged and post-merge validated |
+| Rust compiler/index regression | restore previous accepted capability path until removal gate |
+| WASM failure | use retained compatible current path for that capability |
+| public deployment regression | Atlas rollback to prior exact public deployment/bundle pair |
+| embedded bundle incompatible/corrupt | disable panel or repin prior compatible bundle in a new client candidate; native minimap stays |
+| bridge mismatch/failure | disable bridge/live overlay; do not guess compatibility |
+| embedded host crash/hang | tear down/disable host; gameplay/native minimap stays |
+| private-state leak | fail release, disable bridge profile, sanitize evidence/logging, requalify security |
+| Game export incompatible | Atlas rejects/marks unavailable; no legacy-runtime truth fallback |
+| bad META compatibility record | retain prior canonical record; do not report DONE |
 
----
+## 16. Definition of Done
 
-# 16. Definition of Done
+Programme completion requires immutable proof that:
 
-The programme is not `DONE` until immutable evidence proves all of the following:
+- architecture packet is canonical on protected META main;
+- Game/Atlas child work is terminal or evidence-backed `NO_CHANGE_REQUIRED`;
+- Game authority boundary remains intact;
+- Atlas Rust Core is real, tested, parity-qualified and rollback-capable;
+- public and embedded Atlas use the accepted shared Core/bundle architecture;
+- embedded Atlas works locally/offline and native minimap remains independent;
+- bridge is versioned/default-deny/security-qualified and private state remains local;
+- cross-surface journeys and failure cases pass;
+- performance/resource evidence exists;
+- substantial task routing evidence is fresh and valid, including Wave-0 and WA-6Q PR-backed META evidence lanes;
+- for each provider, required checks/review bind the exact pre-squash PR head, immutable merge evidence binds that head to the exact resulting protected-main/release SHA, and post-merge/live evidence binds the resulting SHA;
+- Game export-build, Atlas embedded-bundle build, client bundle pin, bridge handshake and public deployment chains are immutable and exact;
+- no triggered cutover-blocking risk remains unresolved;
+- #84 V1 mechanism is canonical;
+- final World Atlas compatibility record is exact-head reviewed/gated, protected-squash-merged, exact-record read back and post-merge `meta-gate` validated;
+- fresh independent `OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR` returns `FINAL_VERDICT: DONE`;
+- retained/removed legacy paths are truthful.
 
-- ADR 0005 and this programme packet are canonical on protected META main.
-- Required Game #191 and Atlas #188 children are terminal or evidence-backed `NO_CHANGE_REQUIRED`.
-- Game remains sole canonical world/content/gameplay authority.
-- Atlas Rust Core is real, tested and owns accepted derived capabilities without arbitrary Game-internal dependencies.
-- Migrated capabilities have parity, bounded resource and rollback evidence.
-- Public and embedded Atlas use the accepted shared Core/bundle architecture.
-- Native client opens a locally packaged Atlas without remote dependency; native minimap remains independent.
-- Bridge is versioned/default-deny/security-qualified and private state remains local-only.
-- Cross-surface user and failure journeys pass.
-- Exact performance/resource evidence exists for migrated paths and selected host.
-- Every substantial task packet that required routing validation has fresh, passing execution-routing evidence before local work/mutation; independently launched Wave-0 scouts additionally have truthful META evidence Issue/PR/task-head/report-path identities and no provider mutation.
-- Provider exact-head/protected-main checks and reviews are green, with separate immutable Game and Atlas required-check and review evidence, and every retained provider evidence ref resolves to the exact corresponding recorded final provider SHA rather than an older/stale head.
-- Every triggered risk has the disposition/evidence required by `WORLD_ATLAS_RISK_REGISTER.md`, with no unresolved cutover-blocking risk.
-- Immutable Game export-build evidence binds the recorded producer/profile/world revision to the exact produced manifest/payload digests.
-- Immutable Atlas embedded-bundle build evidence binds the exact accepted Game digests and Atlas Core/API identity to the exact embedded bundle version/digest.
-- Immutable bridge compatibility/handshake evidence binds the exact accepted Game client identity and pinned embedded bundle to the selected supported bridge protocol/profile and recorded world/content compatibility identity.
-- Public Atlas live acceptance binds the named public deployment to its exact deployed bundle version/digest.
-- Native client acceptance binds the client identity to its exact embedded bundle digest.
-- When public and embedded bundles differ, their relation is explicitly `COMPATIBLE_INDEPENDENT` with immutable compatibility evidence; otherwise it is `SAME_BUNDLE` with digest equality.
-- #84 dedicated V1 schema/validator/meta-gate mechanism is canonical.
-- Final World Atlas compatibility record is created only from the mandatory post-deployment terminal refreeze, preserves exact final provider SHAs and provider-head-bound required-check/review evidence, Game export-build evidence, Atlas embedded-bundle build evidence, bridge compatibility/handshake evidence, separate Game/Atlas required-check and review evidence, is exact-head reviewed/gated, protected-squash-merged, read back and post-merge `meta-gate` validated.
-- A fresh independent `OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR` returns `FINAL_VERDICT: DONE` with complete immutable evidence.
-- Legacy paths are retained or removed truthfully according to their own removal gates.
-- No unresolved security, authority, provenance or compatibility conflict is hidden as PASS.
+## 17. Coordinator completion report
 
-# 17. Coordinator completion report
+Return exact:
 
-The final coordinator returns:
-
-- parent/child Issue numbers and terminal states;
-- META architecture merge SHA;
-- exact Game and Atlas final main/release SHAs;
-- exact provider PRs/merge SHAs;
-- separate immutable Game and Atlas provider exact-head required-check refs and review evidence refs, each resolving to the corresponding recorded final provider SHA;
-- Game export profile/version, producer revision, world/content revision, exact produced manifest/payload digests and immutable Game export-build evidence ref;
-- Atlas Core/API identity, exact accepted Game manifest/payload digests, exact embedded bundle version/digest and immutable Atlas embedded-bundle build evidence ref;
-- exact public deployed bundle version/digest and relation to embedded;
-- immutable public deployment-to-bundle evidence;
-- bridge protocol/profile and immutable bridge compatibility/handshake evidence;
-- Game client identity pinning the embedded bundle;
-- public Atlas deployment identity;
-- execution-routing validation refs for substantial lanes, including META evidence Issue/PR/report identities for independently launched Wave-0 scouts;
-- #84 schema/validator paths and final compatibility record path/PR/head/merge/post-merge-gate refs;
-- verification/security/performance evidence references;
-- rollback evidence;
-- risk-register disposition evidence;
-- deliberately retained legacy paths and reasons;
-- independent closeout auditor verdict;
-- final verdict `DONE`, `WAITING_EXTERNAL`, `BLOCKED`, or `STALLED` with exact material reason.
+- META/Game/Atlas protected SHAs and implementation PR/merge identities;
+- Game provider PR head, exact-head required-check/review refs, resulting main/release SHA and immutable merge-evidence ref;
+- Atlas provider PR head, exact-head required-check/review refs, resulting main/release SHA and immutable merge-evidence ref;
+- Game export profile/producer/world revision, exact produced digests and Game export-build evidence;
+- Atlas Core/API identity, accepted Game digests, exact embedded bundle and Atlas build evidence;
+- exact public deployed bundle/deployment/relation evidence;
+- bridge protocol/profile, exact client+bundle handshake evidence and Game client identity;
+- routing validation refs including Wave-0 and WA-6Q META evidence Issue/PR/report identities;
+- #84 schema/validator/final-record PR/head/merge/readback/post-merge-gate refs;
+- security/performance/E2E/rollback/risk disposition evidence;
+- retained legacy paths/reasons;
+- independent closeout verdict;
+- final `DONE|WAITING_EXTERNAL|BLOCKED|STALLED` with exact reason.
