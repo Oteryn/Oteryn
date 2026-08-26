@@ -114,7 +114,7 @@ Up to five independent reasoning/scout/reviewer lanes may be active concurrently
 
 Serialize root Cargo/workspace/toolchain/dependency changes, Game app/client composition, Atlas `web/fullworld*` shared shell/composition, provider workflow/CI files, META compatibility/release mechanism/records and final provider integration/cutover mutations.
 
-## Wave 0 — five read-only lanes
+## Wave 0 — five provider-read-only / META evidence-only lanes
 
 Dispatch concurrently from the parallel-agent suite:
 
@@ -124,7 +124,9 @@ Dispatch concurrently from the parallel-agent suite:
 - `WA-0D SECURITY-SCOUT` — Extra High;
 - `WA-0E VERIFICATION-PERF-SCOUT` — Extra High.
 
-Require exact paths/SHAs/Issues, facts/inferences/unknowns and minimal next actions. Reject floating refs, invented schemas and assumptions presented as facts.
+For each independently launched Wave-0 role, create a fresh META evidence child Issue, dedicated META branch/worktree and PR/task head, assign exactly one disjoint `docs/evidence/world-atlas/wave0/<role>.md` report path (or recorded equivalent), and validate a normal PR-backed execution-routing packet before research starts. Permit only that META report mutation; Game/Atlas/provider/runtime/config/Cargo/workflow/shared-shell/production paths stay read-only. There is no PR-less Wave-0 route and no fabricated/unrelated PR identity.
+
+Require exact paths/SHAs/Issues, evidence Issue/PR/report path, routing evidence, facts/inferences/unknowns and minimal next actions. Reject floating refs, invented schemas and assumptions presented as facts.
 
 ## Wave 1 — provider design freeze
 
@@ -168,13 +170,13 @@ Under #79, #84 and `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`:
 2. refresh/reconcile #84; continue that exact lifecycle if the dedicated V1 schema/validator/meta-gate mechanism is not canonical and keep final-record work fail-closed rather than creating duplicate work;
 3. freeze exact Game export profile/version, producer revision, world/content revision, exact produced manifest/payload digests and immutable Game export-build evidence binding those inputs to those exact digests;
 4. freeze Atlas Core/API, exact accepted Game export digests, exact embedded bundle version/digest and immutable Atlas build/manifest evidence binding that exact export + Core identity to that exact bundle;
-5. freeze bridge protocol/profile and Game client identity pinning the exact embedded bundle digest;
-6. complete provider late integration and protected merges;
+5. freeze bridge protocol/profile and Game client identity pinning the exact embedded bundle digest, plus immutable bridge compatibility/handshake evidence binding that exact client identity, embedded bundle version/digest, client/bundle supported bridge range/profile, selected protocol/profile and recorded world/content compatibility identity;
+6. complete provider late integration and protected merges; freeze the exact final `game.main_or_release_commit_sha` and `atlas.main_or_release_commit_sha`, and require every Game/Atlas provider required-check and review evidence reference to resolve to the corresponding exact recorded final provider SHA — older/stale-head or cross-provider evidence is blocking;
 7. run Atlas merged-main public deployment/live acceptance and record the exact public deployed bundle version/digest plus immutable evidence binding the public deployment identity to that digest;
 8. record `public_atlas_bundle_relation_to_embedded` as `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT`; require digest equality for the former and explicit immutable compatibility evidence for the latter;
-9. run Game native-client acceptance against the exact embedded bundle digest;
+9. run Game native-client acceptance against the exact embedded bundle digest and recorded bridge handshake tuple;
 10. create the final dedicated World Atlas compatibility record only at `ecosystem/world-atlas/releases/<release_id>.json` using the canonical #84 schema/validator;
-11. validate Game-input→produced-export evidence, Game-produced→Atlas-accepted artifact links, Atlas accepted-export/Core→embedded-bundle evidence, Game-client→embedded-bundle link and public-deployment→public-bundle link under the declared relation mode;
+11. validate Game-input→produced-export evidence, Game-produced→Atlas-accepted artifact links, Atlas accepted-export/Core→embedded-bundle evidence, Game-client→embedded-bundle link, exact client+bundle→bridge handshake evidence, exact-provider-head→required-check/review evidence and public-deployment→public-bundle link under the declared relation mode;
 12. require the final compatibility-record META PR to pass exact-head checks/review, protected-squash-merge it, read the exact record path back from that squash-merge SHA with an immutable readback reference, and require post-merge `meta-gate` on the exact protected-main SHA.
 
 An Issue #79 comment, generic release record, local file, Draft or unmerged PR is not the final compatibility record. Public Atlas and Game client remain independent release domains; compatibility must be proven rather than inferred.
@@ -185,11 +187,11 @@ Open separate bounded Atlas removal lifecycles only after new defaults have prov
 
 ## Required worker handoff
 
-Every mutating worker returns exact role/repo/Issue/admission main/task branch/head, owned/forbidden paths, verified facts/inferences/unknowns, consumed/produced interfaces, routing-packet identity and validation result, execution target/runner, lane/dependency/lease state, tests/results, performance/security impact, upstream/reconciliation state and integration readiness. Read-only scouts explicitly return `READ_ONLY` and, when substantial under current policy, their validated routing packet/evidence.
+Every mutating worker returns exact role/repo/Issue/admission main/task branch/head, owned/forbidden paths, verified facts/inferences/unknowns, consumed/produced interfaces, routing-packet identity and validation result, execution target/runner, lane/dependency/lease state, tests/results, performance/security impact, upstream/reconciliation state and integration readiness. Wave-0 provider-read-only/META evidence-only scouts return their META evidence Issue, PR/task head, exact report path, provider-read-only declaration and validated routing packet/evidence.
 
 ## Coordinator review checklist
 
-Reject a lane for missing/invalid/stale execution-routing packet, missing exact identity, ownership overlap, authority duplication, accidental Game-internal public API, private-state leakage, WebView gameplay dependency, premature rollback removal, missing RED→GREEN tests, unprofiled benchmark claims, missing required browser evidence, failed provider gates, unresolved applicable risk-register gate, or no-op retrigger commits.
+Reject a lane for missing/invalid/stale execution-routing packet, missing exact identity, ownership overlap, authority duplication, accidental Game-internal public API, private-state leakage, WebView gameplay dependency, premature rollback removal, missing RED→GREEN tests, unprofiled benchmark claims, missing required browser evidence, failed provider gates, provider evidence bound to an older/stale or wrong provider head, missing bridge compatibility/handshake evidence, unresolved applicable risk-register gate, or no-op retrigger commits.
 
 ## Completion and status rules
 
@@ -197,7 +199,7 @@ Return `DONE` only when ALL are true:
 
 1. the Definition of Done in the plan is proven;
 2. every triggered risk has the disposition/evidence required by `WORLD_ATLAS_RISK_REGISTER.md`, with no unresolved cutover-blocking risk;
-3. the complete exact tuple from `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` is canonical on protected META `main`, including exact Game input→produced-export build evidence, exact Game produced artifact, exact Atlas accepted-export/Core→embedded-bundle build evidence, exact embedded bundle, exact public deployed bundle and its relation/evidence, exact compatibility schema/validator/record path, exact record PR/head/check/review evidence, squash-merge SHA, immutable exact-record protected-main readback and post-merge `meta-gate`; and
+3. the complete exact tuple from `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` is canonical on protected META `main`, including exact final Game/Atlas provider SHAs with their own exact-head required-check/review evidence, exact Game input→produced-export build evidence, exact Game produced artifact, exact Atlas accepted-export/Core→embedded-bundle build evidence, exact embedded bundle, immutable exact client+bundle→bridge compatibility/handshake evidence, exact public deployed bundle and its relation/evidence, exact compatibility schema/validator/record path, exact record PR/head/check/review evidence, squash-merge SHA, immutable exact-record protected-main readback and post-merge `meta-gate`; and
 4. a fresh independent `OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR` invocation audits final protected provider/META state and returns `FINAL_VERDICT: DONE` with complete immutable evidence.
 
 Coordinator narration, provider success, completion of #79, Issue-only tuple or unmerged compatibility PR is insufficient.
@@ -207,11 +209,11 @@ Return `WAITING_EXTERNAL` for unchanged external dependency/ownership/review/CI/
 Final report must include:
 
 - exact META/Game/Atlas main SHAs and all implementation PR/merge SHAs;
-- separate immutable Game and Atlas provider exact-head required-check refs and review evidence refs;
+- exact recorded final Game and Atlas provider SHAs plus separate immutable provider exact-head required-check refs and review evidence refs resolving to those exact SHAs;
 - Game export profile/version, producer revision, world/content revision, exact manifest/payload digests and immutable Game export-build evidence ref;
 - Atlas Core/API identity, exact accepted Game export digests, exact embedded bundle version/digest and immutable Atlas embedded-bundle build evidence ref;
 - exact public deployed bundle version/digest, relation to embedded and immutable deployment-to-bundle evidence;
-- bridge protocol version and capability profile, Game client identity and public deployment identity;
+- bridge protocol version and capability profile, immutable bridge compatibility/handshake evidence, Game client identity and public deployment identity;
 - #84 schema/validator path and final record path/PR/head/check/review/merge/readback/post-merge-gate refs;
 - security/performance/E2E, rollback and risk-register disposition evidence;
 - retained legacy paths/reasons;
