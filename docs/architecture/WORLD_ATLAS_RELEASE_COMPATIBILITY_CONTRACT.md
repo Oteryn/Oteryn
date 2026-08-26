@@ -54,7 +54,7 @@ Game producer revision/profile + world/content revision
  pinning embedded digest    bound to deployed bundle digest
 ```
 
-A missing or inferred link is `UNKNOWN_BLOCKING`.
+The Atlas build/manifest evidence in this chain must immutably bind the exact accepted Game manifest digest, exact accepted Game payload digest/root, the recorded Atlas Core/API identity and the exact embedded bundle digest/version produced from them. A missing or inferred link is `UNKNOWN_BLOCKING`.
 
 ## 3. Dedicated canonical META record mechanism V1
 
@@ -94,6 +94,7 @@ atlas.main_or_release_commit_sha
 atlas.core_api_identity
 atlas.web_embedded_bundle_version
 atlas.web_embedded_bundle_digest
+atlas.embedded_bundle_build_evidence_ref
 atlas.public_release_or_deployment_identity
 atlas.public_deployed_bundle_version
 atlas.public_deployed_bundle_digest
@@ -124,6 +125,7 @@ The validator integrated into `meta-gate` must fail closed unless at least:
 - required tuple fields are non-empty and independent;
 - Atlas accepted Game manifest digest equals Game produced manifest digest;
 - Atlas accepted Game payload digest/root equals Game produced payload digest/root;
+- `atlas.embedded_bundle_build_evidence_ref` is an immutable Atlas-owned build/manifest evidence identity whose resolved evidence binds **all four** of: `atlas.web_embedded_bundle_digest` (and its recorded version where present), `atlas.core_api_identity`, `atlas.accepted_game_export_artifact_manifest_digest`, and `atlas.accepted_game_export_payload_digest_or_root`; a stale bundle built from a different accepted export or Core identity is rejected;
 - Game client pinned bundle digest equals Atlas embedded bundle digest;
 - public bundle relation is exactly `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT`;
 - for `SAME_BUNDLE`, public deployed bundle digest equals embedded bundle digest;
@@ -135,7 +137,7 @@ The validator integrated into `meta-gate` must fail closed unless at least:
 - duplicate or contradictory references do not silently satisfy a required evidence class;
 - floating or mutable release identities are rejected.
 
-The #84 implementation must include negative tests for empty evidence arrays, missing/empty Game or Atlas provider-check arrays, malformed check refs, cross-provider check-ref substitution, missing/empty Game or Atlas provider-review arrays, malformed review refs, cross-provider review-ref substitution, mutable/malformed evidence references, duplicate/contradictory evidence where material, cross-link and deployment/bundle mismatches, plus positive fixtures for both bundle-relation modes with independently valid Game and Atlas provider required-check and review evidence.
+The #84 implementation must include negative tests for empty evidence arrays, missing/empty Game or Atlas provider-check arrays, malformed check refs, cross-provider check-ref substitution, missing/empty Game or Atlas provider-review arrays, malformed review refs, cross-provider review-ref substitution, missing/mutable embedded-bundle build evidence, embedded-bundle build evidence that binds the wrong Game manifest digest, wrong Game payload digest/root, wrong Atlas Core/API identity or wrong embedded bundle digest/version, mutable/malformed evidence references, duplicate/contradictory evidence where material, cross-link and deployment/bundle mismatches, plus positive fixtures for both bundle-relation modes with independently valid Game and Atlas provider required-check/review evidence and a valid exact export→Core→embedded-bundle build binding.
 
 ### 3.3 No alternate terminal encoding
 
@@ -174,13 +176,13 @@ meta_compatibility_post_merge_meta_gate_run_or_check_ref
 
 Game evidence must bind export profile/version, producer revision, world/content revision, exact produced export manifest/payload digest, deterministic producer validation, immutable exact-head provider required-check evidence, immutable accepted exact-head provider review evidence for every provider PR whose policy requires review, provider merge evidence when applicable, and the client identity plus exact Atlas embedded bundle digest it packages/pins.
 
-Atlas evidence must bind the exact Game export digests accepted by ingestion, Atlas Core/API identity, source/release identity, exact embedded bundle version/digest, exact public deployed bundle version/digest, immutable deployment evidence binding public deployment identity to its bundle, the declared public/embedded relation, immutable exact-head provider required-check evidence, immutable accepted exact-head provider review evidence for every provider PR whose policy requires review, provider merge/live-acceptance evidence, and the exact deployed bundle binding.
+Atlas evidence must bind the exact Game export digests accepted by ingestion, Atlas Core/API identity, source/release identity, exact embedded bundle version/digest, **immutable Atlas build/manifest evidence proving that exact embedded bundle and Core identity were produced from those exact accepted Game export digests**, exact public deployed bundle version/digest, immutable deployment evidence binding public deployment identity to its bundle, the declared public/embedded relation, immutable exact-head provider required-check evidence, immutable accepted exact-head provider review evidence for every provider PR whose policy requires review, provider merge/live-acceptance evidence, and the exact deployed bundle binding.
 
 Provider PR/merge identity, the other provider's checks, and review evidence do not substitute for a provider's own required-check evidence; similarly, provider PR/merge identity and required-check success do not substitute for required review evidence. The canonical V1 record must preserve Game and Atlas provider required-check references as separate non-empty typed fields and preserve Game and Atlas provider review-evidence references as separate non-empty typed fields, so independent closeout can prove which exact checks and reviews satisfied each provider gate.
 
 ## 7. Failure semantics
 
-Return `NOT_DONE` / `UNKNOWN_BLOCKING` if any required artifact identity, chain-of-custody link, client/embedded binding, public-deployment/bundle binding, independent-bundle compatibility evidence, non-empty immutable evidence-reference class, provider-specific required-check evidence, required provider or META exact-head review evidence, #84 schema/validator/meta-gate integration, protected META compatibility merge/readback/check evidence, or immutable tuple field is absent, floating, malformed, cross-provider substituted or contradictory. These conditions cannot be waived by narration.
+Return `NOT_DONE` / `UNKNOWN_BLOCKING` if any required artifact identity, exact export→Core→embedded-bundle build binding, chain-of-custody link, client/embedded binding, public-deployment/bundle binding, independent-bundle compatibility evidence, non-empty immutable evidence-reference class, provider-specific required-check evidence, required provider or META exact-head review evidence, #84 schema/validator/meta-gate integration, protected META compatibility merge/readback/check evidence, or immutable tuple field is absent, floating, malformed, cross-provider substituted or contradictory. These conditions cannot be waived by narration.
 
 ## 8. Relationship to independent closeout
 
