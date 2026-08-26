@@ -10,6 +10,7 @@ import argparse
 from collections import deque
 import json
 from pathlib import Path
+import re
 
 
 def load_policy(path: Path) -> dict[str, object]:
@@ -49,15 +50,38 @@ def _is_safe_repository_relative_path(path: object) -> bool:
     """Return whether a path glob stays safely within the repository root."""
     if not isinstance(path, str) or not path.strip():
         return False
-    normalized = path.replace("\\", "/").strip()
-    if normalized.startswith("/") or ":" in normalized or any(ord(character) < 32 for character in normalized):
+    normalized = path.strip()
+    if (
+        normalized.startswith("/")
+        or "\\" in normalized
+        or ":" in normalized
+        or any(ord(character) < 32 for character in normalized)
+    ):
         return False
     return all(part not in {"", ".", ".."} for part in normalized.split("/"))
 
 
+_LITERAL_PATH_SEGMENT = re.compile(r"^[\w .-]+$", re.UNICODE)
+
+
 def _is_supported_path_glob(path: object) -> bool:
-    """Return whether a path uses only the validator's supported glob syntax."""
-    return isinstance(path, str) and not any(character in path for character in "?[]")
+    """Return whether a path uses literal segments and only ``*`` wildcards.
+
+    A wildcard run may contain one or two stars; all other characters must be
+    ordinary repository path characters. This deliberately excludes brace,
+    extglob, character-class, and shell-expansion syntax.
+    """
+    if not isinstance(path, str) or "\\" in path:
+        return False
+    for segment in path.split("/"):
+        if not segment:
+            return False
+        literal_parts = re.split(r"\*{1,2}", segment)
+        if any("*" in part for part in literal_parts):
+            return False
+        if any(part and not _LITERAL_PATH_SEGMENT.fullmatch(part) for part in literal_parts):
+            return False
+    return True
 
 
 def _paths_overlap(left: str, right: str) -> bool:

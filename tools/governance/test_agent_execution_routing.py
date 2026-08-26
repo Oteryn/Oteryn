@@ -237,6 +237,36 @@ def test_unsupported_character_class_glob_cannot_hide_owned_path_conflict() -> N
     assert "owned_paths must use only '*' and '**' wildcards" in errors
 
 
+def test_unsupported_brace_glob_cannot_hide_owned_path_conflict() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lanes"] = [lane("glob", ["src/{a,b}.py"]), lane("specific", ["src/a.py"])]
+    parallel["integration_order"] = ["glob", "specific"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "owned_paths must use only '*' and '**' wildcards" in errors
+
+
+def test_unsupported_extglob_prefixes_cannot_hide_owned_path_conflict() -> None:
+    for prefix in ("!", "@", "+", "?", "*"):
+        packet = default_packet()
+        parallel = packet["parallel_execution"]
+        assert isinstance(parallel, dict)
+        parallel["lanes"] = [lane("glob", [f"src/{prefix}(a).py"]), lane("specific", ["src/a.py"])]
+        parallel["integration_order"] = ["glob", "specific"]
+        errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+        assert "owned_paths must use only '*' and '**' wildcards" in errors
+
+
+def test_backslash_owned_path_is_rejected() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lanes"] = [lane("path", [r"src\\*.py"])]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert any("owned_paths must be a list of non-empty safe repository-relative strings" in error for error in errors)
+
+
 def test_unknown_lane_dependency_fails() -> None:
     packet = default_packet()
     parallel = packet["parallel_execution"]
@@ -545,7 +575,16 @@ def test_cli_rejects_fail_open_execution_routing_bypasses() -> None:
         parallel["lanes"] = [lane("policy", ["docs/agents/**", 7])]
         assert_rejected(packet, "owned_paths must be a list of non-empty safe repository-relative strings")
 
-        for unsupported_glob in ("src/?.py", "src/[ab].py"):
+        for unsupported_glob in (
+            "src/?.py",
+            "src/[ab].py",
+            "src/{a,b}.py",
+            "src/!(a).py",
+            "src/@(a).py",
+            "src/+(a).py",
+            "src/?(a).py",
+            "src/*(a).py",
+        ):
             packet = default_packet()
             parallel = packet["parallel_execution"]
             assert isinstance(parallel, dict)
