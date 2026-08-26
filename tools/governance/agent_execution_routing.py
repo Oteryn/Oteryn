@@ -65,21 +65,20 @@ _LITERAL_PATH_SEGMENT = re.compile(r"^[\w .-]+$", re.UNICODE)
 
 
 def _is_supported_path_glob(path: object) -> bool:
-    """Return whether a path uses literal segments and only ``*`` wildcards.
+    """Return whether each path segment is a literal, ``*``, or ``**``.
 
-    A wildcard run may contain one or two stars; all other characters must be
-    ordinary repository path characters. This deliberately excludes brace,
-    extglob, character-class, and shell-expansion syntax.
+    Wildcards are complete path segments, never filename fragments. This
+    deliberately excludes brace, extglob, character-class, and shell-
+    expansion syntax, including star runs longer than two characters.
     """
     if not isinstance(path, str) or "\\" in path:
         return False
     for segment in path.split("/"):
         if not segment:
             return False
-        literal_parts = re.split(r"\*{1,2}", segment)
-        if any("*" in part for part in literal_parts):
-            return False
-        if any(part and not _LITERAL_PATH_SEGMENT.fullmatch(part) for part in literal_parts):
+        if segment in {"*", "**"}:
+            continue
+        if "*" in segment or not _LITERAL_PATH_SEGMENT.fullmatch(segment):
             return False
     return True
 

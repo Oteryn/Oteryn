@@ -258,6 +258,47 @@ def test_unsupported_extglob_prefixes_cannot_hide_owned_path_conflict() -> None:
         assert "owned_paths must use only '*' and '**' wildcards" in errors
 
 
+def test_wildcards_must_be_complete_path_segments() -> None:
+    for path in ("src/a*.py", "src/foo**bar.py", "src/***", "src/****"):
+        packet = default_packet()
+        parallel = packet["parallel_execution"]
+        assert isinstance(parallel, dict)
+        parallel["lanes"] = [lane("invalid", [path])]
+        parallel["integration_order"] = ["invalid"]
+        errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+        assert "owned_paths must use only '*' and '**' wildcards" in errors
+
+
+def test_partial_segment_wildcard_cannot_hide_owned_path_conflict() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lanes"] = [lane("glob", ["src/*"]), lane("specific", ["src/ab.py"])]
+    parallel["integration_order"] = ["glob", "specific"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "parallel lanes have overlapping owned_paths" in errors
+
+
+def test_partial_segment_wildcard_collision_is_rejected() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lanes"] = [lane("glob", ["src/a*.py"]), lane("specific", ["src/ab.py"])]
+    parallel["integration_order"] = ["glob", "specific"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "owned_paths must use only '*' and '**' wildcards" in errors
+
+
+def test_token_wildcard_segments_remain_valid() -> None:
+    for path in ("src/*", "src/**", "src/lib", "docs/agents/schemas/**"):
+        packet = default_packet()
+        parallel = packet["parallel_execution"]
+        assert isinstance(parallel, dict)
+        parallel["lanes"] = [lane("valid", [path])]
+        parallel["integration_order"] = ["valid"]
+        assert routing.validate_packet(packet, live_state=live_state(), policy=policy()) == []
+
+
 def test_backslash_owned_path_is_rejected() -> None:
     packet = default_packet()
     parallel = packet["parallel_execution"]
@@ -477,6 +518,39 @@ def test_cli_returns_zero_for_valid_packet_and_one_for_invalid_packet() -> None:
         failed = subprocess.run(command, check=False, capture_output=True, text=True)
         assert failed.returncode == 1
         assert "execution_target is not allowed" in failed.stdout
+
+
+def test_cli_rejects_partial_and_long_wildcard_segments() -> None:
+    script = Path(__file__).with_name("agent_execution_routing.py")
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        directory = Path(temporary_directory)
+        policy_path = directory / "policy.json"
+        packet_path = directory / "packet.json"
+        live_state_path = directory / "live-state.json"
+        policy_path.write_text(json.dumps(policy()), encoding="utf-8")
+        live_state_path.write_text(json.dumps(live_state()), encoding="utf-8")
+        command = [
+            sys.executable,
+            str(script),
+            "--policy", str(policy_path),
+            "--packet", str(packet_path),
+            "--live-state", str(live_state_path),
+        ]
+        for path, concrete in (
+            ("src/a*.py", "src/ab.py"),
+            ("src/foo**bar.py", "src/fooxbar.py"),
+            ("src/***", "src/aZZ.py"),
+            ("src/****", "src/aZZ.py"),
+        ):
+            packet = default_packet()
+            parallel = packet["parallel_execution"]
+            assert isinstance(parallel, dict)
+            parallel["lanes"] = [lane("invalid", [path]), lane("specific", [concrete])]
+            parallel["integration_order"] = ["invalid", "specific"]
+            packet_path.write_text(json.dumps(packet), encoding="utf-8")
+            result = subprocess.run(command, check=False, capture_output=True, text=True)
+            assert result.returncode == 1
+            assert "owned_paths must use only '*' and '**' wildcards" in result.stdout
 
 
 def test_cli_returns_policy_error_for_non_string_closed_enum() -> None:
