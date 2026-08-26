@@ -62,6 +62,14 @@ def _is_safe_repository_relative_path(path: object) -> bool:
 
 
 _LITERAL_PATH_SEGMENT = re.compile(r"^[\w .-]+$", re.UNICODE)
+_REPOSITORY_COORDINATE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_GIT_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
+
+_TARGET_RUNNER_COMPATIBILITY = {
+    "github_actions": {"github_hosted", "organization_product_isolated"},
+    "isolated_workspace": {"isolated_workspace"},
+    "host_exception": {"not_applicable"},
+}
 
 
 def _is_supported_path_glob(path: object) -> bool:
@@ -80,6 +88,22 @@ def _is_supported_path_glob(path: object) -> bool:
             continue
         if "*" in segment or not _LITERAL_PATH_SEGMENT.fullmatch(segment):
             return False
+    return True
+
+
+def _is_positive_identifier(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
+def _has_valid_preflight_identity(field: str, value: object) -> bool:
+    if field == "repository":
+        return isinstance(value, str) and bool(_REPOSITORY_COORDINATE.fullmatch(value))
+    if field in {"default_branch_sha", "task_head_sha"}:
+        return isinstance(value, str) and bool(_GIT_SHA.fullmatch(value))
+    if field in {"governing_issue", "pull_request"}:
+        return _is_positive_identifier(value)
+    if field == "verified_at":
+        return isinstance(value, str) and bool(value.strip())
     return True
 
 
@@ -108,11 +132,14 @@ def _validate_preflight(
             errors.append(f"github_preflight missing required field: {field}")
         if field not in live_state:
             errors.append(f"live_state missing required field: {field}")
-    verified_at = preflight.get("verified_at")
-    if "verified_at" in preflight and (not isinstance(verified_at, str) or not verified_at.strip()):
-        errors.append("github_preflight.verified_at must be a timestamp string")
     for field in required_fields:
-        if field in preflight and field in live_state and preflight[field] != live_state[field]:
+        preflight_valid = field in preflight and _has_valid_preflight_identity(field, preflight.get(field))
+        live_state_valid = field in live_state and _has_valid_preflight_identity(field, live_state.get(field))
+        if field in preflight and not preflight_valid:
+            errors.append(f"github_preflight.{field} has invalid identity")
+        if field in live_state and not live_state_valid:
+            errors.append(f"live_state.{field} has invalid identity")
+        if preflight_valid and live_state_valid and preflight[field] != live_state[field]:
             errors.append(f"github_preflight.{field} does not match live_state")
 
 
@@ -322,6 +349,8 @@ def validate_packet(
     runner_class = execution.get("runner_class")
     if not _is_closed_value(runner_class, _closed_values(policy, "runner_classes")):
         errors.append("runner_class is not allowed")
+    elif isinstance(target, str) and runner_class not in _TARGET_RUNNER_COMPATIBILITY.get(target, set()):
+        errors.append("runner_class is incompatible with execution_target")
     remote_desktop = execution.get("remote_desktop")
     if not _is_closed_value(remote_desktop, {"denied", "exception"}):
         errors.append("remote_desktop must be denied or exception")

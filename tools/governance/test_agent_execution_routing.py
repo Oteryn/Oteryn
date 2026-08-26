@@ -21,6 +21,9 @@ SPEC.loader.exec_module(routing)
 
 REPO = "Oteryn/Oteryn"
 SHA = "d79df968c1aba98373455399732fc71ab71e6a5d"
+GOVERNING_ISSUE = 85
+PULL_REQUEST = 87
+TASK_HEAD_SHA = "f4cda70de8bc61008226c6be2983cff34600f86d"
 
 
 def policy() -> dict[str, object]:
@@ -34,9 +37,9 @@ def live_state() -> dict[str, object]:
         "repository": REPO,
         "default_branch": "main",
         "default_branch_sha": SHA,
-        "governing_issue": 85,
-        "pull_request": None,
-        "task_head_sha": None,
+        "governing_issue": GOVERNING_ISSUE,
+        "pull_request": PULL_REQUEST,
+        "task_head_sha": TASK_HEAD_SHA,
     }
 
 
@@ -45,9 +48,9 @@ def preflight() -> dict[str, object]:
         "verified_at": "2026-08-26T12:00:00Z",
         "repository": REPO,
         "default_branch_sha": SHA,
-        "governing_issue": 85,
-        "pull_request": None,
-        "task_head_sha": None,
+        "governing_issue": GOVERNING_ISSUE,
+        "pull_request": PULL_REQUEST,
+        "task_head_sha": TASK_HEAD_SHA,
     }
 
 
@@ -195,6 +198,55 @@ def test_resume_preflight_identity_mismatches_fail() -> None:
         preflight_data[field] = value
         errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
         assert f"github_preflight.{field} does not match live_state" in errors
+
+
+def test_resume_preflight_rejects_missing_or_malformed_identities_before_comparison() -> None:
+    invalid_values = {
+        "repository": (None, "", "Oteryn", "Oteryn/"),
+        "default_branch_sha": (None, "", "a" * 39, "g" * 40),
+        "governing_issue": (None, 0, -1, "85"),
+        "pull_request": (None, 0, -1, "87"),
+        "task_head_sha": (None, "", "a" * 39, "g" * 40),
+    }
+    for field, values in invalid_values.items():
+        for value in values:
+            packet = default_packet()
+            execution = packet["execution_routing"]
+            assert isinstance(execution, dict)
+            preflight_data = execution["github_preflight"]
+            assert isinstance(preflight_data, dict)
+            preflight_data[field] = value
+            errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+            assert f"github_preflight.{field} has invalid identity" in errors
+
+            current_state = live_state()
+            current_state[field] = value
+            errors = routing.validate_packet(default_packet(), live_state=current_state, policy=policy())
+            assert f"live_state.{field} has invalid identity" in errors
+
+
+def test_runner_class_must_be_compatible_with_execution_target() -> None:
+    allowed_routes = {
+        "github_actions": ("github_hosted", "organization_product_isolated"),
+        "isolated_workspace": ("isolated_workspace",),
+        "host_exception": ("not_applicable",),
+    }
+    for target, runner_classes in allowed_routes.items():
+        for runner_class in runner_classes:
+            packet = exception_packet("lan_or_hardware") if target == "host_exception" else default_packet()
+            execution = packet["execution_routing"]
+            assert isinstance(execution, dict)
+            execution["execution_target"] = target
+            execution["runner_class"] = runner_class
+            assert routing.validate_packet(packet, live_state=live_state(), policy=policy()) == []
+
+    packet = default_packet()
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    execution["execution_target"] = "isolated_workspace"
+    assert "runner_class is incompatible with execution_target" in routing.validate_packet(
+        packet, live_state=live_state(), policy=policy()
+    )
 
 
 def test_multi_lane_task_requires_parallel_plan() -> None:
@@ -584,6 +636,45 @@ def test_cli_returns_policy_error_for_non_string_closed_enum() -> None:
         )
         assert failed.returncode == 1
         assert "execution_target is not allowed" in failed.stdout
+        assert "Traceback" not in failed.stderr
+
+
+def test_cli_rejects_invalid_preflight_identity() -> None:
+    script = Path(__file__).with_name("agent_execution_routing.py")
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        directory = Path(temporary_directory)
+        policy_path = directory / "policy.json"
+        packet_path = directory / "packet.json"
+        live_state_path = directory / "live-state.json"
+        invalid_packet = default_packet()
+        execution = invalid_packet["execution_routing"]
+        assert isinstance(execution, dict)
+        packet_preflight = execution["github_preflight"]
+        assert isinstance(packet_preflight, dict)
+        packet_preflight["task_head_sha"] = None
+        invalid_live_state = live_state()
+        invalid_live_state["task_head_sha"] = None
+        policy_path.write_text(json.dumps(policy()), encoding="utf-8")
+        packet_path.write_text(json.dumps(invalid_packet), encoding="utf-8")
+        live_state_path.write_text(json.dumps(invalid_live_state), encoding="utf-8")
+        failed = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--policy",
+                str(policy_path),
+                "--packet",
+                str(packet_path),
+                "--live-state",
+                str(live_state_path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert failed.returncode == 1
+        assert "github_preflight.task_head_sha has invalid identity" in failed.stdout
+        assert "live_state.task_head_sha has invalid identity" in failed.stdout
         assert "Traceback" not in failed.stderr
 
 
