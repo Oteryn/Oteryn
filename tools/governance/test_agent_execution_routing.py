@@ -30,6 +30,7 @@ def policy() -> dict[str, object]:
 
 def live_state() -> dict[str, object]:
     return {
+        "verified_at": "2026-08-26T12:00:00Z",
         "repository": REPO,
         "default_branch": "main",
         "default_branch_sha": SHA,
@@ -246,6 +247,94 @@ def test_constrained_resource_requires_a_lease() -> None:
     )
 
 
+def test_closed_enum_non_strings_are_deterministic_errors() -> None:
+    invalid_values = {
+        "execution_target": [],
+        "runner_class": {},
+        "remote_desktop": [],
+        "remote_desktop_reason": {},
+    }
+    expected_errors = {
+        "execution_target": "execution_target is not allowed",
+        "runner_class": "runner_class is not allowed",
+        "remote_desktop": "remote_desktop must be denied or exception",
+        "remote_desktop_reason": "remote_desktop_reason requires remote_desktop=exception",
+    }
+    for field, value in invalid_values.items():
+        packet = default_packet()
+        execution = packet["execution_routing"]
+        assert isinstance(execution, dict)
+        execution[field] = value
+        errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+        assert expected_errors[field] in errors
+
+
+def test_missing_or_partial_live_state_fails_fresh_preflight() -> None:
+    empty_errors = routing.validate_packet(default_packet(), live_state={}, policy=policy())
+    assert "live_state missing required field: repository" in empty_errors
+    assert "live_state missing required field: default_branch_sha" in empty_errors
+
+    partial_errors = routing.validate_packet(
+        default_packet(),
+        live_state={"repository": REPO},
+        policy=policy(),
+    )
+    assert "live_state missing required field: default_branch_sha" in partial_errors
+
+
+def test_dependency_cycles_are_rejected() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lanes"] = [
+        lane("one", ["src/one/**"], depends_on=["two"]),
+        lane("two", ["src/two/**"], depends_on=["three"]),
+        lane("three", ["src/three/**"], depends_on=["one"]),
+    ]
+    parallel["integration_order"] = ["one", "two", "three"]
+    assert "parallel lane dependencies must be acyclic" in routing.validate_packet(
+        packet, live_state=live_state(), policy=policy()
+    )
+
+
+def test_structured_leases_require_one_valid_holder_and_release_condition() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    first = lane("first", ["src/shared/**"])
+    second = lane("second", ["src/shared/file.py"])
+    first["shared_leases"] = ["shared-resource"]
+    second["shared_leases"] = [
+        {"resource": "shared-resource", "holder": "missing", "release_condition": "merged"}
+    ]
+    parallel["lanes"] = [first, second]
+    parallel["constrained_resources"] = ["shared-resource"]
+    parallel["integration_order"] = ["first", "second"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "lane 'first' shared_leases must contain structured leases" in errors
+    assert "lease 'shared-resource' holder must name exactly one lane" in errors
+
+
+def test_structured_leases_reject_multiple_holders_and_missing_release_condition() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    first = lane("first", ["src/first/**"])
+    second = lane("second", ["src/second/**"])
+    first["shared_leases"] = [
+        {"resource": "heavy-test-slot", "holder": "first", "release_condition": "merged"}
+    ]
+    second["shared_leases"] = [
+        {"resource": "heavy-test-slot", "holder": "second", "release_condition": ""}
+    ]
+    parallel["lanes"] = [first, second]
+    parallel["constrained_resources"] = ["heavy-test-slot"]
+    parallel["integration_order"] = ["first", "second"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "lane 'second' shared_leases must contain structured leases" in errors
+    assert "lease 'heavy-test-slot' holder must name exactly one lane" in errors
+
+
 def test_cli_returns_zero_for_valid_packet_and_one_for_invalid_packet() -> None:
     script = Path(__file__).with_name("agent_execution_routing.py")
     with tempfile.TemporaryDirectory() as temporary_directory:
@@ -276,6 +365,40 @@ def test_cli_returns_zero_for_valid_packet_and_one_for_invalid_packet() -> None:
         failed = subprocess.run(command, check=False, capture_output=True, text=True)
         assert failed.returncode == 1
         assert "execution_target is not allowed" in failed.stdout
+
+
+def test_cli_returns_policy_error_for_non_string_closed_enum() -> None:
+    script = Path(__file__).with_name("agent_execution_routing.py")
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        directory = Path(temporary_directory)
+        policy_path = directory / "policy.json"
+        packet_path = directory / "packet.json"
+        live_state_path = directory / "live-state.json"
+        invalid_packet = default_packet()
+        execution = invalid_packet["execution_routing"]
+        assert isinstance(execution, dict)
+        execution["execution_target"] = []
+        policy_path.write_text(json.dumps(policy()), encoding="utf-8")
+        packet_path.write_text(json.dumps(invalid_packet), encoding="utf-8")
+        live_state_path.write_text(json.dumps(live_state()), encoding="utf-8")
+        failed = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--policy",
+                str(policy_path),
+                "--packet",
+                str(packet_path),
+                "--live-state",
+                str(live_state_path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert failed.returncode == 1
+        assert "execution_target is not allowed" in failed.stdout
+        assert "Traceback" not in failed.stderr
 
 
 if __name__ == "__main__":

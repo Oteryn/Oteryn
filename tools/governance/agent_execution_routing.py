@@ -31,6 +31,11 @@ def _closed_values(policy: dict[str, object], key: str) -> set[str]:
     return {value for value in _list(policy.get(key)) if isinstance(value, str)}
 
 
+def _is_closed_value(value: object, allowed_values: set[str]) -> bool:
+    """Return whether a JSON string belongs to a policy's closed values."""
+    return isinstance(value, str) and value in allowed_values
+
+
 def _path_prefix(path: str) -> str:
     normalized = path.replace("\\", "/").strip("/")
     wildcard = normalized.find("*")
@@ -51,27 +56,6 @@ def _paths_overlap(left: str, right: str) -> bool:
     )
 
 
-def _lease_resources(lane: dict[str, object]) -> set[str]:
-    resources: set[str] = set()
-    for lease in _list(lane.get("shared_leases")):
-        if isinstance(lease, str) and lease:
-            resources.add(lease)
-        elif isinstance(lease, dict):
-            resource = lease.get("resource")
-            holder = lease.get("holder")
-            release_condition = lease.get("release_condition")
-            if (
-                isinstance(resource, str)
-                and resource
-                and isinstance(holder, str)
-                and holder
-                and isinstance(release_condition, str)
-                and release_condition
-            ):
-                resources.add(resource)
-    return resources
-
-
 def _validate_preflight(
     execution: dict[str, object], live_state: dict[str, object], policy: dict[str, object], errors: list[str]
 ) -> None:
@@ -79,17 +63,46 @@ def _validate_preflight(
     if not isinstance(preflight, dict) or not preflight:
         errors.append("github_preflight is required")
         return
-    for field in sorted(_closed_values(policy, "resume_preflight_required_fields")):
+    required_fields = sorted(_closed_values(policy, "resume_preflight_required_fields"))
+    for field in required_fields:
         if field not in preflight:
             errors.append(f"github_preflight missing required field: {field}")
+        if field not in live_state:
+            errors.append(f"live_state missing required field: {field}")
     verified_at = preflight.get("verified_at")
     if "verified_at" in preflight and (not isinstance(verified_at, str) or not verified_at.strip()):
         errors.append("github_preflight.verified_at must be a timestamp string")
-    for field, expected in live_state.items():
-        if field not in preflight:
-            continue
-        if preflight[field] != expected:
+    for field in required_fields:
+        if field in preflight and field in live_state and preflight[field] != live_state[field]:
             errors.append(f"github_preflight.{field} does not match live_state")
+
+
+def _has_dependency_cycle(lanes: list[dict[str, object]], lane_ids: set[str]) -> bool:
+    dependencies = {
+        identifier: {
+            dependency
+            for dependency in _list(lane.get("depends_on"))
+            if isinstance(dependency, str) and dependency in lane_ids
+        }
+        for lane in lanes
+        if isinstance((identifier := lane.get("id")), str) and identifier in lane_ids
+    }
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def visit(identifier: str) -> bool:
+        if identifier in visiting:
+            return True
+        if identifier in visited:
+            return False
+        visiting.add(identifier)
+        if any(visit(dependency) for dependency in dependencies.get(identifier, set())):
+            return True
+        visiting.remove(identifier)
+        visited.add(identifier)
+        return False
+
+    return any(visit(identifier) for identifier in lane_ids)
 
 
 def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], errors: list[str]) -> None:
@@ -102,7 +115,7 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
         errors.append("parallel_execution.lanes must be a list")
     if len(lanes) != len(_list(lanes_value)):
         errors.append("parallel_execution.lanes must contain objects")
-    if strategy not in strategies:
+    if not _is_closed_value(strategy, strategies):
         if len(lanes) > 1:
             errors.append("multi-lane task requires lane_strategy")
         else:
@@ -114,7 +127,8 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
 
     required_lane_fields = {value for value in _list(rules.get("required_lane_fields")) if isinstance(value, str)}
     lane_ids: set[str] = set()
-    lane_paths: list[tuple[str, list[str], set[str]]] = []
+    lane_paths: list[tuple[str, list[str]]] = []
+    lease_claims: dict[str, list[tuple[str, object, object, bool]]] = {}
     for lane in lanes:
         identifier = lane.get("id")
         display_identifier = identifier if isinstance(identifier, str) and identifier else "<unnamed>"
@@ -137,7 +151,28 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
             errors.append(f"lane '{display_identifier}' requires branch_and_worktree")
         if not isinstance(lane.get("shared_leases", []), list):
             errors.append(f"lane '{display_identifier}' shared_leases must be a list")
-        lane_paths.append((display_identifier, owned_paths, _lease_resources(lane)))
+        for lease in _list(lane.get("shared_leases")):
+            if not isinstance(lease, dict):
+                errors.append(f"lane '{display_identifier}' shared_leases must contain structured leases")
+                continue
+            resource = lease.get("resource")
+            holder = lease.get("holder")
+            release_condition = lease.get("release_condition")
+            valid_structure = (
+                isinstance(resource, str)
+                and bool(resource.strip())
+                and isinstance(holder, str)
+                and bool(holder.strip())
+                and isinstance(release_condition, str)
+                and bool(release_condition.strip())
+            )
+            if not valid_structure:
+                errors.append(f"lane '{display_identifier}' shared_leases must contain structured leases")
+            if isinstance(resource, str) and resource.strip():
+                lease_claims.setdefault(resource, []).append(
+                    (display_identifier, holder, release_condition, valid_structure)
+                )
+        lane_paths.append((display_identifier, owned_paths))
 
     for lane in lanes:
         identifier = lane.get("id") if isinstance(lane.get("id"), str) else "<unnamed>"
@@ -147,14 +182,34 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
             elif dependency == identifier:
                 errors.append(f"lane '{identifier}' cannot depend_on itself")
 
-    for index, (left_id, left_paths, left_leases) in enumerate(lane_paths):
-        for right_id, right_paths, right_leases in lane_paths[index + 1 :]:
+    if _has_dependency_cycle(lanes, lane_ids):
+        errors.append("parallel lane dependencies must be acyclic")
+
+    lease_resources_by_lane: dict[str, set[str]] = {identifier: set() for identifier in lane_ids}
+    for resource, claims in lease_claims.items():
+        holders = {
+            holder
+            for _, holder, _, _ in claims
+            if isinstance(holder, str) and holder in lane_ids
+        }
+        all_claims_structured = all(valid_structure for _, _, _, valid_structure in claims)
+        if len(holders) != 1:
+            errors.append(f"lease '{resource}' holder must name exactly one lane")
+        if len(holders) == 1 and all_claims_structured:
+            for declarer, _, _, _ in claims:
+                if declarer in lease_resources_by_lane:
+                    lease_resources_by_lane[declarer].add(resource)
+
+    for index, (left_id, left_paths) in enumerate(lane_paths):
+        for right_id, right_paths in lane_paths[index + 1 :]:
             overlapping_paths = any(
                 _paths_overlap(left_path, right_path)
                 for left_path in left_paths
                 for right_path in right_paths
             )
-            if overlapping_paths and not (left_leases & right_leases):
+            if overlapping_paths and not (
+                lease_resources_by_lane.get(left_id, set()) & lease_resources_by_lane.get(right_id, set())
+            ):
                 errors.append("parallel lanes have overlapping owned_paths")
 
     constrained_resources = [
@@ -162,7 +217,7 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
         for resource in _list(parallel.get("constrained_resources"))
         if isinstance(resource, str) and resource
     ]
-    leased_resources = set().union(*(leases for _, _, leases in lane_paths)) if lane_paths else set()
+    leased_resources = set().union(*lease_resources_by_lane.values()) if lease_resources_by_lane else set()
     for resource in constrained_resources:
         if resource not in leased_resources:
             errors.append(f"constrained resource requires a lease: {resource}")
@@ -188,13 +243,13 @@ def validate_packet(
         return ["execution_routing is required"]
 
     target = execution.get("execution_target")
-    if target not in _closed_values(policy, "execution_targets"):
+    if not _is_closed_value(target, _closed_values(policy, "execution_targets")):
         errors.append("execution_target is not allowed")
     runner_class = execution.get("runner_class")
-    if runner_class not in _closed_values(policy, "runner_classes"):
+    if not _is_closed_value(runner_class, _closed_values(policy, "runner_classes")):
         errors.append("runner_class is not allowed")
     remote_desktop = execution.get("remote_desktop")
-    if remote_desktop not in {"denied", "exception"}:
+    if not _is_closed_value(remote_desktop, {"denied", "exception"}):
         errors.append("remote_desktop must be denied or exception")
     if target == "host_exception" and remote_desktop != "exception":
         errors.append("host_exception requires remote_desktop=exception")
@@ -207,13 +262,15 @@ def validate_packet(
             errors.append("remote_desktop exception requires a closed reason")
         elif reason not in allowed_reasons:
             errors.append("remote_desktop_reason is not an allowed exception")
-    elif execution.get("remote_desktop_reason") not in {None, "not_applicable"}:
+    elif execution.get("remote_desktop_reason") is not None and execution.get("remote_desktop_reason") != "not_applicable":
         errors.append("remote_desktop_reason requires remote_desktop=exception")
 
     equivalent_ci = execution.get("equivalent_ci")
     forbidden_actions = _closed_values(policy, "forbidden_remote_desktop_actions_when_equivalent_ci")
     requested_actions = _list(execution.get("requested_host_actions"))
-    if equivalent_ci and any(action in forbidden_actions for action in requested_actions):
+    if equivalent_ci and any(
+        isinstance(action, str) and action in forbidden_actions for action in requested_actions
+    ):
         errors.append("equivalent_ci prohibits RDC polling")
     if equivalent_ci and remote_desktop == "exception":
         errors.append("remote_desktop exception requires no equivalent_ci")
