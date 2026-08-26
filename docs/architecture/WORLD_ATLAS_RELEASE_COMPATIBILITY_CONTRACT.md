@@ -32,7 +32,7 @@ game_client_release_or_candidate_identity
 public_atlas_release_or_deployment_identity
 ```
 
-Producer source/profile/world revision are not substitutes for produced-artifact identity. Atlas evidence must prove which exact Game artifact was consumed and which exact embedded bundle was built from the accepted input.
+Producer source/profile/world revision are not substitutes for produced-artifact identity. Game evidence must prove that the exact produced export digests came from the recorded producer/profile/world inputs. Atlas evidence must prove which exact Game artifact was consumed and which exact embedded bundle was built from the accepted input.
 
 Public Atlas and the Game client remain independent release/failure domains. Therefore the tuple separately records the bundle actually served by the public deployment. `public_atlas_bundle_relation_to_embedded` is `SAME_BUNDLE` when both surfaces use the same bundle bytes, or `COMPATIBLE_INDEPENDENT` when public Atlas intentionally advances or rolls back independently. In the latter case the public bundle version/digest may differ, but immutable deployment and compatibility evidence are mandatory.
 
@@ -42,6 +42,7 @@ Terminal evidence must establish:
 
 ```text
 Game producer revision/profile + world/content revision
+        -> Game export-build evidence
         -> exact produced Game Atlas manifest/payload digest
         -> Atlas verified ingestion/build evidence
         -> Atlas Core/API identity
@@ -54,7 +55,7 @@ Game producer revision/profile + world/content revision
  pinning embedded digest    bound to deployed bundle digest
 ```
 
-The Atlas build/manifest evidence in this chain must immutably bind the exact accepted Game manifest digest, exact accepted Game payload digest/root, the recorded Atlas Core/API identity and the exact embedded bundle digest/version produced from them. A missing or inferred link is `UNKNOWN_BLOCKING`.
+The Game export-build evidence in this chain must immutably bind the exact producer revision, export profile/version and world/content revision to the exact produced manifest digest and payload digest/root. The Atlas build/manifest evidence must immutably bind the exact accepted Game manifest digest, exact accepted Game payload digest/root, the recorded Atlas Core/API identity and the exact embedded bundle digest/version produced from them. A missing or inferred link is `UNKNOWN_BLOCKING`.
 
 ## 3. Dedicated canonical META record mechanism V1
 
@@ -83,6 +84,7 @@ game.atlas_export_profile_version
 game.atlas_export_producer_revision
 game.atlas_export_artifact_manifest_digest
 game.atlas_export_payload_digest_or_root
+game.atlas_export_build_evidence_ref
 game.world_content_revision
 game.client_release_or_candidate_identity
 game.client_pinned_atlas_bundle_digest
@@ -123,6 +125,7 @@ The validator integrated into `meta-gate` must fail closed unless at least:
 - schema/version/kind, filename and provider-coordinate rules are satisfied;
 - required Git identities and SHA-256 artifact fields have the canonical immutable formats;
 - required tuple fields are non-empty and independent;
+- `game.atlas_export_build_evidence_ref` is an immutable Game-owned producer/build/manifest evidence identity whose resolved evidence binds **all five** of: `game.atlas_export_producer_revision`, `game.atlas_export_profile_version`, `game.world_content_revision`, `game.atlas_export_artifact_manifest_digest`, and `game.atlas_export_payload_digest_or_root`; mixing digests from a different export/profile/world revision is rejected;
 - Atlas accepted Game manifest digest equals Game produced manifest digest;
 - Atlas accepted Game payload digest/root equals Game produced payload digest/root;
 - `atlas.embedded_bundle_build_evidence_ref` is an immutable Atlas-owned build/manifest evidence identity whose resolved evidence binds **all four** of: `atlas.web_embedded_bundle_digest` (and its recorded version where present), `atlas.core_api_identity`, `atlas.accepted_game_export_artifact_manifest_digest`, and `atlas.accepted_game_export_payload_digest_or_root`; a stale bundle built from a different accepted export or Core identity is rejected;
@@ -137,7 +140,7 @@ The validator integrated into `meta-gate` must fail closed unless at least:
 - duplicate or contradictory references do not silently satisfy a required evidence class;
 - floating or mutable release identities are rejected.
 
-The #84 implementation must include negative tests for empty evidence arrays, missing/empty Game or Atlas provider-check arrays, malformed check refs, cross-provider check-ref substitution, missing/empty Game or Atlas provider-review arrays, malformed review refs, cross-provider review-ref substitution, missing/mutable embedded-bundle build evidence, embedded-bundle build evidence that binds the wrong Game manifest digest, wrong Game payload digest/root, wrong Atlas Core/API identity or wrong embedded bundle digest/version, mutable/malformed evidence references, duplicate/contradictory evidence where material, cross-link and deployment/bundle mismatches, plus positive fixtures for both bundle-relation modes with independently valid Game and Atlas provider required-check/review evidence and a valid exact export→Core→embedded-bundle build binding.
+The #84 implementation must include negative tests for empty evidence arrays, missing/mutable Game export-build evidence, Game export-build evidence that binds the wrong producer revision, export profile/version, world/content revision, manifest digest or payload digest/root, missing/empty Game or Atlas provider-check arrays, malformed check refs, cross-provider check-ref substitution, missing/empty Game or Atlas provider-review arrays, malformed review refs, cross-provider review-ref substitution, missing/mutable embedded-bundle build evidence, embedded-bundle build evidence that binds the wrong Game manifest digest, wrong Game payload digest/root, wrong Atlas Core/API identity or wrong embedded bundle digest/version, mutable/malformed evidence references, duplicate/contradictory evidence where material, cross-link and deployment/bundle mismatches, plus positive fixtures for both bundle-relation modes with independently valid Game export-build evidence, Game and Atlas provider required-check/review evidence, and a valid exact export→Core→embedded-bundle build binding.
 
 ### 3.3 No alternate terminal encoding
 
@@ -174,7 +177,7 @@ meta_compatibility_post_merge_meta_gate_run_or_check_ref
 
 ## 6. Provider evidence requirements
 
-Game evidence must bind export profile/version, producer revision, world/content revision, exact produced export manifest/payload digest, deterministic producer validation, immutable exact-head provider required-check evidence, immutable accepted exact-head provider review evidence for every provider PR whose policy requires review, provider merge evidence when applicable, and the client identity plus exact Atlas embedded bundle digest it packages/pins.
+Game evidence must bind export profile/version, producer revision, world/content revision and exact produced export manifest/payload digest through **immutable Game-owned export-build/manifest evidence**, plus deterministic producer validation, immutable exact-head provider required-check evidence, immutable accepted exact-head provider review evidence for every provider PR whose policy requires review, provider merge evidence when applicable, and the client identity plus exact Atlas embedded bundle digest it packages/pins.
 
 Atlas evidence must bind the exact Game export digests accepted by ingestion, Atlas Core/API identity, source/release identity, exact embedded bundle version/digest, **immutable Atlas build/manifest evidence proving that exact embedded bundle and Core identity were produced from those exact accepted Game export digests**, exact public deployed bundle version/digest, immutable deployment evidence binding public deployment identity to its bundle, the declared public/embedded relation, immutable exact-head provider required-check evidence, immutable accepted exact-head provider review evidence for every provider PR whose policy requires review, provider merge/live-acceptance evidence, and the exact deployed bundle binding.
 
@@ -182,10 +185,10 @@ Provider PR/merge identity, the other provider's checks, and review evidence do 
 
 ## 7. Failure semantics
 
-Return `NOT_DONE` / `UNKNOWN_BLOCKING` if any required artifact identity, exact export→Core→embedded-bundle build binding, chain-of-custody link, client/embedded binding, public-deployment/bundle binding, independent-bundle compatibility evidence, non-empty immutable evidence-reference class, provider-specific required-check evidence, required provider or META exact-head review evidence, #84 schema/validator/meta-gate integration, protected META compatibility merge/readback/check evidence, or immutable tuple field is absent, floating, malformed, cross-provider substituted or contradictory. These conditions cannot be waived by narration.
+Return `NOT_DONE` / `UNKNOWN_BLOCKING` if any required artifact identity, exact Game-input→produced-export binding, exact export→Core→embedded-bundle build binding, chain-of-custody link, client/embedded binding, public-deployment/bundle binding, independent-bundle compatibility evidence, non-empty immutable evidence-reference class, provider-specific required-check evidence, required provider or META exact-head review evidence, #84 schema/validator/meta-gate integration, protected META compatibility merge/readback/check evidence, or immutable tuple field is absent, floating, malformed, cross-provider substituted or contradictory. These conditions cannot be waived by narration.
 
 ## 8. Relationship to independent closeout
 
-`OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR` is the terminal verifier of this contract. Its `FINAL_VERDICT: DONE` is valid only when it returns the immutable Game artifact, embedded Atlas bundle, public deployed Atlas bundle, Game client, public deployment and canonical validated META record evidence required here.
+`OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR` is the terminal verifier of this contract. Its `FINAL_VERDICT: DONE` is valid only when it returns the immutable Game export-build chain, embedded Atlas build chain, public deployed Atlas bundle, Game client, public deployment and canonical validated META record evidence required here.
 
 The programme coordinator may not report terminal `DONE` before that independent verdict.
