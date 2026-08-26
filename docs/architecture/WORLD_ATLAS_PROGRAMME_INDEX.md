@@ -21,6 +21,21 @@ Status: proposed until the architecture packet is protected-merged to META `main
 7. Independent terminal auditor:
    - `docs/agents/prompts/OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR.md`
 
+### Architecture-packet admission evidence
+
+The packet becomes canonical only through the normal protected META pull-request lifecycle. Terminal architecture evidence must independently identify:
+
+```text
+meta_architecture_pr_number
+meta_architecture_pr_head_sha
+meta_architecture_pr_required_check_refs
+meta_architecture_pr_review_evidence_refs
+meta_architecture_pr_squash_merge_sha
+protected_main_packet_readback_ref
+```
+
+The accepted exact head SHA must be the same candidate covered by the required `meta-gate` and accepted R2/deep review evidence before protected squash merge. A merge SHA, Issue narration, floating branch, stale review or admin/bypass path cannot substitute for those exact-head admission identities. After merge, ADR 0005, the executable plan and coordinator/auditor packet must be readable from the exact protected-main squash-merge SHA before provider runtime execution treats this architecture as canonical.
+
 ## Lifecycle graph
 
 - META parent architecture/programme: `Oteryn/Oteryn#75`
