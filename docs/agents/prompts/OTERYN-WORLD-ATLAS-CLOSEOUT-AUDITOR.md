@@ -21,120 +21,45 @@ Audit current protected state, not coordinator narration or stale planning SHAs.
 
 ## Canonical inputs
 
-From protected META `main`:
+From protected META `main` read ADR 0001, ADR 0004, ADR 0005, the unified implementation plan, `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`, the coordinator/parallel suite, META Issues #75-#81/#84 and release/cutover evidence under #79.
 
-- ADR 0001;
-- ADR 0004;
-- ADR 0005;
-- unified World Atlas implementation plan;
-- `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`;
-- coordinator and parallel-agent suite;
-- META Issues #75-#81;
-- release/cutover evidence under #79.
-
-From providers:
-
-- current `Oteryn/Oteryn-Game` protected main, Game #191 and all linked child Issues/PRs;
-- current `Oteryn/Oteryn-Atlas` protected main, Atlas #188 and all linked child Issues/PRs;
-- current required checks/reviews/branch protection;
-- exact provider release/deployment/candidate evidence named by the coordinator.
+From providers read current protected Game/Atlas main, Game #191 and Atlas #188 with linked children, required checks/reviews/protection and the exact provider artifact/release/deployment evidence named by the coordinator.
 
 ## Audit dimensions
 
 ### A. Authority boundary
 
-Require proof that:
-
-- Game is still sole canonical World/Content/gameplay-fact authority;
-- Game owns the public Atlas export/profile/allowlist/provenance;
-- Atlas consumes only accepted public-safe provider artifacts for canonical facts;
-- Atlas did not copy a normative Game schema or become a second authority;
-- META did not duplicate provider schemas/runtime;
-- any public Rust contract crate is explicitly provider-owned/versioned rather than an accidental Game internal API.
-
-Fail closeout on any unresolved authority conflict.
+Require Game to remain sole canonical World/Content/gameplay-fact authority, Game ownership of public Atlas export/profile/allowlist/provenance, Atlas consumption only of accepted public-safe artifacts, no normative Game schema copy into Atlas/META and no accidental Game-internal Rust crate as cross-repo public API.
 
 ### B. Atlas Rust Core reality
 
-Require exact evidence that:
-
-- an Atlas-owned Rust Core exists on protected Atlas main;
-- crate/dependency direction matches the accepted provider design;
-- migrated capabilities have permanent tests;
-- parity against the prior accepted implementation is proven for every cut-over capability;
-- resource limits/error handling are fail closed;
-- performance evidence exists for migration decisions;
-- legacy paths remain or were removed only according to the separate removal gate.
-
-Do not accept “Rust exists in repo” as proof that the intended Atlas capabilities use it.
+Require protected-main Atlas-owned Rust Core, accepted dependency direction, permanent tests for migrated capabilities, parity against the prior accepted implementation for each cutover, bounded resource/error handling, performance evidence and truthful retention/removal of legacy paths.
 
 ### C. Web product convergence
 
-Require proof that:
-
-- public Atlas remains the accepted production web product rather than a second rewritten app;
-- Production UI Shell/current product state is preserved/integrated;
-- WASM is used only behind explicit compatibility interfaces;
-- browser accessibility/visual/geometry/performance gates required by current Atlas policy are green on exact candidate/main;
-- public mode has no dependency on private client state or bridge availability.
+Require public Atlas to remain the accepted production web product, Production UI Shell integration, bounded WASM interfaces, current accessibility/visual/geometry/performance gates and no public-mode dependency on private bridge state.
 
 ### D. Embedded client reuse
 
-Require proof that:
-
-- the client loads a pinned local Atlas bundle identity/digest;
-- base embedded Atlas works without public Atlas network availability;
-- host origin/navigation/resource policy is enforced;
-- host failure/crash/hang is contained to Atlas capability;
-- gameplay/native minimap remains usable when the embedded host is disabled/unavailable;
-- native minimap is not implemented through the web host.
+Require the client to load a pinned local Atlas embedded bundle version/digest, work without public Atlas availability, enforce host origin/navigation/resource policy, contain host failure to Atlas capability, and keep gameplay/native minimap usable independently.
 
 ### E. Bridge security/privacy
 
-Require independent security evidence under #77 that:
-
-- protocol/profile version handshake exists;
-- message schemas, source/origin, size and rate are validated;
-- capability allowlist is default-deny;
-- v1 exposes no movement/combat/use/arbitrary server mutation;
-- no Game credential/session secret is exposed to the web surface;
-- private/live state is local-session-only;
-- public Atlas artifacts/build outputs do not contain private/live state;
-- logs/screenshots/evidence meet privacy sanitization rules;
-- malformed/flooded/spoofed/incompatible messages fail closed;
-- dependency/supply-chain posture of selected host was reviewed.
-
-Any material privacy leak is a closeout failure, not a warning.
+Require independent #77 evidence for protocol/profile handshake, schema/source/origin/size/rate validation, default-deny capability allowlist, no movement/combat/use/arbitrary server mutation, no credential/session-secret exposure, local-session-only private state, no public publication leakage, privacy-safe evidence and malformed/flood/spoof/mismatch negative tests plus host dependency/supply-chain review.
 
 ### F. Cross-surface functional parity
 
-Require #78 evidence that public web and embedded client, on an explicitly compatible world/export revision, prove the accepted shared journeys:
-
-- same public entity identity/facts;
-- same target map location/floor;
-- compatible camera/floor behavior;
-- accepted route/waypoint behavior;
-- embedded mode can add allowlisted local state;
-- public mode does not receive that state;
-- negative bundle/export/bridge/WASM/host/offline journeys behave as designed.
+Require #78 evidence for compatible public identity/facts, location/floor/camera semantics, route/waypoint behavior, local embedded state absent from public mode, and negative bundle/export/bridge/WASM/host/offline journeys.
 
 ### G. Performance/resource evidence
 
-Require #80 exact-profile evidence for:
-
-- migrated Python/index workloads versus Rust candidates;
-- selected JS/WASM hot paths;
-- embedded host startup/RSS/CPU/GPU/input impact;
-- large-world scaling;
-- native minimap unaffected baseline.
-
-The architecture does not require a fixed speedup ratio, but missing or misleading benchmark evidence fails the corresponding migration/host decision audit.
+Require #80 exact-profile evidence for migrated Python/index workloads versus Rust, selected JS/WASM paths, embedded host startup/RSS/CPU/GPU/input, large-world scaling and native minimap unaffected baseline.
 
 ### H. Release/compatibility tuple
 
-Require the exact contract in `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` to be satisfied.
+Require the exact `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` contract.
 
-The final tuple must independently bind at least:
+The final tuple independently binds:
 
 ```text
 game_atlas_export_profile_version
@@ -145,58 +70,36 @@ game_world_content_revision
 atlas_core_api_identity
 atlas_web_embedded_bundle_version
 atlas_web_embedded_bundle_digest
+public_atlas_deployed_bundle_version
+public_atlas_deployed_bundle_digest
+public_atlas_bundle_relation_to_embedded
 atlas_bridge_protocol_version
 atlas_bridge_capability_profile
-game_client release/candidate identity
-public_atlas release/deployment identity
+game_client_release_or_candidate_identity
+public_atlas_release_or_deployment_identity
 ```
 
-Producer source/profile/world revision does not substitute for the exact produced Game export artifact manifest/payload digest. Require proof that Atlas consumed that exact produced artifact and that the accepted Atlas bundle digest derives from the accepted input.
+Require proof that Atlas consumed the exact produced Game artifact and that the Game client pins the exact embedded bundle digest. Separately require immutable evidence that the named public deployment serves `public_atlas_deployed_bundle_digest`.
 
-Issue #79 coordination is not terminal authority by itself. The final compatibility record must be protected-squash-merged at its canonical META compatibility/release path, with exact PR head, required exact-head check/review evidence, squash-merge SHA, protected-main readback and post-merge `meta-gate` evidence on that exact merge SHA.
+If `public_atlas_bundle_relation_to_embedded == SAME_BUNDLE`, require public and embedded bundle digests to match. If `COMPATIBLE_INDEPENDENT`, allow different digests only with immutable deployment evidence and provider/cross-surface evidence proving the public bundle is compatible with the recorded Game export/world contract.
 
-No floating `main`, `latest`, unpinned URL, Issue-only tuple, unmerged PR or undocumented compatibility guess is accepted.
+Issue #79 is not terminal authority by itself. Require #84 dedicated schema/validator/meta-gate mechanism and a final record protected-squash-merged at its canonical META path, exact PR/head/check/review evidence, protected-main readback and post-merge `meta-gate` on the exact merge SHA. Reject floating `main`, `latest`, Issue-only tuples, unmerged PRs and undocumented compatibility guesses.
 
 ### I. Provider final gates
 
-For every final provider PR/candidate:
-
-- exact branch/head is known;
-- complete changed-file/diff scope is bounded;
-- required provider checks are green on the exact final head;
-- required reviews are satisfied;
-- protected squash merge is proven;
-- resulting protected main SHA is known;
-- post-merge provider checks are green where required;
-- Atlas merged-main live acceptance is green for the final deployed Atlas identity;
-- Game native-client candidate/release acceptance is green for the exact bundle digest.
+For every final provider PR/candidate require exact branch/head, bounded diff, exact-head required checks/reviews, protected squash merge, resulting main SHA, required post-merge checks, Atlas live acceptance bound to the exact public deployed bundle, and Game native-client acceptance bound to the exact embedded bundle.
 
 ### J. Parallel-agent hygiene
 
-Audit that:
-
-- no two active workers shared one writable branch/worktree;
-- serialized Cargo/workspace/client-composition/FullWorld-shell/CI/release leases were respected;
-- `main` advancement was handled by late integration rather than destructive restart;
-- no no-op/retrigger commits were used as a substitute for unchanged external evidence;
-- stale branch/Issue state was not promoted to current authority;
-- branches are disposed according to provider policy after terminal state.
+Require one writable branch/worktree per mutating worker, serialized shared leases, late integration instead of destructive restart, no no-op/retrigger commits for unchanged evidence, no stale state promoted to authority and correct branch disposal.
 
 ## Risk/unknown handling
 
-Classify each material item as:
-
-- `FACT_PROVEN`;
-- `INFERENCE_SUPPORTED`;
-- `UNKNOWN_BLOCKING`;
-- `CONFLICT_BLOCKING`;
-- `NOT_APPLICABLE` with reason.
-
-No `UNKNOWN_BLOCKING` or `CONFLICT_BLOCKING` may coexist with `DONE`.
+Classify each material item as `FACT_PROVEN`, `INFERENCE_SUPPORTED`, `UNKNOWN_BLOCKING`, `CONFLICT_BLOCKING`, or `NOT_APPLICABLE` with reason. No blocking unknown/conflict may coexist with `DONE`.
 
 ## Output
 
-Return exactly this closeout summary shape. Every `*_REFS` field must contain immutable evidence identifiers where applicable: repository + PR/run/check/artifact/deployment identity, exact commit SHA, and digest/version where the evidence is artifact-bound. A bare narrative such as `PASS` without the corresponding immutable references is insufficient for `DONE`.
+Return exactly this summary. Every `*_REFS`/evidence field must contain immutable identifiers where applicable; bare narrative PASS is insufficient.
 
 ```text
 PROGRAMME: OTERYN-WORLD-ATLAS
@@ -214,6 +117,10 @@ WORLD_CONTENT_REVISION:
 ATLAS_CORE_API_IDENTITY:
 ATLAS_WEB_EMBEDDED_BUNDLE_VERSION:
 ATLAS_WEB_EMBEDDED_BUNDLE_DIGEST:
+PUBLIC_ATLAS_DEPLOYED_BUNDLE_VERSION:
+PUBLIC_ATLAS_DEPLOYED_BUNDLE_DIGEST:
+PUBLIC_ATLAS_BUNDLE_RELATION_TO_EMBEDDED:
+PUBLIC_ATLAS_DEPLOYMENT_BUNDLE_EVIDENCE_REF:
 ATLAS_BRIDGE_PROTOCOL_PROFILE:
 GAME_CLIENT_RELEASE_OR_CANDIDATE_IDENTITY:
 PUBLIC_ATLAS_RELEASE_DEPLOYMENT_IDENTITY:
@@ -248,4 +155,4 @@ FINAL_VERDICT: DONE|NOT_DONE
 REQUIRED_NEXT_ACTIONS:
 ```
 
-A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable evidence in all applicable identity/reference fields above, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
+A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable evidence in all applicable fields, a valid public-deployment/bundle binding under the declared relation mode, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
