@@ -102,7 +102,7 @@ Require proof that Atlas consumed the exact produced Game artifact and that the 
 
 If `public_atlas_bundle_relation_to_embedded == SAME_BUNDLE`, require public and embedded bundle digests to match. If `COMPATIBLE_INDEPENDENT`, allow different digests only with immutable deployment evidence and provider/cross-surface evidence proving the public bundle is compatible with the recorded Game export/world contract.
 
-Issue #79 is not terminal authority by itself. Require #84 dedicated schema/validator/meta-gate mechanism and a final record protected-squash-merged at its canonical META path, exact PR/head/check/review evidence, protected-main readback and post-merge `meta-gate` on the exact merge SHA. Reject floating `main`, `latest`, Issue-only tuples, unmerged PRs and undocumented compatibility guesses.
+Issue #79 is not terminal authority by itself. Require #84 dedicated schema/validator/meta-gate mechanism and a final record protected-squash-merged at its canonical META path, exact PR/head/check/review evidence, protected-main readback and post-merge `meta-gate` on the exact merge SHA. The immutable `META_COMPATIBILITY_RECORD_READBACK_REF` must bind the exact `META_COMPATIBILITY_RECORD_PATH` to `META_COMPATIBILITY_SQUASH_MERGE_SHA`; a floating `main`, later commit, path-only assertion, or post-merge gate without exact record readback is insufficient. Reject floating `main`, `latest`, Issue-only tuples, unmerged PRs and undocumented compatibility guesses.
 
 ### I. Provider final gates
 
@@ -169,6 +169,7 @@ META_COMPATIBILITY_PR_HEAD_SHA:
 META_COMPATIBILITY_PR_REQUIRED_CHECK_REFS:
 META_COMPATIBILITY_PR_REVIEW_EVIDENCE_REFS:
 META_COMPATIBILITY_SQUASH_MERGE_SHA:
+META_COMPATIBILITY_RECORD_READBACK_REF:
 META_COMPATIBILITY_POST_MERGE_META_GATE_REF:
 ARCHITECTURE_PACKET: PASS|FAIL
 AUTHORITY_BOUNDARY: PASS|FAIL
@@ -190,4 +191,4 @@ FINAL_VERDICT: DONE|NOT_DONE
 REQUIRED_NEXT_ACTIONS:
 ```
 
-A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable architecture-packet exact-head check/review/merge evidence, `PROTECTED_MAIN_PACKET_READBACK_REF` proving all eight canonical packet artifacts at the exact `META_ARCHITECTURE_PR_MERGE_SHA`, complete immutable evidence in all applicable provider fields including provider exact-head review evidence, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, partial, later-commit, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
+A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable architecture-packet exact-head check/review/merge evidence, `PROTECTED_MAIN_PACKET_READBACK_REF` proving all eight canonical packet artifacts at the exact `META_ARCHITECTURE_PR_MERGE_SHA`, complete immutable compatibility-record evidence including `META_COMPATIBILITY_RECORD_READBACK_REF` binding the exact record path to `META_COMPATIBILITY_SQUASH_MERGE_SHA`, complete immutable evidence in all applicable provider fields including provider exact-head review evidence, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, partial, later-commit, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
