@@ -9,6 +9,9 @@ from __future__ import annotations
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 
 MODULE_PATH = Path(__file__).with_name("agent_execution_routing.py")
 SPEC = importlib.util.spec_from_file_location("agent_execution_routing", MODULE_PATH)
@@ -108,6 +111,16 @@ def test_non_closed_remote_desktop_reason_fails() -> None:
     assert "remote_desktop_reason is not an allowed exception" in routing.validate_packet(packet, live_state=live_state(), policy=policy())
 
 
+def test_remote_desktop_exception_requires_a_host_exception_route() -> None:
+    packet = default_packet()
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    execution.update({"remote_desktop": "exception", "remote_desktop_reason": "lan_or_hardware"})
+    assert "remote_desktop exception requires execution_target=host_exception" in routing.validate_packet(
+        packet, live_state=live_state(), policy=policy()
+    )
+
+
 def test_equivalent_ci_forbids_rdc_polling() -> None:
     packet = exception_packet("self_hosted_runner_diagnosis")
     execution = packet["execution_routing"]
@@ -115,6 +128,16 @@ def test_equivalent_ci_forbids_rdc_polling() -> None:
     execution["equivalent_ci"] = ".github/workflows/ci.yml:meta-gate"
     execution["requested_host_actions"] = ["poll_docker_logs"]
     assert "equivalent_ci prohibits RDC polling" in routing.validate_packet(packet, live_state=live_state(), policy=policy())
+
+
+def test_remote_desktop_exception_requires_no_equivalent_ci() -> None:
+    packet = exception_packet("self_hosted_runner_diagnosis")
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    execution["equivalent_ci"] = ".github/workflows/ci.yml:meta-gate"
+    assert "remote_desktop exception requires no equivalent_ci" in routing.validate_packet(
+        packet, live_state=live_state(), policy=policy()
+    )
 
 
 def test_missing_resume_preflight_fails() -> None:
@@ -191,6 +214,68 @@ def test_overlapping_parallel_lanes_fail() -> None:
         lane("specific-file", ["docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md"]),
     ]
     assert "parallel lanes have overlapping owned_paths" in routing.validate_packet(packet, live_state=live_state(), policy=policy())
+
+
+def test_unknown_lane_dependency_fails() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lanes"] = [lane("policy", ["docs/agents/schemas/**"], depends_on=["missing"])]
+    assert "lane 'policy' depends_on unknown lane 'missing'" in routing.validate_packet(
+        packet, live_state=live_state(), policy=policy()
+    )
+
+
+def test_serial_plan_requires_a_concrete_reason() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lane_strategy"] = "serial_with_reason"
+    assert "serial_with_reason requires serial_reason" in routing.validate_packet(
+        packet, live_state=live_state(), policy=policy()
+    )
+
+
+def test_constrained_resource_requires_a_lease() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["constrained_resources"] = ["heavy-test-slot"]
+    assert "constrained resource requires a lease: heavy-test-slot" in routing.validate_packet(
+        packet, live_state=live_state(), policy=policy()
+    )
+
+
+def test_cli_returns_zero_for_valid_packet_and_one_for_invalid_packet() -> None:
+    script = Path(__file__).with_name("agent_execution_routing.py")
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        directory = Path(temporary_directory)
+        policy_path = directory / "policy.json"
+        packet_path = directory / "packet.json"
+        live_state_path = directory / "live-state.json"
+        policy_path.write_text(json.dumps(policy()), encoding="utf-8")
+        packet_path.write_text(json.dumps(default_packet()), encoding="utf-8")
+        live_state_path.write_text(json.dumps(live_state()), encoding="utf-8")
+        command = [
+            sys.executable,
+            str(script),
+            "--policy",
+            str(policy_path),
+            "--packet",
+            str(packet_path),
+            "--live-state",
+            str(live_state_path),
+        ]
+        assert subprocess.run(command, check=False, capture_output=True, text=True).returncode == 0
+
+        invalid_packet = default_packet()
+        invalid_execution = invalid_packet["execution_routing"]
+        assert isinstance(invalid_execution, dict)
+        invalid_execution["execution_target"] = "untrusted_host"
+        packet_path.write_text(json.dumps(invalid_packet), encoding="utf-8")
+        failed = subprocess.run(command, check=False, capture_output=True, text=True)
+        assert failed.returncode == 1
+        assert "execution_target is not allowed" in failed.stdout
 
 
 if __name__ == "__main__":
