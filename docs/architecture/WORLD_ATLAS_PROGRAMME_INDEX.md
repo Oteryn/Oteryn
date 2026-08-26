@@ -38,7 +38,7 @@ meta_architecture_pr_squash_merge_sha
 protected_main_packet_readback_ref
 ```
 
-The accepted exact head SHA must be the same candidate covered by successful required `meta-gate` and `ai-review-gate` checks and accepted R2/deep review evidence before protected squash merge. A merge SHA, Issue narration, floating branch, stale/raw review, failing/missing trusted verifier, or admin/bypass path cannot substitute for those exact-head admission identities. After merge, the complete eight-path manifest above must be readable from the exact protected-main squash-merge SHA before provider runtime execution treats this architecture as canonical; a seven-file or representative-subset readback is incomplete.
+The accepted exact head SHA must be the same candidate covered by successful required `meta-gate` and `ai-review-gate` checks and accepted R2/deep review evidence before protected squash merge. A merge SHA, Issue narration, floating branch, stale/raw review, failing/missing trusted verifier, or admin/bypass path cannot substitute for those exact-head admission identities. After merge, the complete eight-path manifest above must be readable from the exact protected-main squash-merge SHA before provider runtime execution treats this architecture as canonical.
 
 ## Lifecycle graph
 
@@ -65,29 +65,38 @@ Recommended reasoning effort: **Extra High**.
 
 The coordinator resolves current GitHub state, ownership and dependencies before releasing provider work. Do not manually start mutating worker roles merely because this planning packet exists.
 
-For release/cutover, `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` is the canonical exact tuple/evidence contract. Its required produced Game export artifact digests and protected-main META compatibility-record evidence refine the shorthand Wave 7 tuple in the implementation plan and may not be omitted.
+## Terminal evidence model
 
-The current generic META release schema is not the terminal World Atlas record format. Issue #84 owns the required dedicated implementation. Before Wave 7 Task 7E can complete, protected META `main` must contain:
+`WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` is canonical for the exact release tuple. It requires, separately for Game and Atlas:
+
+```text
+provider_pr_head_sha
+provider_required_check_set_evidence_ref
+complete provider_required_check_refs[]
+provider_review_evidence_refs[]
+provider_merge_evidence_ref
+provider_main_or_release_commit_sha
+provider_post_merge_evidence_refs[]
+```
+
+Checks/review bind the exact pre-squash provider PR head. Merge evidence binds that head to the exact resulting protected-main/release SHA. A non-empty subset of required checks is insufficient.
+
+The same contract requires authorized Game/Atlas build-source commit SHAs tied to final provider revisions, immutable Game export-build and Atlas bundle-build chains, exact client/bundle/bridge handshake evidence, exact public deployment/bundle evidence, and a `qualification_candidate_evidence_manifest_ref` binding security/performance/E2E/rollback evidence to the exact released candidate. Stale candidate evidence is not terminal evidence.
+
+The current generic META release schema is not the terminal World Atlas record format. Issue #84 owns the dedicated mechanism. Before Wave 7 Task 7E can complete, protected META `main` must contain:
 
 - `ecosystem/world-atlas/compatibility.schema.json`;
-- `ecosystem/world-atlas/releases/<release_id>.json` for each final record;
+- `ecosystem/world-atlas/releases/<release_id>.json`;
 - `tools/governance/validate_world_atlas_compatibility.py`;
-- integration of that validator into `meta-gate` with deterministic negative/positive tests.
+- `meta-gate` integration with deterministic positive/negative tests.
 
-If that mechanism is absent, cutover is `WAITING_EXTERNAL`, not an invitation to encode the tuple in opaque generic fields.
+If absent, cutover is `WAITING_EXTERNAL`, not an invitation to encode the tuple in opaque generic fields.
 
 ## Optional manual Wave 0 parallel scouts
 
-If the owner chooses separate chats instead of an agent-capable coordinator, the five Wave-0 roles may still run concurrently, but **provider read-only does not mean lifecycle-free**. Every independently launched scout is a META evidence-only worker:
+The five Wave-0 roles may run concurrently, but provider read-only does not mean lifecycle-free. Every independently launched scout is a META evidence-only worker with a fresh META child Issue, dedicated branch/worktree and PR/task head, exactly one disjoint `docs/evidence/world-atlas/wave0/<role>.md` report path or recorded equivalent, and a normal PR-backed execution-routing packet validated against fresh GitHub state. It may mutate only that META evidence report; Game/Atlas/provider/runtime/config/Cargo/workflow/shared-shell/production surfaces remain read-only. There is no PR-less scout route.
 
-- it receives a fresh META child Issue under #75;
-- it receives a dedicated META branch/worktree and PR/task head;
-- it owns exactly one disjoint report path under `docs/evidence/world-atlas/wave0/<role>.md` (or the coordinator-recorded equivalent path);
-- its normal PR-backed execution-routing packet is validated against a fresh GitHub snapshot before work begins;
-- it may mutate only that assigned META evidence report;
-- `Oteryn/Oteryn-Game`, `Oteryn/Oteryn-Atlas`, provider runtime/config, Cargo/workflow/shared-shell and production surfaces remain strictly read-only for Wave 0.
-
-The five evidence-only roles are:
+Roles:
 
 - `OTERYN-WORLD-ATLAS-GAME-CONTRACT-SCOUT` — Extra High
 - `OTERYN-WORLD-ATLAS-ATLAS-MIGRATION-SCOUT` — Extra High
@@ -95,15 +104,13 @@ The five evidence-only roles are:
 - `OTERYN-WORLD-ATLAS-SECURITY-SCOUT` — Extra High
 - `OTERYN-WORLD-ATLAS-VERIFICATION-PERF-SCOUT` — Extra High
 
-There is no PR-less standalone scout route. Their exact prompts, routing-evidence return requirement and return formats are in the parallel-agent suite.
-
 ## Qualification evidence lane
 
-`OTERYN-WORLD-ATLAS-QUALIFICATION-LEAD` is provider-read-only over frozen Game/Atlas candidates but is not routing-lifecycle-free. Its default invocation receives a fresh META qualification-evidence child Issue under #78/#80, a dedicated META branch/worktree and PR/task head, exactly one report path under `docs/evidence/world-atlas/qualification/<candidate-or-role>.md` (or the coordinator-recorded equivalent), and a normal PR-backed execution-routing packet validated against fresh GitHub state. Only that qualification report is writable by the lead. If provider-owned test/evidence code must change, the lead coordinates a separate provider child Issue/branch/worktree/PR rather than borrowing or fabricating a PR identity. There is no PR-less WA-6Q route.
+`OTERYN-WORLD-ATLAS-QUALIFICATION-LEAD` is provider-read-only over frozen candidates but gets a real META qualification-evidence Issue/branch/worktree/PR/task head, one qualification report path and normal PR-backed routing validation. Provider test/evidence-code changes require separate provider child tasks. WA-6Q must produce an immutable qualification candidate manifest binding accepted evidence to the exact candidate/released tuple. There is no PR-less WA-6Q route.
 
 ## Allocation-gated mutating leads
 
-These must not mutate provider code until the coordinator records a fresh provider child Issue, `admission_main_sha`, branch/worktree and exact path ownership and the substantial task packet passes current execution-routing validation:
+These must not mutate provider code until the coordinator records fresh provider child Issue, `admission_main_sha`, branch/worktree, exact path ownership and passing routing validation:
 
 - `OTERYN-WORLD-ATLAS-GAME-PROVIDER-LEAD`
 - `OTERYN-WORLD-ATLAS-ATLAS-CORE-LEAD`
@@ -115,10 +122,12 @@ Normal mutating concurrency is 2–3 disjoint lanes. Root Cargo/workspace, clien
 
 ## Terminal verification entry point
 
-After provider implementation/cutover claims completion, run independently:
+After provider implementation/cutover and the canonical V1 compatibility record are complete, run:
 
 `OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR`
 
 Recommended reasoning effort: **Extra High**.
 
-Only the auditor's `DONE` verdict backed by exact provider evidence and the canonical validated protected-main World Atlas compatibility record permits the programme coordinator to report terminal completion.
+The closeout auditor is itself substantial and therefore uses a real PR-backed META closeout-evidence lifecycle: fresh child Issue under #75/#81, dedicated branch/worktree + PR/task head, exactly one `docs/evidence/world-atlas/closeout/<release-id-or-candidate>.md` report path or recorded equivalent, and normal routing validation against fresh GitHub state. Provider/META product/config state remains read-only from the auditor. There is no PR-less closeout route.
+
+Only a `DONE` verdict backed by the canonical closeout report and its immutable META evidence, plus the exact provider/compatibility evidence required above, permits the coordinator to report terminal programme completion.
