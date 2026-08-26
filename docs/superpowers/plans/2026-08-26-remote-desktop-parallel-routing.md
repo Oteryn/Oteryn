@@ -141,28 +141,12 @@ git commit -m "feat(governance): validate execution routing"
 - Modify: `AGENTS.md`
 - Modify: `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`
 - Modify: `.github/workflows/ci.yml`
-- Modify: `tools/governance/test_agent_execution_routing.py`
 
 **Interfaces:**
 - Contract uses exact default-deny and parallel-first terms from Task 1.
 - META CI invokes `python3 tools/governance/test_agent_execution_routing.py`.
 
-- [ ] **Step 1: Add the failing contract test**
-
-```python
-def test_contract_declares_default_deny_and_parallel_first() -> None:
-    text = Path("docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md").read_text(encoding="utf-8")
-    assert "Remote Desktop/Desktop Commander is default-deny" in text
-    assert "parallel-first task plan" in text
-```
-
-- [ ] **Step 2: Run the test before editing the contract**
-
-Run: `python tools/governance/test_agent_execution_routing.py`
-
-Expected: failure for missing mandatory terms.
-
-- [ ] **Step 3: Add the contract and CI binding**
+- [ ] **Step 1: Add the contract and CI binding**
 
 Document the routing record, exception table, equivalent-CI polling prohibition, fresh resume preflight, lanes, shared leases and integration order. Add this workflow step after the existing governance tests:
 
@@ -172,14 +156,14 @@ Document the routing record, exception table, equivalent-CI polling prohibition,
   run: python3 tools/governance/test_agent_execution_routing.py
 ```
 
-- [ ] **Step 4: Run focused tests and commit**
+- [ ] **Step 2: Run focused tests and commit**
 
 Run: `python tools/governance/test_agent_execution_routing.py`
 
-Expected: all routing and contract assertions pass.
+Expected: all executable routing assertions pass. The contract itself is reviewed as policy text; the validator tests remain behavior-focused rather than asserting wording.
 
 ```bash
-git add AGENTS.md docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md .github/workflows/ci.yml tools/governance/test_agent_execution_routing.py
+git add AGENTS.md docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md .github/workflows/ci.yml
 git commit -m "docs(governance): enforce RDC default deny"
 ```
 
