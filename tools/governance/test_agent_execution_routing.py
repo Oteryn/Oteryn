@@ -463,6 +463,79 @@ def test_cli_returns_policy_error_for_non_string_closed_enum() -> None:
         assert "Traceback" not in failed.stderr
 
 
+def test_cli_rejects_fail_open_execution_routing_bypasses() -> None:
+    script = Path(__file__).with_name("agent_execution_routing.py")
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        directory = Path(temporary_directory)
+        policy_path = directory / "policy.json"
+        packet_path = directory / "packet.json"
+        live_state_path = directory / "live-state.json"
+        policy_path.write_text(json.dumps(policy()), encoding="utf-8")
+        live_state_path.write_text(json.dumps(live_state()), encoding="utf-8")
+        command = [
+            sys.executable,
+            str(script),
+            "--policy",
+            str(policy_path),
+            "--packet",
+            str(packet_path),
+            "--live-state",
+            str(live_state_path),
+        ]
+
+        def assert_rejected(packet: dict[str, object], expected_error: str) -> str:
+            packet_path.write_text(json.dumps(packet), encoding="utf-8")
+            result = subprocess.run(command, check=False, capture_output=True, text=True)
+            assert result.returncode == 1
+            assert expected_error in result.stdout
+            assert "Traceback" not in result.stderr
+            return result.stdout
+
+        for invalid_equivalent_ci in ([], {}, "", False, 0):
+            packet = exception_packet("lan_or_hardware")
+            execution = packet["execution_routing"]
+            assert isinstance(execution, dict)
+            execution["equivalent_ci"] = invalid_equivalent_ci
+            assert_rejected(packet, "equivalent_ci must be null or a non-empty workflow identifier string")
+
+        packet = default_packet()
+        execution = packet["execution_routing"]
+        assert isinstance(execution, dict)
+        execution["equivalent_ci"] = None
+        execution["requested_host_actions"] = ["poll_docker_logs"]
+        assert_rejected(packet, "requested_host_actions require remote_desktop=exception")
+
+        packet = default_packet()
+        parallel = packet["parallel_execution"]
+        assert isinstance(parallel, dict)
+        parallel["lanes"] = []
+        parallel["integration_order"] = []
+        output = assert_rejected(packet, "parallel_first requires at least one lane")
+        assert "parallel_first requires a non-empty integration_order" in output
+
+        packet = default_packet()
+        parallel = packet["parallel_execution"]
+        assert isinstance(parallel, dict)
+        parallel["constrained_resources"] = "heavy-test-slot"
+        assert_rejected(packet, "constrained_resources must be a list of non-empty strings")
+
+        packet = default_packet()
+        parallel = packet["parallel_execution"]
+        assert isinstance(parallel, dict)
+        parallel["lanes"] = [lane("policy", ["docs/agents/**", 7])]
+        assert_rejected(packet, "owned_paths must be a list of non-empty safe repository-relative strings")
+
+        packet = default_packet()
+        parallel = packet["parallel_execution"]
+        assert isinstance(parallel, dict)
+        parallel["lanes"] = [
+            lane("all", ["**"]),
+            lane("specific", ["src/a.py"]),
+        ]
+        parallel["integration_order"] = ["all", "specific"]
+        assert_rejected(packet, "parallel lanes have overlapping owned_paths")
+
+
 if __name__ == "__main__":
     failures = []
     for name, test in sorted(globals().items()):

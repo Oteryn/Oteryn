@@ -45,11 +45,21 @@ def _path_prefix(path: str) -> str:
     return normalized
 
 
+def _is_safe_repository_relative_path(path: object) -> bool:
+    """Return whether a path glob stays safely within the repository root."""
+    if not isinstance(path, str) or not path.strip():
+        return False
+    normalized = path.replace("\\", "/").strip()
+    if normalized.startswith("/") or ":" in normalized or any(ord(character) < 32 for character in normalized):
+        return False
+    return all(part not in {"", ".", ".."} for part in normalized.split("/"))
+
+
 def _paths_overlap(left: str, right: str) -> bool:
     left_prefix = _path_prefix(left)
     right_prefix = _path_prefix(right)
     if not left_prefix or not right_prefix:
-        return left == right
+        return bool(left_prefix == right_prefix or "*" in left or "*" in right)
     return (
         left_prefix == right_prefix
         or left_prefix.startswith(right_prefix + "/")
@@ -123,6 +133,10 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
             errors.append("multi-lane task requires lane_strategy")
         else:
             errors.append("lane_strategy is not allowed")
+    if strategy == "parallel_first" and not lanes:
+        errors.append("parallel_first requires at least one lane")
+    if strategy == "parallel_first" and not _list(parallel.get("integration_order")):
+        errors.append("parallel_first requires a non-empty integration_order")
     if strategy == "serial_with_reason":
         serial_reason = parallel.get("serial_reason")
         if not isinstance(serial_reason, str) or not serial_reason.strip():
@@ -144,7 +158,12 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
         for field in required_lane_fields:
             if field not in lane:
                 errors.append(f"lane '{display_identifier}' missing required field: {field}")
-        owned_paths = [path for path in _list(lane.get("owned_paths")) if isinstance(path, str) and path]
+        owned_paths_value = lane.get("owned_paths")
+        owned_paths = [path for path in _list(owned_paths_value) if _is_safe_repository_relative_path(path)]
+        if not isinstance(owned_paths_value, list) or len(owned_paths) != len(_list(owned_paths_value)):
+            errors.append(
+                f"lane '{display_identifier}' owned_paths must be a list of non-empty safe repository-relative strings"
+            )
         if not owned_paths:
             errors.append(f"lane '{display_identifier}' requires owned_paths")
         if not isinstance(lane.get("depends_on", []), list):
@@ -219,11 +238,14 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
             ):
                 errors.append("parallel lanes have overlapping owned_paths")
 
+    constrained_resources_value = parallel.get("constrained_resources", [])
     constrained_resources = [
-        resource
-        for resource in _list(parallel.get("constrained_resources"))
-        if isinstance(resource, str) and resource
+        resource for resource in _list(constrained_resources_value) if isinstance(resource, str) and resource.strip()
     ]
+    if not isinstance(constrained_resources_value, list) or len(constrained_resources) != len(
+        _list(constrained_resources_value)
+    ):
+        errors.append("constrained_resources must be a list of non-empty strings")
     leased_resources = set().union(*lease_resources_by_lane.values()) if lease_resources_by_lane else set()
     for resource in constrained_resources:
         if resource not in leased_resources:
@@ -287,6 +309,12 @@ def validate_packet(
         errors.append("remote_desktop_reason requires remote_desktop=exception")
 
     equivalent_ci = execution.get("equivalent_ci")
+    valid_equivalent_ci = equivalent_ci is None or (
+        isinstance(equivalent_ci, str) and bool(equivalent_ci.strip())
+    )
+    if "equivalent_ci" not in execution or not valid_equivalent_ci:
+        errors.append("equivalent_ci must be null or a non-empty workflow identifier string")
+    equivalent_ci_exists = isinstance(equivalent_ci, str) and bool(equivalent_ci.strip())
     forbidden_actions = _closed_values(policy, "forbidden_remote_desktop_actions_when_equivalent_ci")
     requested_actions_value = execution.get("requested_host_actions")
     requested_actions = _list(requested_actions_value)
@@ -300,12 +328,17 @@ def validate_packet(
         if isinstance(requested_actions_value, str)
         else [action for action in requested_actions if isinstance(action, str)]
     )
-    if equivalent_ci and any(
+    if equivalent_ci_exists and any(
         action in forbidden_actions for action in polling_actions
     ):
         errors.append("equivalent_ci prohibits RDC polling")
-    if equivalent_ci and remote_desktop == "exception":
+    if remote_desktop == "exception" and equivalent_ci is not None:
         errors.append("remote_desktop exception requires no equivalent_ci")
+    if requested_actions:
+        if remote_desktop != "exception":
+            errors.append("requested_host_actions require remote_desktop=exception")
+        elif equivalent_ci is not None:
+            errors.append("requested_host_actions require equivalent_ci=null")
 
     _validate_preflight(execution, _mapping(live_state), policy, errors)
     parallel = packet.get("parallel_execution")
