@@ -30,6 +30,7 @@ Status: proposed until the architecture packet is protected-merged to META `main
 - META release/cutover: `Oteryn/Oteryn#79`
 - META performance/resource evidence: `Oteryn/Oteryn#80`
 - META architecture-packet validation: `Oteryn/Oteryn#81`
+- META World Atlas Compatibility Record V1 implementation: `Oteryn/Oteryn#84`
 - Game provider programme: `Oteryn/Oteryn-Game#191`
 - Atlas provider programme: `Oteryn/Oteryn-Atlas#188`
 
@@ -47,10 +48,10 @@ The coordinator resolves current GitHub state, ownership and dependencies before
 
 For release/cutover, `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` is the canonical exact tuple/evidence contract. Its required produced Game export artifact digests and protected-main META compatibility-record evidence refine the shorthand Wave 7 tuple in the implementation plan and may not be omitted.
 
-The current generic META release schema is not the terminal World Atlas record format. Before Wave 7 Task 7E can complete, META must have the dedicated protected-main mechanism required by that contract:
+The current generic META release schema is not the terminal World Atlas record format. Issue #84 owns the required dedicated implementation. Before Wave 7 Task 7E can complete, protected META `main` must contain:
 
 - `ecosystem/world-atlas/compatibility.schema.json`;
-- `ecosystem/world-atlas/releases/<release_id>.json`;
+- `ecosystem/world-atlas/releases/<release_id>.json` for each final record;
 - `tools/governance/validate_world_atlas_compatibility.py`;
 - integration of that validator into `meta-gate` with deterministic negative/positive tests.
 
