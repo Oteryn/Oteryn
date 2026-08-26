@@ -32,6 +32,7 @@ Before doing anything, load from current protected META `main`:
 - `docs/architecture/adr/0001-ecosystem-topology-authority.md`;
 - `docs/architecture/adr/0004-parallel-agent-git-concurrency.md`;
 - `docs/architecture/adr/0005-unified-world-atlas-surfaces-and-reuse.md`;
+- `docs/architecture/WORLD_ATLAS_PROGRAMME_INDEX.md`;
 - `docs/superpowers/plans/2026-08-26-unified-world-atlas-convergence.md`;
 - `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`;
 - `docs/agents/prompts/OTERYN-WORLD-ATLAS-PARALLEL-AGENT-SUITE.md`;
@@ -46,6 +47,7 @@ Lifecycle graph:
 - release/cutover `Oteryn/Oteryn#79`;
 - performance `Oteryn/Oteryn#80`;
 - architecture packet validation `Oteryn/Oteryn#81`;
+- World Atlas Compatibility Record V1 implementation `Oteryn/Oteryn#84`;
 - Game umbrella `Oteryn/Oteryn-Game#191`;
 - Atlas umbrella `Oteryn/Oteryn-Atlas#188`.
 
@@ -75,8 +77,8 @@ Before local work or mutation:
 
 1. Resolve current protected `main` SHAs and required checks for META, Game and Atlas.
 2. Read current root and nearer applicable `AGENTS.md` in all three repositories.
-3. Verify ADR 0005, the implementation plan, the release compatibility contract and this prompt are on protected META `main`. If they exist only on a planning branch/PR, do not start provider runtime work; return `WAITING_EXTERNAL: META_ARCHITECTURE_NOT_CANONICAL` with exact PR/head.
-4. Refresh lifecycle Issues #75-#81, Game #191 and Atlas #188.
+3. Verify ADR 0005, the programme index, implementation plan, release compatibility contract and this prompt are on protected META `main`. If they exist only on a planning branch/PR, do not start provider runtime work; return `WAITING_EXTERNAL: META_ARCHITECTURE_NOT_CANONICAL` with exact PR/head.
+4. Refresh lifecycle Issues #75-#81 and #84, Game #191 and Atlas #188. If #84 is open, inspect and continue/reconcile that exact lifecycle when the compatibility-record mechanism becomes dependency-ready; do not create a duplicate schema/validator lifecycle.
 5. Search current open PRs/Issues/branches for semantic/path overlap.
 6. In Game, resolve the current implementation coordinator/allocation state and any current durability/client/renderer/Cargo ownership blockers, including successors to historical #187/#162.
 7. In Atlas, resolve current verification/E2E, FullWorld, Production UI Shell, creature/runtime, Rust/workspace and workflow ownership, including successors to historical #179/#162/#170/#185.
@@ -255,19 +257,20 @@ Require the cross-surface journeys and failure injections defined in the impleme
 
 ## Wave 7 — cutover
 
-Under #79 and `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`:
+Under #79, #84 and `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`:
 
-1. freeze exact Game export profile/version and producer revision;
-2. freeze the exact immutable digest of the produced Game→Atlas export manifest and the exact payload digest/root consumed by Atlas; producer/profile/world revision alone is insufficient artifact identity;
-3. freeze exact world/content revision;
-4. freeze Atlas Core/API and embedded bundle version/digest and prove that the bundle's accepted input is the exact Game export artifact from step 2;
-5. freeze bridge protocol/profile;
-6. freeze Game client identity pinning that exact Atlas bundle digest;
-7. complete provider late integration + exact-head protected merges independently;
-8. run Atlas merged-main live acceptance under current Atlas policy;
-9. run Game native-client candidate/release acceptance under current Game policy;
-10. create the final compatibility record at the canonical META compatibility/release path using only immutable identities and evidence;
-11. require the compatibility-record META PR to pass current exact-head checks/review, protected-squash-merge it, read it back from the exact merge SHA, and require post-merge `meta-gate` success on that exact protected-main SHA.
+1. refresh and reconcile #84; if the dedicated World Atlas Compatibility Record V1 schema/validator/meta-gate mechanism is not canonical, continue the existing #84 lifecycle when dependency-ready and keep Task 7E fail-closed rather than creating duplicate work;
+2. freeze exact Game export profile/version and producer revision;
+3. freeze the exact immutable digest of the produced Game→Atlas export manifest and the exact payload digest/root consumed by Atlas; producer/profile/world revision alone is insufficient artifact identity;
+4. freeze exact world/content revision;
+5. freeze Atlas Core/API and embedded bundle version/digest and prove that the bundle's accepted input is the exact Game export artifact from step 3;
+6. freeze bridge protocol/profile;
+7. freeze Game client identity pinning that exact Atlas bundle digest;
+8. complete provider late integration + exact-head protected merges independently;
+9. run Atlas merged-main live acceptance under current Atlas policy;
+10. run Game native-client candidate/release acceptance under current Game policy;
+11. create the final compatibility record at the canonical META compatibility/release path using only immutable identities and evidence;
+12. require the compatibility-record META PR to pass current exact-head checks/review, protected-squash-merge it, read it back from the exact merge SHA, and require post-merge `meta-gate` success on that exact protected-main SHA.
 
 An Issue #79 comment, local file, Draft or unmerged PR is not the final compatibility record. Do not force public Atlas and Game client into one release transaction merely because they are compatible.
 
@@ -348,7 +351,7 @@ Final report must include:
 - exact produced Game export manifest digest and payload digest/root consumed by Atlas;
 - exact Atlas Core/API and bundle version/digest;
 - exact bridge/client/public-Atlas identities;
-- canonical META compatibility-record path, PR/head, required check/review refs, squash-merge SHA and post-merge `meta-gate` ref;
+- canonical META compatibility schema path, validator path, record path, PR/head, required check/review refs, squash-merge SHA and post-merge `meta-gate` ref;
 - security/performance/E2E evidence;
 - rollback evidence;
 - retained legacy paths with reasons;
