@@ -297,6 +297,21 @@ def test_dependency_cycles_are_rejected() -> None:
     )
 
 
+def test_large_dependency_cycle_is_rejected_without_recursion_error() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    lane_count = 1_101
+    lane_ids = [f"lane-{index}" for index in range(lane_count)]
+    parallel["lanes"] = [
+        lane(identifier, [f"src/{identifier}/**"], depends_on=[lane_ids[(index + 1) % lane_count]])
+        for index, identifier in enumerate(lane_ids)
+    ]
+    parallel["integration_order"] = lane_ids
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "parallel lane dependencies must be acyclic" in errors
+
+
 def test_structured_leases_require_one_valid_holder_and_release_condition() -> None:
     packet = default_packet()
     parallel = packet["parallel_execution"]
@@ -313,6 +328,53 @@ def test_structured_leases_require_one_valid_holder_and_release_condition() -> N
     errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
     assert "lane 'first' shared_leases must contain structured leases" in errors
     assert "lease 'shared-resource' holder must name exactly one lane" in errors
+
+
+def test_lease_holder_must_declare_the_resource() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    first = lane("first", ["src/first/**"])
+    second = lane("second", ["src/second/**"])
+    second["shared_leases"] = [
+        {"resource": "heavy-test-slot", "holder": "first", "release_condition": "merged"}
+    ]
+    parallel["lanes"] = [first, second]
+    parallel["constrained_resources"] = ["heavy-test-slot"]
+    parallel["integration_order"] = ["first", "second"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "lease 'heavy-test-slot' holder must declare the resource" in errors
+
+
+def test_requested_host_actions_must_be_a_supported_string_list() -> None:
+    packet = default_packet()
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    execution["requested_host_actions"] = "poll_docker_logs"
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "requested_host_actions must be a list of supported action strings" in errors
+    assert "equivalent_ci prohibits RDC polling" in errors
+
+    for malformed_actions in ({"action": "poll_docker_logs"}, ["poll_docker_logs", {}], ["unknown_action"]):
+        packet = default_packet()
+        execution = packet["execution_routing"]
+        assert isinstance(execution, dict)
+        execution["requested_host_actions"] = malformed_actions
+        errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+        assert "requested_host_actions must be a list of supported action strings" in errors
+
+
+def test_integration_order_requires_dependencies_first() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lanes"] = [
+        lane("dependent", ["src/dependent/**"], depends_on=["dependency"]),
+        lane("dependency", ["src/dependency/**"]),
+    ]
+    parallel["integration_order"] = ["dependent", "dependency"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "integration_order must place dependencies before dependents" in errors
 
 
 def test_structured_leases_reject_multiple_holders_and_missing_release_condition() -> None:

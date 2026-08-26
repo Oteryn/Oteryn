@@ -7,6 +7,7 @@ no network, host, Remote Desktop, service, or tool calls.
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import json
 from pathlib import Path
 
@@ -87,22 +88,24 @@ def _has_dependency_cycle(lanes: list[dict[str, object]], lane_ids: set[str]) ->
         for lane in lanes
         if isinstance((identifier := lane.get("id")), str) and identifier in lane_ids
     }
-    visiting: set[str] = set()
-    visited: set[str] = set()
+    dependents = {identifier: [] for identifier in lane_ids}
+    remaining_dependencies = {
+        identifier: len(dependencies.get(identifier, set())) for identifier in lane_ids
+    }
+    for identifier, dependency_ids in dependencies.items():
+        for dependency in dependency_ids:
+            dependents[dependency].append(identifier)
 
-    def visit(identifier: str) -> bool:
-        if identifier in visiting:
-            return True
-        if identifier in visited:
-            return False
-        visiting.add(identifier)
-        if any(visit(dependency) for dependency in dependencies.get(identifier, set())):
-            return True
-        visiting.remove(identifier)
-        visited.add(identifier)
-        return False
-
-    return any(visit(identifier) for identifier in lane_ids)
+    ready = deque(sorted(identifier for identifier, count in remaining_dependencies.items() if count == 0))
+    processed = 0
+    while ready:
+        identifier = ready.popleft()
+        processed += 1
+        for dependent in sorted(dependents[identifier]):
+            remaining_dependencies[dependent] -= 1
+            if remaining_dependencies[dependent] == 0:
+                ready.append(dependent)
+    return processed != len(lane_ids)
 
 
 def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], errors: list[str]) -> None:
@@ -192,10 +195,14 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
             for _, holder, _, _ in claims
             if isinstance(holder, str) and holder in lane_ids
         }
+        declarers = {declarer for declarer, _, _, _ in claims if declarer in lane_ids}
         all_claims_structured = all(valid_structure for _, _, _, valid_structure in claims)
         if len(holders) != 1:
             errors.append(f"lease '{resource}' holder must name exactly one lane")
-        if len(holders) == 1 and all_claims_structured:
+        holder = next(iter(holders), None)
+        if holder is not None and holder not in declarers:
+            errors.append(f"lease '{resource}' holder must declare the resource")
+        if len(holders) == 1 and holder in declarers and all_claims_structured:
             for declarer, _, _, _ in claims:
                 if declarer in lease_resources_by_lane:
                     lease_resources_by_lane[declarer].add(resource)
@@ -231,6 +238,20 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
     )
     if not valid_order:
         errors.append("integration_order must list every lane exactly once")
+    else:
+        integration_positions = {identifier: index for index, identifier in enumerate(integration_order)}
+        for lane in lanes:
+            identifier = lane.get("id")
+            if not isinstance(identifier, str) or identifier not in lane_ids:
+                continue
+            for dependency in _list(lane.get("depends_on")):
+                if (
+                    isinstance(dependency, str)
+                    and dependency in lane_ids
+                    and integration_positions[dependency] > integration_positions[identifier]
+                ):
+                    errors.append("integration_order must place dependencies before dependents")
+                    return
 
 
 def validate_packet(
@@ -267,9 +288,20 @@ def validate_packet(
 
     equivalent_ci = execution.get("equivalent_ci")
     forbidden_actions = _closed_values(policy, "forbidden_remote_desktop_actions_when_equivalent_ci")
-    requested_actions = _list(execution.get("requested_host_actions"))
+    requested_actions_value = execution.get("requested_host_actions")
+    requested_actions = _list(requested_actions_value)
+    if requested_actions_value is not None and (
+        not isinstance(requested_actions_value, list)
+        or any(not isinstance(action, str) or action not in forbidden_actions for action in requested_actions)
+    ):
+        errors.append("requested_host_actions must be a list of supported action strings")
+    polling_actions = (
+        [requested_actions_value]
+        if isinstance(requested_actions_value, str)
+        else [action for action in requested_actions if isinstance(action, str)]
+    )
     if equivalent_ci and any(
-        isinstance(action, str) and action in forbidden_actions for action in requested_actions
+        action in forbidden_actions for action in polling_actions
     ):
         errors.append("equivalent_ci prohibits RDC polling")
     if equivalent_ci and remote_desktop == "exception":
