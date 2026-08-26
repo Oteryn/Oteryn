@@ -78,7 +78,16 @@ If that mechanism is absent, cutover is `WAITING_EXTERNAL`, not an invitation to
 
 ## Optional manual Wave 0 parallel scouts
 
-If the owner chooses separate chats instead of an agent-capable coordinator, these five roles are intentionally read-only and may run concurrently after the packet is canonical:
+If the owner chooses separate chats instead of an agent-capable coordinator, the five Wave-0 roles may still run concurrently, but **provider read-only does not mean lifecycle-free**. Every independently launched scout is a META evidence-only worker:
+
+- it receives a fresh META child Issue under #75;
+- it receives a dedicated META branch/worktree and PR/task head;
+- it owns exactly one disjoint report path under `docs/evidence/world-atlas/wave0/<role>.md` (or the coordinator-recorded equivalent path);
+- its normal PR-backed execution-routing packet is validated against a fresh GitHub snapshot before work begins;
+- it may mutate only that assigned META evidence report;
+- `Oteryn/Oteryn-Game`, `Oteryn/Oteryn-Atlas`, provider runtime/config, Cargo/workflow/shared-shell and production surfaces remain strictly read-only for Wave 0.
+
+The five evidence-only roles are:
 
 - `OTERYN-WORLD-ATLAS-GAME-CONTRACT-SCOUT` — Extra High
 - `OTERYN-WORLD-ATLAS-ATLAS-MIGRATION-SCOUT` — Extra High
@@ -86,7 +95,7 @@ If the owner chooses separate chats instead of an agent-capable coordinator, the
 - `OTERYN-WORLD-ATLAS-SECURITY-SCOUT` — Extra High
 - `OTERYN-WORLD-ATLAS-VERIFICATION-PERF-SCOUT` — Extra High
 
-They are still substantial task packets. Before any manually launched scout begins work, its current execution-routing packet must be validated against a fresh GitHub snapshot under `ecosystem/agent-execution-routing-policy.json`; read-only mode does not waive fresh preflight, execution-target/runner declaration, dependency graph, isolated lane identity or applicable lease planning. Their exact prompts, routing-evidence return requirement and return formats are in the parallel-agent suite.
+There is no PR-less standalone scout route. Their exact prompts, routing-evidence return requirement and return formats are in the parallel-agent suite.
 
 ## Allocation-gated later leads
 
