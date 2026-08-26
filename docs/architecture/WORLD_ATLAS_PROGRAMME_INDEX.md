@@ -2,6 +2,8 @@
 
 Lifecycle: `Oteryn/Oteryn#75`.
 
+Architecture admission lifecycle: `Oteryn/Oteryn#86`. Historical PR #83 is superseded unmerged and is not architecture-admission authority.
+
 Status: proposed until the architecture packet is protected-merged to META `main`. Provider runtime implementation must not start from this branch.
 
 ## Canonical packet after merge
