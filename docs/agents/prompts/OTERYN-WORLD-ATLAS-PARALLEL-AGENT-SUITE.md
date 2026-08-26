@@ -22,21 +22,36 @@ For provider work, read the provider root/nearer `AGENTS.md`, live coordinator/a
 
 Planning-time SHAs are evidence only. Never trust stale issue/branch status.
 
-Before **any substantial role in this suite begins or resumes work, including manually launched read-only Wave 0 scouts**, create or refresh the canonical execution-routing packet and validate it against a freshly obtained GitHub live-state snapshot with:
+### Wave-0 evidence-only lifecycle
+
+`WA-0A` through `WA-0E` are **provider-read-only, META evidence-only** roles. `Read-only`, `no mutation` and equivalent wording inside those five role sections mean no Game/Atlas/provider/runtime/config mutation; they do **not** create a PR-less routing exception.
+
+Before an independently launched Wave-0 scout begins or resumes:
+
+1. create/refresh a fresh META child Issue under #75 for that scout;
+2. assign a dedicated META branch/worktree and PR/task head;
+3. assign exactly one disjoint report path under `docs/evidence/world-atlas/wave0/<role>.md` or a coordinator-recorded equivalent path;
+4. create/refresh a normal execution-routing packet whose `github_preflight.pull_request` and `task_head_sha` are that real META evidence PR/head and whose sole writable owned path is that report;
+5. validate that packet against a fresh GitHub live-state snapshot before research begins;
+6. permit mutation only of the assigned META evidence report; all Game/Atlas/provider paths, Cargo/workflows/shared shells and production surfaces remain read-only.
+
+There is no PR-less standalone Wave-0 route and no fabricated/unrelated PR identity. The existing central execution-routing policy/validator is used unchanged.
+
+Before **any substantial role in this suite begins or resumes work**, create or refresh the canonical execution-routing packet and validate it against a freshly obtained GitHub live-state snapshot with:
 
 ```text
 python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-execution-routing-policy.json --packet <packet.json> --live-state <fresh-github-state.json>
 ```
 
-Require validation `PASS` before work is released. Read-only mode does not waive the fresh GitHub preflight, execution-target/runner declaration, equivalent-CI truthfulness, Remote Desktop disposition, dependency graph, lane identity, or applicable shared-resource lease planning. Mutating roles additionally require their dedicated Issue/branch/worktree/path allocation. A missing, invalid, stale or fabricated routing packet is a fail-closed admission failure.
+Require validation `PASS` before work is released. Provider-read-only mode does not waive fresh GitHub preflight, a truthful PR/task-head identity, execution-target/runner declaration, equivalent-CI truthfulness, Remote Desktop disposition, dependency graph, lane identity or applicable shared-resource lease planning. Later mutating provider roles additionally require their dedicated provider Issue/branch/worktree/path allocation. A missing, invalid, stale or fabricated routing packet is a fail-closed admission failure.
 
-Every role handoff/return must include `ROUTING_PACKET_ID_OR_REF` and `ROUTING_VALIDATION_REF_OR_RESULT`; substantial roles may not claim their work was admissible without that evidence.
+Every role handoff/return must include `ROUTING_PACKET_ID_OR_REF` and `ROUTING_VALIDATION_REF_OR_RESULT`; substantial roles may not claim their work was admissible without that evidence. Every Wave-0 return additionally records its META evidence Issue/PR/report path.
 
 Every mutating worker uses one Issue, one branch/worktree, one PR and exact owned paths. A moving `main` does not justify restart; use late integration refresh.
 
 ## Recommended concurrency
 
-Wave 0: all five read-only roles below may run concurrently.
+Wave 0: all five provider-read-only / META evidence-only roles below may run concurrently because they own disjoint evidence-report paths.
 
 Later provider mutation: normally two or three disjoint lanes at once. Shared Cargo/workspace/client-composition/FullWorld-shell/CI/release surfaces are serialized.
 
@@ -51,13 +66,13 @@ EFFORT:
 Extra High.
 
 MODE:
-Read-only.
+Provider-read-only; META evidence-only under the shared Wave-0 lifecycle above.
 
 REPO:
-`Oteryn/Oteryn-Game`
+Read `Oteryn/Oteryn-Game`; write only the assigned META Wave-0 evidence report.
 
 LIFECYCLE:
-Game umbrella #191; META parent #75.
+Game umbrella #191; META parent #75; dedicated META evidence child Issue/PR required.
 
 ## Goal
 
@@ -77,20 +92,25 @@ Determine exactly what Game already publishes for Atlas, what the current canoni
    - `UNKNOWN`.
 6. Evaluate whether a small public Rust contract/codec crate has a concrete cross-repo benefit. Default to existing artifact/schema boundary unless a stable public crate clearly reduces risk without exposing Game internals.
 7. Record active branches/PRs/path leases that would block later work.
+8. Write only the assigned META evidence report; do not change provider files.
 
 ## Forbidden
 
-- no file mutation;
+- no Game/provider file mutation;
 - no Cargo changes;
 - no new schema fields;
 - no Atlas derived search/index logic in Game;
-- no assumption that internal Rust structs are public wire contracts.
+- no assumption that internal Rust structs are public wire contracts;
+- no META mutation outside the assigned evidence report.
 
 ## Return
 
 ```text
 ROLE: WA-0A GAME-CONTRACT-SCOUT
-READ_ONLY: YES
+PROVIDER_READ_ONLY: YES
+META_EVIDENCE_ISSUE:
+META_EVIDENCE_PR:
+META_EVIDENCE_REPORT_PATH:
 ROUTING_PACKET_ID_OR_REF:
 ROUTING_VALIDATION_REF_OR_RESULT:
 GAME_MAIN_SHA:
@@ -119,13 +139,13 @@ EFFORT:
 Extra High.
 
 MODE:
-Read-only.
+Provider-read-only; META evidence-only under the shared Wave-0 lifecycle above.
 
 REPO:
-`Oteryn/Oteryn-Atlas`
+Read `Oteryn/Oteryn-Atlas`; write only the assigned META Wave-0 evidence report.
 
 LIFECYCLE:
-Atlas umbrella #188; META parent #75.
+Atlas umbrella #188; META parent #75; dedicated META evidence child Issue/PR required.
 
 ## Goal
 
@@ -148,20 +168,25 @@ Build an exact current dataflow and Rust-migration suitability matrix for Atlas 
 6. Identify current modules whose public interfaces must be frozen before parallel Rust lanes.
 7. Identify shared root Cargo/workflow/FullWorld-shell lease points.
 8. Reconcile active #179/#162/#170/#185 successors by live state; do not treat planning state as current truth.
+9. Write only the assigned META evidence report; do not change provider files.
 
 ## Forbidden
 
-- no mutation;
+- no Atlas/provider file mutation;
 - no framework rewrite recommendation without evidence;
 - no browser-runtime fallback to legacy sources;
 - no inferred Game canonical facts;
-- no proposal to rewrite DOM/accessibility purely for Rust uniformity.
+- no proposal to rewrite DOM/accessibility purely for Rust uniformity;
+- no META mutation outside the assigned evidence report.
 
 ## Return
 
 ```text
 ROLE: WA-0B ATLAS-MIGRATION-SCOUT
-READ_ONLY: YES
+PROVIDER_READ_ONLY: YES
+META_EVIDENCE_ISSUE:
+META_EVIDENCE_PR:
+META_EVIDENCE_REPORT_PATH:
 ROUTING_PACKET_ID_OR_REF:
 ROUTING_VALIDATION_REF_OR_RESULT:
 ATLAS_MAIN_SHA:
@@ -189,13 +214,13 @@ EFFORT:
 Extra High.
 
 MODE:
-Read-only architecture/feasibility scout. A later prototype requires its own Game child Issue/branch.
+Provider-read-only architecture/feasibility scout; META evidence-only under the shared Wave-0 lifecycle above. A later prototype requires its own Game child Issue/branch.
 
 REPO:
-`Oteryn/Oteryn-Game`
+Read `Oteryn/Oteryn-Game`; write only the assigned META Wave-0 evidence report.
 
 LIFECYCLE:
-Game #191; security #77; performance #80.
+Game #191; security #77; performance #80; dedicated META evidence child Issue/PR required.
 
 ## Goal
 
@@ -219,6 +244,7 @@ Find the safest product boundary and realistic host candidates for loading the s
    - license/supply-chain posture.
 5. Identify exact native client paths/entrypoints that a later prototype would own.
 6. Propose a benchmark matrix; do not select a host without the benchmark/security gate.
+7. Write only the assigned META evidence report; do not change provider files.
 
 ## Invariants
 
@@ -231,7 +257,10 @@ Find the safest product boundary and realistic host candidates for loading the s
 
 ```text
 ROLE: WA-0C CLIENT-HOST-SCOUT
-READ_ONLY: YES
+PROVIDER_READ_ONLY: YES
+META_EVIDENCE_ISSUE:
+META_EVIDENCE_PR:
+META_EVIDENCE_REPORT_PATH:
 ROUTING_PACKET_ID_OR_REF:
 ROUTING_VALIDATION_REF_OR_RESULT:
 GAME_MAIN_SHA:
@@ -259,10 +288,10 @@ EFFORT:
 Extra High.
 
 MODE:
-Read-only threat-model lead.
+Provider-read-only threat-model lead; META evidence-only under the shared Wave-0 lifecycle above.
 
 LIFECYCLE:
-META #77; parent #75; read provider repos as necessary.
+META #77; parent #75; read provider repos as necessary; dedicated META evidence child Issue/PR required.
 
 ## Goal
 
@@ -302,13 +331,16 @@ Assess:
 - host crash/hang/resource exhaustion;
 - dependency/update/supply-chain compromise.
 
-Define mandatory controls, negative tests and evidence. Do not weaken a control because a preferred host cannot support it.
+Define mandatory controls, negative tests and evidence. Do not weaken a control because a preferred host cannot support it. Write only the assigned META evidence report; do not change provider files.
 
 ## Return
 
 ```text
 ROLE: WA-0D SECURITY-SCOUT
-READ_ONLY: YES
+PROVIDER_READ_ONLY: YES
+META_EVIDENCE_ISSUE:
+META_EVIDENCE_PR:
+META_EVIDENCE_REPORT_PATH:
 ROUTING_PACKET_ID_OR_REF:
 ROUTING_VALIDATION_REF_OR_RESULT:
 TRUST_BOUNDARIES:
@@ -336,10 +368,10 @@ EFFORT:
 Extra High.
 
 MODE:
-Read-only verification/resource planner.
+Provider-read-only verification/resource planner; META evidence-only under the shared Wave-0 lifecycle above.
 
 LIFECYCLES:
-META #78 and #80.
+META #78 and #80; dedicated META evidence child Issue/PR required.
 
 ## Goal
 
@@ -359,12 +391,16 @@ Map the exact current provider verification platform and select representative p
 5. Define shared user-journey oracles for public web vs embedded client.
 6. Define failure-injection matrix: corrupt bundle, wrong export, bridge mismatch, WASM failure, host crash/hang, offline mode.
 7. Define privacy sanitization requirements for screenshots/logs/evidence.
+8. Write only the assigned META evidence report; do not change provider files.
 
 ## Return
 
 ```text
 ROLE: WA-0E VERIFICATION-PERF-SCOUT
-READ_ONLY: YES
+PROVIDER_READ_ONLY: YES
+META_EVIDENCE_ISSUE:
+META_EVIDENCE_PR:
+META_EVIDENCE_REPORT_PATH:
 ROUTING_PACKET_ID_OR_REF:
 ROUTING_VALIDATION_REF_OR_RESULT:
 GAME_MAIN_SHA:
