@@ -23,9 +23,15 @@ Audit current protected state, not coordinator narration or stale planning SHAs.
 
 From protected META `main` read ADR 0001, ADR 0004, ADR 0005, the unified implementation plan, `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`, `WORLD_ATLAS_RISK_REGISTER.md`, the coordinator/parallel suite, META Issues #75-#81/#84 and release/cutover evidence under #79.
 
+Resolve the exact architecture-packet PR that introduced the canonical ADR/plan/prompt packet. Require its immutable PR number, accepted exact head SHA, required exact-head META check references, accepted exact-head review evidence, protected squash-merge SHA, and protected-main readback of the packet. A merge SHA by itself is not sufficient architecture-gate evidence.
+
 From providers read current protected Game/Atlas main, Game #191 and Atlas #188 with linked children, required checks/reviews/protection and the exact provider artifact/release/deployment evidence named by the coordinator.
 
 ## Audit dimensions
+
+### A0. Architecture packet canonicalization
+
+Require proof that the exact World Atlas architecture packet was admitted through the current META protected lifecycle rather than an admin/bypass or stale review path. Record the architecture PR number and exact accepted head, immutable required-check references for that head, immutable accepted review evidence for that same head, the protected squash-merge SHA, and readback of ADR 0005 plus the executable plan/coordinator from that merge SHA. Any mismatch between reviewed/gated head and merged packet is `CONFLICT_BLOCKING`; missing architecture PR check/review evidence is `UNKNOWN_BLOCKING`.
 
 ### A. Authority boundary
 
@@ -110,6 +116,10 @@ PROGRAMME: OTERYN-WORLD-ATLAS
 META_MAIN_SHA:
 GAME_MAIN_SHA:
 ATLAS_MAIN_SHA:
+META_ARCHITECTURE_PR_NUMBER:
+META_ARCHITECTURE_PR_HEAD_SHA:
+META_ARCHITECTURE_PR_REQUIRED_CHECK_REFS:
+META_ARCHITECTURE_PR_REVIEW_EVIDENCE_REFS:
 META_ARCHITECTURE_PR_MERGE_SHA:
 GAME_PROVIDER_PRS_AND_MERGE_SHAS:
 GAME_PROVIDER_REVIEW_EVIDENCE_REFS:
@@ -146,6 +156,7 @@ META_COMPATIBILITY_PR_REQUIRED_CHECK_REFS:
 META_COMPATIBILITY_PR_REVIEW_EVIDENCE_REFS:
 META_COMPATIBILITY_SQUASH_MERGE_SHA:
 META_COMPATIBILITY_POST_MERGE_META_GATE_REF:
+ARCHITECTURE_PACKET: PASS|FAIL
 AUTHORITY_BOUNDARY: PASS|FAIL
 ATLAS_RUST_CORE: PASS|FAIL
 PUBLIC_WEB_SURFACE: PASS|FAIL
@@ -165,4 +176,4 @@ FINAL_VERDICT: DONE|NOT_DONE
 REQUIRED_NEXT_ACTIONS:
 ```
 
-A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable evidence in all applicable fields including provider exact-head review evidence, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
+A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable architecture-packet exact-head check/review/merge evidence, complete immutable evidence in all applicable provider fields including provider exact-head review evidence, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
