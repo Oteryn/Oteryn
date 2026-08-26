@@ -86,6 +86,7 @@ game.atlas_export_payload_digest_or_root
 game.world_content_revision
 game.client_release_or_candidate_identity
 game.client_pinned_atlas_bundle_digest
+game.provider_required_check_refs[]
 game.provider_review_evidence_refs[]
 
 atlas.repository
@@ -100,6 +101,7 @@ atlas.public_bundle_relation_to_embedded
 atlas.public_deployment_bundle_evidence_ref
 atlas.accepted_game_export_artifact_manifest_digest
 atlas.accepted_game_export_payload_digest_or_root
+atlas.provider_required_check_refs[]
 atlas.provider_review_evidence_refs[]
 
 bridge.protocol_version
@@ -109,10 +111,9 @@ security_evidence_refs[]
 performance_evidence_refs[]
 cross_surface_e2e_refs[]
 rollback_evidence_refs[]
-provider_required_check_refs[]
 ```
 
-Exact JSON property spelling is frozen by #84, but every semantic field above must remain independently represented. Every required evidence-reference array is semantically a non-empty set of immutable evidence identities, not merely an array that may be present but empty. Game and Atlas provider review evidence are separate evidence classes: neither provider's review refs may satisfy the other's field.
+Exact JSON property spelling is frozen by #84, but every semantic field above must remain independently represented. Every required evidence-reference array is semantically a non-empty set of immutable evidence identities, not merely an array that may be present but empty. Game and Atlas provider check evidence are separate evidence classes, and Game and Atlas provider review evidence are separate evidence classes: neither provider's check or review refs may satisfy the other provider's field.
 
 ### 3.2 Required validator invariants
 
@@ -128,12 +129,13 @@ The validator integrated into `meta-gate` must fail closed unless at least:
 - for `SAME_BUNDLE`, public deployed bundle digest equals embedded bundle digest;
 - for `COMPATIBLE_INDEPENDENT`, immutable evidence binds the named public deployment to its separately recorded public bundle digest and proves compatibility with the recorded Game export/world contract;
 - every required evidence-reference array is present **and non-empty**;
+- `game.provider_required_check_refs[]` and `atlas.provider_required_check_refs[]` are independently present, non-empty and contain only immutable exact-head required-check evidence for their owning provider; omission or cross-provider substitution is rejected;
 - `game.provider_review_evidence_refs[]` and `atlas.provider_review_evidence_refs[]` are independently present, non-empty and contain only immutable exact-head review evidence for their owning provider; cross-provider substitution is rejected;
 - every evidence reference is validated as an immutable supported identity appropriate to its class, such as an exact repository + PR/review/run/job/check/artifact/deployment identifier, an exact 40-hex commit SHA, or a digest-bound artifact identity; floating branches, `latest`, mutable aliases/URLs, narrative `PASS`, or otherwise unpinned references are rejected;
 - duplicate or contradictory references do not silently satisfy a required evidence class;
 - floating or mutable release identities are rejected.
 
-The #84 implementation must include negative tests for empty evidence arrays, missing/empty Game or Atlas provider-review arrays, malformed review refs, cross-provider review-ref substitution, mutable/malformed evidence references, duplicate/contradictory evidence where material, cross-link and deployment/bundle mismatches, plus positive fixtures for both bundle-relation modes with independently valid Game and Atlas provider review evidence.
+The #84 implementation must include negative tests for empty evidence arrays, missing/empty Game or Atlas provider-check arrays, malformed check refs, cross-provider check-ref substitution, missing/empty Game or Atlas provider-review arrays, malformed review refs, cross-provider review-ref substitution, mutable/malformed evidence references, duplicate/contradictory evidence where material, cross-link and deployment/bundle mismatches, plus positive fixtures for both bundle-relation modes with independently valid Game and Atlas provider required-check and review evidence.
 
 ### 3.3 No alternate terminal encoding
 
@@ -170,15 +172,15 @@ meta_compatibility_post_merge_meta_gate_run_or_check_ref
 
 ## 6. Provider evidence requirements
 
-Game evidence must bind export profile/version, producer revision, world/content revision, exact produced export manifest/payload digest, deterministic producer validation, provider merge/check evidence when applicable, immutable accepted exact-head provider review evidence for every provider PR whose policy requires review, and the client identity plus exact Atlas embedded bundle digest it packages/pins.
+Game evidence must bind export profile/version, producer revision, world/content revision, exact produced export manifest/payload digest, deterministic producer validation, immutable exact-head provider required-check evidence, immutable accepted exact-head provider review evidence for every provider PR whose policy requires review, provider merge evidence when applicable, and the client identity plus exact Atlas embedded bundle digest it packages/pins.
 
-Atlas evidence must bind the exact Game export digests accepted by ingestion, Atlas Core/API identity, source/release identity, exact embedded bundle version/digest, exact public deployed bundle version/digest, immutable deployment evidence binding public deployment identity to its bundle, the declared public/embedded relation, provider merge/check/live-acceptance evidence, and immutable accepted exact-head provider review evidence for every provider PR whose policy requires review.
+Atlas evidence must bind the exact Game export digests accepted by ingestion, Atlas Core/API identity, source/release identity, exact embedded bundle version/digest, exact public deployed bundle version/digest, immutable deployment evidence binding public deployment identity to its bundle, the declared public/embedded relation, immutable exact-head provider required-check evidence, immutable accepted exact-head provider review evidence for every provider PR whose policy requires review, provider merge/live-acceptance evidence, and the exact deployed bundle binding.
 
-Provider PR/merge identity and required-check success do not substitute for required review evidence. The canonical V1 record must preserve Game and Atlas provider review-evidence references as separate non-empty typed fields, and independent closeout must expose those references separately so a terminal verdict can prove which exact review satisfied each provider gate.
+Provider PR/merge identity, the other provider's checks, and review evidence do not substitute for a provider's own required-check evidence; similarly, provider PR/merge identity and required-check success do not substitute for required review evidence. The canonical V1 record must preserve Game and Atlas provider required-check references as separate non-empty typed fields and preserve Game and Atlas provider review-evidence references as separate non-empty typed fields, so independent closeout can prove which exact checks and reviews satisfied each provider gate.
 
 ## 7. Failure semantics
 
-Return `NOT_DONE` / `UNKNOWN_BLOCKING` if any required artifact identity, chain-of-custody link, client/embedded binding, public-deployment/bundle binding, independent-bundle compatibility evidence, non-empty immutable evidence-reference class, required provider or META exact-head review evidence, #84 schema/validator/meta-gate integration, protected META compatibility merge/readback/check evidence, or immutable tuple field is absent, floating, malformed or contradictory. These conditions cannot be waived by narration.
+Return `NOT_DONE` / `UNKNOWN_BLOCKING` if any required artifact identity, chain-of-custody link, client/embedded binding, public-deployment/bundle binding, independent-bundle compatibility evidence, non-empty immutable evidence-reference class, provider-specific required-check evidence, required provider or META exact-head review evidence, #84 schema/validator/meta-gate integration, protected META compatibility merge/readback/check evidence, or immutable tuple field is absent, floating, malformed, cross-provider substituted or contradictory. These conditions cannot be waived by narration.
 
 ## 8. Relationship to independent closeout
 
