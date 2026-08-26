@@ -184,13 +184,30 @@ No `UNKNOWN_BLOCKING` or `CONFLICT_BLOCKING` may coexist with `DONE`.
 
 ## Output
 
-Return exactly this closeout summary shape:
+Return exactly this closeout summary shape. Every `*_REFS` field must contain immutable evidence identifiers where applicable: repository + PR/run/check/artifact/deployment identity, exact commit SHA, and digest/version where the evidence is artifact-bound. A bare narrative such as `PASS` without the corresponding immutable references is insufficient for `DONE`.
 
 ```text
 PROGRAMME: OTERYN-WORLD-ATLAS
 META_MAIN_SHA:
 GAME_MAIN_SHA:
 ATLAS_MAIN_SHA:
+META_ARCHITECTURE_PR_MERGE_SHA:
+GAME_PROVIDER_PRS_AND_MERGE_SHAS:
+ATLAS_PROVIDER_PRS_AND_MERGE_SHAS:
+GAME_ATLAS_EXPORT_PROFILE_VERSION:
+GAME_ATLAS_EXPORT_PRODUCER_SHA_OR_DIGEST:
+WORLD_CONTENT_REVISION:
+ATLAS_CORE_API_IDENTITY:
+ATLAS_WEB_EMBEDDED_BUNDLE_VERSION:
+ATLAS_WEB_EMBEDDED_BUNDLE_DIGEST:
+ATLAS_BRIDGE_PROTOCOL_PROFILE:
+GAME_CLIENT_RELEASE_OR_CANDIDATE_IDENTITY:
+PUBLIC_ATLAS_RELEASE_DEPLOYMENT_IDENTITY:
+PROVIDER_REQUIRED_CHECK_REFS:
+SECURITY_EVIDENCE_REFS:
+PERFORMANCE_EVIDENCE_REFS:
+CROSS_SURFACE_E2E_REFS:
+ROLLBACK_EVIDENCE_REFS:
 AUTHORITY_BOUNDARY: PASS|FAIL
 ATLAS_RUST_CORE: PASS|FAIL
 PUBLIC_WEB_SURFACE: PASS|FAIL
@@ -209,4 +226,4 @@ FINAL_VERDICT: DONE|NOT_DONE
 REQUIRED_NEXT_ACTIONS:
 ```
 
-A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, and exact immutable evidence.
+A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, and complete immutable evidence in all applicable identity/reference fields above. Missing or floating evidence forces `FINAL_VERDICT: NOT_DONE`.
