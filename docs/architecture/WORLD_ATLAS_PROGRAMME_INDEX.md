@@ -47,6 +47,15 @@ The coordinator resolves current GitHub state, ownership and dependencies before
 
 For release/cutover, `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` is the canonical exact tuple/evidence contract. Its required produced Game export artifact digests and protected-main META compatibility-record evidence refine the shorthand Wave 7 tuple in the implementation plan and may not be omitted.
 
+The current generic META release schema is not the terminal World Atlas record format. Before Wave 7 Task 7E can complete, META must have the dedicated protected-main mechanism required by that contract:
+
+- `ecosystem/world-atlas/compatibility.schema.json`;
+- `ecosystem/world-atlas/releases/<release_id>.json`;
+- `tools/governance/validate_world_atlas_compatibility.py`;
+- integration of that validator into `meta-gate` with deterministic negative/positive tests.
+
+If that mechanism is absent, cutover is `WAITING_EXTERNAL`, not an invitation to encode the tuple in opaque generic fields.
+
 ## Optional manual Wave 0 parallel scouts
 
 If the owner chooses separate chats instead of an agent-capable coordinator, these five roles are intentionally read-only and may run concurrently after the packet is canonical:
@@ -80,4 +89,4 @@ After provider implementation/cutover claims completion, run independently:
 
 Recommended reasoning effort: **Extra High**.
 
-Only the auditor's `DONE` verdict backed by exact provider evidence and the canonical protected-main compatibility record permits the programme coordinator to report terminal completion.
+Only the auditor's `DONE` verdict backed by exact provider evidence and the canonical validated protected-main World Atlas compatibility record permits the programme coordinator to report terminal completion.
