@@ -27,6 +27,7 @@
 - Private/live client state is local-session-only and never becomes a public Atlas publication input.
 - The first bridge profile is non-authoritative UI integration only; no movement/combat/use/server-mutation commands.
 - Every task resolves fresh protected `main`, instructions, Issues/PRs, branch protection, active path ownership and required checks before mutation.
+- Every substantial new or resumed provider task packet must be validated against a freshly obtained GitHub snapshot with the canonical `ecosystem/agent-execution-routing-policy.json` and `tools/governance/agent_execution_routing.py` before local work or mutation is released. The validated packet must truthfully bind execution target/runner, equivalent CI, Remote Desktop disposition, lane ownership, branch/worktree, dependencies, leases/release conditions and integration order; missing or stale routing validation is a fail-closed dispatch blocker.
 - Follow ADR 0004: immutable admission SHA, one task/branch/worktree/PR, no restart because `main` moved, late merge-up integration, exact-head proof.
 - Shared Cargo/workspace files, shared app composition, shared Atlas FullWorld shell, workflow/CI files, release manifests and final integration are serialized leases.
 - Current planning SHAs are provenance only: META `d79df968c1aba98373455399732fc71ab71e6a5d`, Game `2019d501d22614720ef37718e16913d81728e0a2`, Atlas `fc2a952169e15c070b4a2bc66095624d63798435`.
@@ -102,7 +103,7 @@ Rules:
 
 ### 4.1 Game → Atlas public artifact envelope
 
-Must convey producer revision, export profile version, world/content revision, public capabilities, payload manifest, payload digests, provenance and minimum consumer requirements. It contains only Game-selected public-safe facts.
+Must convey producer revision, export profile version, world/content revision, public capabilities, payload manifest, payload digests, provenance and minimum consumer requirements. It contains only Game-selected public-safe facts. Provider evidence must retain an immutable Game export-build/manifest identity proving that the recorded producer revision/profile/world revision produced the exact manifest and payload digests used by Atlas.
 
 ### 4.2 Atlas Core surface
 
@@ -123,7 +124,7 @@ Browser/DOM state is not a second authority inside the core.
 
 ### 4.3 Embedded bundle manifest
 
-Must identify bundle version/digest, Atlas Core/API identity, supported Game export profiles, supported bridge range, required host capabilities, file/asset digests and security profile.
+Must identify bundle version/digest, Atlas Core/API identity, supported Game export profiles, supported bridge range, required host capabilities, file/asset digests and security profile. Provider evidence must retain an immutable Atlas build/manifest identity binding the exact accepted Game manifest/payload digests plus Atlas Core/API identity to the exact embedded bundle version/digest.
 
 ### 4.4 Local bridge
 
@@ -232,7 +233,7 @@ Serialized Atlas root workspace/dependency/CI lease. Deliver toolchain/workspace
 
 ### Task 2B — Game export gap implementation
 
-Run only when Wave 0/1 proves a concrete gap. Deliver Game-owned profile/schema evolution, deterministic producer changes, compatibility/negative tests and exact fixture/publication evidence. If no gap, record `NO_CHANGE_REQUIRED`; no cosmetic branch.
+Run only when Wave 0/1 proves a concrete gap. Deliver Game-owned profile/schema evolution, deterministic producer changes, compatibility/negative tests, immutable export-build/manifest evidence binding producer/profile/world inputs to exact output digests, and exact fixture/publication evidence. If no gap, record `NO_CHANGE_REQUIRED`; no cosmetic branch.
 
 ### Task 2C — embedded host prototype
 
@@ -272,7 +273,7 @@ For every migrated capability compare current and Rust/WASM paths on the same fi
 
 ### Task 4C — web/embedded bundle V1
 
-Produce deterministic local static bundle with manifest, exact Core/export/bridge identities, file digests, public/embedded modes without codebase duplication, default-deny embedded remote navigation and a bridge endpoint disabled in public mode.
+Produce deterministic local static bundle with manifest, exact Core/export/bridge identities, file digests, public/embedded modes without codebase duplication, default-deny embedded remote navigation and a bridge endpoint disabled in public mode. Retain immutable build/manifest evidence proving the exact accepted Game export digests and exact Atlas Core/API identity that produced the exact embedded bundle version/digest.
 
 ---
 
@@ -330,13 +331,18 @@ This is a **candidate-only freeze**, not the terminal compatibility tuple. Freez
 
 ```text
 Game export profile/version + producer revision
+Game world/content revision
+Game export-build/manifest evidence binding those inputs to exact produced manifest/payload digests
 Game produced export manifest digest + payload digest/root
-world/content revision
 Atlas Core/API identity
+Atlas accepted Game manifest/payload digests
+Atlas embedded-bundle build/manifest evidence binding accepted digests + Core identity to exact bundle
 embedded bundle version + digest
 bridge protocol/profile
 Game client candidate identity + pinned embedded bundle digest
-security/performance/cross-surface/rollback/provider-check/provider-review evidence refs available at candidate freeze
+separate Game/Atlas provider required-check refs
+separate Game/Atlas provider review-evidence refs
+security/performance/cross-surface/rollback evidence refs available at candidate freeze
 ```
 
 Do **not** freeze `public_atlas_deployed_bundle_version`, `public_atlas_deployed_bundle_digest`, `public_atlas_release_or_deployment_identity`, final `public_atlas_bundle_relation_to_embedded`, or immutable public deployment-to-bundle evidence in Task 7A. Those terminal identities do not exist until the merged-main public deployment/live acceptance in Task 7C. Any earlier deployment values are historical evidence only and must not be carried forward as the final tuple.
@@ -364,9 +370,9 @@ Game runs provider-owned native-client acceptance against the exact embedded bun
    - deterministic positive/negative validator regressions;
    - integration into stable `meta-gate`.
 3. If that mechanism is not canonical, return `WAITING_EXTERNAL: WORLD_ATLAS_COMPATIBILITY_RECORD_MECHANISM_NOT_CANONICAL` for Task 7E while other dependency-ready work may continue.
-4. **After Tasks 7B–7D are complete, perform a mandatory terminal refreeze** that supersedes Task 7A for release authority. It must bind the exact final provider main/release identities, exact public deployment identity, exact public deployed bundle version/digest, immutable deployment-to-bundle evidence, final `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT` relation, Game client identity/pinned embedded digest, provider required-check refs and separate Game/Atlas provider review-evidence refs.
+4. **After Tasks 7B–7D are complete, perform a mandatory terminal refreeze** that supersedes Task 7A for release authority. It must bind the exact final provider main/release identities; immutable Game export-build evidence; exact produced and Atlas-accepted Game manifest/payload digests; Atlas Core/API identity; immutable Atlas embedded-bundle build evidence; exact embedded bundle version/digest; exact public deployment identity; exact public deployed bundle version/digest; immutable deployment-to-bundle evidence; final `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT` relation; Game client identity/pinned embedded digest; separate Game/Atlas provider required-check refs; and separate Game/Atlas provider review-evidence refs.
 5. Create the final record only at `ecosystem/world-atlas/releases/<release_id>.json` from that terminal refreeze using the separately typed identities required by the release contract. Generic `ecosystem/releases/*.json`, Issue comments, Markdown tables or opaque fields are not substitutes.
-6. Validate exact cross-links: produced Game export == Atlas accepted export, Game client pinned digest == embedded bundle digest, and public deployment identity is bound to its exact public deployed bundle under the declared `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT` mode.
+6. Validate exact cross-links: Game producer/profile/world inputs == Game export-build evidence == produced Game manifest/payload digests; produced Game export == Atlas accepted export; Atlas accepted export + Core identity == Atlas embedded-bundle build evidence == embedded bundle; Game client pinned digest == embedded bundle digest; and public deployment identity is bound to its exact public deployed bundle under the declared `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT` mode.
 7. Deliver the final record through a dedicated META PR with exact head, current required checks/review and `meta-gate` validation.
 8. Protected-squash-merge the record, read it back from the exact merge SHA and require post-merge `meta-gate` success on that exact protected-main SHA.
 
@@ -410,13 +416,16 @@ The programme is not `DONE` until immutable evidence proves all of the following
 - Bridge is versioned/default-deny/security-qualified and private state remains local-only.
 - Cross-surface user and failure journeys pass.
 - Exact performance/resource evidence exists for migrated paths and selected host.
-- Provider exact-head/protected-main checks and reviews are green.
+- Every substantial provider task packet that required routing validation has fresh, passing execution-routing evidence before local work/mutation.
+- Provider exact-head/protected-main checks and reviews are green, with separate immutable Game and Atlas required-check and review evidence.
 - Every triggered risk has the disposition/evidence required by `WORLD_ATLAS_RISK_REGISTER.md`, with no unresolved cutover-blocking risk.
+- Immutable Game export-build evidence binds the recorded producer/profile/world revision to the exact produced manifest/payload digests.
+- Immutable Atlas embedded-bundle build evidence binds the exact accepted Game digests and Atlas Core/API identity to the exact embedded bundle version/digest.
 - Public Atlas live acceptance binds the named public deployment to its exact deployed bundle version/digest.
 - Native client acceptance binds the client identity to its exact embedded bundle digest.
 - When public and embedded bundles differ, their relation is explicitly `COMPATIBLE_INDEPENDENT` with immutable compatibility evidence; otherwise it is `SAME_BUNDLE` with digest equality.
 - #84 dedicated V1 schema/validator/meta-gate mechanism is canonical.
-- Final World Atlas compatibility record is created only from the mandatory post-deployment terminal refreeze, preserves separate Game/Atlas provider review evidence, is exact-head reviewed/gated, protected-squash-merged, read back and post-merge `meta-gate` validated.
+- Final World Atlas compatibility record is created only from the mandatory post-deployment terminal refreeze, preserves Game export-build evidence, Atlas embedded-bundle build evidence, separate Game/Atlas required-check and review evidence, is exact-head reviewed/gated, protected-squash-merged, read back and post-merge `meta-gate` validated.
 - A fresh independent `OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR` returns `FINAL_VERDICT: DONE` with complete immutable evidence.
 - Legacy paths are retained or removed truthfully according to their own removal gates.
 - No unresolved security, authority, provenance or compatibility conflict is hidden as PASS.
@@ -429,15 +438,15 @@ The final coordinator returns:
 - META architecture merge SHA;
 - exact Game and Atlas final main SHAs;
 - exact provider PRs/merge SHAs;
-- separate immutable Game and Atlas provider exact-head review evidence refs;
-- Game export profile/version, producer revision and exact produced manifest/payload digests;
-- Atlas Core/API identity;
-- embedded bundle version/digest;
-- public deployed bundle version/digest and relation to embedded;
+- separate immutable Game and Atlas provider exact-head required-check refs and review evidence refs;
+- Game export profile/version, producer revision, world/content revision, exact produced manifest/payload digests and immutable Game export-build evidence ref;
+- Atlas Core/API identity, exact accepted Game manifest/payload digests, exact embedded bundle version/digest and immutable Atlas embedded-bundle build evidence ref;
+- exact public deployed bundle version/digest and relation to embedded;
 - immutable public deployment-to-bundle evidence;
 - bridge protocol/profile;
 - Game client identity pinning the embedded bundle;
 - public Atlas deployment identity;
+- execution-routing validation refs for substantial provider lanes;
 - #84 schema/validator paths and final compatibility record path/PR/head/merge/post-merge-gate refs;
 - verification/security/performance evidence references;
 - rollback evidence;
