@@ -322,7 +322,13 @@ Reject if any applies:
 
 ## Completion and status rules
 
-Return `DONE` only when the Definition of Done in the plan is proven and #79 records an exact compatible tuple.
+Return `DONE` only when ALL of the following are true:
+
+1. the Definition of Done in the plan is proven;
+2. #79 records an exact compatible non-floating tuple; and
+3. a fresh independent invocation of `OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR` has audited the final protected provider/META state and returned `FINAL_VERDICT: DONE` with the required immutable evidence references.
+
+The coordinator's own assessment, provider success narration or completion of #79 alone is never sufficient to emit terminal `DONE`.
 
 Return `WAITING_EXTERNAL` when a dependency/ownership/review/CI/host-selection fact must change externally and no useful dependency-ready work remains in that lane.
 
@@ -339,4 +345,5 @@ Final report must include:
 - rollback evidence;
 - retained legacy paths with reasons;
 - current provider live/candidate acceptance results;
+- independent closeout auditor verdict and immutable evidence references;
 - unresolved unknowns, if any.
