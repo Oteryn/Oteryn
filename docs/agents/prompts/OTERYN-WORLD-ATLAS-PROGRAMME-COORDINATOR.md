@@ -73,14 +73,15 @@ Before local work or mutation:
 2. Read current root and nearer applicable `AGENTS.md` in all three repositories.
 3. Verify ADR 0005, the programme index, risk register, implementation plan, release compatibility contract and this prompt are on protected META `main`. If they exist only on a planning branch/PR, do not start provider runtime work; return `WAITING_EXTERNAL: META_ARCHITECTURE_NOT_CANONICAL` with exact PR/head.
 4. Resolve the exact META architecture-packet PR that introduced the canonical eight-artifact packet. Before any provider child Issue/branch/worktree is released for mutation, require immutable proof of all of the following on the same accepted architecture generation: architecture PR number, exact accepted head SHA, exact-head `meta-gate` reference, exact-head `ai-review-gate` reference, accepted exact-head R2/deep review evidence, protected squash-merge SHA, and a protected-main packet readback binding all eight canonical packet paths to that exact squash-merge SHA. Confirm both required checks succeeded for that accepted head, the squash-merge is on current protected META `main` ancestry, and that no admin/bypass, stale review, raw review without a successful trusted verifier, floating branch or partial readback substitutes for those identities. If any identity/check/readback is missing or mismatched, do not dispatch provider mutation; return `WAITING_EXTERNAL: META_ARCHITECTURE_ADMISSION_UNPROVEN` with the exact missing/conflicting evidence.
-5. Refresh lifecycle Issues #75-#81 and #84, Game #191 and Atlas #188. If #84 is open, inspect and continue/reconcile that exact lifecycle when the compatibility-record mechanism becomes dependency-ready; do not create a duplicate schema/validator lifecycle.
-6. Re-read `WORLD_ATLAS_RISK_REGISTER.md`, record the current state of every triggered leading indicator and its owning lifecycle/evidence, and classify unresolved facts as discovery work or blockers rather than implicit acceptance.
-7. Search current open PRs/Issues/branches for semantic/path overlap.
-8. In Game, resolve the current implementation coordinator/allocation state and any current durability/client/renderer/Cargo ownership blockers, including successors to historical #187/#162.
-9. In Atlas, resolve current verification/E2E, FullWorld, Production UI Shell, creature/runtime, Rust/workspace and workflow ownership, including successors to historical #179/#162/#170/#185.
-10. Resolve current constrained heavy-E2E runner/slot policy before any Atlas browser qualification.
-11. Record `admission_main_sha` separately for every mutating child task.
-12. Never use planning-time SHAs or issue state as live authority without refresh.
+5. For every substantial new or resumed provider task packet, create or refresh the canonical execution-routing packet and validate it against a freshly obtained GitHub live-state snapshot with `python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-execution-routing-policy.json --packet <packet.json> --live-state <fresh-github-state.json>`. Require validation PASS before releasing local work or mutation. The packet must truthfully bind the current GitHub preflight plus `execution_target`, `runner_class`, `equivalent_ci`, `remote_desktop`, `remote_desktop_reason`, lane IDs, owned paths, dedicated branch/worktree identities, dependencies, shared-resource leases with release conditions, and integration order. Invalid, stale, omitted or fabricated routing evidence blocks that lane; never substitute a convenient local checkout, Remote Desktop session, available shell or narrative claim for this validation.
+6. Refresh lifecycle Issues #75-#81 and #84, Game #191 and Atlas #188. If #84 is open, inspect and continue/reconcile that exact lifecycle when the compatibility-record mechanism becomes dependency-ready; do not create a duplicate schema/validator lifecycle.
+7. Re-read `WORLD_ATLAS_RISK_REGISTER.md`, record the current state of every triggered leading indicator and its owning lifecycle/evidence, and classify unresolved facts as discovery work or blockers rather than implicit acceptance.
+8. Search current open PRs/Issues/branches for semantic/path overlap.
+9. In Game, resolve the current implementation coordinator/allocation state and any current durability/client/renderer/Cargo ownership blockers, including successors to historical #187/#162.
+10. In Atlas, resolve current verification/E2E, FullWorld, Production UI Shell, creature/runtime, Rust/workspace and workflow ownership, including successors to historical #179/#162/#170/#185.
+11. Resolve current constrained heavy-E2E runner/slot policy before any Atlas browser qualification.
+12. Record `admission_main_sha` separately for every mutating child task.
+13. Never use planning-time SHAs or issue state as live authority without refresh.
 
 ## Mandatory risk-register checkpoints
 
@@ -165,17 +166,16 @@ Under #79, #84 and `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`:
 
 1. execute the **final cutover** risk-register checkpoint; record immutable dispositions for every triggered risk and do not begin terminal compatibility-record creation while any cutover-blocking risk remains unresolved;
 2. refresh/reconcile #84; continue that exact lifecycle if the dedicated V1 schema/validator/meta-gate mechanism is not canonical and keep final-record work fail-closed rather than creating duplicate work;
-3. freeze exact Game export profile/version, producer revision and exact produced manifest/payload digests;
-4. freeze exact world/content revision;
-5. freeze Atlas Core/API and exact embedded bundle version/digest, proving its accepted input is the exact Game artifact;
-6. freeze bridge protocol/profile and Game client identity pinning the exact embedded bundle digest;
-7. complete provider late integration and protected merges;
-8. run Atlas merged-main public deployment/live acceptance and record the exact public deployed bundle version/digest plus immutable evidence binding the public deployment identity to that digest;
-9. record `public_atlas_bundle_relation_to_embedded` as `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT`; require digest equality for the former and explicit immutable compatibility evidence for the latter;
-10. run Game native-client acceptance against the exact embedded bundle digest;
-11. create the final dedicated World Atlas compatibility record only at `ecosystem/world-atlas/releases/<release_id>.json` using the canonical #84 schema/validator;
-12. validate Game-produced→Atlas-accepted artifact links, Game-client→embedded-bundle link and public-deployment→public-bundle link under the declared relation mode;
-13. require the final compatibility-record META PR to pass exact-head checks/review, protected-squash-merge it, read the exact record path back from that squash-merge SHA with an immutable readback reference, and require post-merge `meta-gate` on the exact protected-main SHA.
+3. freeze exact Game export profile/version, producer revision, world/content revision, exact produced manifest/payload digests and immutable Game export-build evidence binding those inputs to those exact digests;
+4. freeze Atlas Core/API, exact accepted Game export digests, exact embedded bundle version/digest and immutable Atlas build/manifest evidence binding that exact export + Core identity to that exact bundle;
+5. freeze bridge protocol/profile and Game client identity pinning the exact embedded bundle digest;
+6. complete provider late integration and protected merges;
+7. run Atlas merged-main public deployment/live acceptance and record the exact public deployed bundle version/digest plus immutable evidence binding the public deployment identity to that digest;
+8. record `public_atlas_bundle_relation_to_embedded` as `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT`; require digest equality for the former and explicit immutable compatibility evidence for the latter;
+9. run Game native-client acceptance against the exact embedded bundle digest;
+10. create the final dedicated World Atlas compatibility record only at `ecosystem/world-atlas/releases/<release_id>.json` using the canonical #84 schema/validator;
+11. validate Game-input→produced-export evidence, Game-produced→Atlas-accepted artifact links, Atlas accepted-export/Core→embedded-bundle evidence, Game-client→embedded-bundle link and public-deployment→public-bundle link under the declared relation mode;
+12. require the final compatibility-record META PR to pass exact-head checks/review, protected-squash-merge it, read the exact record path back from that squash-merge SHA with an immutable readback reference, and require post-merge `meta-gate` on the exact protected-main SHA.
 
 An Issue #79 comment, generic release record, local file, Draft or unmerged PR is not the final compatibility record. Public Atlas and Game client remain independent release domains; compatibility must be proven rather than inferred.
 
@@ -185,11 +185,11 @@ Open separate bounded Atlas removal lifecycles only after new defaults have prov
 
 ## Required worker handoff
 
-Every mutating worker returns exact role/repo/Issue/admission main/task branch/head, owned/forbidden paths, verified facts/inferences/unknowns, consumed/produced interfaces, tests/results, performance/security impact, upstream/reconciliation state and integration readiness. Read-only scouts explicitly return `READ_ONLY`.
+Every mutating worker returns exact role/repo/Issue/admission main/task branch/head, owned/forbidden paths, verified facts/inferences/unknowns, consumed/produced interfaces, routing-packet identity and validation result, execution target/runner, lane/dependency/lease state, tests/results, performance/security impact, upstream/reconciliation state and integration readiness. Read-only scouts explicitly return `READ_ONLY` and, when substantial under current policy, their validated routing packet/evidence.
 
 ## Coordinator review checklist
 
-Reject a lane for missing exact identity, ownership overlap, authority duplication, accidental Game-internal public API, private-state leakage, WebView gameplay dependency, premature rollback removal, missing RED→GREEN tests, unprofiled benchmark claims, missing required browser evidence, failed provider gates, unresolved applicable risk-register gate, or no-op retrigger commits.
+Reject a lane for missing/invalid/stale execution-routing packet, missing exact identity, ownership overlap, authority duplication, accidental Game-internal public API, private-state leakage, WebView gameplay dependency, premature rollback removal, missing RED→GREEN tests, unprofiled benchmark claims, missing required browser evidence, failed provider gates, unresolved applicable risk-register gate, or no-op retrigger commits.
 
 ## Completion and status rules
 
@@ -197,7 +197,7 @@ Return `DONE` only when ALL are true:
 
 1. the Definition of Done in the plan is proven;
 2. every triggered risk has the disposition/evidence required by `WORLD_ATLAS_RISK_REGISTER.md`, with no unresolved cutover-blocking risk;
-3. the complete exact tuple from `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` is canonical on protected META `main`, including exact Game produced artifact, exact embedded bundle, exact public deployed bundle and its relation/evidence, exact compatibility schema/validator/record path, exact record PR/head/check/review evidence, squash-merge SHA, immutable exact-record protected-main readback and post-merge `meta-gate`; and
+3. the complete exact tuple from `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` is canonical on protected META `main`, including exact Game input→produced-export build evidence, exact Game produced artifact, exact Atlas accepted-export/Core→embedded-bundle build evidence, exact embedded bundle, exact public deployed bundle and its relation/evidence, exact compatibility schema/validator/record path, exact record PR/head/check/review evidence, squash-merge SHA, immutable exact-record protected-main readback and post-merge `meta-gate`; and
 4. a fresh independent `OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR` invocation audits final protected provider/META state and returns `FINAL_VERDICT: DONE` with complete immutable evidence.
 
 Coordinator narration, provider success, completion of #79, Issue-only tuple or unmerged compatibility PR is insufficient.
@@ -207,9 +207,9 @@ Return `WAITING_EXTERNAL` for unchanged external dependency/ownership/review/CI/
 Final report must include:
 
 - exact META/Game/Atlas main SHAs and all implementation PR/merge SHAs;
-- immutable Game and Atlas provider exact-head review evidence refs plus required check refs;
-- Game export profile/version, producer revision, exact manifest/payload digests;
-- Atlas Core/API identity and exact embedded bundle version/digest;
+- separate immutable Game and Atlas provider exact-head required-check refs and review evidence refs;
+- Game export profile/version, producer revision, world/content revision, exact manifest/payload digests and immutable Game export-build evidence ref;
+- Atlas Core/API identity, exact accepted Game export digests, exact embedded bundle version/digest and immutable Atlas embedded-bundle build evidence ref;
 - exact public deployed bundle version/digest, relation to embedded and immutable deployment-to-bundle evidence;
 - bridge protocol version and capability profile, Game client identity and public deployment identity;
 - #84 schema/validator path and final record path/PR/head/check/review/merge/readback/post-merge-gate refs;
