@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 from collections import deque
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
@@ -65,11 +66,68 @@ _LITERAL_PATH_SEGMENT = re.compile(r"^[\w .-]+$", re.UNICODE)
 _REPOSITORY_COORDINATE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _GIT_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 
-_TARGET_RUNNER_COMPATIBILITY = {
-    "github_actions": {"github_hosted", "organization_product_isolated"},
-    "isolated_workspace": {"isolated_workspace"},
-    "host_exception": {"not_applicable"},
-}
+_UTC_RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+
+
+def _parse_utc_rfc3339(value: object) -> datetime | None:
+    """Parse an unambiguous RFC3339 timestamp written explicitly in UTC."""
+    if not isinstance(value, str) or not _UTC_RFC3339.fullmatch(value):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo == timezone.utc else None
+
+
+def _is_unique_string_list(value: object) -> bool:
+    return (
+        isinstance(value, list)
+        and bool(value)
+        and all(isinstance(member, str) and member for member in value)
+        and len(set(value)) == len(value)
+    )
+
+
+def _policy_errors(policy: dict[str, object]) -> list[str]:
+    """Reject malformed policy data before it can authorize a packet."""
+    errors: list[str] = []
+    targets_value = policy.get("execution_targets")
+    runners_value = policy.get("runner_classes")
+    if not _is_unique_string_list(targets_value):
+        errors.append("policy execution_targets must be a non-empty list of unique strings")
+    if not _is_unique_string_list(runners_value):
+        errors.append("policy runner_classes must be a non-empty list of unique strings")
+
+    targets = set(targets_value) if _is_unique_string_list(targets_value) else set()
+    runners = set(runners_value) if _is_unique_string_list(runners_value) else set()
+    matrix_value = policy.get("target_runner_compatibility")
+    if not isinstance(matrix_value, dict):
+        errors.append("policy target_runner_compatibility must be an object")
+    else:
+        matrix_keys = set(matrix_value)
+        if matrix_keys != targets:
+            errors.append("policy target_runner_compatibility must map every and only execution target")
+        for target, compatible_runners in matrix_value.items():
+            if not isinstance(target, str) or target not in targets:
+                continue
+            if not _is_unique_string_list(compatible_runners):
+                errors.append(
+                    f"policy target_runner_compatibility.{target} must be a non-empty list of runner classes"
+                )
+            elif not set(compatible_runners).issubset(runners):
+                errors.append(
+                    f"policy target_runner_compatibility.{target} contains a runner class outside policy runner_classes"
+                )
+
+    freshness = policy.get("preflight_freshness")
+    if not isinstance(freshness, dict):
+        errors.append("policy preflight_freshness must be an object")
+    else:
+        max_age_seconds = freshness.get("max_age_seconds")
+        if not isinstance(max_age_seconds, int) or isinstance(max_age_seconds, bool) or max_age_seconds < 0:
+            errors.append("policy preflight_freshness.max_age_seconds must be a non-negative integer")
+    return errors
 
 
 def _is_supported_path_glob(path: object) -> bool:
@@ -103,7 +161,7 @@ def _has_valid_preflight_identity(field: str, value: object) -> bool:
     if field in {"governing_issue", "pull_request"}:
         return _is_positive_identifier(value)
     if field == "verified_at":
-        return isinstance(value, str) and bool(value.strip())
+        return _parse_utc_rfc3339(value) is not None
     return True
 
 
@@ -141,6 +199,32 @@ def _validate_preflight(
             errors.append(f"live_state.{field} has invalid identity")
         if preflight_valid and live_state_valid and preflight[field] != live_state[field]:
             errors.append(f"github_preflight.{field} does not match live_state")
+
+    evaluated_at = live_state.get("evaluated_at")
+    if "evaluated_at" not in live_state:
+        errors.append("live_state missing evaluation timestamp: evaluated_at")
+        return
+    evaluation_time = _parse_utc_rfc3339(evaluated_at)
+    if evaluation_time is None:
+        errors.append("live_state.evaluated_at has invalid UTC RFC3339 timestamp")
+        return
+
+    preflight_time = _parse_utc_rfc3339(preflight.get("verified_at"))
+    live_preflight_time = _parse_utc_rfc3339(live_state.get("verified_at"))
+    if "verified_at" in preflight and preflight_time is None:
+        errors.append("github_preflight.verified_at has invalid UTC RFC3339 timestamp")
+    if "verified_at" in live_state and live_preflight_time is None:
+        errors.append("live_state.verified_at has invalid UTC RFC3339 timestamp")
+    if preflight_time is None:
+        return
+    if preflight_time > evaluation_time:
+        errors.append("github_preflight.verified_at is later than live_state.evaluated_at")
+        return
+    freshness = _mapping(policy.get("preflight_freshness"))
+    max_age_seconds = freshness.get("max_age_seconds")
+    if isinstance(max_age_seconds, int) and not isinstance(max_age_seconds, bool):
+        if (evaluation_time - preflight_time).total_seconds() > max_age_seconds:
+            errors.append("github_preflight.verified_at exceeds policy freshness limit")
 
 
 def _has_dependency_cycle(lanes: list[dict[str, object]], lane_ids: set[str]) -> bool:
@@ -338,6 +422,9 @@ def validate_packet(
     packet: dict[str, object], *, live_state: dict[str, object], policy: dict[str, object]
 ) -> list[str]:
     """Return deterministic errors for a packet; an empty list means valid."""
+    policy_errors = _policy_errors(policy)
+    if policy_errors:
+        return policy_errors
     errors: list[str] = []
     execution = packet.get("execution_routing")
     if not isinstance(execution, dict):
@@ -349,8 +436,10 @@ def validate_packet(
     runner_class = execution.get("runner_class")
     if not _is_closed_value(runner_class, _closed_values(policy, "runner_classes")):
         errors.append("runner_class is not allowed")
-    elif isinstance(target, str) and runner_class not in _TARGET_RUNNER_COMPATIBILITY.get(target, set()):
-        errors.append("runner_class is incompatible with execution_target")
+    elif isinstance(target, str):
+        matrix = _mapping(policy.get("target_runner_compatibility"))
+        if runner_class not in _list(matrix.get(target)):
+            errors.append("runner_class is incompatible with execution_target")
     remote_desktop = execution.get("remote_desktop")
     if not _is_closed_value(remote_desktop, {"denied", "exception"}):
         errors.append("remote_desktop must be denied or exception")

@@ -34,6 +34,7 @@ def policy() -> dict[str, object]:
 def live_state() -> dict[str, object]:
     return {
         "verified_at": "2026-08-26T12:00:00Z",
+        "evaluated_at": "2026-08-26T12:05:00Z",
         "repository": REPO,
         "default_branch": "main",
         "default_branch_sha": SHA,
@@ -92,6 +93,91 @@ def exception_packet(reason: str) -> dict[str, object]:
 
 def test_default_actions_packet_passes() -> None:
     assert routing.validate_packet(default_packet(), live_state=live_state(), policy=policy()) == []
+
+
+def test_preflight_timestamps_require_strict_utc_rfc3339_and_freshness() -> None:
+    cases = (
+        ("github_preflight", "verified_at", "2026-08-26 12:00:00Z", "has invalid UTC RFC3339 timestamp"),
+        ("github_preflight", "verified_at", "2026-08-26T12:06:00Z", "is later than live_state.evaluated_at"),
+        ("github_preflight", "verified_at", "2026-08-26T11:49:59Z", "exceeds policy freshness limit"),
+        ("live_state", "evaluated_at", "not-a-timestamp", "has invalid UTC RFC3339 timestamp"),
+    )
+    for location, field, value, expected_error in cases:
+        packet = default_packet()
+        current_live_state = live_state()
+        if location == "github_preflight":
+            execution = packet["execution_routing"]
+            assert isinstance(execution, dict)
+            preflight_data = execution["github_preflight"]
+            assert isinstance(preflight_data, dict)
+            preflight_data[field] = value
+        else:
+            current_live_state[field] = value
+        errors = routing.validate_packet(packet, live_state=current_live_state, policy=policy())
+        assert any(expected_error in error for error in errors)
+
+
+def test_missing_evaluation_timestamp_fails_closed() -> None:
+    current_live_state = live_state()
+    del current_live_state["evaluated_at"]
+    errors = routing.validate_packet(default_packet(), live_state=current_live_state, policy=policy())
+    assert "live_state missing evaluation timestamp: evaluated_at" in errors
+
+
+def test_policy_drives_preflight_limit_and_target_runner_matrix() -> None:
+    packet = default_packet()
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    preflight_data = execution["github_preflight"]
+    assert isinstance(preflight_data, dict)
+    preflight_data["verified_at"] = "2026-08-26T12:03:00Z"
+    current_live_state = live_state()
+    current_live_state["verified_at"] = "2026-08-26T12:03:00Z"
+
+    tightened_policy = policy()
+    freshness = tightened_policy["preflight_freshness"]
+    assert isinstance(freshness, dict)
+    freshness["max_age_seconds"] = 60
+    errors = routing.validate_packet(packet, live_state=current_live_state, policy=tightened_policy)
+    assert "github_preflight.verified_at exceeds policy freshness limit" in errors
+
+    widened_policy = policy()
+    freshness = widened_policy["preflight_freshness"]
+    assert isinstance(freshness, dict)
+    freshness["max_age_seconds"] = 180
+    assert routing.validate_packet(packet, live_state=current_live_state, policy=widened_policy) == []
+
+    incompatible_policy = policy()
+    matrix = incompatible_policy["target_runner_compatibility"]
+    assert isinstance(matrix, dict)
+    matrix["github_actions"] = ["organization_product_isolated"]
+    errors = routing.validate_packet(default_packet(), live_state=live_state(), policy=incompatible_policy)
+    assert "runner_class is incompatible with execution_target" in errors
+
+
+def test_malformed_policy_freshness_and_matrix_fail_closed() -> None:
+    malformed_policies = []
+    missing_target_policy = policy()
+    matrix = missing_target_policy["target_runner_compatibility"]
+    assert isinstance(matrix, dict)
+    del matrix["host_exception"]
+    malformed_policies.append(missing_target_policy)
+
+    unknown_runner_policy = policy()
+    matrix = unknown_runner_policy["target_runner_compatibility"]
+    assert isinstance(matrix, dict)
+    matrix["github_actions"] = ["untrusted_runner"]
+    malformed_policies.append(unknown_runner_policy)
+
+    malformed_freshness_policy = policy()
+    freshness = malformed_freshness_policy["preflight_freshness"]
+    assert isinstance(freshness, dict)
+    freshness["max_age_seconds"] = -1
+    malformed_policies.append(malformed_freshness_policy)
+
+    for malformed_policy in malformed_policies:
+        errors = routing.validate_packet(default_packet(), live_state=live_state(), policy=malformed_policy)
+        assert any(error.startswith("policy ") for error in errors)
 
 
 def test_undeclared_remote_desktop_exception_fails() -> None:
@@ -676,6 +762,82 @@ def test_cli_rejects_invalid_preflight_identity() -> None:
         assert "github_preflight.task_head_sha has invalid identity" in failed.stdout
         assert "live_state.task_head_sha has invalid identity" in failed.stdout
         assert "Traceback" not in failed.stderr
+
+
+def test_cli_rejects_timestamp_and_policy_matrix_bypasses() -> None:
+    script = Path(__file__).with_name("agent_execution_routing.py")
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        directory = Path(temporary_directory)
+        policy_path = directory / "policy.json"
+        packet_path = directory / "packet.json"
+        live_state_path = directory / "live-state.json"
+        command = [
+            sys.executable,
+            str(script),
+            "--policy",
+            str(policy_path),
+            "--packet",
+            str(packet_path),
+            "--live-state",
+            str(live_state_path),
+        ]
+
+        def assert_rejected(
+            packet: dict[str, object], current_live_state: dict[str, object], current_policy: dict[str, object], error: str
+        ) -> None:
+            policy_path.write_text(json.dumps(current_policy), encoding="utf-8")
+            packet_path.write_text(json.dumps(packet), encoding="utf-8")
+            live_state_path.write_text(json.dumps(current_live_state), encoding="utf-8")
+            result = subprocess.run(command, check=False, capture_output=True, text=True)
+            assert result.returncode == 1
+            assert error in result.stdout
+            assert "Traceback" not in result.stderr
+
+        malformed_packet = default_packet()
+        execution = malformed_packet["execution_routing"]
+        assert isinstance(execution, dict)
+        preflight_data = execution["github_preflight"]
+        assert isinstance(preflight_data, dict)
+        preflight_data["verified_at"] = "2026-08-26T12:00:00+00:00"
+        assert_rejected(
+            malformed_packet,
+            live_state(),
+            policy(),
+            "github_preflight.verified_at has invalid UTC RFC3339 timestamp",
+        )
+
+        stale_packet = default_packet()
+        execution = stale_packet["execution_routing"]
+        assert isinstance(execution, dict)
+        preflight_data = execution["github_preflight"]
+        assert isinstance(preflight_data, dict)
+        preflight_data["verified_at"] = "2026-08-26T11:49:59Z"
+        assert_rejected(
+            stale_packet,
+            live_state(),
+            policy(),
+            "github_preflight.verified_at exceeds policy freshness limit",
+        )
+
+        missing_evaluation_time = live_state()
+        del missing_evaluation_time["evaluated_at"]
+        assert_rejected(
+            default_packet(),
+            missing_evaluation_time,
+            policy(),
+            "live_state missing evaluation timestamp: evaluated_at",
+        )
+
+        malformed_policy = policy()
+        matrix = malformed_policy["target_runner_compatibility"]
+        assert isinstance(matrix, dict)
+        matrix["github_actions"] = "github_hosted"
+        assert_rejected(
+            default_packet(),
+            live_state(),
+            malformed_policy,
+            "policy target_runner_compatibility.github_actions must be a non-empty list of runner classes",
+        )
 
 
 def test_cli_rejects_fail_open_execution_routing_bypasses() -> None:

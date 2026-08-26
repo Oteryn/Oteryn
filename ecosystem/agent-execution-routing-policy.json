@@ -11,6 +11,21 @@
     "isolated_workspace",
     "not_applicable"
   ],
+  "target_runner_compatibility": {
+    "github_actions": [
+      "github_hosted",
+      "organization_product_isolated"
+    ],
+    "isolated_workspace": [
+      "isolated_workspace"
+    ],
+    "host_exception": [
+      "not_applicable"
+    ]
+  },
+  "preflight_freshness": {
+    "max_age_seconds": 900
+  },
   "remote_desktop_reasons": [
     "host_only_service",
     "lan_or_hardware",
