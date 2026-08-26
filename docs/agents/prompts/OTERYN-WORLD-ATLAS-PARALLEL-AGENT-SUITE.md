@@ -37,6 +37,21 @@ Before an independently launched Wave-0 scout begins or resumes:
 
 There is no PR-less standalone Wave-0 route and no fabricated/unrelated PR identity. The existing central execution-routing policy/validator is used unchanged.
 
+### Qualification evidence-only lifecycle
+
+`WA-6Q` is **provider-read-only, META qualification-evidence-only** by default. It is substantial work and therefore also has no PR-less routing exception.
+
+Before `WA-6Q` begins or resumes:
+
+1. create/refresh a fresh META qualification-evidence child Issue under #78/#80;
+2. assign a dedicated META branch/worktree and PR/task head;
+3. assign exactly one report path under `docs/evidence/world-atlas/qualification/<candidate-or-role>.md` or a coordinator-recorded equivalent;
+4. validate a normal PR-backed execution-routing packet whose sole writable owned path is that qualification report;
+5. permit mutation only of that META qualification report while Game/Atlas frozen candidate code/config remains read-only;
+6. if provider-owned test/evidence code must change, create a separate provider child Issue/branch/worktree/PR with its own routing packet rather than borrowing or fabricating the qualification PR identity.
+
+There is no PR-less `WA-6Q` route and no fabricated/unrelated provider PR identity. The existing central execution-routing policy/validator is used unchanged.
+
 Before **any substantial role in this suite begins or resumes work**, create or refresh the canonical execution-routing packet and validate it against a freshly obtained GitHub live-state snapshot with:
 
 ```text
@@ -45,7 +60,7 @@ python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-exe
 
 Require validation `PASS` before work is released. Provider-read-only mode does not waive fresh GitHub preflight, a truthful PR/task-head identity, execution-target/runner declaration, equivalent-CI truthfulness, Remote Desktop disposition, dependency graph, lane identity or applicable shared-resource lease planning. Later mutating provider roles additionally require their dedicated provider Issue/branch/worktree/path allocation. A missing, invalid, stale or fabricated routing packet is a fail-closed admission failure.
 
-Every role handoff/return must include `ROUTING_PACKET_ID_OR_REF` and `ROUTING_VALIDATION_REF_OR_RESULT`; substantial roles may not claim their work was admissible without that evidence. Every Wave-0 return additionally records its META evidence Issue/PR/report path.
+Every role handoff/return must include `ROUTING_PACKET_ID_OR_REF` and `ROUTING_VALIDATION_REF_OR_RESULT`; substantial roles may not claim their work was admissible without that evidence. Every Wave-0 return additionally records its META evidence Issue/PR/report path. `WA-6Q` additionally records its META qualification-evidence Issue/PR/report path and any separately created provider evidence child tasks.
 
 Every mutating worker uses one Issue, one branch/worktree, one PR and exact owned paths. A moving `main` does not justify restart; use late integration refresh.
 
@@ -586,20 +601,48 @@ EFFORT:
 Extra High.
 
 MODE:
-Read-only integrator/reviewer over frozen candidates plus explicitly owned test/evidence branches where provider policy requires.
+Provider-read-only integrator/reviewer over frozen candidates; META qualification-evidence-only under the shared qualification lifecycle above.
 
 LIFECYCLES:
-META #77/#78/#80.
+META #77/#78/#80 plus a dedicated META qualification-evidence child Issue/PR for each frozen candidate qualification cycle.
 
 ## Goal
 
 Coordinate independent security, performance and cross-surface proof on exact frozen provider candidates without changing product behavior to make tests easier.
 
-The shared routing validation above is required before this substantial role begins or resumes, including when its current invocation remains read-only.
+## Admission requirements
 
-A product change invalidates affected evidence and returns the candidate to integration.
+Before this role begins or resumes:
+
+- allocate the fresh META qualification-evidence child Issue, branch/worktree, PR/task head and exactly one qualification report path required by the shared lifecycle;
+- validate the normal PR-backed execution-routing packet against fresh GitHub state, with that report as the sole writable path;
+- keep Game/Atlas frozen candidate code/config strictly read-only from this qualification role;
+- if qualification discovers that provider-owned test/evidence code must change, stop treating the candidate as frozen and create a separate provider child task with its own Issue/branch/worktree/PR/routing packet; never borrow or fabricate the META qualification PR identity.
+
+A product or provider test/config change invalidates affected evidence and returns the candidate to integration.
 
 Do not weaken retries, tolerances, browser coverage, privacy controls or resource assertions silently.
+
+## Return
+
+```text
+ROLE: WA-6Q QUALIFICATION-LEAD
+PROVIDER_READ_ONLY: YES
+META_QUALIFICATION_EVIDENCE_ISSUE:
+META_QUALIFICATION_EVIDENCE_PR:
+META_QUALIFICATION_REPORT_PATH:
+ROUTING_PACKET_ID_OR_REF:
+ROUTING_VALIDATION_REF_OR_RESULT:
+FROZEN_GAME_CANDIDATE:
+FROZEN_ATLAS_CANDIDATE:
+SECURITY_EVIDENCE:
+PERFORMANCE_EVIDENCE:
+CROSS_SURFACE_EVIDENCE:
+PROVIDER_CHILD_TASKS_CREATED:
+FACTS:
+INFERENCES:
+UNKNOWNS:
+```
 
 ---
 
@@ -622,6 +665,8 @@ Perform late integration and cutover only after Game/Atlas candidates, bundle/ex
 
 - shared routing validation above is PASS for the current task packet;
 - integrate Game and Atlas independently through their own protected gates;
+- preserve each provider's exact pre-squash PR head separately from the resulting protected-main/release SHA;
+- bind required checks/review to the pre-squash PR head and retain immutable merge evidence linking that exact head to the exact resulting main/release SHA;
 - no force-push/rewrite of published task history by default;
 - refresh current `main`, merge-up, rerun invalidated exact-head proof;
 - record exact merge/main/deployed/candidate identities;
