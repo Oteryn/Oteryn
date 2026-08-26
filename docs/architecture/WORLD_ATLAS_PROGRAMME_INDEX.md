@@ -97,15 +97,18 @@ The five evidence-only roles are:
 
 There is no PR-less standalone scout route. Their exact prompts, routing-evidence return requirement and return formats are in the parallel-agent suite.
 
-## Allocation-gated later leads
+## Qualification evidence lane
 
-These must not mutate until the coordinator records a fresh provider child Issue, `admission_main_sha`, branch/worktree and exact path ownership and the substantial task packet passes current execution-routing validation:
+`OTERYN-WORLD-ATLAS-QUALIFICATION-LEAD` is provider-read-only over frozen Game/Atlas candidates but is not routing-lifecycle-free. Its default invocation receives a fresh META qualification-evidence child Issue under #78/#80, a dedicated META branch/worktree and PR/task head, exactly one report path under `docs/evidence/world-atlas/qualification/<candidate-or-role>.md` (or the coordinator-recorded equivalent), and a normal PR-backed execution-routing packet validated against fresh GitHub state. Only that qualification report is writable by the lead. If provider-owned test/evidence code must change, the lead coordinates a separate provider child Issue/branch/worktree/PR rather than borrowing or fabricating a PR identity. There is no PR-less WA-6Q route.
+
+## Allocation-gated mutating leads
+
+These must not mutate provider code until the coordinator records a fresh provider child Issue, `admission_main_sha`, branch/worktree and exact path ownership and the substantial task packet passes current execution-routing validation:
 
 - `OTERYN-WORLD-ATLAS-GAME-PROVIDER-LEAD`
 - `OTERYN-WORLD-ATLAS-ATLAS-CORE-LEAD`
 - `OTERYN-WORLD-ATLAS-WEB-EMBEDDED-LEAD`
 - `OTERYN-WORLD-ATLAS-CLIENT-INTEGRATION-LEAD`
-- `OTERYN-WORLD-ATLAS-QUALIFICATION-LEAD`
 - `OTERYN-WORLD-ATLAS-FINAL-INTEGRATION-LEAD`
 
 Normal mutating concurrency is 2–3 disjoint lanes. Root Cargo/workspace, client composition, Atlas shared FullWorld shell, workflow/CI and release-manifest surfaces are serialized leases.
