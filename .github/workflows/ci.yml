@@ -60,10 +60,13 @@ jobs:
               Path('ecosystem/repositories.json'),
               Path('ecosystem/governance-desired-state.json'),
               Path('ecosystem/compatibility.schema.json'),
+              Path('ecosystem/agent-execution-routing-policy.json'),
               Path('tools/governance/audit_github_readonly.py'),
               Path('tools/governance/audit_github_readonly_core.py'),
               Path('tools/governance/test_audit_github_readonly.py'),
               Path('tools/governance/test_audit_github_readonly_terminal.py'),
+              Path('tools/governance/agent_execution_routing.py'),
+              Path('tools/governance/test_agent_execution_routing.py'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
           if missing:
@@ -174,6 +177,12 @@ jobs:
           python3 tools/governance/audit_github_readonly.py --offline
           python3 tools/governance/test_audit_github_readonly.py
           python3 tools/governance/test_audit_github_readonly_terminal.py
+
+      - name: Validate agent execution routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/governance/test_agent_execution_routing.py
 
       - name: Validate AI review risk policy
         shell: bash
