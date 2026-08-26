@@ -2,7 +2,7 @@
 
 Lifecycle: `Oteryn/Oteryn#75`.
 
-Architecture admission lifecycle: `Oteryn/Oteryn#86`. Historical PR #83 is superseded unmerged and is not architecture-admission authority.
+Architecture admission authority is the protected-merged pull request that carries this exact packet. Superseded unmerged recovery pull requests carry no architecture-admission authority.
 
 Status: proposed until the architecture packet is protected-merged to META `main`. Provider runtime implementation must not start from this branch.
 
