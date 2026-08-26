@@ -64,7 +64,7 @@ Require the client to load a pinned local Atlas embedded bundle version/digest, 
 
 ### E. Bridge security/privacy
 
-Require independent #77 evidence for protocol/profile handshake, schema/source/origin/size/rate validation, default-deny capability allowlist, no movement/combat/use/arbitrary server mutation, no credential/session-secret exposure, local-session-only private state, no public publication leakage, privacy-safe evidence and malformed/flood/spoof/mismatch negative tests plus host dependency/supply-chain review.
+Require independent #77 evidence for protocol/profile handshake, schema/source/origin/size/rate validation, default-deny capability allowlist, no movement/combat/use/arbitrary server mutation, no credential/session-secret exposure, local-session-only private state, no public publication leakage, privacy-safe evidence and malformed/flood/spoof/mismatch negative tests plus host dependency/supply-chain review. Require an immutable `ATLAS_BRIDGE_COMPATIBILITY_HANDSHAKE_EVIDENCE_REF` proving that the exact recorded Game client identity and its exact pinned embedded Atlas bundle mutually support the recorded bridge protocol/profile and relevant world/content compatibility identity; strings or checks without this binding are insufficient.
 
 ### F. Cross-surface functional parity
 
@@ -94,11 +94,12 @@ public_atlas_deployed_bundle_digest
 public_atlas_bundle_relation_to_embedded
 atlas_bridge_protocol_version
 atlas_bridge_capability_profile
+atlas_bridge_compatibility_handshake_evidence_ref
 game_client_release_or_candidate_identity
 public_atlas_release_or_deployment_identity
 ```
 
-Require immutable `GAME_ATLAS_EXPORT_BUILD_EVIDENCE_REF` proving that the recorded Game producer revision, export profile/version and world/content revision produced the exact recorded manifest and payload digests. Require proof that Atlas consumed those exact produced Game digests and immutable `ATLAS_EMBEDDED_BUNDLE_BUILD_EVIDENCE_REF` proving that the recorded Atlas Core/API identity built the exact embedded bundle version/digest from those exact accepted digests. Require that the Game client pins that exact embedded bundle digest. Separately require immutable evidence that the named public deployment serves `public_atlas_deployed_bundle_digest`.
+Require immutable `GAME_ATLAS_EXPORT_BUILD_EVIDENCE_REF` proving that the recorded Game producer revision, export profile/version and world/content revision produced the exact recorded manifest and payload digests. Require proof that Atlas consumed those exact produced Game digests and immutable `ATLAS_EMBEDDED_BUNDLE_BUILD_EVIDENCE_REF` proving that the recorded Atlas Core/API identity built the exact embedded bundle version/digest from those exact accepted digests. Require that the Game client pins that exact embedded bundle digest. Require immutable `ATLAS_BRIDGE_COMPATIBILITY_HANDSHAKE_EVIDENCE_REF` proving that this exact client identity + pinned embedded bundle version/digest support the selected bridge protocol/profile and the recorded world/content compatibility identity. Separately require immutable evidence that the named public deployment serves `public_atlas_deployed_bundle_digest`.
 
 If `public_atlas_bundle_relation_to_embedded == SAME_BUNDLE`, require public and embedded bundle digests to match. If `COMPATIBLE_INDEPENDENT`, allow different digests only with immutable deployment evidence and provider/cross-surface evidence proving the public bundle is compatible with the recorded Game export/world contract.
 
@@ -106,11 +107,11 @@ Issue #79 is not terminal authority by itself. Require #84 dedicated schema/vali
 
 ### I. Provider final gates
 
-For every final provider PR/candidate require exact branch/head, bounded diff, exact-head required checks/reviews, protected squash merge, resulting main SHA, required post-merge checks, Atlas live acceptance bound to the exact public deployed bundle, and Game native-client acceptance bound to the exact embedded bundle. Record immutable accepted exact-head required-check evidence separately for Game and Atlas provider PRs and immutable accepted exact-head review evidence separately for Game and Atlas provider PRs; one provider's checks/reviews cannot satisfy the other's gate, and provider PR/merge identity alone proves neither required checks nor required review.
+For every final provider PR/candidate require exact branch/head, bounded diff, exact-head required checks/reviews, protected squash merge, resulting main SHA, required post-merge checks, Atlas live acceptance bound to the exact public deployed bundle, and Game native-client acceptance bound to the exact embedded bundle. Record `GAME_MAIN_OR_RELEASE_COMMIT_SHA` and `ATLAS_MAIN_OR_RELEASE_COMMIT_SHA` exactly as used by the canonical V1 record. Every immutable Game provider required-check/review evidence ref must resolve to `GAME_MAIN_OR_RELEASE_COMMIT_SHA`; every immutable Atlas provider required-check/review evidence ref must resolve to `ATLAS_MAIN_OR_RELEASE_COMMIT_SHA`. One provider's checks/reviews cannot satisfy the other's gate, provider PR/merge identity alone proves neither required checks nor required review, and evidence from an older/stale provider head is `CONFLICT_BLOCKING` rather than acceptable historical proof.
 
 ### J. Parallel-agent hygiene
 
-Require one writable branch/worktree per mutating worker, serialized shared leases, late integration instead of destructive restart, no no-op/retrigger commits for unchanged evidence, no stale state promoted to authority and correct branch disposal. For substantial provider task packets, require immutable or reproducibly identified evidence that the current execution-routing packet was validated against a fresh GitHub snapshot before local work/mutation was released; missing or stale routing validation makes the affected lane fail this dimension.
+Require one writable branch/worktree per mutating worker, serialized shared leases, late integration instead of destructive restart, no no-op/retrigger commits for unchanged evidence, no stale state promoted to authority and correct branch disposal. For every substantial execution task packet, require immutable or reproducibly identified evidence that the current execution-routing packet was validated against a fresh GitHub snapshot before the task was released. Wave-0 provider inspection may be provider-read-only, but if launched independently it must use the packet's canonical META evidence-only lifecycle with a truthful PR/task head and exactly one disjoint report path; there is no PR-less standalone scout route. Missing, stale or fabricated routing validation makes the affected lane fail this dimension.
 
 ### K. Risk-register disposition
 
@@ -136,9 +137,11 @@ META_ARCHITECTURE_PR_REVIEW_EVIDENCE_REFS:
 META_ARCHITECTURE_PR_MERGE_SHA:
 PROTECTED_MAIN_PACKET_READBACK_REF:
 GAME_PROVIDER_PRS_AND_MERGE_SHAS:
+GAME_MAIN_OR_RELEASE_COMMIT_SHA:
 GAME_PROVIDER_REQUIRED_CHECK_REFS:
 GAME_PROVIDER_REVIEW_EVIDENCE_REFS:
 ATLAS_PROVIDER_PRS_AND_MERGE_SHAS:
+ATLAS_MAIN_OR_RELEASE_COMMIT_SHA:
 ATLAS_PROVIDER_REQUIRED_CHECK_REFS:
 ATLAS_PROVIDER_REVIEW_EVIDENCE_REFS:
 GAME_ATLAS_EXPORT_PROFILE_VERSION:
@@ -157,6 +160,7 @@ PUBLIC_ATLAS_BUNDLE_RELATION_TO_EMBEDDED:
 PUBLIC_ATLAS_DEPLOYMENT_BUNDLE_EVIDENCE_REF:
 ATLAS_BRIDGE_PROTOCOL_VERSION:
 ATLAS_BRIDGE_CAPABILITY_PROFILE:
+ATLAS_BRIDGE_COMPATIBILITY_HANDSHAKE_EVIDENCE_REF:
 GAME_CLIENT_RELEASE_OR_CANDIDATE_IDENTITY:
 PUBLIC_ATLAS_RELEASE_DEPLOYMENT_IDENTITY:
 SECURITY_EVIDENCE_REFS:
@@ -195,4 +199,4 @@ FINAL_VERDICT: DONE|NOT_DONE
 REQUIRED_NEXT_ACTIONS:
 ```
 
-A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable architecture-packet exact-head check/review/merge evidence, `PROTECTED_MAIN_PACKET_READBACK_REF` proving all eight canonical packet artifacts at the exact `META_ARCHITECTURE_PR_MERGE_SHA`, complete immutable compatibility-record evidence including `META_COMPATIBILITY_RECORD_READBACK_REF` binding the exact record path to `META_COMPATIBILITY_SQUASH_MERGE_SHA`, complete immutable Game input→export and Atlas export/Core→embedded-bundle build evidence, separate Game/Atlas exact-head required-check and review evidence, valid execution-routing validation evidence for substantial provider lanes, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, partial, later-commit, cross-provider-substituted, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
+A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable architecture-packet exact-head check/review/merge evidence, `PROTECTED_MAIN_PACKET_READBACK_REF` proving all eight canonical packet artifacts at the exact `META_ARCHITECTURE_PR_MERGE_SHA`, complete immutable compatibility-record evidence including `META_COMPATIBILITY_RECORD_READBACK_REF` binding the exact record path to `META_COMPATIBILITY_SQUASH_MERGE_SHA`, complete immutable Game input→export and Atlas export/Core→embedded-bundle build evidence, exact client+bundle→bridge compatibility/handshake evidence, separate Game/Atlas exact-head required-check and review evidence each resolving to the corresponding recorded final provider SHA, valid execution-routing validation evidence for substantial lanes including PR-backed META evidence-only Wave-0 scouts when independently launched, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, partial, later-commit, old-head/stale-head, cross-provider-substituted, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
