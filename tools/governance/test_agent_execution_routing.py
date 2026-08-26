@@ -21,7 +21,7 @@ SHA = "d79df968c1aba98373455399732fc71ab71e6a5d"
 
 
 def policy() -> dict[str, object]:
-    path = Path(__file__).parents[2] / "docs" / "agents" / "schemas" / "agent_execution_routing.schema.json"
+    path = Path(__file__).parents[2] / "ecosystem" / "agent-execution-routing-policy.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -133,6 +133,44 @@ def test_stale_resume_preflight_fails() -> None:
     assert isinstance(preflight_data, dict)
     preflight_data["default_branch_sha"] = "a" * 40
     assert "github_preflight.default_branch_sha does not match live_state" in routing.validate_packet(packet, live_state=live_state(), policy=policy())
+
+
+def test_missing_resume_preflight_fields_fail() -> None:
+    required_fields = [
+        "verified_at",
+        "repository",
+        "default_branch_sha",
+        "governing_issue",
+        "pull_request",
+        "task_head_sha",
+    ]
+    for field in required_fields:
+        packet = default_packet()
+        execution = packet["execution_routing"]
+        assert isinstance(execution, dict)
+        preflight_data = execution["github_preflight"]
+        assert isinstance(preflight_data, dict)
+        del preflight_data[field]
+        errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+        assert f"github_preflight missing required field: {field}" in errors
+
+
+def test_resume_preflight_identity_mismatches_fail() -> None:
+    mismatches = {
+        "repository": "Oteryn/other-repository",
+        "governing_issue": 999,
+        "pull_request": 999,
+        "task_head_sha": "a" * 40,
+    }
+    for field, value in mismatches.items():
+        packet = default_packet()
+        execution = packet["execution_routing"]
+        assert isinstance(execution, dict)
+        preflight_data = execution["github_preflight"]
+        assert isinstance(preflight_data, dict)
+        preflight_data[field] = value
+        errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+        assert f"github_preflight.{field} does not match live_state" in errors
 
 
 def test_multi_lane_task_requires_parallel_plan() -> None:
