@@ -217,6 +217,26 @@ def test_overlapping_parallel_lanes_fail() -> None:
     assert "parallel lanes have overlapping owned_paths" in routing.validate_packet(packet, live_state=live_state(), policy=policy())
 
 
+def test_unsupported_question_mark_glob_cannot_hide_owned_path_conflict() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lanes"] = [lane("glob", ["src/?.py"]), lane("specific", ["src/a.py"])]
+    parallel["integration_order"] = ["glob", "specific"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "owned_paths must use only '*' and '**' wildcards" in errors
+
+
+def test_unsupported_character_class_glob_cannot_hide_owned_path_conflict() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lanes"] = [lane("glob", ["src/[ab].py"]), lane("specific", ["src/a.py"])]
+    parallel["integration_order"] = ["glob", "specific"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "owned_paths must use only '*' and '**' wildcards" in errors
+
+
 def test_unknown_lane_dependency_fails() -> None:
     packet = default_packet()
     parallel = packet["parallel_execution"]
@@ -524,6 +544,14 @@ def test_cli_rejects_fail_open_execution_routing_bypasses() -> None:
         assert isinstance(parallel, dict)
         parallel["lanes"] = [lane("policy", ["docs/agents/**", 7])]
         assert_rejected(packet, "owned_paths must be a list of non-empty safe repository-relative strings")
+
+        for unsupported_glob in ("src/?.py", "src/[ab].py"):
+            packet = default_packet()
+            parallel = packet["parallel_execution"]
+            assert isinstance(parallel, dict)
+            parallel["lanes"] = [lane("glob", [unsupported_glob]), lane("specific", ["src/a.py"])]
+            parallel["integration_order"] = ["glob", "specific"]
+            assert_rejected(packet, "owned_paths must use only '*' and '**' wildcards")
 
         packet = default_packet()
         parallel = packet["parallel_execution"]

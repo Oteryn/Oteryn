@@ -55,6 +55,11 @@ def _is_safe_repository_relative_path(path: object) -> bool:
     return all(part not in {"", ".", ".."} for part in normalized.split("/"))
 
 
+def _is_supported_path_glob(path: object) -> bool:
+    """Return whether a path uses only the validator's supported glob syntax."""
+    return isinstance(path, str) and not any(character in path for character in "?[]")
+
+
 def _paths_overlap(left: str, right: str) -> bool:
     left_prefix = _path_prefix(left)
     right_prefix = _path_prefix(right)
@@ -164,6 +169,9 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
             errors.append(
                 f"lane '{display_identifier}' owned_paths must be a list of non-empty safe repository-relative strings"
             )
+        for path in _list(owned_paths_value):
+            if _is_safe_repository_relative_path(path) and not _is_supported_path_glob(path):
+                errors.append("owned_paths must use only '*' and '**' wildcards")
         if not owned_paths:
             errors.append(f"lane '{display_identifier}' requires owned_paths")
         if not isinstance(lane.get("depends_on", []), list):
