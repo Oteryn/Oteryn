@@ -180,6 +180,38 @@ def test_malformed_policy_freshness_and_matrix_fail_closed() -> None:
         assert any(error.startswith("policy ") for error in errors)
 
 
+def test_resume_required_fields_policy_is_exact_and_fail_closed() -> None:
+    malformed_values = (
+        [],
+        ["verified_at"],
+        ["verified_at", "repository", "default_branch_sha", "governing_issue", "pull_request", "task_head_sha", "task_head_sha"],
+        ["verified_at", "repository", "default_branch_sha", "governing_issue", "pull_request", "unknown"],
+        ["verified_at", "repository", "default_branch_sha", "governing_issue", "pull_request", None],
+        "verified_at",
+        None,
+    )
+    for malformed_value in malformed_values:
+        malformed_policy = policy()
+        malformed_policy["resume_preflight_required_fields"] = malformed_value
+        errors = routing.validate_packet(default_packet(), live_state=live_state(), policy=malformed_policy)
+        assert "policy resume_preflight_required_fields must be the exact canonical list of unique required identities" in errors
+
+
+def test_malformed_required_fields_cannot_make_null_identities_pass() -> None:
+    malformed_policy = policy()
+    malformed_policy["resume_preflight_required_fields"] = ["verified_at"]
+    packet = default_packet()
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    packet_preflight = execution["github_preflight"]
+    assert isinstance(packet_preflight, dict)
+    packet_preflight.update({"repository": None, "default_branch_sha": None, "governing_issue": None, "pull_request": None, "task_head_sha": None})
+    current_live_state = live_state()
+    current_live_state.update({"repository": None, "default_branch_sha": None, "governing_issue": None, "pull_request": None, "task_head_sha": None})
+    errors = routing.validate_packet(packet, live_state=current_live_state, policy=malformed_policy)
+    assert errors == ["policy resume_preflight_required_fields must be the exact canonical list of unique required identities"]
+
+
 def test_undeclared_remote_desktop_exception_fails() -> None:
     packet = default_packet()
     execution = packet["execution_routing"]
@@ -761,6 +793,37 @@ def test_cli_rejects_invalid_preflight_identity() -> None:
         assert failed.returncode == 1
         assert "github_preflight.task_head_sha has invalid identity" in failed.stdout
         assert "live_state.task_head_sha has invalid identity" in failed.stdout
+        assert "Traceback" not in failed.stderr
+
+
+def test_cli_rejects_malformed_required_fields_policy_with_null_identities() -> None:
+    script = Path(__file__).with_name("agent_execution_routing.py")
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        directory = Path(temporary_directory)
+        policy_path = directory / "policy.json"
+        packet_path = directory / "packet.json"
+        live_state_path = directory / "live-state.json"
+        packet = default_packet()
+        execution = packet["execution_routing"]
+        assert isinstance(execution, dict)
+        packet_preflight = execution["github_preflight"]
+        assert isinstance(packet_preflight, dict)
+        packet_preflight.update({"repository": None, "default_branch_sha": None, "governing_issue": None, "pull_request": None, "task_head_sha": None})
+        current_live_state = live_state()
+        current_live_state.update({"repository": None, "default_branch_sha": None, "governing_issue": None, "pull_request": None, "task_head_sha": None})
+        malformed_policy = policy()
+        malformed_policy["resume_preflight_required_fields"] = ["verified_at"]
+        policy_path.write_text(json.dumps(malformed_policy), encoding="utf-8")
+        packet_path.write_text(json.dumps(packet), encoding="utf-8")
+        live_state_path.write_text(json.dumps(current_live_state), encoding="utf-8")
+        failed = subprocess.run(
+            [sys.executable, str(script), "--policy", str(policy_path), "--packet", str(packet_path), "--live-state", str(live_state_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert failed.returncode == 1
+        assert "policy resume_preflight_required_fields must be the exact canonical list of unique required identities" in failed.stdout
         assert "Traceback" not in failed.stderr
 
 

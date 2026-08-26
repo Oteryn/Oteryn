@@ -68,6 +68,15 @@ _GIT_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 
 _UTC_RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
 
+_CANONICAL_RESUME_PREFLIGHT_FIELDS = (
+    "verified_at",
+    "repository",
+    "default_branch_sha",
+    "governing_issue",
+    "pull_request",
+    "task_head_sha",
+)
+
 
 def _parse_utc_rfc3339(value: object) -> datetime | None:
     """Parse an unambiguous RFC3339 timestamp written explicitly in UTC."""
@@ -98,6 +107,12 @@ def _policy_errors(policy: dict[str, object]) -> list[str]:
         errors.append("policy execution_targets must be a non-empty list of unique strings")
     if not _is_unique_string_list(runners_value):
         errors.append("policy runner_classes must be a non-empty list of unique strings")
+
+    required_fields = policy.get("resume_preflight_required_fields")
+    if required_fields != list(_CANONICAL_RESUME_PREFLIGHT_FIELDS):
+        errors.append(
+            "policy resume_preflight_required_fields must be the exact canonical list of unique required identities"
+        )
 
     targets = set(targets_value) if _is_unique_string_list(targets_value) else set()
     runners = set(runners_value) if _is_unique_string_list(runners_value) else set()
