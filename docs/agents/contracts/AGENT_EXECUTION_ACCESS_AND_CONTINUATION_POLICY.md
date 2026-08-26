@@ -42,6 +42,39 @@ If GitHub state cannot be read or written because of a real capability/permissio
 
 This gate does not prohibit Remote Desktop/Desktop Commander, Synology, WSL, Docker or local tooling. It constrains their role: execution after GitHub preflight, never authority in place of GitHub.
 
+## Default-deny Remote Desktop and parallel-first routing
+
+`ecosystem/agent-execution-routing-policy.json` is the canonical machine-readable routing policy for substantial new and resumed task packets. `tools/governance/agent_execution_routing.py` validates a declared packet against a caller-supplied, freshly verified GitHub state snapshot; `tools/governance/test_agent_execution_routing.py` is its deterministic behavior suite.
+
+The required execution order is:
+
+1. resolve and record the current GitHub control-plane state;
+2. use GitHub Actions or another repository-approved CI runner when it can perform the required work;
+3. use a worker-owned isolated workspace for authorized implementation and local deterministic checks;
+4. use a host exception only when the packet validates it.
+
+The packet records `execution_target`, `runner_class`, `equivalent_ci`, `remote_desktop`, `remote_desktop_reason`, the GitHub preflight, and the parallel-execution plan. `github_actions` and `isolated_workspace` are default targets. `host_exception` requires `remote_desktop: exception`, `equivalent_ci: null`, and one closed reason:
+
+| Reason | Narrowly permitted need |
+| --- | --- |
+| `host_only_service` | A named service exists only on the host and no equivalent runner workflow can reach it. |
+| `lan_or_hardware` | An in-scope LAN device, physical hardware, or other host-bound acceptance operation is required. |
+| `self_hosted_runner_diagnosis` | A verified runner or workflow failure requires host-level diagnosis. |
+
+Remote Desktop/Desktop Commander is otherwise denied. The presence of a checkout, shell, Docker daemon, toolchain, or a ready Remote Desktop session is not a reason. A valid exception is limited to its recorded host action and does not authorize general development, alternative repository authority, or an unrecorded host mutation.
+
+When `equivalent_ci` identifies a capable workflow, agents MUST NOT use Remote Desktop/Desktop Commander to poll process output, Docker logs, workflow state, or Git state. Agents observe the GitHub workflow's status, logs, and artifacts through GitHub and follow the applicable bounded-wait policy. They do not replace CI observation with repeated manual host polling.
+
+### Fresh preflight for starts and resumptions
+
+Before starting or resuming a mutation, the routing packet's `github_preflight` MUST be newly verified against current GitHub facts. It includes `verified_at`, `repository`, `default_branch_sha`, `governing_issue`, `pull_request`, and `task_head_sha`. The validator compares every required identity with the fresh `live_state` supplied by the caller. Earlier handoffs, local worktrees, branches, sessions, caches, and logs are evidence to inspect, not authority and not a preflight substitute.
+
+### Parallel-first task planning
+
+Task preparation MUST first evaluate a dependency graph and create independently mergeable lanes whenever their paths and resources can be separated safely. The `parallel_execution` record requires a `lane_strategy`, lanes, and an `integration_order`. Each lane declares an ID, owned repository-relative paths, dependencies, a dedicated branch/worktree, and shared leases.
+
+One lane has one active writer and no two lanes share a writable branch or worktree. Shared mutable paths, a limited test slot, a shared browser/runtime, a release manifest, or another constrained resource must be represented by a structured lease with one holder and a release condition. The integration order must respect dependencies. `serial_with_reason` is allowed only when it records the concrete dependency, shared mutable surface, constrained capacity, or integration boundary that prevents parallel execution.
+
 ## Parallel-agent Git concurrency and late integration
 
 For substantial mutating work in permanent Oteryn repositories, agents MUST distinguish three revision coordinates:

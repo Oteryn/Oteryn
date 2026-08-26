@@ -24,6 +24,22 @@ Agents MUST complete the GitHub preflight defined in `docs/agents/contracts/AGEN
 
 Host-local filesystems, clones, worktrees, containers and shells are execution/cache planes only. They MUST NOT be used to select authoritative repository state or bypass GitHub lifecycle. Durable local changes receive no completion credit until committed, pushed to the approved GitHub branch/PR and verified against the remote exact head.
 
+## Execution-routing policy
+
+`ecosystem/agent-execution-routing-policy.json` is the canonical machine-readable policy for substantial new or resumed task packets. Validate a packet against a freshly obtained GitHub snapshot with:
+
+```text
+python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-execution-routing-policy.json --packet <packet.json> --live-state <fresh-github-state.json>
+```
+
+Use this execution order: current GitHub state; GitHub Actions or another repository-approved CI runner; a worker-owned isolated workspace; then, only when validated, a narrowly authorized host exception. Remote Desktop/Desktop Commander is **default-deny**. It may be used only when the packet sets `remote_desktop: exception`, `execution_target: host_exception`, no equivalent CI exists, and `remote_desktop_reason` is exactly one of `host_only_service`, `lan_or_hardware`, or `self_hosted_runner_diagnosis`.
+
+The exception authorizes the minimum recorded host action, not a replacement source of truth. A convenient local checkout, shell, Docker daemon, toolchain, or available Remote Desktop session is never an exception reason. When an equivalent CI workflow exists, agents MUST NOT use Remote Desktop/Desktop Commander to poll process output, Docker logs, workflow state, or Git state; inspect the equivalent GitHub workflow, its logs, status, and artifacts instead.
+
+Before resuming work, obtain and record a new GitHub preflight with the repository, current default-branch SHA, governing Issue, PR, task-head SHA, and verification timestamp. A prior handoff, local branch, worktree, session, cache, or log is evidence only and cannot satisfy that preflight.
+
+Project task preparation is **parallel-first**. Record a dependency graph and create independent lanes where safe. Every lane needs an ID, owned paths, one isolated branch/worktree, dependencies, shared-resource leases, and an integration order. Lanes MUST NOT share writable branches or worktrees. A shared mutable surface or constrained resource requires an explicit lease with one holder and a release condition. Serial work is allowed only as `serial_with_reason` with its concrete constraint recorded.
+
 ## Organization runner routing
 
 Product-owned host-local GitHub Actions workloads MUST use the product-isolated organization runner group and product label together:
