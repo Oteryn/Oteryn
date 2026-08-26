@@ -324,9 +324,9 @@ Lifecycle #78. On compatible immutable world/export evidence prove same public e
 
 Before Task 7A or terminal compatibility-record creation, execute the final-cutover risk checkpoint: re-read `WORLD_ATLAS_RISK_REGISTER.md`, record immutable dispositions for every triggered High/Critical risk, and stop cutover while any triggered unresolved Critical risk remains. Triggered High risks require exact mitigation evidence before the dependent cutover decision; successful checks alone do not close them.
 
-### Task 7A — freeze exact compatible tuple
+### Task 7A — freeze pre-cutover candidate identities
 
-Record immutable evidence for:
+This is a **candidate-only freeze**, not the terminal compatibility tuple. Freeze only identities and evidence that already exist before provider merge/deployment:
 
 ```text
 Game export profile/version + producer revision
@@ -334,16 +334,14 @@ Game produced export manifest digest + payload digest/root
 world/content revision
 Atlas Core/API identity
 embedded bundle version + digest
-public deployed bundle version + digest
-public bundle relation to embedded: SAME_BUNDLE | COMPATIBLE_INDEPENDENT
-immutable public deployment-to-bundle evidence
 bridge protocol/profile
-Game client candidate/release identity + pinned embedded bundle digest
-public Atlas release/deployment identity
-security/performance/cross-surface/rollback/provider-check evidence refs
+Game client candidate identity + pinned embedded bundle digest
+security/performance/cross-surface/rollback/provider-check/provider-review evidence refs available at candidate freeze
 ```
 
-No tuple contains floating refs. When public and embedded bundles differ deliberately, the tuple must identify both and prove their compatible relationship rather than pretending equality.
+Do **not** freeze `public_atlas_deployed_bundle_version`, `public_atlas_deployed_bundle_digest`, `public_atlas_release_or_deployment_identity`, final `public_atlas_bundle_relation_to_embedded`, or immutable public deployment-to-bundle evidence in Task 7A. Those terminal identities do not exist until the merged-main public deployment/live acceptance in Task 7C. Any earlier deployment values are historical evidence only and must not be carried forward as the final tuple.
+
+No candidate identity contains a floating ref.
 
 ### Task 7B — provider final integration
 
@@ -357,7 +355,7 @@ Atlas follows its normal merged-main deployment/live acceptance. Record exact de
 
 Game runs provider-owned native-client acceptance against the exact embedded bundle digest. Prove offline/local startup, bridge behavior and native minimap fallback.
 
-### Task 7E — dedicated META World Atlas Compatibility Record V1
+### Task 7E — terminal tuple refreeze + dedicated META World Atlas Compatibility Record V1
 
 1. Refresh/reconcile existing lifecycle `Oteryn/Oteryn#84`; do not create a duplicate compatibility schema/validator task.
 2. Require #84 to have protected-merged the dedicated mechanism:
@@ -366,12 +364,13 @@ Game runs provider-owned native-client acceptance against the exact embedded bun
    - deterministic positive/negative validator regressions;
    - integration into stable `meta-gate`.
 3. If that mechanism is not canonical, return `WAITING_EXTERNAL: WORLD_ATLAS_COMPATIBILITY_RECORD_MECHANISM_NOT_CANONICAL` for Task 7E while other dependency-ready work may continue.
-4. Create the final record only at `ecosystem/world-atlas/releases/<release_id>.json` using the separately typed identities required by the release contract. Generic `ecosystem/releases/*.json`, Issue comments, Markdown tables or opaque fields are not substitutes.
-5. Validate exact cross-links: produced Game export == Atlas accepted export, Game client pinned digest == embedded bundle digest, and public deployment identity is bound to its exact public deployed bundle under the declared `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT` mode.
-6. Deliver the final record through a dedicated META PR with exact head, current required checks/review and `meta-gate` validation.
-7. Protected-squash-merge the record, read it back from the exact merge SHA and require post-merge `meta-gate` success on that exact protected-main SHA.
+4. **After Tasks 7B–7D are complete, perform a mandatory terminal refreeze** that supersedes Task 7A for release authority. It must bind the exact final provider main/release identities, exact public deployment identity, exact public deployed bundle version/digest, immutable deployment-to-bundle evidence, final `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT` relation, Game client identity/pinned embedded digest, provider required-check refs and separate Game/Atlas provider review-evidence refs.
+5. Create the final record only at `ecosystem/world-atlas/releases/<release_id>.json` from that terminal refreeze using the separately typed identities required by the release contract. Generic `ecosystem/releases/*.json`, Issue comments, Markdown tables or opaque fields are not substitutes.
+6. Validate exact cross-links: produced Game export == Atlas accepted export, Game client pinned digest == embedded bundle digest, and public deployment identity is bound to its exact public deployed bundle under the declared `SAME_BUNDLE` or `COMPATIBLE_INDEPENDENT` mode.
+7. Deliver the final record through a dedicated META PR with exact head, current required checks/review and `meta-gate` validation.
+8. Protected-squash-merge the record, read it back from the exact merge SHA and require post-merge `meta-gate` success on that exact protected-main SHA.
 
-Task 7E is not complete merely because #79 contains a tuple or a compatibility PR exists.
+Task 7E is not complete merely because #79 contains a candidate tuple or a compatibility PR exists. A terminal refreeze after public deployment/live acceptance is mandatory.
 
 ---
 
@@ -417,7 +416,7 @@ The programme is not `DONE` until immutable evidence proves all of the following
 - Native client acceptance binds the client identity to its exact embedded bundle digest.
 - When public and embedded bundles differ, their relation is explicitly `COMPATIBLE_INDEPENDENT` with immutable compatibility evidence; otherwise it is `SAME_BUNDLE` with digest equality.
 - #84 dedicated V1 schema/validator/meta-gate mechanism is canonical.
-- Final World Atlas compatibility record is exact-head reviewed/gated, protected-squash-merged, read back and post-merge `meta-gate` validated.
+- Final World Atlas compatibility record is created only from the mandatory post-deployment terminal refreeze, preserves separate Game/Atlas provider review evidence, is exact-head reviewed/gated, protected-squash-merged, read back and post-merge `meta-gate` validated.
 - A fresh independent `OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR` returns `FINAL_VERDICT: DONE` with complete immutable evidence.
 - Legacy paths are retained or removed truthfully according to their own removal gates.
 - No unresolved security, authority, provenance or compatibility conflict is hidden as PASS.
@@ -430,6 +429,7 @@ The final coordinator returns:
 - META architecture merge SHA;
 - exact Game and Atlas final main SHAs;
 - exact provider PRs/merge SHAs;
+- separate immutable Game and Atlas provider exact-head review evidence refs;
 - Game export profile/version, producer revision and exact produced manifest/payload digests;
 - Atlas Core/API identity;
 - embedded bundle version/digest;
