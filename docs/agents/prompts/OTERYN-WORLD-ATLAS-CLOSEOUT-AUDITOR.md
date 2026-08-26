@@ -21,7 +21,7 @@ Audit current protected state, not coordinator narration or stale planning SHAs.
 
 ## Canonical inputs
 
-From protected META `main` read ADR 0001, ADR 0004, ADR 0005, the unified implementation plan, `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`, the coordinator/parallel suite, META Issues #75-#81/#84 and release/cutover evidence under #79.
+From protected META `main` read ADR 0001, ADR 0004, ADR 0005, the unified implementation plan, `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`, `WORLD_ATLAS_RISK_REGISTER.md`, the coordinator/parallel suite, META Issues #75-#81/#84 and release/cutover evidence under #79.
 
 From providers read current protected Game/Atlas main, Game #191 and Atlas #188 with linked children, required checks/reviews/protection and the exact provider artifact/release/deployment evidence named by the coordinator.
 
@@ -93,6 +93,10 @@ For every final provider PR/candidate require exact branch/head, bounded diff, e
 
 Require one writable branch/worktree per mutating worker, serialized shared leases, late integration instead of destructive restart, no no-op/retrigger commits for unchanged evidence, no stale state promoted to authority and correct branch disposal.
 
+### K. Risk-register disposition
+
+Re-read `docs/architecture/WORLD_ATLAS_RISK_REGISTER.md` against the exact final protected provider/META state and the final compatibility tuple. For every registered risk whose leading indicator occurred during the programme, require an explicit immutable disposition/evidence reference. Any unresolved risk classified by the canonical register as cutover-blocking — including every unresolved Critical risk — makes `RISK_REGISTER` fail and forces `FINAL_VERDICT: NOT_DONE`. Do not infer risk closure from successful CI alone.
+
 ## Risk/unknown handling
 
 Classify each material item as `FACT_PROVEN`, `INFERENCE_SUPPORTED`, `UNKNOWN_BLOCKING`, `CONFLICT_BLOCKING`, or `NOT_APPLICABLE` with reason. No blocking unknown/conflict may coexist with `DONE`.
@@ -121,7 +125,8 @@ PUBLIC_ATLAS_DEPLOYED_BUNDLE_VERSION:
 PUBLIC_ATLAS_DEPLOYED_BUNDLE_DIGEST:
 PUBLIC_ATLAS_BUNDLE_RELATION_TO_EMBEDDED:
 PUBLIC_ATLAS_DEPLOYMENT_BUNDLE_EVIDENCE_REF:
-ATLAS_BRIDGE_PROTOCOL_PROFILE:
+ATLAS_BRIDGE_PROTOCOL_VERSION:
+ATLAS_BRIDGE_CAPABILITY_PROFILE:
 GAME_CLIENT_RELEASE_OR_CANDIDATE_IDENTITY:
 PUBLIC_ATLAS_RELEASE_DEPLOYMENT_IDENTITY:
 PROVIDER_REQUIRED_CHECK_REFS:
@@ -129,12 +134,14 @@ SECURITY_EVIDENCE_REFS:
 PERFORMANCE_EVIDENCE_REFS:
 CROSS_SURFACE_E2E_REFS:
 ROLLBACK_EVIDENCE_REFS:
+RISK_REGISTER_DISPOSITION_REFS:
 META_COMPATIBILITY_SCHEMA_PATH:
 META_COMPATIBILITY_VALIDATOR_PATH:
 META_COMPATIBILITY_RECORD_PATH:
 META_COMPATIBILITY_PR_NUMBER:
 META_COMPATIBILITY_PR_HEAD_SHA:
 META_COMPATIBILITY_PR_REQUIRED_CHECK_REFS:
+META_COMPATIBILITY_PR_REVIEW_EVIDENCE_REFS:
 META_COMPATIBILITY_SQUASH_MERGE_SHA:
 META_COMPATIBILITY_POST_MERGE_META_GATE_REF:
 AUTHORITY_BOUNDARY: PASS|FAIL
@@ -147,6 +154,7 @@ PERFORMANCE_RESOURCE_EVIDENCE: PASS|FAIL
 COMPATIBILITY_TUPLE: PASS|FAIL
 PROVIDER_FINAL_GATES: PASS|FAIL
 PARALLEL_AGENT_HYGIENE: PASS|FAIL
+RISK_REGISTER: PASS|FAIL
 ROLLBACK: PASS|FAIL
 UNKNOWN_BLOCKING:
 CONFLICT_BLOCKING:
@@ -155,4 +163,4 @@ FINAL_VERDICT: DONE|NOT_DONE
 REQUIRED_NEXT_ACTIONS:
 ```
 
-A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable evidence in all applicable fields, a valid public-deployment/bundle binding under the declared relation mode, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
+A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable evidence in all applicable fields, a valid public-deployment/bundle binding under the declared relation mode, explicit disposition of every triggered risk with no unresolved cutover-blocking risk, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
