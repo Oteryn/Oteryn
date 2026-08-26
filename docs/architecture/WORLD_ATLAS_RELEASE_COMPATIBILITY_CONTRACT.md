@@ -167,13 +167,15 @@ meta_compatibility_post_merge_meta_gate_run_or_check_ref
 
 ## 6. Provider evidence requirements
 
-Game evidence must bind export profile/version, producer revision, world/content revision, exact produced export manifest/payload digest, deterministic producer validation, provider merge/check/review evidence when applicable, and the client identity plus exact Atlas embedded bundle digest it packages/pins.
+Game evidence must bind export profile/version, producer revision, world/content revision, exact produced export manifest/payload digest, deterministic producer validation, provider merge/check evidence when applicable, immutable accepted exact-head provider review evidence for every provider PR whose policy requires review, and the client identity plus exact Atlas embedded bundle digest it packages/pins.
 
-Atlas evidence must bind the exact Game export digests accepted by ingestion, Atlas Core/API identity, source/release identity, exact embedded bundle version/digest, exact public deployed bundle version/digest, immutable deployment evidence binding public deployment identity to its bundle, the declared public/embedded relation and provider merge/check/review/live-acceptance evidence.
+Atlas evidence must bind the exact Game export digests accepted by ingestion, Atlas Core/API identity, source/release identity, exact embedded bundle version/digest, exact public deployed bundle version/digest, immutable deployment evidence binding public deployment identity to its bundle, the declared public/embedded relation, provider merge/check/live-acceptance evidence, and immutable accepted exact-head provider review evidence for every provider PR whose policy requires review.
+
+Provider PR/merge identity and required-check success do not substitute for required review evidence. Independent closeout must expose Game and Atlas provider review-evidence references separately so a terminal verdict can prove which exact review satisfied each provider gate.
 
 ## 7. Failure semantics
 
-Return `NOT_DONE` / `UNKNOWN_BLOCKING` if any required artifact identity, chain-of-custody link, client/embedded binding, public-deployment/bundle binding, independent-bundle compatibility evidence, non-empty immutable evidence-reference class, #84 schema/validator/meta-gate integration, protected META compatibility merge/readback/check/review evidence, or immutable tuple field is absent, floating, malformed or contradictory. These conditions cannot be waived by narration.
+Return `NOT_DONE` / `UNKNOWN_BLOCKING` if any required artifact identity, chain-of-custody link, client/embedded binding, public-deployment/bundle binding, independent-bundle compatibility evidence, non-empty immutable evidence-reference class, required provider or META exact-head review evidence, #84 schema/validator/meta-gate integration, protected META compatibility merge/readback/check evidence, or immutable tuple field is absent, floating, malformed or contradictory. These conditions cannot be waived by narration.
 
 ## 8. Relationship to independent closeout
 
