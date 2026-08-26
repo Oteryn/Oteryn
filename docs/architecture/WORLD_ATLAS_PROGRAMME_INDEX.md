@@ -8,19 +8,21 @@ Status: proposed until the architecture packet is protected-merged to META `main
 
 ## Canonical packet after merge
 
-1. Architecture decision:
+1. Programme manifest / admission index:
+   - `docs/architecture/WORLD_ATLAS_PROGRAMME_INDEX.md`
+2. Architecture decision:
    - `docs/architecture/adr/0005-unified-world-atlas-surfaces-and-reuse.md`
-2. Executable implementation DAG:
+3. Executable implementation DAG:
    - `docs/superpowers/plans/2026-08-26-unified-world-atlas-convergence.md`
-3. Cross-repository risk register:
+4. Cross-repository risk register:
    - `docs/architecture/WORLD_ATLAS_RISK_REGISTER.md`
-4. Release compatibility / cutover evidence contract:
+5. Release compatibility / cutover evidence contract:
    - `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`
-5. Autonomous programme coordinator:
+6. Autonomous programme coordinator:
    - `docs/agents/prompts/OTERYN-WORLD-ATLAS-PROGRAMME-COORDINATOR.md`
-6. Parallel role prompt pack:
+7. Parallel role prompt pack:
    - `docs/agents/prompts/OTERYN-WORLD-ATLAS-PARALLEL-AGENT-SUITE.md`
-7. Independent terminal auditor:
+8. Independent terminal auditor:
    - `docs/agents/prompts/OTERYN-WORLD-ATLAS-CLOSEOUT-AUDITOR.md`
 
 ### Architecture-packet admission evidence
@@ -36,7 +38,7 @@ meta_architecture_pr_squash_merge_sha
 protected_main_packet_readback_ref
 ```
 
-The accepted exact head SHA must be the same candidate covered by the required `meta-gate` and accepted R2/deep review evidence before protected squash merge. A merge SHA, Issue narration, floating branch, stale review or admin/bypass path cannot substitute for those exact-head admission identities. After merge, ADR 0005, the executable plan and coordinator/auditor packet must be readable from the exact protected-main squash-merge SHA before provider runtime execution treats this architecture as canonical.
+The accepted exact head SHA must be the same candidate covered by successful required `meta-gate` and `ai-review-gate` checks and accepted R2/deep review evidence before protected squash merge. A merge SHA, Issue narration, floating branch, stale/raw review, failing/missing trusted verifier, or admin/bypass path cannot substitute for those exact-head admission identities. After merge, the complete eight-path manifest above must be readable from the exact protected-main squash-merge SHA before provider runtime execution treats this architecture as canonical; a seven-file or representative-subset readback is incomplete.
 
 ## Lifecycle graph
 
@@ -84,11 +86,11 @@ If the owner chooses separate chats instead of an agent-capable coordinator, the
 - `OTERYN-WORLD-ATLAS-SECURITY-SCOUT` — Extra High
 - `OTERYN-WORLD-ATLAS-VERIFICATION-PERF-SCOUT` — Extra High
 
-Their exact prompts and return formats are in the parallel-agent suite.
+They are still substantial task packets. Before any manually launched scout begins work, its current execution-routing packet must be validated against a fresh GitHub snapshot under `ecosystem/agent-execution-routing-policy.json`; read-only mode does not waive fresh preflight, execution-target/runner declaration, dependency graph, isolated lane identity or applicable lease planning. Their exact prompts, routing-evidence return requirement and return formats are in the parallel-agent suite.
 
 ## Allocation-gated later leads
 
-These must not mutate until the coordinator records a fresh provider child Issue, `admission_main_sha`, branch/worktree and exact path ownership:
+These must not mutate until the coordinator records a fresh provider child Issue, `admission_main_sha`, branch/worktree and exact path ownership and the substantial task packet passes current execution-routing validation:
 
 - `OTERYN-WORLD-ATLAS-GAME-PROVIDER-LEAD`
 - `OTERYN-WORLD-ATLAS-ATLAS-CORE-LEAD`
