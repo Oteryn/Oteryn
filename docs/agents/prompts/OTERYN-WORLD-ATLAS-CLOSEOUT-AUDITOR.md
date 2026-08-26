@@ -27,6 +27,7 @@ From protected META `main`:
 - ADR 0004;
 - ADR 0005;
 - unified World Atlas implementation plan;
+- `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`;
 - coordinator and parallel-agent suite;
 - META Issues #75-#81;
 - release/cutover evidence under #79.
@@ -131,19 +132,30 @@ The architecture does not require a fixed speedup ratio, but missing or misleadi
 
 ### H. Release/compatibility tuple
 
-Require #79 to record immutable identities for at least:
+Require the exact contract in `docs/architecture/WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md` to be satisfied.
+
+The final tuple must independently bind at least:
 
 ```text
-game_atlas_export_profile/version + producer revision/digest
-world/content revision
-atlas_core_api identity
-atlas_web_embedded_bundle version + digest
-atlas_bridge_protocol/profile
+game_atlas_export_profile_version
+game_atlas_export_producer_revision
+game_atlas_export_artifact_manifest_digest
+game_atlas_export_payload_digest_or_root
+game_world_content_revision
+atlas_core_api_identity
+atlas_web_embedded_bundle_version
+atlas_web_embedded_bundle_digest
+atlas_bridge_protocol_version
+atlas_bridge_capability_profile
 game_client release/candidate identity
 public_atlas release/deployment identity
 ```
 
-No floating `main`, `latest`, unpinned URL or undocumented compatibility guess is accepted.
+Producer source/profile/world revision does not substitute for the exact produced Game export artifact manifest/payload digest. Require proof that Atlas consumed that exact produced artifact and that the accepted Atlas bundle digest derives from the accepted input.
+
+Issue #79 coordination is not terminal authority by itself. The final compatibility record must be protected-squash-merged at its canonical META compatibility/release path, with exact PR head, required exact-head check/review evidence, squash-merge SHA, protected-main readback and post-merge `meta-gate` evidence on that exact merge SHA.
+
+No floating `main`, `latest`, unpinned URL, Issue-only tuple, unmerged PR or undocumented compatibility guess is accepted.
 
 ### I. Provider final gates
 
@@ -195,7 +207,9 @@ META_ARCHITECTURE_PR_MERGE_SHA:
 GAME_PROVIDER_PRS_AND_MERGE_SHAS:
 ATLAS_PROVIDER_PRS_AND_MERGE_SHAS:
 GAME_ATLAS_EXPORT_PROFILE_VERSION:
-GAME_ATLAS_EXPORT_PRODUCER_SHA_OR_DIGEST:
+GAME_ATLAS_EXPORT_PRODUCER_REVISION:
+GAME_ATLAS_EXPORT_ARTIFACT_MANIFEST_DIGEST:
+GAME_ATLAS_EXPORT_PAYLOAD_DIGEST_OR_ROOT:
 WORLD_CONTENT_REVISION:
 ATLAS_CORE_API_IDENTITY:
 ATLAS_WEB_EMBEDDED_BUNDLE_VERSION:
@@ -208,6 +222,12 @@ SECURITY_EVIDENCE_REFS:
 PERFORMANCE_EVIDENCE_REFS:
 CROSS_SURFACE_E2E_REFS:
 ROLLBACK_EVIDENCE_REFS:
+META_COMPATIBILITY_RECORD_PATH:
+META_COMPATIBILITY_PR_NUMBER:
+META_COMPATIBILITY_PR_HEAD_SHA:
+META_COMPATIBILITY_PR_REQUIRED_CHECK_REFS:
+META_COMPATIBILITY_SQUASH_MERGE_SHA:
+META_COMPATIBILITY_POST_MERGE_META_GATE_REF:
 AUTHORITY_BOUNDARY: PASS|FAIL
 ATLAS_RUST_CORE: PASS|FAIL
 PUBLIC_WEB_SURFACE: PASS|FAIL
@@ -226,4 +246,4 @@ FINAL_VERDICT: DONE|NOT_DONE
 REQUIRED_NEXT_ACTIONS:
 ```
 
-A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, and complete immutable evidence in all applicable identity/reference fields above. Missing or floating evidence forces `FINAL_VERDICT: NOT_DONE`.
+A `DONE` verdict requires every PASS dimension, zero blocking unknown/conflict, complete immutable evidence in all applicable identity/reference fields above, and a canonical protected-main META compatibility record satisfying `WORLD_ATLAS_RELEASE_COMPATIBILITY_CONTRACT.md`. Missing, floating, Issue-only or unmerged evidence forces `FINAL_VERDICT: NOT_DONE`.
