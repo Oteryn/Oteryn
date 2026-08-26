@@ -22,6 +22,16 @@ For provider work, read the provider root/nearer `AGENTS.md`, live coordinator/a
 
 Planning-time SHAs are evidence only. Never trust stale issue/branch status.
 
+Before **any substantial role in this suite begins or resumes work, including manually launched read-only Wave 0 scouts**, create or refresh the canonical execution-routing packet and validate it against a freshly obtained GitHub live-state snapshot with:
+
+```text
+python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-execution-routing-policy.json --packet <packet.json> --live-state <fresh-github-state.json>
+```
+
+Require validation `PASS` before work is released. Read-only mode does not waive the fresh GitHub preflight, execution-target/runner declaration, equivalent-CI truthfulness, Remote Desktop disposition, dependency graph, lane identity, or applicable shared-resource lease planning. Mutating roles additionally require their dedicated Issue/branch/worktree/path allocation. A missing, invalid, stale or fabricated routing packet is a fail-closed admission failure.
+
+Every role handoff/return must include `ROUTING_PACKET_ID_OR_REF` and `ROUTING_VALIDATION_REF_OR_RESULT`; substantial roles may not claim their work was admissible without that evidence.
+
 Every mutating worker uses one Issue, one branch/worktree, one PR and exact owned paths. A moving `main` does not justify restart; use late integration refresh.
 
 ## Recommended concurrency
@@ -81,6 +91,8 @@ Determine exactly what Game already publishes for Atlas, what the current canoni
 ```text
 ROLE: WA-0A GAME-CONTRACT-SCOUT
 READ_ONLY: YES
+ROUTING_PACKET_ID_OR_REF:
+ROUTING_VALIDATION_REF_OR_RESULT:
 GAME_MAIN_SHA:
 CANONICAL_EXPORT_CONTRACTS:
 PRODUCER_PATHS:
@@ -150,6 +162,8 @@ Build an exact current dataflow and Rust-migration suitability matrix for Atlas 
 ```text
 ROLE: WA-0B ATLAS-MIGRATION-SCOUT
 READ_ONLY: YES
+ROUTING_PACKET_ID_OR_REF:
+ROUTING_VALIDATION_REF_OR_RESULT:
 ATLAS_MAIN_SHA:
 DATAFLOW:
 MIGRATION_MATRIX:
@@ -160,7 +174,7 @@ ACTIVE_OWNERSHIP_CONFLICTS:
 PERF_HOTSPOTS_KNOWN:
 FACTS:
 INFERENCES:
-UNKNOWNS:
+UNKNOWS:
 MINIMAL_NEXT_ACTIONS:
 ```
 
@@ -218,6 +232,8 @@ Find the safest product boundary and realistic host candidates for loading the s
 ```text
 ROLE: WA-0C CLIENT-HOST-SCOUT
 READ_ONLY: YES
+ROUTING_PACKET_ID_OR_REF:
+ROUTING_VALIDATION_REF_OR_RESULT:
 GAME_MAIN_SHA:
 CLIENT_HOST_BOUNDARY:
 CANDIDATES:
@@ -293,6 +309,8 @@ Define mandatory controls, negative tests and evidence. Do not weaken a control 
 ```text
 ROLE: WA-0D SECURITY-SCOUT
 READ_ONLY: YES
+ROUTING_PACKET_ID_OR_REF:
+ROUTING_VALIDATION_REF_OR_RESULT:
 TRUST_BOUNDARIES:
 ASSETS_TO_PROTECT:
 THREATS:
@@ -347,6 +365,8 @@ Map the exact current provider verification platform and select representative p
 ```text
 ROLE: WA-0E VERIFICATION-PERF-SCOUT
 READ_ONLY: YES
+ROUTING_PACKET_ID_OR_REF:
+ROUTING_VALIDATION_REF_OR_RESULT:
 GAME_MAIN_SHA:
 ATLAS_MAIN_SHA:
 CURRENT_PROVIDER_GATES:
@@ -380,6 +400,7 @@ Own the Game provider design and serialized integration plan for public Atlas pr
 
 ## Admission requirements
 
+- shared routing validation above is PASS for the current task packet;
 - ADR 0005 canonical on META main;
 - Wave 0A/0C/0D/0E handoffs accepted;
 - fresh Game child Issue created;
@@ -427,6 +448,7 @@ Own Atlas Rust Core design/foundation and release disjoint implementation lanes 
 
 ## Admission requirements
 
+- shared routing validation above is PASS for the current task packet;
 - ADR 0005 canonical;
 - Wave 0B/0D/0E accepted;
 - fresh Atlas child Issue;
@@ -467,6 +489,7 @@ Integrate stable Atlas Core into the existing web product through WASM/compatibi
 
 ## Requirements
 
+- shared routing validation above is PASS for the current task packet;
 - core APIs accepted;
 - Production UI Shell current state/ownership resolved;
 - exact shared shell lease acquired for integration only;
@@ -498,6 +521,7 @@ Integrate the accepted host, exact Atlas bundle and bridge into the native clien
 
 ## Admission requirements
 
+- shared routing validation above is PASS for the current task packet;
 - accepted host prototype/security evidence;
 - immutable Atlas bundle candidate;
 - bridge protocol/profile frozen;
@@ -535,6 +559,8 @@ META #77/#78/#80.
 
 Coordinate independent security, performance and cross-surface proof on exact frozen provider candidates without changing product behavior to make tests easier.
 
+The shared routing validation above is required before this substantial role begins or resumes, including when its current invocation remains read-only.
+
 A product change invalidates affected evidence and returns the candidate to integration.
 
 Do not weaken retries, tolerances, browser coverage, privacy controls or resource assertions silently.
@@ -558,6 +584,7 @@ Perform late integration and cutover only after Game/Atlas candidates, bundle/ex
 
 ## Rules
 
+- shared routing validation above is PASS for the current task packet;
 - integrate Game and Atlas independently through their own protected gates;
 - no force-push/rewrite of published task history by default;
 - refresh current `main`, merge-up, rerun invalidated exact-head proof;
