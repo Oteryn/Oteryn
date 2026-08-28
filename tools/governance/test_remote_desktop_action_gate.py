@@ -130,6 +130,31 @@ def test_unknown_remote_tool_is_rejected_by_packet_validation() -> None:
     assert "requested_remote_desktop_tools must contain only known permitted tool identifiers" in errors
 
 
+def test_packet_rejects_action_incompatible_with_reason() -> None:
+    packet = exception_packet("lan_or_hardware")
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    execution["requested_host_actions"] = ["inspect_host_only_service"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "requested_host_actions are incompatible with remote_desktop_reason" in errors
+
+
+def test_malformed_reason_action_mapping_fails_closed() -> None:
+    malformed = policy()
+    malformed["remote_desktop_reason_action_compatibility"] = {
+        "host_only_service": ["perform_lan_or_hardware_acceptance"]
+    }
+    errors = routing.validate_packet(default_packet(), live_state=live_state(), policy=malformed)
+    assert "policy remote_desktop_reason_action_compatibility must map every and only remote_desktop_reason" in errors
+
+
+def test_policy_tool_sets_must_be_disjoint() -> None:
+    malformed = policy()
+    malformed["always_forbidden_remote_desktop_tools"] = ["Remote_Desktop_Commander.ping"]
+    errors = routing.validate_packet(default_packet(), live_state=live_state(), policy=malformed)
+    assert "policy Remote Desktop known and always-forbidden tool sets must be disjoint" in errors
+
+
 def test_list_devices_without_exception_is_denied() -> None:
     errors = routing.validate_remote_desktop_action(
         "perform_lan_or_hardware_acceptance",
@@ -182,6 +207,18 @@ def test_unknown_tool_fails_closed() -> None:
         policy=policy(),
     )
     assert "remote desktop tool is not policy-known" in errors
+
+
+def test_missing_packet_or_live_state_fails_closed() -> None:
+    for packet_value, live_state_value in ((None, live_state()), (exception_packet("lan_or_hardware"), None)):
+        errors = routing.validate_remote_desktop_action(
+            "perform_lan_or_hardware_acceptance",
+            "Remote_Desktop_Commander.ping",
+            packet=packet_value,
+            live_state=live_state_value,
+            policy=policy(),
+        )
+        assert "remote desktop direct call requires current packet and live_state" in errors
 
 
 def test_wrong_semantic_action_for_reason_is_denied() -> None:
