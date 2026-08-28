@@ -235,9 +235,9 @@ Every cycle ran through the repository-approved GitHub-hosted `meta-gate`; Remot
 
 The repository classifier reports `R2` / reviewer class `deep` because this change touches governance, `AGENTS.md`, `.github/workflows/**` and `tools/governance/**`. Any later content change requires a new exact-head classification/fingerprint.
 
-- [ ] **Step 3: Freeze and verify the exact final changed-file set**
+- [x] **Step 3: Freeze and verify the exact final changed-file set**
 
-The final PR must contain exactly these nine paths:
+The final PR contains exactly these nine paths:
 
 ```text
 .github/workflows/ci.yml
@@ -251,11 +251,11 @@ tools/governance/test_agent_execution_routing.py
 tools/governance/test_remote_desktop_action_gate.py
 ```
 
-Inspect every patch and the full diff. Confirm no product runtime/deployment/secret/runner-host/live-host mutation, no new exception reason, no Remote Desktop execution path and no connector-level firewall claim.
+Exact-diff review confirmed no product runtime/deployment/secret/runner-host/live-host mutation, no new exception reason, no Remote Desktop execution path and no connector-level firewall claim.
 
-- [ ] **Step 4: Require exact-head deterministic CI**
+- [x] **Step 4: Require exact-head deterministic CI**
 
-The final frozen head must have `meta-gate` PASS. Its routing step must run both deterministic routing suites. The classification emitted from that same final head must still be `R2` / `deep` with a fresh fingerprint.
+Candidate `ccafbb916fede249000e8dc73a0b92464896af14` passed `meta-gate` in run `33165136802`, job `98828620304`. The routing step ran both deterministic suites and the classifier emitted `R2` / `deep` with fingerprint `4910eedd8a61e9ad57c34c40d7c7e03688be89c95f8146d862bda5491535b186`.
 
 - [ ] **Step 5: Request exactly one primary R2/deep review for the stable fingerprint**
 
