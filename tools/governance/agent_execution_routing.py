@@ -614,6 +614,10 @@ def validate_remote_desktop_action(
     if policy_errors:
         return policy_errors
 
+    if not isinstance(remote_tool, str) or not remote_tool:
+        return ["remote desktop tool identifier is invalid"]
+    if not isinstance(host_action, str) or not host_action:
+        return ["host action identifier is invalid"]
     if remote_tool in _closed_values(policy, "always_forbidden_remote_desktop_tools"):
         return ["remote desktop tool is always forbidden by policy"]
     if remote_tool not in _closed_values(policy, "known_remote_desktop_tools"):
