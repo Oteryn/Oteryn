@@ -68,6 +68,7 @@ jobs:
               Path('tools/governance/test_audit_github_readonly_terminal.py'),
               Path('tools/governance/agent_execution_routing.py'),
               Path('tools/governance/test_agent_execution_routing.py'),
+              Path('tools/governance/test_remote_desktop_action_gate.py'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
           if missing:
@@ -184,6 +185,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/governance/test_agent_execution_routing.py
+          python3 tools/governance/test_remote_desktop_action_gate.py
 
       - name: Validate AI review risk policy
         shell: bash
