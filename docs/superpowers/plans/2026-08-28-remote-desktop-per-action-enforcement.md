@@ -21,6 +21,7 @@
 - Existing `validate_packet(...)` semantics remain authoritative for routing validity and preflight freshness.
 - Do not claim connector-enforced firewalling until the external connector/router actually consumes this decision interface.
 - Game rollout starts only after protected META merge and protected-main readback.
+- Final exact-head SHA, review fingerprint, check/review evidence and merge evidence live in immutable GitHub PR/check/review state. Do not move a frozen candidate merely to copy those values back into this tracked plan.
 
 ## Execution adjustment
 
@@ -231,13 +232,13 @@ explicit identifier validation -> GREEN
 
 Every cycle ran through the repository-approved GitHub-hosted `meta-gate`; Remote Desktop was not used.
 
-- [x] **Step 2: Mechanically classify review risk on a green exact head**
+- [x] **Step 2: Mechanically classify review risk**
 
-The repository classifier reports `R2` / reviewer class `deep` because this change touches governance, `AGENTS.md`, `.github/workflows/**` and `tools/governance/**`. Any later content change requires a new exact-head classification/fingerprint.
+The repository classifier reports `R2` / reviewer class `deep` because this change touches governance, `AGENTS.md`, `.github/workflows/**` and `tools/governance/**`. The exact final head and review fingerprint must be taken from the final GitHub Actions classification for the frozen PR head, not copied back into this file.
 
-- [x] **Step 3: Freeze and verify the exact final changed-file set**
+- [x] **Step 3: Define and verify the changed-file set**
 
-The final PR contains exactly these nine paths:
+The PR must contain exactly these nine paths:
 
 ```text
 .github/workflows/ci.yml
@@ -251,11 +252,11 @@ tools/governance/test_agent_execution_routing.py
 tools/governance/test_remote_desktop_action_gate.py
 ```
 
-Exact-diff review confirmed no product runtime/deployment/secret/runner-host/live-host mutation, no new exception reason, no Remote Desktop execution path and no connector-level firewall claim.
+Exact-diff review must confirm no product runtime/deployment/secret/runner-host/live-host mutation, no new exception reason, no Remote Desktop execution path and no connector-level firewall claim.
 
-- [x] **Step 4: Require exact-head deterministic CI**
+- [ ] **Step 4: Freeze and qualify the final exact head**
 
-Candidate `ccafbb916fede249000e8dc73a0b92464896af14` passed `meta-gate` in run `33165136802`, job `98828620304`. The routing step ran both deterministic suites and the classifier emitted `R2` / `deep` with fingerprint `4910eedd8a61e9ad57c34c40d7c7e03688be89c95f8146d862bda5491535b186`.
+After the last tracked-file change, do not update this plan again. Resolve the PR head from GitHub, require `meta-gate` PASS for exactly that head, and take the `R2` / `deep` fingerprint from the same exact-head classifier output. Record those coordinates only in GitHub PR/check/review evidence.
 
 - [ ] **Step 5: Request exactly one primary R2/deep review for the stable fingerprint**
 
