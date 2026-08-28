@@ -92,6 +92,11 @@ def exception_packet(reason: str) -> dict[str, object]:
         "lan_or_hardware": ["perform_lan_or_hardware_acceptance"],
         "self_hosted_runner_diagnosis": ["diagnose_self_hosted_runner"],
     }
+    tools_by_reason = {
+        "host_only_service": ["Remote_Desktop_Commander.get_config"],
+        "lan_or_hardware": ["Remote_Desktop_Commander.ping"],
+        "self_hosted_runner_diagnosis": ["Remote_Desktop_Commander.list_processes"],
+    }
     execution.update(
         {
             "execution_target": "host_exception",
@@ -100,6 +105,9 @@ def exception_packet(reason: str) -> dict[str, object]:
             "remote_desktop_reason": reason,
             "equivalent_ci": None,
             "requested_host_actions": actions_by_reason.get(reason, ["inspect_host_only_service"]),
+            "requested_remote_desktop_tools": tools_by_reason.get(
+                reason, ["Remote_Desktop_Commander.get_config"]
+            ),
         }
     )
     return packet
