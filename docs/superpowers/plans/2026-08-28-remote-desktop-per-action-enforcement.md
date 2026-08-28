@@ -4,7 +4,7 @@
 
 **Goal:** Make every direct `Remote_Desktop_Commander.*` invocation fail closed unless the exact call is covered by a fresh, valid META host-exception packet.
 
-**Architecture:** Extend the existing execution-routing policy with explicit reason/action compatibility and a closed set of known Remote Desktop tool identifiers, then add a pure `validate_remote_desktop_action(...)` decision function that reuses `validate_packet(...)`. Clarify capability discovery so only out-of-band tool-schema inspection is allowed without an exception; direct connector calls remain exception-only.
+**Architecture:** Extend the existing execution-routing policy with exact reason/action compatibility and a closed set of Remote Desktop tool identifiers. Add a pure `validate_remote_desktop_action(...)` decision function that reuses `validate_packet(...)`, then remove the capability-discovery ambiguity from canonical instructions. Provider adoption is deliberately deferred until this META change is protected-merged.
 
 **Tech Stack:** JSON, Python 3.12 standard library, Markdown, GitHub Actions.
 
@@ -12,30 +12,32 @@
 
 ## Global Constraints
 
-- GitHub is the repository source of truth; no Remote Desktop host is used to implement or validate this change.
-- Keep the existing exception reasons exactly `host_only_service`, `lan_or_hardware`, and `self_hosted_runner_diagnosis`.
+- GitHub remains the repository source of truth.
+- Do not invoke Remote Desktop to implement, inspect, test or verify this change.
+- Keep the exception reasons exactly `host_only_service`, `lan_or_hardware`, and `self_hosted_runner_diagnosis`.
 - Every direct `Remote_Desktop_Commander.*` call is exception-only; there are no direct-call discovery exemptions.
-- Unknown connector tool identifiers fail closed.
-- `connector_schema_discovery` means local registry/schema inspection without invoking any Remote Desktop function.
-- Existing `validate_packet(...)` semantics remain authoritative for routing packet validity and fresh GitHub preflight.
-- The implementation must not claim connector-enforced firewalling; it provides repository-enforced policy and a mandatory decision interface for future connector/router integration.
-- Provider rollout starts only after this META change is protected-merged and read back from `main`.
+- Out-of-band connector registration/schema inspection is outside the direct-call gate because it does not invoke Remote Desktop.
+- Unknown Remote Desktop tool identifiers fail closed.
+- Existing `validate_packet(...)` semantics remain authoritative for routing validity and preflight freshness.
+- Do not claim connector-enforced firewalling until the external connector/router actually consumes this decision interface.
+- Game rollout starts only after protected META merge and protected-main readback.
 
 ---
 
-### Task 1: Make the machine-readable policy express exact Remote Desktop authority
+### Task 1: Encode exact Remote Desktop authority in the machine-readable policy
 
 **Files:**
 - Modify: `ecosystem/agent-execution-routing-policy.json`
+- Modify: `tools/governance/agent_execution_routing.py`
 - Modify: `tools/governance/test_agent_execution_routing.py`
 
 **Interfaces:**
 - Consumes: existing `remote_desktop_reasons`, `remote_desktop_actions`, `validate_packet(...)`.
-- Produces: `remote_desktop_reason_action_compatibility`, `known_remote_desktop_tools`, `always_forbidden_remote_desktop_tools`, and packet field `requested_remote_desktop_tools`.
+- Produces policy keys `remote_desktop_reason_action_compatibility`, `known_remote_desktop_tools`, `always_forbidden_remote_desktop_tools` and packet field `requested_remote_desktop_tools`.
 
-- [ ] **Step 1: Add failing policy-shape and packet tests**
+- [ ] **Step 1: Add RED tests for the new policy shape**
 
-Add deterministic tests asserting the canonical mapping and fail-closed tool declarations:
+Add these tests:
 
 ```python
 def test_remote_desktop_policy_has_exact_reason_action_mapping() -> None:
@@ -47,11 +49,46 @@ def test_remote_desktop_policy_has_exact_reason_action_mapping() -> None:
     }
 
 
+def test_remote_desktop_tool_sets_are_closed_and_disjoint() -> None:
+    current = policy()
+    known = current["known_remote_desktop_tools"]
+    forbidden = current["always_forbidden_remote_desktop_tools"]
+    assert isinstance(known, list) and known
+    assert isinstance(forbidden, list) and forbidden
+    assert len(set(known)) == len(known)
+    assert len(set(forbidden)) == len(forbidden)
+    assert set(known).isdisjoint(forbidden)
+    assert all(tool.startswith("Remote_Desktop_Commander.") for tool in [*known, *forbidden])
+```
+
+- [ ] **Step 2: Extend valid exception fixtures with exact connector tools**
+
+Update `exception_packet(...)` so each valid fixture has both semantic action and exact connector tool:
+
+```python
+actions_by_reason = {
+    "host_only_service": ["inspect_host_only_service"],
+    "lan_or_hardware": ["perform_lan_or_hardware_acceptance"],
+    "self_hosted_runner_diagnosis": ["diagnose_self_hosted_runner"],
+}
+tools_by_reason = {
+    "host_only_service": ["Remote_Desktop_Commander.get_config"],
+    "lan_or_hardware": ["Remote_Desktop_Commander.ping"],
+    "self_hosted_runner_diagnosis": ["Remote_Desktop_Commander.list_processes"],
+}
+execution["requested_remote_desktop_tools"] = tools_by_reason[reason]
+```
+
+- [ ] **Step 3: Add RED packet-validation tests**
+
+Add:
+
+```python
 def test_remote_desktop_exception_requires_exact_remote_tool_set() -> None:
     packet = exception_packet("lan_or_hardware")
     execution = packet["execution_routing"]
     assert isinstance(execution, dict)
-    execution.pop("requested_remote_desktop_tools", None)
+    del execution["requested_remote_desktop_tools"]
     errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
     assert "remote_desktop exception requires non-empty requested_remote_desktop_tools" in errors
 
@@ -63,11 +100,18 @@ def test_unknown_remote_desktop_tool_is_rejected_by_packet_validation() -> None:
     execution["requested_remote_desktop_tools"] = ["Remote_Desktop_Commander.future_unknown_tool"]
     errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
     assert "requested_remote_desktop_tools must contain only known permitted tool identifiers" in errors
+
+
+def test_reason_action_mismatch_is_rejected_by_packet_validation() -> None:
+    packet = exception_packet("lan_or_hardware")
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    execution["requested_host_actions"] = ["inspect_host_only_service"]
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "requested_host_actions are incompatible with remote_desktop_reason" in errors
 ```
 
-Update `exception_packet(...)` so valid fixtures declare one representative tool, for example `Remote_Desktop_Commander.ping` for `lan_or_hardware`, `Remote_Desktop_Commander.get_config` for `host_only_service`, and `Remote_Desktop_Commander.list_processes` for `self_hosted_runner_diagnosis`.
-
-- [ ] **Step 2: Run the focused test file and confirm RED**
+- [ ] **Step 4: Run the focused suite and confirm RED**
 
 Run:
 
@@ -75,11 +119,11 @@ Run:
 python3 tools/governance/test_agent_execution_routing.py
 ```
 
-Expected: non-zero exit because the new policy keys and packet validation do not yet exist.
+Expected: non-zero exit because the new policy keys and validation do not exist yet.
 
-- [ ] **Step 3: Extend the JSON policy minimally**
+- [ ] **Step 5: Add the exact policy mappings**
 
-Add these exact structures while preserving the existing three reasons/actions:
+Add:
 
 ```json
 "remote_desktop_reason_action_compatibility": {
@@ -123,13 +167,34 @@ Add these exact structures while preserving the existing three reasons/actions:
 ]
 ```
 
-The known and always-forbidden sets must be disjoint. Always-forbidden functions are not authorizable through the current three reasons.
+- [ ] **Step 6: Make `_policy_errors(...)` fail closed**
 
-- [ ] **Step 4: Extend policy validation and packet validation**
+Validate all of these conditions:
 
-In `_policy_errors(...)`, reject malformed reason/action mappings, duplicate/unknown semantic actions, duplicate tool names, overlap between known and always-forbidden tool sets, and tool identifiers not prefixed with `Remote_Desktop_Commander.`.
+```python
+reasons = _closed_values(policy, "remote_desktop_reasons")
+actions = _closed_values(policy, "remote_desktop_actions")
+compatibility = _mapping(policy.get("remote_desktop_reason_action_compatibility"))
+known_tools = policy.get("known_remote_desktop_tools")
+forbidden_tools = policy.get("always_forbidden_remote_desktop_tools")
+```
 
-In `validate_packet(...)`, enforce:
+Require `set(compatibility) == reasons`; each compatibility value must be a non-empty unique string list and a subset of `actions`; `known_tools` and `forbidden_tools` must each be non-empty unique string lists; every tool must start with `Remote_Desktop_Commander.`; the two sets must be disjoint.
+
+Use deterministic messages:
+
+```text
+policy remote_desktop_reason_action_compatibility must map every and only remote_desktop reason
+policy remote_desktop_reason_action_compatibility contains an action outside remote_desktop_actions
+policy known_remote_desktop_tools must be a non-empty list of unique tool identifiers
+policy always_forbidden_remote_desktop_tools must be a non-empty list of unique tool identifiers
+policy remote desktop tool identifiers must use Remote_Desktop_Commander prefix
+policy known and always-forbidden remote desktop tools must be disjoint
+```
+
+- [ ] **Step 7: Validate `requested_remote_desktop_tools` and reason/action compatibility**
+
+In `validate_packet(...)` enforce:
 
 ```python
 requested_tools_value = execution.get("requested_remote_desktop_tools")
@@ -150,9 +215,17 @@ elif remote_desktop != "exception" and requested_tools:
     errors.append("requested_remote_desktop_tools require remote_desktop=exception")
 ```
 
-Also enforce reason/action compatibility using `remote_desktop_reason_action_compatibility`; a valid action from the global action list but wrong for the selected reason must fail.
+Then enforce:
 
-- [ ] **Step 5: Run focused tests and confirm GREEN**
+```python
+reason = execution.get("remote_desktop_reason")
+compatibility = _mapping(policy.get("remote_desktop_reason_action_compatibility"))
+allowed_for_reason = set(_list(compatibility.get(reason)))
+if remote_desktop == "exception" and any(action not in allowed_for_reason for action in requested_actions):
+    errors.append("requested_host_actions are incompatible with remote_desktop_reason")
+```
+
+- [ ] **Step 8: Run GREEN verification**
 
 Run:
 
@@ -163,24 +236,24 @@ python3 -c "import json; json.load(open('ecosystem/agent-execution-routing-polic
 
 Expected: both commands exit 0.
 
-- [ ] **Step 6: Commit Task 1**
+- [ ] **Step 9: Commit Task 1**
 
 ```bash
-git add ecosystem/agent-execution-routing-policy.json tools/governance/test_agent_execution_routing.py tools/governance/agent_execution_routing.py
+git add ecosystem/agent-execution-routing-policy.json tools/governance/agent_execution_routing.py tools/governance/test_agent_execution_routing.py
 git commit -m "feat(governance): constrain Remote Desktop tool authority"
 ```
 
 ---
 
-### Task 2: Add the pure per-action Remote Desktop decision function
+### Task 2: Add the pure per-action decision gate
 
 **Files:**
 - Modify: `tools/governance/agent_execution_routing.py`
 - Modify: `tools/governance/test_agent_execution_routing.py`
 
 **Interfaces:**
-- Consumes: `validate_packet(packet, live_state=..., policy=...)` and the policy keys from Task 1.
-- Produces:
+- Consumes: policy fields from Task 1 and `validate_packet(...)`.
+- Produces exactly this function:
 
 ```python
 def validate_remote_desktop_action(
@@ -191,89 +264,6 @@ def validate_remote_desktop_action(
     live_state: dict[str, object] | None,
     policy: dict[str, object],
 ) -> list[str]:
-    ...
-```
-
-- [ ] **Step 1: Add RED tests for direct-call denial and exact allow**
-
-Add tests covering the user-visible failure mode:
-
-```python
-def test_list_devices_without_exception_is_denied() -> None:
-    errors = routing.validate_remote_desktop_action(
-        "perform_lan_or_hardware_acceptance",
-        "Remote_Desktop_Commander.list_devices",
-        packet=default_packet(),
-        live_state=live_state(),
-        policy=policy(),
-    )
-    assert "remote desktop direct call requires validated host_exception" in errors
-
-
-def test_get_config_without_exception_is_denied() -> None:
-    errors = routing.validate_remote_desktop_action(
-        "inspect_host_only_service",
-        "Remote_Desktop_Commander.get_config",
-        packet=default_packet(),
-        live_state=live_state(),
-        policy=policy(),
-    )
-    assert "remote desktop direct call requires validated host_exception" in errors
-
-
-def test_unknown_remote_tool_fails_closed() -> None:
-    packet = exception_packet("lan_or_hardware")
-    errors = routing.validate_remote_desktop_action(
-        "perform_lan_or_hardware_acceptance",
-        "Remote_Desktop_Commander.future_unknown_tool",
-        packet=packet,
-        live_state=live_state(),
-        policy=policy(),
-    )
-    assert "remote desktop tool is not policy-known" in errors
-
-
-def test_wrong_semantic_action_for_reason_is_denied() -> None:
-    packet = exception_packet("lan_or_hardware")
-    errors = routing.validate_remote_desktop_action(
-        "inspect_host_only_service",
-        "Remote_Desktop_Commander.ping",
-        packet=packet,
-        live_state=live_state(),
-        policy=policy(),
-    )
-    assert "host action is incompatible with remote_desktop_reason" in errors
-
-
-def test_exact_declared_reason_action_and_tool_is_allowed() -> None:
-    packet = exception_packet("lan_or_hardware")
-    assert routing.validate_remote_desktop_action(
-        "perform_lan_or_hardware_acceptance",
-        "Remote_Desktop_Commander.ping",
-        packet=packet,
-        live_state=live_state(),
-        policy=policy(),
-    ) == []
-```
-
-Also add representative denial tests for `read_file`, `list_processes`, `start_process`, and stale GitHub preflight.
-
-- [ ] **Step 2: Run the focused suite and confirm RED**
-
-Run:
-
-```bash
-python3 tools/governance/test_agent_execution_routing.py
-```
-
-Expected: non-zero exit because `validate_remote_desktop_action` is not defined.
-
-- [ ] **Step 3: Implement the minimal pure gate**
-
-Implement the function with this order:
-
-```python
-def validate_remote_desktop_action(host_action, remote_tool, *, packet, live_state, policy):
     policy_errors = _policy_errors(policy)
     if policy_errors:
         return policy_errors
@@ -303,9 +293,107 @@ def validate_remote_desktop_action(host_action, remote_tool, *, packet, live_sta
     return []
 ```
 
-Keep the implementation deterministic and side-effect free.
+- [ ] **Step 1: Add RED direct-call tests**
 
-- [ ] **Step 4: Run RED-to-GREEN verification**
+Add:
+
+```python
+def test_list_devices_without_exception_is_denied() -> None:
+    errors = routing.validate_remote_desktop_action(
+        "perform_lan_or_hardware_acceptance",
+        "Remote_Desktop_Commander.list_devices",
+        packet=default_packet(), live_state=live_state(), policy=policy(),
+    )
+    assert "remote desktop direct call requires validated host_exception" in errors
+
+
+def test_get_config_without_exception_is_denied() -> None:
+    errors = routing.validate_remote_desktop_action(
+        "inspect_host_only_service",
+        "Remote_Desktop_Commander.get_config",
+        packet=default_packet(), live_state=live_state(), policy=policy(),
+    )
+    assert "remote desktop direct call requires validated host_exception" in errors
+
+
+def test_unknown_remote_tool_fails_closed() -> None:
+    errors = routing.validate_remote_desktop_action(
+        "perform_lan_or_hardware_acceptance",
+        "Remote_Desktop_Commander.future_unknown_tool",
+        packet=exception_packet("lan_or_hardware"), live_state=live_state(), policy=policy(),
+    )
+    assert errors == ["remote desktop tool is not policy-known"]
+
+
+def test_always_forbidden_remote_tool_is_denied_even_with_exception() -> None:
+    errors = routing.validate_remote_desktop_action(
+        "perform_lan_or_hardware_acceptance",
+        "Remote_Desktop_Commander.shutdown",
+        packet=exception_packet("lan_or_hardware"), live_state=live_state(), policy=policy(),
+    )
+    assert errors == ["remote desktop tool is always forbidden by policy"]
+
+
+def test_exact_declared_reason_action_and_tool_is_allowed() -> None:
+    assert routing.validate_remote_desktop_action(
+        "perform_lan_or_hardware_acceptance",
+        "Remote_Desktop_Commander.ping",
+        packet=exception_packet("lan_or_hardware"), live_state=live_state(), policy=policy(),
+    ) == []
+```
+
+- [ ] **Step 2: Add RED tests for representative host-contact surfaces**
+
+Add:
+
+```python
+def test_representative_remote_tools_are_denied_without_exception() -> None:
+    cases = (
+        ("inspect_host_only_service", "Remote_Desktop_Commander.read_file"),
+        ("diagnose_self_hosted_runner", "Remote_Desktop_Commander.list_processes"),
+        ("diagnose_self_hosted_runner", "Remote_Desktop_Commander.start_process"),
+        ("diagnose_self_hosted_runner", "Remote_Desktop_Commander.read_process_output"),
+    )
+    for host_action, remote_tool in cases:
+        errors = routing.validate_remote_desktop_action(
+            host_action, remote_tool,
+            packet=default_packet(), live_state=live_state(), policy=policy(),
+        )
+        assert "remote desktop direct call requires validated host_exception" in errors
+```
+
+- [ ] **Step 3: Add RED tests for stale preflight and exact-tool scoping**
+
+Add:
+
+```python
+def test_stale_preflight_denies_direct_call() -> None:
+    packet = exception_packet("lan_or_hardware")
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    current_preflight = execution["github_preflight"]
+    assert isinstance(current_preflight, dict)
+    current_preflight["default_branch_sha"] = "a" * 40
+    errors = routing.validate_remote_desktop_action(
+        "perform_lan_or_hardware_acceptance",
+        "Remote_Desktop_Commander.ping",
+        packet=packet, live_state=live_state(), policy=policy(),
+    )
+    assert "remote desktop direct call requires valid routing packet" in errors
+    assert "github_preflight.default_branch_sha does not match live_state" in errors
+
+
+def test_undeclared_exact_tool_is_denied() -> None:
+    packet = exception_packet("lan_or_hardware")
+    errors = routing.validate_remote_desktop_action(
+        "perform_lan_or_hardware_acceptance",
+        "Remote_Desktop_Commander.list_devices",
+        packet=packet, live_state=live_state(), policy=policy(),
+    )
+    assert errors == ["remote desktop tool was not requested by the routing packet"]
+```
+
+- [ ] **Step 4: Run the focused suite and confirm RED**
 
 Run:
 
@@ -313,13 +401,23 @@ Run:
 python3 tools/governance/test_agent_execution_routing.py
 ```
 
-Expected: exit 0 and all new direct-call tests pass.
+Expected: non-zero exit because `validate_remote_desktop_action(...)` is absent.
 
-- [ ] **Step 5: Add CLI-free audit metadata helper only if needed by tests**
+- [ ] **Step 5: Implement the exact function from the Interfaces block**
 
-Do not introduce persistence/logging in this task. If audit representation is useful, expose a pure helper returning non-sensitive fields only; otherwise leave logging to the future connector integration described by the spec.
+Insert the function after `validate_packet(...)` and before CLI-only helpers. Do not add network, logging, filesystem or connector calls.
 
-- [ ] **Step 6: Commit Task 2**
+- [ ] **Step 6: Run GREEN verification**
+
+Run:
+
+```bash
+python3 tools/governance/test_agent_execution_routing.py
+```
+
+Expected: exit 0.
+
+- [ ] **Step 7: Commit Task 2**
 
 ```bash
 git add tools/governance/agent_execution_routing.py tools/governance/test_agent_execution_routing.py
@@ -333,25 +431,30 @@ git commit -m "feat(governance): gate Remote Desktop calls per action"
 **Files:**
 - Modify: `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`
 - Modify: `AGENTS.md`
+- Modify: `tools/governance/test_agent_execution_routing.py`
 
 **Interfaces:**
-- Consumes: `validate_remote_desktop_action(...)` and the policy semantics from Tasks 1-2.
-- Produces: canonical prose stating that local registration/schema inspection is allowed without exception, while every direct `Remote_Desktop_Commander.*` invocation requires a positive per-action gate.
+- Consumes: `validate_remote_desktop_action(...)` from Task 2.
+- Produces: canonical instructions that permit only out-of-band connector schema inspection without an exception and require a positive per-action gate before every direct Remote Desktop function call.
 
-- [ ] **Step 1: Add instruction assertions to the deterministic suite**
+- [ ] **Step 1: Add RED text-contract tests**
 
-Extend `tools/governance/test_agent_execution_routing.py` with text-contract checks that read the two canonical Markdown files and assert all of these phrases/semantics are present:
+Add:
 
 ```python
-assert "every direct `Remote_Desktop_Commander.*` invocation" in contract_text
-assert "local connector/tool registration" in contract_text
-assert "must not invoke `Remote_Desktop_Commander.list_devices`" in contract_text
-assert "positive per-action" in contract_text
+def test_canonical_contract_forbids_direct_rdc_capability_probes() -> None:
+    repo_root = Path(__file__).parents[2]
+    contract_text = (repo_root / "docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md").read_text(encoding="utf-8")
+    root_agents = (repo_root / "AGENTS.md").read_text(encoding="utf-8")
+    for text in (contract_text, root_agents):
+        assert "every direct `Remote_Desktop_Commander.*` invocation" in text
+        assert "local connector/tool registration" in text
+        assert "positive per-action" in text
+    assert "must not invoke `Remote_Desktop_Commander.list_devices`" in contract_text
+    assert "must not invoke `Remote_Desktop_Commander.get_config`" in contract_text
 ```
 
-The test should also assert that the contract does not describe `list_devices` or `get_config` as harmless capability discovery.
-
-- [ ] **Step 2: Run tests and confirm RED**
+- [ ] **Step 2: Run the focused suite and confirm RED**
 
 Run:
 
@@ -359,31 +462,31 @@ Run:
 python3 tools/governance/test_agent_execution_routing.py
 ```
 
-Expected: non-zero exit because canonical prose has not yet been updated.
+Expected: non-zero exit because the canonical Markdown does not yet contain the required invariant.
 
-- [ ] **Step 3: Update the central contract**
+- [ ] **Step 3: Correct the central capability-discovery contract**
 
-In `Capability truthfulness and tool discovery before blocking`, replace broad Remote Desktop capability probing with this execution order:
-
-1. inspect the locally exposed connector registration/tool schemas without invoking Remote Desktop;
-2. inspect GitHub-native capabilities and permission evidence;
-3. use GitHub-native reads for repository facts;
-4. never call `Remote_Desktop_Commander.list_devices`, `who_am_i`, `ping`, `get_config`, filesystem/process/terminal/search/history functions merely to prove Remote Desktop capability;
-5. when an actual host-only need is proven, build a fresh host-exception packet and require `validate_remote_desktop_action(...) == []` for the exact semantic action and exact connector tool immediately before the call.
-
-State explicitly that a `DENY` is not automatically a blocker and ordinary work continues through GitHub, Actions or isolated workspaces.
-
-- [ ] **Step 4: Update root `AGENTS.md` with the same non-weakenable invariant**
-
-Add a concise mandatory rule under execution routing/capability discovery:
+In `Capability truthfulness and tool discovery before blocking`, require this exact order:
 
 ```text
-Out-of-band inspection of registered Remote Desktop tool schemas is capability discovery. Invoking any `Remote_Desktop_Commander.*` function is execution and requires a fresh validated host exception plus a positive `validate_remote_desktop_action(...)` decision for the exact semantic action and exact tool. `list_devices`, `who_am_i`, `ping` and `get_config` are not discovery exemptions.
+1. inspect local connector/tool registration, descriptions and argument schemas without invoking Remote Desktop;
+2. inspect repository-native GitHub capabilities and authenticated permission evidence;
+3. use repository-native reads for repository facts;
+4. must not invoke `Remote_Desktop_Commander.list_devices`, `Remote_Desktop_Commander.who_am_i`, `Remote_Desktop_Commander.ping`, `Remote_Desktop_Commander.get_config` or any filesystem/process/terminal/search/history Remote Desktop function merely to prove capability;
+5. when an actual host-only need is proven, construct a fresh host-exception packet and require a positive per-action `validate_remote_desktop_action(...)` decision for the exact semantic action and exact connector tool before the direct call.
 ```
 
-Do not duplicate the full policy; keep META policy/contract canonical.
+Also state: every direct `Remote_Desktop_Commander.*` invocation is execution, not schema discovery; a denial is not automatically a blocker; continue via GitHub, Actions or isolated workspaces when useful work remains.
 
-- [ ] **Step 5: Run focused tests and diff checks**
+- [ ] **Step 4: Add the root non-weakenable invariant**
+
+Add this paragraph under execution routing/capability discovery in `AGENTS.md`:
+
+```text
+Out-of-band inspection of local connector/tool registration and schemas is capability discovery. Every direct `Remote_Desktop_Commander.*` invocation is execution and requires a fresh validated host exception plus a positive per-action `validate_remote_desktop_action(...)` decision for the exact semantic action and exact connector tool. `list_devices`, `who_am_i`, `ping` and `get_config` are not discovery exemptions.
+```
+
+- [ ] **Step 5: Run GREEN verification and whitespace check**
 
 Run:
 
@@ -392,7 +495,7 @@ python3 tools/governance/test_agent_execution_routing.py
 git diff --check
 ```
 
-Expected: both exit 0.
+Expected: both commands exit 0.
 
 - [ ] **Step 6: Commit Task 3**
 
@@ -406,14 +509,13 @@ git commit -m "docs(governance): forbid ungated Remote Desktop discovery calls"
 ### Task 4: Exact-head META qualification and protected delivery
 
 **Files:**
-- Verify all files changed by Tasks 1-3 plus the approved spec/plan.
-- No additional implementation file is required unless verification finds a concrete defect.
+- Verify all changed files; do not add implementation paths during closeout unless a concrete failing check identifies a defect.
 
 **Interfaces:**
-- Consumes: final META task head.
-- Produces: exact-head CI/review evidence and protected merge prerequisite for provider adoption.
+- Consumes: final PR #93 head.
+- Produces: exact-head deterministic checks, current risk-policy review evidence, protected squash merge and protected-main readback.
 
-- [ ] **Step 1: Run the complete applicable META validation locally/in an isolated workspace**
+- [ ] **Step 1: Run all applicable deterministic META checks**
 
 Run:
 
@@ -428,11 +530,11 @@ python3 tools/governance/test_verify_ai_review_evidence.py
 git diff --check main...HEAD
 ```
 
-Expected: all applicable commands exit 0. If a command is platform-inapplicable, use the existing repository-approved CI proof rather than Remote Desktop.
+Expected: every command exits 0. Platform-specific evidence that cannot execute in the isolated implementation environment must be satisfied only by repository-approved GitHub CI; do not route it through Remote Desktop.
 
-- [ ] **Step 2: Inspect the exact changed-file set and full diff**
+- [ ] **Step 2: Verify the exact changed-file set**
 
-Confirm the PR contains only:
+The final PR must contain exactly these paths:
 
 ```text
 AGENTS.md
@@ -444,24 +546,28 @@ docs/superpowers/specs/2026-08-28-remote-desktop-per-action-enforcement-design.m
 docs/superpowers/plans/2026-08-28-remote-desktop-per-action-enforcement.md
 ```
 
-Any additional path requires explicit reconciliation before readiness.
+If the list differs, stop readiness and reconcile the additional/missing path before continuing.
 
-- [ ] **Step 3: Freeze the final head and require exact-head GitHub gates**
+- [ ] **Step 3: Freeze and read the exact PR head**
 
-Read PR #93 and require the repository's current protected `meta-gate` and `ai-review-gate` on the exact final head. Do not reuse evidence from an older head.
+Read PR #93, record its exact head SHA and verify the full diff against `main`. Any subsequent content change invalidates this evidence and requires repeating Steps 1-3.
 
-- [ ] **Step 4: Apply the current AI review risk policy**
+- [ ] **Step 4: Apply the current META AI review policy mechanically**
 
-Because this change alters governance enforcement and authorization semantics, classify it using `ecosystem/ai-review-policy.json` on the final exact diff. Follow the resulting R-tier exactly; do not manually downgrade.
+Run the repository's current risk classifier on the exact final diff. Follow the resulting `R0`/`R1`/`R2` requirement exactly; do not manually downgrade governance/authorization risk.
 
-- [ ] **Step 5: Reconcile all review findings**
+- [ ] **Step 5: Require current exact-head protected checks and review evidence**
 
-For every blocking review finding, repair on the same branch, rerun the invalidated tests, obtain a new exact head and repeat exact-head review/check qualification. Do not use Remote Desktop to inspect or rerun equivalent CI.
+Require the protected `meta-gate` and `ai-review-gate` for the exact frozen head. If review returns blocking findings, repair on the same branch, rerun affected deterministic checks, freeze the new head and obtain fresh review/check evidence.
 
-- [ ] **Step 6: Protected squash merge and readback**
+- [ ] **Step 6: Mark the PR ready only after implementation self-review is complete**
 
-Merge only after all current required exact-head checks/reviews pass. Then read protected `main` and verify the merged policy, validator function, canonical contract and spec are present at the resulting squash-merge SHA.
+Inspect every changed file and the complete diff, confirm no connector-level firewall claim was introduced, confirm no new exception reason exists, and confirm every direct-call test is fail-closed by default.
 
-- [ ] **Step 7: Start the provider rollout only from the merged META SHA**
+- [ ] **Step 7: Protected squash merge and readback**
 
-After successful readback, create a fresh Game issue/branch/plan that references the exact merged META commit. The provider plan must add prompt/governance regression binding without copying the META policy or changing Game runtime, deployment, secrets, runner configuration or live Remote Desktop state.
+Merge only with the expected exact head and only after current required checks/reviews pass. Read protected `main` after merge and verify the merged policy keys, `validate_remote_desktop_action(...)`, canonical contract wording and spec are present at the resulting squash-merge SHA.
+
+- [ ] **Step 8: Start Game adoption from the merged META SHA**
+
+Create a fresh Game issue/branch and a separate provider implementation plan referencing the exact protected META merge SHA. The provider change may add prompt/governance regression binding only; it must not copy/fork the META policy, change Game runtime/deployment/secrets/runner configuration, or touch live Remote Desktop state.
