@@ -44,7 +44,7 @@ This gate does not prohibit Remote Desktop/Desktop Commander, Synology, WSL, Doc
 
 ## Default-deny Remote Desktop and parallel-first routing
 
-`ecosystem/agent-execution-routing-policy.json` is the canonical machine-readable routing policy for substantial new and resumed task packets. `tools/governance/agent_execution_routing.py` validates a declared packet against a caller-supplied, freshly verified GitHub state snapshot; `tools/governance/test_agent_execution_routing.py` is its deterministic behavior suite.
+`ecosystem/agent-execution-routing-policy.json` is the canonical machine-readable routing policy for substantial new and resumed task packets. `tools/governance/agent_execution_routing.py` validates a declared packet against a caller-supplied, freshly verified GitHub state snapshot; `tools/governance/test_agent_execution_routing.py` and `tools/governance/test_remote_desktop_action_gate.py` are its deterministic behavior suites.
 
 The required execution order is:
 
@@ -53,7 +53,7 @@ The required execution order is:
 3. use a worker-owned isolated workspace for authorized implementation and local deterministic checks;
 4. use a host exception only when the packet validates it.
 
-The packet records `execution_target`, `runner_class`, `equivalent_ci`, `remote_desktop`, `remote_desktop_reason`, the GitHub preflight, and the parallel-execution plan. `github_actions` and `isolated_workspace` are default targets. `host_exception` requires `remote_desktop: exception`, `equivalent_ci: null`, and one closed reason:
+The packet records `execution_target`, `runner_class`, `equivalent_ci`, `remote_desktop`, `remote_desktop_reason`, `requested_host_actions`, `requested_remote_desktop_tools`, the GitHub preflight, and the parallel-execution plan. `github_actions` and `isolated_workspace` are default targets. `host_exception` requires `remote_desktop: exception`, `equivalent_ci: null`, and one closed reason:
 
 | Reason | Narrowly permitted need |
 | --- | --- |
@@ -61,7 +61,11 @@ The packet records `execution_target`, `runner_class`, `equivalent_ci`, `remote_
 | `lan_or_hardware` | An in-scope LAN device, physical hardware, or other host-bound acceptance operation is required. |
 | `self_hosted_runner_diagnosis` | A verified runner or workflow failure requires host-level diagnosis. |
 
-Remote Desktop/Desktop Commander is otherwise denied. The presence of a checkout, shell, Docker daemon, toolchain, or a ready Remote Desktop session is not a reason. A valid exception is limited to its recorded host action and does not authorize general development, alternative repository authority, or an unrecorded host mutation.
+Remote Desktop/Desktop Commander is otherwise denied. The presence of a checkout, shell, Docker daemon, toolchain, or a ready Remote Desktop session is not a reason. A valid exception is limited to its recorded semantic host action and exact connector tool identifiers and does not authorize general development, alternative repository authority, an unrecorded host mutation, or a different direct connector call.
+
+Out-of-band capability discovery may inspect local connector/tool registration, registered function names, descriptions and argument schemas without invoking the Remote Desktop connector. By contrast, every direct `Remote_Desktop_Commander.*` invocation is an exception-only operation and requires a fresh valid host-exception packet plus a positive per-action decision from `validate_remote_desktop_action(...)` for the exact semantic host action and exact connector function immediately before the call. A positive decision for one tool or action never authorizes another.
+
+Agents must not invoke `Remote_Desktop_Commander.list_devices` merely to discover whether Remote Desktop is connected or usable. The prohibition extends to `who_am_i`, `ping`, `get_config`, filesystem/search/process/session/terminal/history functions and all other direct Remote Desktop functions unless an already proven host-only need has been encoded in a valid exception and the exact call passes the per-action gate. Read-only or metadata-looking connector calls are not discovery exemptions. Unknown Remote Desktop tool identifiers fail closed, and tool identifiers listed by policy as always forbidden cannot be authorized through the existing reasons. A Remote Desktop `DENY` is not automatically a blocker; agents continue through GitHub, GitHub Actions, repository-native connectors or isolated workspaces when those routes can perform useful authorized work.
 
 When `equivalent_ci` identifies a capable workflow, agents MUST NOT use Remote Desktop/Desktop Commander to poll process output, Docker logs, workflow state, or Git state. Agents observe the GitHub workflow's status, logs, and artifacts through GitHub and follow the applicable bounded-wait policy. They do not replace CI observation with repeated manual host polling.
 
@@ -146,8 +150,8 @@ Available tools, connectors and exposed actions in the **current session** are t
 
 Before reporting that repository work cannot continue, GitHub is read-only, commit/push/PR is unavailable, a mode switch is required, or another execution capability is missing, an agent MUST:
 
-1. inspect all currently exposed **relevant** tools/connectors and discover the actions needed for the requested operation, including write actions that may be separate from read actions;
-2. inspect current authentication/context and repository permissions when the available connector exposes that evidence;
+1. inspect local connector/tool registration and schemas for relevant tools without invoking Remote Desktop merely to discover its runtime state;
+2. inspect current authentication/context and repository permissions when the available repository-native connector exposes that evidence;
 3. prefer repository-native operations for repository state and lifecycle work, especially GitHub repository/file/branch/commit/PR/Issue/review/check actions;
 4. if the preferred operation is unavailable or fails, evaluate every safe, authorized fallback that can legitimately perform the same task before asking the owner to switch modes, repeat work manually, or take over the operation;
 5. classify the exact limitation as one of: missing tool/action, unauthenticated context, permission denied, operation unsupported, repository/policy restriction, transient transport/service failure, or another specifically observed condition;
@@ -165,7 +169,9 @@ Remote Desktop/Desktop Commander remains governed by the default-deny host-excep
 
 Capability discovery itself MUST be observational and least-mutating. Agents MUST NOT create throwaway branches, files, commits, comments, PRs, workflow runs, deployments, or other durable state merely to prove that write access exists.
 
-Use connector registration/action discovery, authenticated identity, permission metadata and harmless reads first. When a write operation is actually part of the authorized task, successful execution of that real task mutation may establish the capability; do not manufacture a no-op probe.
+Use local connector/tool registration and argument-schema discovery, authenticated repository identity, permission metadata and repository-native harmless reads first. This out-of-band schema discovery is distinct from invoking a connector function. Agents must not invoke `Remote_Desktop_Commander.list_devices` as a capability probe, and must not call `who_am_i`, `ping`, `get_config`, filesystem/process/session/terminal/search/history functions or another direct Remote Desktop function merely to establish that the connector works. If an actual host-only need is proven, construct a fresh narrow exception and require a positive per-action decision for the exact tool immediately before the first direct call.
+
+A Remote Desktop `DENY` is not automatically a blocker. After denial, continue any useful authorized repository work through GitHub, GitHub Actions, repository-native connectors or isolated workspaces. When a write operation is actually part of the authorized task, successful execution of that real task mutation may establish the relevant non-Remote-Desktop capability; do not manufacture a no-op probe.
 
 ### Prohibited unverified blocker claims
 
