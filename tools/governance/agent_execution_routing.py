@@ -65,6 +65,7 @@ def _is_safe_repository_relative_path(path: object) -> bool:
 _LITERAL_PATH_SEGMENT = re.compile(r"^[\w .-]+$", re.UNICODE)
 _REPOSITORY_COORDINATE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _GIT_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
+_REMOTE_DESKTOP_TOOL = re.compile(r"^Remote_Desktop_Commander\.[A-Za-z0-9_]+$")
 
 _UTC_RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
 
@@ -108,8 +109,47 @@ def _policy_errors(policy: dict[str, object]) -> list[str]:
     if not _is_unique_string_list(runners_value):
         errors.append("policy runner_classes must be a non-empty list of unique strings")
 
-    if not _is_unique_string_list(policy.get("remote_desktop_actions")):
+    reasons_value = policy.get("remote_desktop_reasons")
+    actions_value = policy.get("remote_desktop_actions")
+    if not _is_unique_string_list(reasons_value):
+        errors.append("policy remote_desktop_reasons must be a non-empty list of unique strings")
+    if not _is_unique_string_list(actions_value):
         errors.append("policy remote_desktop_actions must be a non-empty list of unique strings")
+
+    reasons = set(reasons_value) if _is_unique_string_list(reasons_value) else set()
+    actions = set(actions_value) if _is_unique_string_list(actions_value) else set()
+    compatibility_value = policy.get("remote_desktop_reason_action_compatibility")
+    if not isinstance(compatibility_value, dict) or set(compatibility_value) != reasons:
+        errors.append(
+            "policy remote_desktop_reason_action_compatibility must map every and only remote_desktop_reason"
+        )
+    else:
+        for reason, compatible_actions in compatibility_value.items():
+            if not _is_unique_string_list(compatible_actions):
+                errors.append(
+                    f"policy remote_desktop_reason_action_compatibility.{reason} must be a non-empty list of unique actions"
+                )
+            elif not set(compatible_actions).issubset(actions):
+                errors.append(
+                    f"policy remote_desktop_reason_action_compatibility.{reason} contains an unknown action"
+                )
+
+    known_tools_value = policy.get("known_remote_desktop_tools")
+    forbidden_tools_value = policy.get("always_forbidden_remote_desktop_tools")
+    if not _is_unique_string_list(known_tools_value) or any(
+        not _REMOTE_DESKTOP_TOOL.fullmatch(tool) for tool in _list(known_tools_value) if isinstance(tool, str)
+    ):
+        errors.append("policy known_remote_desktop_tools must be unique Remote_Desktop_Commander tool identifiers")
+    if not _is_unique_string_list(forbidden_tools_value) or any(
+        not _REMOTE_DESKTOP_TOOL.fullmatch(tool) for tool in _list(forbidden_tools_value) if isinstance(tool, str)
+    ):
+        errors.append(
+            "policy always_forbidden_remote_desktop_tools must be unique Remote_Desktop_Commander tool identifiers"
+        )
+    known_tools = set(known_tools_value) if _is_unique_string_list(known_tools_value) else set()
+    forbidden_tools = set(forbidden_tools_value) if _is_unique_string_list(forbidden_tools_value) else set()
+    if known_tools & forbidden_tools:
+        errors.append("policy Remote Desktop known and always-forbidden tool sets must be disjoint")
 
     lane_rules = policy.get("parallel_lane_rules")
     if not isinstance(lane_rules, dict) or lane_rules.get("unique_branch_and_worktree") is not True:
@@ -470,6 +510,7 @@ def validate_packet(
         matrix = _mapping(policy.get("target_runner_compatibility"))
         if runner_class not in _list(matrix.get(target)):
             errors.append("runner_class is incompatible with execution_target")
+
     remote_desktop = execution.get("remote_desktop")
     if not _is_closed_value(remote_desktop, {"denied", "exception"}):
         errors.append("remote_desktop must be denied or exception")
@@ -477,14 +518,15 @@ def validate_packet(
         errors.append("host_exception requires remote_desktop=exception")
     if remote_desktop == "exception" and target != "host_exception":
         errors.append("remote_desktop exception requires execution_target=host_exception")
+
+    reason = execution.get("remote_desktop_reason")
+    allowed_reasons = _closed_values(policy, "remote_desktop_reasons")
     if remote_desktop == "exception":
-        reason = execution.get("remote_desktop_reason")
-        allowed_reasons = _closed_values(policy, "remote_desktop_reasons")
         if not isinstance(reason, str) or not reason:
             errors.append("remote_desktop exception requires a closed reason")
         elif reason not in allowed_reasons:
             errors.append("remote_desktop_reason is not an allowed exception")
-    elif execution.get("remote_desktop_reason") is not None and execution.get("remote_desktop_reason") != "not_applicable":
+    elif reason is not None and reason != "not_applicable":
         errors.append("remote_desktop_reason requires remote_desktop=exception")
 
     equivalent_ci = execution.get("equivalent_ci")
@@ -494,6 +536,7 @@ def validate_packet(
     if "equivalent_ci" not in execution or not valid_equivalent_ci:
         errors.append("equivalent_ci must be null or a non-empty workflow identifier string")
     equivalent_ci_exists = isinstance(equivalent_ci, str) and bool(equivalent_ci.strip())
+
     forbidden_actions = _closed_values(policy, "forbidden_remote_desktop_actions_when_equivalent_ci")
     permitted_host_actions = _closed_values(policy, "remote_desktop_actions")
     requested_actions_value = execution.get("requested_host_actions")
@@ -501,16 +544,27 @@ def validate_packet(
     if requested_actions_value is not None and (
         not isinstance(requested_actions_value, list)
         or any(not isinstance(action, str) or action not in permitted_host_actions for action in requested_actions)
+        or len(set(action for action in requested_actions if isinstance(action, str))) != len(requested_actions)
     ):
         errors.append("requested_host_actions must be a list of permitted host action strings")
+
+    compatibility = _mapping(policy.get("remote_desktop_reason_action_compatibility"))
+    if remote_desktop == "exception" and isinstance(reason, str) and reason in allowed_reasons:
+        compatible_actions = set(
+            action for action in _list(compatibility.get(reason)) if isinstance(action, str)
+        )
+        if any(
+            isinstance(action, str) and action in permitted_host_actions and action not in compatible_actions
+            for action in requested_actions
+        ):
+            errors.append("requested_host_actions are incompatible with remote_desktop_reason")
+
     polling_actions = (
         [requested_actions_value]
         if isinstance(requested_actions_value, str)
         else [action for action in requested_actions if isinstance(action, str)]
     )
-    if equivalent_ci_exists and any(
-        action in forbidden_actions for action in polling_actions
-    ):
+    if equivalent_ci_exists and any(action in forbidden_actions for action in polling_actions):
         errors.append("equivalent_ci prohibits RDC polling")
     if remote_desktop == "exception" and equivalent_ci is not None:
         errors.append("remote_desktop exception requires no equivalent_ci")
@@ -522,6 +576,22 @@ def validate_packet(
     elif requested_actions:
         errors.append("requested_host_actions require remote_desktop=exception")
 
+    known_tools = _closed_values(policy, "known_remote_desktop_tools")
+    requested_tools_value = execution.get("requested_remote_desktop_tools")
+    requested_tools = _list(requested_tools_value)
+    if requested_tools_value is not None and (
+        not isinstance(requested_tools_value, list)
+        or not requested_tools
+        or any(not isinstance(tool, str) or tool not in known_tools for tool in requested_tools)
+        or len(set(tool for tool in requested_tools if isinstance(tool, str))) != len(requested_tools)
+    ):
+        errors.append("requested_remote_desktop_tools must contain only known permitted tool identifiers")
+    if remote_desktop == "exception":
+        if not isinstance(requested_tools_value, list) or not requested_tools:
+            errors.append("remote_desktop exception requires non-empty requested_remote_desktop_tools")
+    elif requested_tools:
+        errors.append("requested_remote_desktop_tools require remote_desktop=exception")
+
     _validate_preflight(execution, _mapping(live_state), policy, errors)
     parallel = packet.get("parallel_execution")
     if not isinstance(parallel, dict):
@@ -529,6 +599,45 @@ def validate_packet(
     else:
         _validate_lanes(parallel, policy, errors)
     return errors
+
+
+def validate_remote_desktop_action(
+    host_action: str,
+    remote_tool: str,
+    *,
+    packet: dict[str, object] | None,
+    live_state: dict[str, object] | None,
+    policy: dict[str, object],
+) -> list[str]:
+    """Return no errors only when this exact direct Remote Desktop call is allowed."""
+    policy_errors = _policy_errors(policy)
+    if policy_errors:
+        return policy_errors
+
+    if remote_tool in _closed_values(policy, "always_forbidden_remote_desktop_tools"):
+        return ["remote desktop tool is always forbidden by policy"]
+    if remote_tool not in _closed_values(policy, "known_remote_desktop_tools"):
+        return ["remote desktop tool is not policy-known"]
+    if not isinstance(packet, dict) or not isinstance(live_state, dict):
+        return ["remote desktop direct call requires current packet and live_state"]
+
+    packet_errors = validate_packet(packet, live_state=live_state, policy=policy)
+    if packet_errors:
+        return ["remote desktop direct call requires valid routing packet", *packet_errors]
+
+    execution = _mapping(packet.get("execution_routing"))
+    if execution.get("execution_target") != "host_exception" or execution.get("remote_desktop") != "exception":
+        return ["remote desktop direct call requires validated host_exception"]
+
+    reason = execution.get("remote_desktop_reason")
+    compatibility = _mapping(policy.get("remote_desktop_reason_action_compatibility"))
+    if host_action not in _list(compatibility.get(reason)):
+        return ["host action is incompatible with remote_desktop_reason"]
+    if host_action not in _list(execution.get("requested_host_actions")):
+        return ["host action was not requested by the routing packet"]
+    if remote_tool not in _list(execution.get("requested_remote_desktop_tools")):
+        return ["remote desktop tool was not requested by the routing packet"]
+    return []
 
 
 def _load_json_object(path: Path, label: str) -> dict[str, object]:
