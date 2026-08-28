@@ -12,6 +12,7 @@ assert SPEC and SPEC.loader
 routing = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(routing)
 
+REPO_ROOT = Path(__file__).parents[2]
 REPO = "Oteryn/Oteryn"
 SHA = "d79df968c1aba98373455399732fc71ab71e6a5d"
 GOVERNING_ISSUE = 85
@@ -20,7 +21,7 @@ TASK_HEAD_SHA = "f4cda70de8bc61008226c6be2983cff34600f86d"
 
 
 def policy() -> dict[str, object]:
-    path = Path(__file__).parents[2] / "ecosystem" / "agent-execution-routing-policy.json"
+    path = REPO_ROOT / "ecosystem" / "agent-execution-routing-policy.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -110,6 +111,19 @@ def test_policy_has_exact_reason_action_mapping() -> None:
         "lan_or_hardware": ["perform_lan_or_hardware_acceptance"],
         "self_hosted_runner_diagnosis": ["diagnose_self_hosted_runner"],
     }
+
+
+def test_canonical_instructions_gate_every_direct_remote_desktop_call() -> None:
+    agents_text = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    contract_text = (
+        REPO_ROOT / "docs" / "agents" / "contracts" / "AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md"
+    ).read_text(encoding="utf-8")
+    for text in (agents_text, contract_text):
+        assert "every direct `Remote_Desktop_Commander.*` invocation" in text
+        assert "local connector/tool registration" in text
+        assert "positive per-action" in text
+        assert "must not invoke `Remote_Desktop_Commander.list_devices`" in text
+        assert "A Remote Desktop `DENY` is not automatically a blocker" in text
 
 
 def test_exception_requires_remote_tool_declaration() -> None:
