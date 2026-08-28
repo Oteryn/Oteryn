@@ -235,6 +235,28 @@ def test_missing_packet_or_live_state_fails_closed() -> None:
         assert "remote desktop direct call requires current packet and live_state" in errors
 
 
+def test_malformed_direct_call_identifiers_fail_closed() -> None:
+    packet = exception_packet("lan_or_hardware")
+    for malformed_tool in (None, [], {}, 7):
+        errors = routing.validate_remote_desktop_action(
+            "perform_lan_or_hardware_acceptance",
+            malformed_tool,
+            packet=packet,
+            live_state=live_state(),
+            policy=policy(),
+        )
+        assert errors == ["remote desktop tool identifier is invalid"]
+    for malformed_action in (None, [], {}, 7):
+        errors = routing.validate_remote_desktop_action(
+            malformed_action,
+            "Remote_Desktop_Commander.ping",
+            packet=packet,
+            live_state=live_state(),
+            policy=policy(),
+        )
+        assert errors == ["host action identifier is invalid"]
+
+
 def test_wrong_semantic_action_for_reason_is_denied() -> None:
     errors = routing.validate_remote_desktop_action(
         "inspect_host_only_service",
