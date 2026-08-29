@@ -202,6 +202,31 @@ def test_current_codex_summary_preserves_blocking_review_finding() -> None:
     )
 
 
+def test_current_codex_summary_preserves_blocking_finding_in_summary_body() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    current = _v1.core_tests.issue_comment(
+        10, _v1.core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
+    )
+    summary = _summary_comment(final[:10])
+    summary["body"] += "\n[P1] Security boundary bypass"
+    _v1.core_tests.expect_fail(
+        lambda: _v1.m.verify_records(
+            [current, summary],
+            policy=_v1.POLICY,
+            repo_root=repo,
+            tier="R2",
+            fingerprint=_v1.core_tests.ISSUE_FP,
+            head=final,
+            repository="Oteryn/Test",
+            pr_number=7,
+            token="x",
+            reviews=[_v1.core_tests.request_anchor(current, final)],
+            review_comments=[],
+            pr_reactions=[_reaction()],
+        )
+    )
+
+
 def main() -> int:
     inherited = [
         value for name, value in sorted(vars(_v1).items())
