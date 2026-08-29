@@ -42,7 +42,7 @@ If GitHub state cannot be read or written because of a real capability/permissio
 
 This gate does not prohibit Remote Desktop/Desktop Commander, Synology, WSL, Docker or local tooling. It constrains their role: execution after GitHub preflight, never authority in place of GitHub.
 
-## Default-deny Remote Desktop and parallel-first routing
+## Default-deny Remote Desktop and effort-aware routing
 
 `ecosystem/agent-execution-routing-policy.json` is the canonical machine-readable routing policy for substantial new and resumed task packets. `tools/governance/agent_execution_routing.py` validates a declared packet against a caller-supplied, freshly verified GitHub state snapshot; `tools/governance/test_agent_execution_routing.py` and `tools/governance/test_remote_desktop_action_gate.py` are its deterministic behavior suites.
 
@@ -53,7 +53,7 @@ The required execution order is:
 3. use a worker-owned isolated workspace for authorized implementation and local deterministic checks;
 4. use a host exception only when the packet validates it.
 
-The packet records `execution_target`, `runner_class`, `equivalent_ci`, `remote_desktop`, `remote_desktop_reason`, `requested_host_actions`, `requested_remote_desktop_tools`, the GitHub preflight, and the parallel-execution plan. `github_actions` and `isolated_workspace` are default targets. `host_exception` requires `remote_desktop: exception`, `equivalent_ci: null`, and one closed reason:
+The packet records `execution_target`, `runner_class`, `equivalent_ci`, `remote_desktop`, `remote_desktop_reason`, `requested_host_actions`, `requested_remote_desktop_tools`, the GitHub preflight, and the effort-aware execution plan carried in `parallel_execution`. `github_actions` and `isolated_workspace` are default targets. `host_exception` requires `remote_desktop: exception`, `equivalent_ci: null`, and one closed reason:
 
 | Reason | Narrowly permitted need |
 | --- | --- |
@@ -73,11 +73,13 @@ When `equivalent_ci` identifies a capable workflow, agents MUST NOT use Remote D
 
 Before starting or resuming a mutation, the routing packet's `github_preflight` MUST be newly verified against current GitHub facts. It includes `verified_at`, `repository`, `default_branch_sha`, `governing_issue`, `pull_request`, and `task_head_sha`. The validator compares every required identity with the fresh `live_state` supplied by the caller. Earlier handoffs, local worktrees, branches, sessions, caches, and logs are evidence to inspect, not authority and not a preflight substitute.
 
-### Parallel-first task planning
+### Effort-aware task planning
 
-Task preparation MUST first evaluate a dependency graph and create independently mergeable lanes whenever their paths and resources can be separated safely. The `parallel_execution` record requires a `lane_strategy`, lanes, and an `integration_order`. Each lane declares an ID, owned repository-relative paths, dependencies, a dedicated branch/worktree, and shared leases.
+Task preparation MUST choose an execution shape proportionally rather than maximizing concurrency. For substantial new or resumed work, first classify expected `effort` as `low`, `medium`, or `high`, then assess the dependency graph, critical path, shared mutable surfaces, constrained resources, and coordination/integration overhead. The `parallel_execution` record requires `effort`, `lane_strategy`, a non-empty `decision_basis`, lanes, and an `integration_order`.
 
-One lane has one active writer and no two lanes share a writable branch or worktree. Shared mutable paths, a limited test slot, a shared browser/runtime, a release manifest, or another constrained resource must be represented by a structured lease with one holder and a release condition. The integration order must respect dependencies. `serial_with_reason` is allowed only when it records the concrete dependency, shared mutable surface, constrained capacity, or integration boundary that prevents parallel execution.
+`single_agent` is a normal first-class strategy and requires exactly one lane; it does not require a serial-exception reason. Use `parallel_when_beneficial` only when at least two materially independent workstreams can make concurrent progress and the expected benefit exceeds coordination and integration cost. When parallelism is beneficial, use the smallest useful number of lanes. Each lane declares an ID, owned repository-relative paths, dependencies, a dedicated branch/worktree, and shared leases.
+
+One lane has one active writer and no two lanes share a writable branch or worktree. Shared mutable paths, a limited test slot, a shared browser/runtime, a release manifest, or another constrained resource must be represented by a structured lease with one holder and a release condition. The integration order must respect dependencies. A task author or coordinator is responsible for the quality of `decision_basis`; deterministic validation enforces the closed effort/strategy vocabulary, required planning evidence, lane cardinality, and existing safety invariants rather than attempting to predict duration or optimize worker count automatically.
 
 ## Parallel-agent Git concurrency and late integration
 
