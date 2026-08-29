@@ -88,8 +88,14 @@ def _reaction(*, login: str = "chatgpt-codex-connector[bot]",
     }
 
 
-def _verify_summary(*, summary: dict | None = None, reactions: list[dict] | None = None,
-                    request_updated: str | None = None, extra_reviews: list[dict] | None = None) -> dict:
+def _verify_summary(*, summary_prefix: str | None = None,
+                    completed: str = "2026-08-20T10:01:00Z",
+                    trigger: str = "Manual request",
+                    app_slug: str = "chatgpt-codex-connector",
+                    updated: str = "2026-08-20T10:01:02Z",
+                    reactions: list[dict] | None = None,
+                    request_updated: str | None = None,
+                    extra_reviews: list[dict] | None = None) -> dict:
     repo, _, final = _v1.core_tests.make_repo()
     current = _v1.core_tests.issue_comment(
         10,
@@ -97,8 +103,15 @@ def _verify_summary(*, summary: dict | None = None, reactions: list[dict] | None
         stamp="2026-08-20T10:00:00Z",
         updated_stamp=request_updated,
     )
+    summary = _summary_comment(
+        summary_prefix or final[:10],
+        completed=completed,
+        trigger=trigger,
+        app_slug=app_slug,
+        updated=updated,
+    )
     return _v1.m.verify_records(
-        [current, summary or _summary_comment(final[:10])],
+        [current, summary],
         policy=_v1.POLICY,
         repo_root=repo,
         tier="R2",
@@ -127,27 +140,21 @@ def test_current_codex_summary_requires_trusted_pr_reaction() -> None:
 
 
 def test_current_codex_summary_rejects_wrong_reviewed_commit() -> None:
-    _v1.core_tests.expect_fail(
-        lambda: _verify_summary(summary=_summary_comment("f" * 10))
-    )
+    _v1.core_tests.expect_fail(lambda: _verify_summary(summary_prefix="f" * 10))
 
 
 def test_current_codex_summary_rejects_non_manual_trigger() -> None:
-    _v1.core_tests.expect_fail(
-        lambda: _verify_summary(summary=_summary_comment("0" * 10, trigger="Automatic"))
-    )
+    _v1.core_tests.expect_fail(lambda: _verify_summary(trigger="Automatic"))
 
 
 def test_current_codex_summary_rejects_wrong_github_app() -> None:
-    _v1.core_tests.expect_fail(
-        lambda: _verify_summary(summary=_summary_comment("0" * 10, app_slug="other-app"))
-    )
+    _v1.core_tests.expect_fail(lambda: _verify_summary(app_slug="other-app"))
 
 
 def test_current_codex_summary_requires_completion_after_request() -> None:
     _v1.core_tests.expect_fail(
         lambda: _verify_summary(
-            summary=_summary_comment("0" * 10, completed="2026-08-20T09:59:59Z"),
+            completed="2026-08-20T09:59:59Z",
             reactions=[_reaction(stamp="2026-08-20T10:01:01Z")],
         )
     )
