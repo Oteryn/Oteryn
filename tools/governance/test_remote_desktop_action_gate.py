@@ -115,6 +115,17 @@ def test_policy_has_exact_reason_action_mapping() -> None:
     }
 
 
+def test_policy_schema_version_must_be_exactly_two() -> None:
+    for invalid_version in (None, 1, 3, "2"):
+        malformed = policy()
+        if invalid_version is None:
+            del malformed["schema_version"]
+        else:
+            malformed["schema_version"] = invalid_version
+        errors = routing.validate_packet(default_packet(), live_state=live_state(), policy=malformed)
+        assert "policy schema_version must be 2" in errors
+
+
 def test_canonical_instructions_gate_every_direct_remote_desktop_call() -> None:
     agents_text = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
     contract_text = (
