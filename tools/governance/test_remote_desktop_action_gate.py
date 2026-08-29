@@ -70,7 +70,9 @@ def default_packet() -> dict[str, object]:
             "github_preflight": preflight(),
         },
         "parallel_execution": {
-            "lane_strategy": "parallel_first",
+            "effort": "medium",
+            "lane_strategy": "single_agent",
+            "decision_basis": "RDC authorization uses one shared policy fixture",
             "lanes": [lane()],
             "integration_order": ["policy"],
         },
