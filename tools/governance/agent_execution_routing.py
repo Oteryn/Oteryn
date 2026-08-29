@@ -102,6 +102,9 @@ def _is_unique_string_list(value: object) -> bool:
 def _policy_errors(policy: dict[str, object]) -> list[str]:
     """Reject malformed policy data before it can authorize a packet."""
     errors: list[str] = []
+    if policy.get("schema_version") != 2:
+        errors.append("policy schema_version must be 2")
+
     targets_value = policy.get("execution_targets")
     runners_value = policy.get("runner_classes")
     if not _is_unique_string_list(targets_value):
