@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
+from copy import deepcopy
+from datetime import datetime, timezone
+import json
+import re
 import types
 from pathlib import Path
 
@@ -21,6 +26,13 @@ _OBSERVED_CLEAN_FLAIRS = {
     "Another round soon, please!",
     "Keep it up!",
 }
+_CODEX_SUMMARY_MARKER = "<!-- codex-pull-request-review-summary -->"
+_CODEX_SUMMARY_APP = "chatgpt-codex-connector"
+_CODEX_SUMMARY_ROW = re.compile(
+    r'^\| 📝 \*\*Code Review\*\* \| ✅ \*\*Completed\*\* '
+    r'<relative-time datetime="([^"]+)">[^<]*</relative-time> '
+    r'\| `([0-9a-f]{7,40})` \| Manual request \|$'
+)
 
 
 def _compat_parse_clean_result(body: str) -> str | None:
@@ -66,15 +78,223 @@ def _compat_verify_records_v2(comments: list[dict], **kwargs) -> dict:
             setattr(_v1, name, value)
 
 
+def _utc_timestamp(raw: object) -> datetime | None:
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _parse_completed_summary(body: str) -> tuple[datetime, str] | None:
+    if body.count(_CODEX_SUMMARY_MARKER) != 1 or body.count("## Codex Review Summary") != 1:
+        return None
+    rows = [line.strip() for line in body.splitlines() if "**Code Review**" in line]
+    if len(rows) != 1:
+        return None
+    match = _CODEX_SUMMARY_ROW.fullmatch(rows[0])
+    if match is None:
+        return None
+    completed = _utc_timestamp(match.group(1))
+    if completed is None:
+        return None
+    return completed, match.group(2)
+
+
+def _eligible_summary_anchor(
+    *, policy: dict, repo_root: str | Path, tier: str, fingerprint: str,
+    head: str, repository: str, pr_number: int, reviews: list[dict],
+) -> tuple[dict, dict[str, str]]:
+    required_class = policy["review_tiers"][tier]["reviewer_class"]
+    allowed_classes = {required_class} if required_class == "deep" else {"fast", "deep"}
+    matches: list[tuple[dict, dict[str, str]]] = []
+    for review, anchor in _v1._core._eligible_request_anchors(
+        reviews=reviews,
+        policy=policy,
+        repo_root=repo_root,
+        head=head,
+        repository=repository,
+        pr_number=pr_number,
+    ):
+        reviewer_class = anchor.get("REVIEWER_CLASS", "")
+        reviewer_id = anchor.get("REVIEWER_ID", "")
+        if (
+            anchor.get("REQUEST_VALID") == "true"
+            and anchor.get("REVIEW_TIER") == tier
+            and anchor.get("REVIEW_FINGERPRINT") == fingerprint
+            and reviewer_class in allowed_classes
+            and _v1._core.reviewer_allowed(policy, reviewer_class, reviewer_id)
+        ):
+            matches.append((review, anchor))
+    if len(matches) != 1:
+        raise RuntimeError("current Codex summary requires one eligible immutable request anchor")
+    return matches[0]
+
+
+def _normalize_current_codex_summary(
+    comments: list[dict], *, pr_reactions: list[dict], policy: dict,
+    repo_root: str | Path, tier: str, fingerprint: str, head: str,
+    repository: str, pr_number: int, reviews: list[dict],
+) -> list[dict]:
+    configured_logins = {
+        str(login).casefold()
+        for values in policy.get("reviewer_source_logins", {}).values()
+        for login in values
+    }
+    summary_candidates = [
+        comment for comment in comments
+        if _CODEX_SUMMARY_MARKER in str(comment.get("body") or "")
+        and str((comment.get("user") or {}).get("login", "")).casefold() in configured_logins
+    ]
+    if not summary_candidates:
+        return comments
+    if len(summary_candidates) != 1:
+        raise RuntimeError("trusted Codex review summary is ambiguous")
+
+    _, anchor = _eligible_summary_anchor(
+        policy=policy,
+        repo_root=repo_root,
+        tier=tier,
+        fingerprint=fingerprint,
+        head=head,
+        repository=repository,
+        pr_number=pr_number,
+        reviews=reviews,
+    )
+    reviewer_id = anchor["REVIEWER_ID"]
+    trusted_logins = _v1._core._trusted_logins(policy, reviewer_id)
+    if not trusted_logins:
+        raise RuntimeError("reviewer has no configured trusted source login")
+
+    summary = summary_candidates[0]
+    summary_login = str((summary.get("user") or {}).get("login", "")).casefold()
+    app_slug = str((summary.get("performed_via_github_app") or {}).get("slug", ""))
+    if (
+        summary_login not in trusted_logins
+        or app_slug != _CODEX_SUMMARY_APP
+        or not _v1._core._issue_comment_identity(summary, repository, pr_number)
+    ):
+        raise RuntimeError("trusted Codex review summary identity is invalid")
+
+    parsed_summary = _parse_completed_summary(str(summary.get("body") or ""))
+    if parsed_summary is None:
+        raise RuntimeError("trusted Codex review summary is not the accepted completed shape")
+    completed_at, prefix = parsed_summary
+    reviewed_head = anchor["REVIEWED_HEAD"]
+    resolved = _v1._core.resolve_reviewed_prefix(repo_root, prefix)
+    if resolved is None or resolved != reviewed_head:
+        raise RuntimeError("Codex summary reviewed-commit prefix does not match the request anchor")
+
+    request_at = _utc_timestamp(anchor.get("REQUEST_CREATED_AT"))
+    summary_updated_at = _utc_timestamp(summary.get("updated_at"))
+    if request_at is None or completed_at <= request_at:
+        raise RuntimeError("Codex summary completion does not follow the current request")
+    if summary_updated_at is None or summary_updated_at < completed_at:
+        raise RuntimeError("Codex summary update timestamp precedes completion")
+
+    matching_reactions: list[dict] = []
+    for reaction in pr_reactions:
+        reaction_at = _utc_timestamp(reaction.get("created_at"))
+        reaction_login = str((reaction.get("user") or {}).get("login", "")).casefold()
+        if (
+            reaction.get("content") == "+1"
+            and reaction_login in trusted_logins
+            and reaction_at is not None
+            and reaction_at >= completed_at
+            and reaction_at > request_at
+        ):
+            matching_reactions.append(reaction)
+    if len(matching_reactions) != 1:
+        raise RuntimeError("current Codex summary requires exactly one trusted post-completion PR reaction")
+    reaction_at_raw = str(matching_reactions[0].get("created_at") or "")
+
+    synthetic = deepcopy(summary)
+    synthetic["body"] = (
+        f"{_CLEAN_PREFIX}\n\n"
+        f"**Reviewed commit:** `{prefix}`"
+    )
+    synthetic["created_at"] = reaction_at_raw
+    synthetic["updated_at"] = reaction_at_raw
+
+    return [synthetic if comment is summary else comment for comment in comments]
+
+
+def _compat_verify_records_v3(comments: list[dict], **kwargs) -> dict:
+    """Adapt the current Codex summary/reaction envelope into the preserved verifier."""
+    pr_reactions = kwargs.pop("pr_reactions", None)
+    if pr_reactions is not None:
+        if not isinstance(pr_reactions, list) or any(not isinstance(item, dict) for item in pr_reactions):
+            raise RuntimeError("pull request reactions response is malformed")
+        comments = _normalize_current_codex_summary(
+            comments,
+            pr_reactions=pr_reactions,
+            policy=kwargs["policy"],
+            repo_root=kwargs["repo_root"],
+            tier=kwargs["tier"],
+            fingerprint=kwargs["fingerprint"],
+            head=kwargs["head"],
+            repository=kwargs["repository"],
+            pr_number=kwargs["pr_number"],
+            reviews=kwargs.get("reviews") or [],
+        )
+    return _compat_verify_records_v2(comments, **kwargs)
+
+
+def fetch_pr_reactions(repository: str, pr_number: int, token: str) -> list[dict]:
+    return _v1._core._fetch_paginated(
+        f"https://api.github.com/repos/{repository}/issues/{pr_number}/reactions", token
+    )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repository", required=True)
+    parser.add_argument("--pr-number", required=True, type=int)
+    parser.add_argument("--tier", required=True, choices=("R1", "R2"))
+    parser.add_argument("--fingerprint", required=True)
+    parser.add_argument("--head", required=True)
+    parser.add_argument("--base", required=True)
+    parser.add_argument("--repo-root", required=True)
+    parser.add_argument("--policy-file", required=True)
+    parser.add_argument("--token", required=True)
+    args = parser.parse_args()
+    policy = json.loads(Path(args.policy_file).read_text(encoding="utf-8"))
+    if not _v1._core.FULL_SHA.fullmatch(args.base):
+        raise SystemExit("base must be a lowercase 40-hex SHA")
+    policy["_trusted_integration_base_sha"] = args.base
+    match = verify_records(
+        _v1._core.fetch_comments(args.repository, args.pr_number, args.token),
+        policy=policy,
+        repo_root=args.repo_root,
+        tier=args.tier,
+        fingerprint=args.fingerprint,
+        head=args.head,
+        repository=args.repository,
+        pr_number=args.pr_number,
+        token=args.token,
+        reviews=_v1._core.fetch_reviews(args.repository, args.pr_number, args.token),
+        review_comments=_v1._core.fetch_review_comments(args.repository, args.pr_number, args.token),
+        pr_reactions=fetch_pr_reactions(args.repository, args.pr_number, args.token),
+    )
+    print(json.dumps(match, sort_keys=True))
+    return 0
+
+
 _v1._core.parse_clean_result = _compat_parse_clean_result
-_v1._core.verify_records = _compat_verify_records_v2
+_v1._core.verify_records = _compat_verify_records_v3
 globals()["_core"] = _v1._core
 globals()["_compat_parse_clean_result"] = _compat_parse_clean_result
 globals()["_compat_fetch_review_source_v2"] = _compat_fetch_review_source_v2
 globals()["_compat_verify_records_v2"] = _compat_verify_records_v2
+globals()["_compat_verify_records_v3"] = _compat_verify_records_v3
 globals()["fetch_review_source"] = _compat_fetch_review_source_v2
-globals()["verify_records"] = _compat_verify_records_v2
+globals()["fetch_pr_reactions"] = fetch_pr_reactions
+globals()["verify_records"] = _compat_verify_records_v3
 
 
 if __name__ == "__main__":
-    raise SystemExit(_v1._core.main())
+    raise SystemExit(main())
