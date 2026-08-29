@@ -180,7 +180,10 @@ def _normalize_current_codex_summary(
     ):
         raise RuntimeError("trusted Codex review summary identity is invalid")
 
-    parsed_summary = _parse_completed_summary(str(summary.get("body") or ""))
+    summary_body = str(summary.get("body") or "")
+    if _v1._core.BLOCKING_FINDING_RE.search(summary_body):
+        raise RuntimeError("P0/P1 Codex finding exists in the review summary")
+    parsed_summary = _parse_completed_summary(summary_body)
     if parsed_summary is None:
         raise RuntimeError("trusted Codex review summary is not the accepted completed shape")
     completed_at, prefix = parsed_summary
