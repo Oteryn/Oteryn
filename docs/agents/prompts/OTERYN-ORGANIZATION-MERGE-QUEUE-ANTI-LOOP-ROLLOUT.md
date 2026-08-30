@@ -30,7 +30,7 @@ Bring the Oteryn organization to one terminal integration model that prevents br
 - that qualification is a protected META organization-ruleset workflow result, never a candidate-controlled `merge_group` workflow or same-name status;
 - unrelated `main` movement does not by itself cause a fresh external review or task-branch mutation;
 - risk-bearing fingerprint changes do require fresh review;
-- P0/P1 block; P2 is follow-up unless correctly escalated to P1 because it proves a merge-blocking invariant violation;
+- P0/P1 block; a P2 is non-blocking only after its exact current-generation trusted finding thread is resolved and has exactly one unedited `OWNER`/`MEMBER`/`COLLABORATOR` `Tracked in #<issue>.` disposition that records an open same-repository Issue, unless correctly escalated to P1 because it proves a merge-blocking invariant violation; the executing agent cannot accept the deferral without that maintainer-owned disposition;
 - unchanged candidates never receive no-op/retrigger/checkpoint commits merely to wake CI/review;
 - META owns semantics and Game/Platform/Atlas consume thin provider configuration.
 
@@ -125,11 +125,11 @@ If risk-bearing candidate content changes, or a trusted-base change changes the 
 
 - P0: blocking.
 - P1: blocking.
-- P2: non-blocking follow-up by default.
+- P2: potentially non-blocking follow-up only when the exact conditions below are verified.
 
 If a P2 actually proves a merge-blocking security, authority, durability, protocol/contract or acceptance invariant violation, reclassify/escalate it to P1 with evidence. Do not create an infinite `P2 -> repair -> new review -> another P2` loop by treating every hypothetical hardening improvement as mandatory before merge.
 
-For a legitimate deferred P2, create/link a durable follow-up Issue and resolve any required review thread with that explicit deferral evidence.
+A legitimate P2 is non-blocking only when its exact current-generation trusted finding is in a resolved, unedited review thread and has exactly one unedited `OWNER`, `MEMBER` or `COLLABORATOR` reply whose entire body is `Tracked in #<issue>.`; the reference must be an open same-repository Issue, not a pull request. Missing, duplicate, edited, stale, cross-repository or closed evidence fails closed. The executing agent cannot create/link an Issue or resolve a thread as sufficient deferral without this maintainer-owned disposition.
 
 ## Execution sequence
 
@@ -232,7 +232,7 @@ Before terminal closeout, prove all of these with durable GitHub evidence:
 2. **Unrelated main advance:** reviewed candidate stays unchanged; fingerprint remains valid; no fresh external review; queue rebuilds latest-main integration candidate; merge-group CI passes; merge succeeds.
 3. **Risk-bearing base advance:** fingerprint reuse fails; integration waits; fresh review occurs only after required reconciliation.
 4. **P1 repair:** TDD repair changes fingerprint; fresh review required; queue integration succeeds after PASS.
-5. **P2 follow-up:** non-blocking P2 is tracked/deferrable without review-repair loop.
+5. **P2 follow-up:** a non-blocking P2 has its exact current-generation trusted finding thread resolved plus exactly one unedited trusted maintainer `Tracked in #<issue>.` disposition for an open same-repository Issue; no agent self-deferral or review-repair loop.
 6. **Late review evidence:** same unchanged candidate is re-evaluated without a no-op Git commit.
 7. **Queue failure:** real integration failure returns to the owning candidate; no branch mutation is performed merely to retrigger unchanged external state.
 8. **Dual-event proof:** a fresh or reopened canary is ineligible before PR-stage review evidence and eligible after it; a same-head late-review rerun uses no commit; its merge-group run produces a distinct exact `I`; neither result can satisfy the other; Evaluate-mode save/readback/source access succeeds; strict freshness remains active through canary readback; a malicious local-helper shadow fails closed; and a Team cross-repository capability failure retains strict freshness as the explicit fallback.

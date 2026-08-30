@@ -28,7 +28,7 @@ Adopt this organization-wide model for `Oteryn/Oteryn`, `Oteryn/Oteryn-Game`, `O
 5. A `main` advance by itself does not force a new external review. Review is reused only when the machine policy proves the same tier/fingerprint and all ancestry/review-neutral/trusted-base conditions.
 6. A change to risk-bearing candidate content or a base change that changes the risk-bearing fingerprint requires fresh external review.
 7. Empty/no-op/checkpoint/retrigger commits are forbidden as evidence-refresh mechanisms.
-8. P0/P1 findings are merge-blocking. P2 findings are non-blocking follow-up unless the finding actually proves a merge-blocking security, authority, durability, contract or acceptance-invariant violation; such a finding must be escalated to P1 instead of creating an unbounded P2 repair loop.
+8. P0/P1 findings are merge-blocking. A P2 may be non-blocking only after the exact maintainer-owned follow-up evidence defined below; a P2 that proves a merge-blocking security, authority, durability, contract or acceptance-invariant violation must be escalated to P1 instead of creating an unbounded P2 repair loop.
 
 ## Terminology
 
@@ -123,9 +123,9 @@ The merge-group gate must verify that external review evidence still qualifies t
 
 - **P0:** blocking.
 - **P1:** blocking.
-- **P2:** non-blocking improvement/follow-up by default.
+- **P2:** potentially non-blocking follow-up only when the exact conditions below are verified.
 
-A reviewer must not label a merge-blocking correctness/security/authority defect as P2 merely to avoid blocking. If a P2 is deferred, create or link a durable follow-up Issue and resolve the PR thread as an explicit policy-compliant deferral; do not leave required review-thread resolution ambiguous.
+A reviewer must not label a merge-blocking correctness/security/authority defect as P2 merely to avoid blocking. A P2 becomes non-blocking only when its exact current-generation trusted finding is in a resolved, unedited review thread and has exactly one unedited disposition from an `OWNER`, `MEMBER` or `COLLABORATOR` whose complete body is `Tracked in #<issue>.`; that reference must be an open same-repository Issue, not a pull request. Missing, duplicate, edited, stale, cross-repository or closed evidence fails closed. The executing agent cannot accept a deferral or resolve the thread as sufficient evidence without that maintainer-owned disposition.
 
 ### Protected branch
 
@@ -268,7 +268,7 @@ The programme is complete only when:
 - strict up-to-date-before-merge is no longer the normal author/agent integration mechanism;
 - fingerprint reuse works across qualifying unrelated `main` advances;
 - fingerprint changes still force fresh review;
-- P0/P1 block and P2 follow-up behavior is deterministic;
+- P0/P1 block and P2 follow-up behavior is deterministic, including the exact resolved finding thread, exactly one trusted maintainer disposition, and open same-repository Issue conditions;
 - no-op/retrigger loops are deterministically prohibited;
 - live configuration drift is detectable;
 - canary PRs prove the end-to-end flow before old protections are removed, including Evaluate-mode save/readback/source access, a fresh or reopened canary, PR-stage ineligible-before/eligible-after evidence, a same-head late-review rerun without a commit, a distinct exact-`I` merge-group run, a malicious local-helper shadow fixture, and strict freshness retained throughout the canary;

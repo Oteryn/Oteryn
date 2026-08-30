@@ -22,7 +22,7 @@
 - Do not use no-op/retrigger commits to obtain new CI/review evidence.
 - Do not require fresh external review solely because a SHA changed; run the canonical fingerprint-reuse verifier first.
 - Do require fresh external review after a risk-bearing fingerprint change.
-- P0/P1 block. P2 is follow-up unless the finding is escalated to P1 because it proves a merge-blocking invariant violation.
+- P0/P1 block. A P2 is non-blocking only after its exact current-generation trusted finding thread is resolved and contains exactly one unedited `OWNER`, `MEMBER` or `COLLABORATOR` disposition whose entire body is `Tracked in #<issue>.`, where that reference is an open Issue—not a pull request—in the same repository. Missing, duplicate, edited, stale, cross-repository or closed evidence fails closed; the executing agent cannot accept the deferral without that maintainer-owned disposition.
 - Provider repositories may be stricter on tests/risk classification but may not fork review-reuse or integration semantics.
 - The one protected META organization-ruleset workflow must support disjoint, fail-closed `pull_request` admission and `merge_group` integration jobs. A target-local `merge_group` workflow is candidate-controlled and cannot be required integration authority; require the protected META workflow by source repository/path, never a same-name status.
 - The PR admission job binds the GitHub PR merge-ref/check-suite head `Hpr` to server-current candidate `C`, verifies the unique trusted PR #111 envelope (`Q`, `R`, exact tier/fingerprint and `R -> C`), and never receives secrets, OIDC, attestation writes or checks/status writes. Candidate contents are inert; candidate tests, if needed, are separate unprivileged jobs. A PR-stage result can never satisfy the distinct exact-`I` merge-group stage.
@@ -72,7 +72,7 @@ Create/extend META machine and human governance so there is one authoritative co
   - risk-bearing candidate change invalidating review;
   - clean trusted-base merge/merge-group reuse under allowed conditions;
   - no-op/retrigger commit rejection;
-  - P2 not being an automatic merge blocker;
+  - a P2 being non-blocking only with its exact resolved unedited finding thread, exactly one trusted maintainer `Tracked in #<issue>.` disposition, and an open same-repository Issue;
   - P1 remaining blocking;
   - provider config being unable to override META reuse semantics;
   - a missing/duplicate commit-to-PR mapping, queue entry or attestation artifact failing closed;
@@ -228,7 +228,7 @@ P1 -> TDD repair -> fingerprint changes -> fresh review -> queue -> merge-group 
 
 ### Scenario E — P2 follow-up
 
-P2 that does not violate a merge-blocking invariant -> durable follow-up Issue/explicit deferral -> required thread resolution -> no repair/re-review loop solely for P2.
+P2 that does not violate a merge-blocking invariant -> exact current-generation trusted finding thread resolved -> exactly one unedited `OWNER`/`MEMBER`/`COLLABORATOR` `Tracked in #<issue>.` disposition for an open same-repository Issue -> no repair/re-review loop solely for P2. The executing agent cannot self-accept or self-resolve the deferral.
 
 ### Scenario F — delayed review evidence
 
