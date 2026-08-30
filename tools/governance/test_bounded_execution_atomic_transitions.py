@@ -169,6 +169,65 @@ class AtomicTransitionRegressionTests(unittest.TestCase):
         with self.assertRaisesRegex(GuardError, "record_loop_breaker_audit"):
             decide(previous, current, "mutate", POLICY)
 
+    def test_external_dependency_observation_reserves_waiting_checkpoint_before_release(self):
+        current = with_binding(
+            snapshot(
+                state="READY",
+                phase="implementation",
+                candidate_frozen=False,
+                blocking_dependency="external-review:123",
+                dependency_kind="external",
+            )
+        )
+        outbox = RecordingOutbox()
+
+        result = raw_decide(
+            None,
+            current,
+            "observe",
+            POLICY,
+            context=ExecutionContext(AllowEvidenceAuthority(), outbox),
+        )
+
+        self.assertTrue(result.allowed)
+        self.assertEqual(result.state, "WAITING_EXTERNAL")
+        self.assertTrue(result.release_session)
+        expected = copy.deepcopy(current)
+        expected["state"] = "WAITING_EXTERNAL"
+        self.assertEqual(outbox.next_checkpoint, _checkpoint_digest(expected))
+
+    def test_completion_requires_prior_durable_frozen_final_candidate(self):
+        previous = with_binding(
+            snapshot(
+                state="READY",
+                phase="implementation",
+                candidate_frozen=False,
+                completion_verified=False,
+            )
+        )
+        current = with_binding(
+            snapshot(
+                state="READY",
+                phase="final_qualification",
+                candidate_frozen=True,
+                completion_verified=True,
+            )
+        )
+        outbox = RecordingOutbox()
+
+        result = raw_decide(
+            previous,
+            current,
+            "complete",
+            POLICY,
+            context=ExecutionContext(AllowEvidenceAuthority(), outbox),
+        )
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "READY")
+        self.assertIn("previous", result.reason)
+        self.assertIsNone(outbox.next_checkpoint)
+
 
 if __name__ == "__main__":
     unittest.main()
