@@ -21,6 +21,7 @@ FORBIDDEN_PROVIDER_WRITES = (
     "pull-requests: write",
     "statuses: write",
 )
+UPLOAD_ARTIFACT_SHA = "ea165f8d65b6e75b540449e92b4886f43607fa02"
 
 
 def main() -> int:
@@ -57,7 +58,25 @@ def main() -> int:
         if f"`{scope}`" not in contract:
             raise SystemExit(f"caller contract must distinguish issuer-only permission: {scope}")
 
-    print("Reusable AI review gate permission contract PASS")
+    attest = workflow.find("- id: attest-review-envelope")
+    verify = workflow.find("- name: Verify GitHub attestation, exact predicate and live coordinates")
+    publish = workflow.find("- id: publish-review-envelope")
+    if min(attest, verify, publish) < 0 or not (attest < verify < publish):
+        raise SystemExit("verified envelope artifact must be published only after attestation self-verification")
+    if f"uses: actions/upload-artifact@{UPLOAD_ARTIFACT_SHA}" not in workflow:
+        raise SystemExit("review-envelope artifact upload action must be pinned to the approved full SHA")
+    for locator_part in (
+        "github.event.pull_request.number",
+        "github.event.pull_request.head.sha",
+        "github.run_id",
+        "github.run_attempt",
+    ):
+        if locator_part not in workflow[publish:]:
+            raise SystemExit(f"review-envelope artifact locator is missing {locator_part}")
+    if "if-no-files-found: error" not in workflow[publish:]:
+        raise SystemExit("review-envelope artifact publication must fail if the canonical envelope is missing")
+
+    print("Reusable AI review gate permission/artifact contract PASS")
     return 0
 
 
