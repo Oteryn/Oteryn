@@ -178,6 +178,16 @@ Test these exact failures:
 {"worker_disposition": "rotate_resumable", "resume_mechanism": "same_session", "resume_locator": "current"}
 {"worker_disposition": "rotate_resumable", "resume_mechanism": "github_native", "resume_locator": "workflow:ci"}
 
+# release_waiting with a configured automatic mechanism must remain locatable
+{"worker_disposition": "release_waiting", "resume_mechanism": "scheduled_task", "resume_locator": None}
+{"worker_disposition": "release_waiting", "resume_mechanism": "scheduled_task", "resume_locator": ""}
+{"worker_disposition": "release_waiting", "resume_mechanism": "work_event_trigger", "resume_locator": None}
+{"worker_disposition": "release_waiting", "resume_mechanism": "work_event_trigger", "resume_locator": ""}
+{"worker_disposition": "release_waiting", "resume_mechanism": "work_persistent", "resume_locator": None}
+{"worker_disposition": "release_waiting", "resume_mechanism": "work_persistent", "resume_locator": ""}
+{"worker_disposition": "release_waiting", "resume_mechanism": "github_native", "resume_locator": None}
+{"worker_disposition": "release_waiting", "resume_mechanism": "github_native", "resume_locator": ""}
+
 # terminal task cannot advertise scheduled continuation
 {"worker_disposition": "terminal", "resume_mechanism": "scheduled_task", "resume_locator": "task-1"}
 ```
@@ -187,6 +197,9 @@ Test these exact valid pairings:
 ```python
 {"worker_disposition": "continue_current", "resume_mechanism": "same_session", "resume_locator": None}
 {"worker_disposition": "release_waiting", "resume_mechanism": "github_native", "resume_locator": "merge-queue:pr-123"}
+{"worker_disposition": "release_waiting", "resume_mechanism": "scheduled_task", "resume_locator": "scheduled-task:abc"}
+{"worker_disposition": "release_waiting", "resume_mechanism": "work_event_trigger", "resume_locator": "work-trigger:def"}
+{"worker_disposition": "release_waiting", "resume_mechanism": "work_persistent", "resume_locator": "work-task:ghi"}
 {"worker_disposition": "rotate_resumable", "resume_mechanism": "scheduled_task", "resume_locator": "scheduled-task:abc"}
 {"worker_disposition": "rotate_resumable", "resume_mechanism": "work_event_trigger", "resume_locator": "work-trigger:def"}
 {"worker_disposition": "rotate_resumable", "resume_mechanism": "work_persistent", "resume_locator": "work-task:ghi"}
@@ -194,7 +207,7 @@ Test these exact valid pairings:
 {"worker_disposition": "terminal", "resume_mechanism": "none_terminal", "resume_locator": None}
 ```
 
-For `release_waiting + github_native`, additionally require a fact such as `phase_can_complete_without_replacement_worker=true`; if later worker action is required and no worker-launching mechanism exists, fail closed to `stop_reinvoke_required` rather than claiming automatic worker continuation.
+For `release_waiting + github_native`, additionally require a fact such as `all_remaining_task_work_can_complete_without_agent_worker=true`; if any later worker action is required and no worker-launching mechanism exists, fail closed to `stop_reinvoke_required` rather than claiming automatic worker continuation. For `release_waiting` paired with `scheduled_task`, `work_event_trigger`, or `work_persistent`, require the same non-empty concrete locator invariant as `rotate_resumable` so a purported waiting continuation can always be re-established and audited.
 
 Build one valid baseline snapshot containing at least these always-required checkpoint fields:
 
@@ -485,11 +498,11 @@ After authorization, require additive continuation fields or derived values that
 ```yaml
 worker_disposition: continue_current | release_waiting | rotate_resumable | stop_reinvoke_required | terminal
 resume_mechanism: same_session | github_native | scheduled_task | work_event_trigger | work_persistent | owner_reinvoke | none_terminal
-resume_locator: <required for worker-launching/preserving automatic rotation; otherwise per compatibility matrix>
+resume_locator: <required for every configured automatic waiting/rotation continuation; otherwise per compatibility matrix>
 context_pressure: <existing Platform classification>
 ```
 
-Do not change the existing canonical task-status vocabulary merely to mirror META names. Require the same fail-closed compatibility matrix as META, including rejection of `rotate_resumable + same_session` and `rotate_resumable + github_native`.
+Do not change the existing canonical task-status vocabulary merely to mirror META names. Require the same fail-closed compatibility matrix as META, including rejection of `rotate_resumable + same_session` and `rotate_resumable + github_native`, plus missing/empty locators for automatic `release_waiting` continuations.
 
 - [ ] **Step 3: Prove RED**
 
@@ -511,7 +524,7 @@ Preserve all existing numeric limits unless a separate owner-approved Platform t
 
 - [ ] **Step 6: Update checkpoint/resume implementation**
 
-Make `checkpoint.py` and `resume.py` validate truthful resume disposition without changing existing liveness/security behavior. `rotate_resumable` must fail closed unless its mechanism is exactly `scheduled_task`, `work_event_trigger` or `work_persistent` with the required concrete locator; `same_session` and `github_native` must not qualify rotation. `owner_reinvoke` must not render as automatic continuation.
+Make `checkpoint.py` and `resume.py` validate truthful resume disposition without changing existing liveness/security behavior. `rotate_resumable` must fail closed unless its mechanism is exactly `scheduled_task`, `work_event_trigger` or `work_persistent` with the required concrete locator; `same_session` and `github_native` must not qualify rotation. Automatic `release_waiting` mechanisms must also carry their required concrete locator. `owner_reinvoke` must not render as automatic continuation.
 
 - [ ] **Step 7: Update Control Room only if needed**
 
