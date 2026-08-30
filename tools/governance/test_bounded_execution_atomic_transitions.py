@@ -228,6 +228,21 @@ class AtomicTransitionRegressionTests(unittest.TestCase):
         self.assertIn("previous", result.reason)
         self.assertIsNone(outbox.next_checkpoint)
 
+    def test_terminal_ledger_certification_requires_record_action_even_when_counters_match(self):
+        previous = snapshot(
+            state="READY",
+            phase="LOOP_BREAKER_AUDIT",
+            candidate_frozen=False,
+            late_material_findings=2,
+            audited_late_material_findings=2,
+            risk_ledger=pending_ledger(),
+        )
+        current = copy.deepcopy(previous)
+        current["risk_ledger"] = terminal_ledger()
+
+        with self.assertRaisesRegex(GuardError, "record_loop_breaker_audit"):
+            decide(previous, current, "mutate", POLICY)
+
 
 if __name__ == "__main__":
     unittest.main()
