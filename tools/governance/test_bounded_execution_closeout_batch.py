@@ -233,6 +233,56 @@ class MaterialChangeEvidenceTests(unittest.TestCase):
 
 
 class TrustedAuthorityAndReservationTests(unittest.TestCase):
+    def test_acknowledgement_requires_durable_dispatch_start_boundary(self):
+        repository = "Oteryn/Oteryn"
+        task_id = "OTERYN-DISPATCH-ACK-START-BOUNDARY"
+        initial = {"revision": 0}
+        reserved = {"revision": 1}
+        scope = ("loop-breaker-generation-1",)
+        with tempfile.TemporaryDirectory() as directory:
+            outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
+            outbox.seed_checkpoint(
+                repository, task_id, _checkpoint_digest(initial), snapshot=initial
+            )
+            reservation = outbox.reserve(
+                repository=repository,
+                task_id=task_id,
+                expected_checkpoint=_checkpoint_digest(initial),
+                next_checkpoint=_checkpoint_digest(reserved),
+                next_snapshot=reserved,
+                action="run_loop_breaker_audit",
+                scope=scope,
+            )
+            claimed = outbox.claim_pending_dispatch(repository, task_id)
+            self.assertIsNotNone(claimed)
+
+            self.assertFalse(
+                outbox.acknowledge_dispatch(
+                    reservation.reservation_key, claimed.dispatch_generation
+                )
+            )
+            self.assertFalse(
+                outbox.has_acknowledged_dispatch(
+                    repository, task_id, "run_loop_breaker_audit", scope
+                )
+            )
+
+            self.assertTrue(
+                outbox.begin_dispatch(
+                    reservation.reservation_key, claimed.dispatch_generation
+                )
+            )
+            self.assertTrue(
+                outbox.acknowledge_dispatch(
+                    reservation.reservation_key, claimed.dispatch_generation
+                )
+            )
+            self.assertTrue(
+                outbox.has_acknowledged_dispatch(
+                    repository, task_id, "run_loop_breaker_audit", scope
+                )
+            )
+
     def test_loop_breaker_audit_dispatch_scope_includes_exact_head(self):
         head_a = snapshot(
             phase="LOOP_BREAKER_AUDIT", late_material_findings=2,
