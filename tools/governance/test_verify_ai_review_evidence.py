@@ -317,6 +317,13 @@ def test_current_codex_summary_does_not_suppress_contradictory_clean_echo() -> N
     )
 
 
+def test_current_codex_summary_does_not_suppress_contradictory_echo_details() -> None:
+    for extra in ("\nMerge is unsafe.", "\n[P2] Results are wrong"):
+        _v1.core_tests.expect_fail(
+            lambda extra=extra: _verify_summary_merge_reuse_with_echoes(echo_extra=extra)
+        )
+
+
 def test_current_codex_summary_rejects_multiple_same_generation_clean_echoes() -> None:
     _v1.core_tests.expect_fail(
         lambda: _verify_summary_merge_reuse_with_echoes(echo_count=2)
