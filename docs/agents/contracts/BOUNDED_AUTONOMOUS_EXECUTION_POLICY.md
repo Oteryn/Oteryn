@@ -70,6 +70,8 @@ A legitimate repair is a durable transition, not a worker assertion. Before open
 
 While that repair generation is open, its material fact and base coordinates remain immutable; one or more real technical changes may be made without consuming a second generation. Refreezing is allowed only after the candidate has a new technical head **and** a changed canonical review/risk fingerprint. `retrigger` is never a material repair action. The worker then freezes the new candidate before final qualification resumes.
 
+`complete` is admitted only from `final_qualification` with that exact candidate frozen; verified completion evidence alone cannot bypass either invariant.
+
 The durable checkpoint writer must compare-and-swap the previous revision before dispatching a consumed action and use an idempotency key over task, generation scope, action and consumed count. The pure guard validates proposed transitions; it cannot make external dispatch persistence atomic by itself.
 
 ## No-op and retrigger prohibition
@@ -94,6 +96,8 @@ The canonical organization defaults are machine-readable in `ecosystem/bounded-a
 - automatic same-head AI-review gate rechecks for one exact head/evidence generation: `1`.
 
 Durable counters may reset only when **their own generation scope** changes. Unrelated phase, status, narration or gate-field changes do not reset a consumed budget.
+
+The policy's `progress_fingerprint_fields` is a closed organization-owned material field set. Providers may not append timestamps, narration, or other nonmaterial fields, nor omit a canonical field, because doing so could manufacture apparent progress.
 
 Canonical scopes are:
 

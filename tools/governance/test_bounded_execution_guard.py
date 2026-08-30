@@ -87,8 +87,41 @@ class ProgressFingerprintTests(unittest.TestCase):
             progress_fingerprint(second, POLICY),
         )
 
+    def test_policy_rejects_noncanonical_progress_fingerprint_fields(self):
+        variants = []
+        appended = copy.deepcopy(POLICY)
+        appended["progress_fingerprint_fields"].append("updated_at")
+        variants.append(appended)
+        omitted = copy.deepcopy(POLICY)
+        omitted["progress_fingerprint_fields"].remove("gate_state")
+        variants.append(omitted)
+
+        for weakened in variants:
+            with self.subTest(fields=weakened["progress_fingerprint_fields"]):
+                with self.assertRaises(GuardError):
+                    decide(None, snapshot(), "observe", weakened)
+
 
 class DecisionTests(unittest.TestCase):
+    def test_completion_requires_a_frozen_candidate_in_every_phase(self):
+        for phase, candidate_frozen in (
+            ("validate", False),
+            ("validate", True),
+            ("repair", False),
+            ("repair", True),
+            ("final_qualification", False),
+        ):
+            with self.subTest(phase=phase, candidate_frozen=candidate_frozen):
+                current = snapshot(
+                    phase=phase,
+                    candidate_frozen=candidate_frozen,
+                    completion_verified=True,
+                )
+                result = decide(None, current, "complete", POLICY)
+                self.assertFalse(result.allowed)
+                self.assertNotEqual(result.state, "DONE")
+                self.assertIn("frozen", result.reason.lower())
+
     def test_frozen_candidate_denies_retrigger_without_material_change(self):
         current = snapshot(candidate_frozen=True, state="READY")
         result = decide(None, current, "retrigger", POLICY)
@@ -218,7 +251,12 @@ class DecisionTests(unittest.TestCase):
         self.assertFalse(result.allowed)
         self.assertNotEqual(result.state, "DONE")
 
-        verified = snapshot(state="READY", completion_verified=True)
+        verified = snapshot(
+            state="READY",
+            phase="final_qualification",
+            candidate_frozen=True,
+            completion_verified=True,
+        )
         result = decide(None, verified, "complete", POLICY)
         self.assertTrue(result.allowed)
         self.assertEqual(result.state, "DONE")

@@ -84,6 +84,21 @@ SUPPORTED_ACTIONS = {
     "enter_final_qualification",
 }
 MAX_ORGANIZATION_LOOP_BREAKER_THRESHOLD = 2
+CANONICAL_PROGRESS_FINGERPRINT_FIELDS = (
+    "repository",
+    "task_id",
+    "task_head_sha",
+    "phase",
+    "blocking_dependency",
+    "dependency_kind",
+    "gate_state",
+    "review_generation",
+    "review_fingerprint",
+    "evidence_generation",
+    "first_material_failure",
+    "material_fact_id",
+    "material_fact_head",
+)
 EXPECTED_COUNTER_SCOPES = {
     "identical_failure_cycles": ["task_head_sha", "failure_fingerprint"],
     "heavy_validation_runs": ["task_head_sha"],
@@ -131,10 +146,8 @@ def validate_policy(policy: dict[str, Any]) -> None:
         raise GuardError("session_release_states do not match the canonical release-state set")
 
     fields = policy.get("progress_fingerprint_fields")
-    if not isinstance(fields, list) or not fields or not all(isinstance(x, str) and x for x in fields):
-        raise GuardError("progress_fingerprint_fields must be a non-empty string list")
-    if "evidence_generation" not in fields:
-        raise GuardError("progress_fingerprint_fields must include evidence_generation")
+    if fields != list(CANONICAL_PROGRESS_FINGERPRINT_FIELDS):
+        raise GuardError("progress_fingerprint_fields must match the canonical material field set")
 
     budgets = policy.get("retry_budgets")
     expected_budgets = {
@@ -701,6 +714,19 @@ def decide(
         return _decision(True, "READY", "qualification admission is within the current bounded audit generation", False, progress, failure)
 
     if requested_action == "complete":
+        if (
+            not current["candidate_frozen"]
+            or current["phase"] != "final_qualification"
+        ):
+            state = current["state"] if current["state"] in release_states else "READY"
+            return _decision(
+                False,
+                state,
+                "DONE is forbidden until the exact technical candidate is frozen in final qualification",
+                state in release_states,
+                progress,
+                failure,
+            )
         if loop_triggered and not _ledger_terminal(current, policy):
             state = current["state"] if current["state"] in release_states else "READY"
             return _decision(False, state, "DONE is forbidden until the loop-breaker risk ledger is terminal", state in release_states, progress, failure)
