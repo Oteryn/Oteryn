@@ -26,9 +26,6 @@ _OBSERVED_CLEAN_FLAIRS = {
     "Another round soon, please!",
     "Keep it up!",
 }
-_OBSERVED_DUPLICATE_ECHO_FIRST_LINES = {
-    f"{_CLEAN_PREFIX} Delightful!",
-}
 _CODEX_SUMMARY_MARKER = "<!-- codex-pull-request-review-summary -->"
 _CODEX_SUMMARY_APP = "chatgpt-codex-connector"
 _CODEX_SUMMARY_ROW = re.compile(
@@ -141,6 +138,32 @@ def _eligible_summary_anchor(
     return matches[0]
 
 
+def _parse_observed_duplicate_clean_echo(body: str) -> str | None:
+    """Return the reviewed prefix only for the complete observed Codex echo envelope."""
+    lines = [line.strip() for line in (body or "").splitlines() if line.strip()]
+    if len(lines) != 11 or lines[0] != f"{_CLEAN_PREFIX} Delightful!":
+        return None
+    reviewed = _REVIEWED_COMMIT_LINE.fullmatch(lines[1])
+    if reviewed is None:
+        return None
+    prefix = reviewed.group(1)
+    expected = [
+        f"{_CLEAN_PREFIX} Delightful!",
+        f"**Reviewed commit:** `{prefix}`",
+        "<details> <summary>ℹ️ About Codex in GitHub</summary>",
+        "<br/>",
+        "[Your team has set up Codex to review pull requests in this repo]"
+        "(https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you",
+        "- Open a pull request for review",
+        "- Mark a draft as ready",
+        '- Comment "@codex review".',
+        "If Codex has suggestions, it will comment; otherwise it will react with 👍.",
+        'Codex can also answer questions or update the PR. Try commenting "@codex address that feedback".',
+        "</details>",
+    ]
+    return prefix if lines == expected else None
+
+
 def _same_generation_clean_echoes(
     comments: list[dict], *, summary: dict, trusted_logins: set[str],
     repo_root: str | Path, reviewed_head: str, request_at: datetime,
@@ -166,15 +189,12 @@ def _same_generation_clean_echoes(
         if not (request_at < created_at <= reaction_at):
             continue
         body = str(comment.get("body") or "")
-        first_line = body.strip().splitlines()[0] if body.strip() else ""
-        if first_line not in _OBSERVED_DUPLICATE_ECHO_FIRST_LINES:
-            continue
         if _v1._core.BLOCKING_FINDING_RE.search(body):
             raise RuntimeError("P0/P1 Codex finding exists in the same-generation clean echo")
-        matches = _REVIEWED_COMMIT_LINE.findall(body)
-        if len(matches) != 1:
+        prefix = _parse_observed_duplicate_clean_echo(body)
+        if prefix is None:
             continue
-        resolved = _v1._core.resolve_reviewed_prefix(repo_root, matches[0])
+        resolved = _v1._core.resolve_reviewed_prefix(repo_root, prefix)
         if resolved != reviewed_head:
             continue
         echoes.append(comment)
