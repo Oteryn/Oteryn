@@ -13,6 +13,7 @@ import dataclasses
 import hashlib
 import json
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from typing import Protocol
 
@@ -82,7 +83,7 @@ class SqliteCheckpointOutbox:
         return connection
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS bounded_execution_checkpoint (
@@ -112,7 +113,7 @@ class SqliteCheckpointOutbox:
         the very CAS lineage this adapter protects.
         """
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             try:
                 connection.execute(
                     "INSERT INTO bounded_execution_checkpoint(repository, task_id, checkpoint) VALUES (?, ?, ?)",
@@ -139,7 +140,7 @@ class SqliteCheckpointOutbox:
             action,
             scope,
         )
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
             replay = connection.execute(
                 "SELECT reservation_key FROM bounded_execution_outbox WHERE reservation_key = ?",
@@ -189,7 +190,7 @@ class SqliteCheckpointOutbox:
     def claim_dispatch(self, reservation_key: str) -> bool:
         """Grant exactly one dispatcher the committed reservation."""
 
-        with self._connect() as connection:
+        with closing(self._connect()) as connection:
             updated = connection.execute(
                 """
                 UPDATE bounded_execution_outbox
