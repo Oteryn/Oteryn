@@ -27,6 +27,7 @@ _OBSERVED_CLEAN_FLAIRS = {
     "Another round soon, please!",
     "Keep it up!",
 }
+_DUPLICATE_ONLY_CLEAN_FLAIRS = {"Delightful!", ":tada:"}
 _CODEX_SUMMARY_MARKER = "<!-- codex-pull-request-review-summary -->"
 _CODEX_SUMMARY_APP = "chatgpt-codex-connector"
 _CODEX_SUMMARY_ROW = re.compile(
@@ -212,8 +213,6 @@ def _parse_observed_duplicate_clean_echo(body: str) -> str | None:
     if len(lines) != 11 or not lines[0].startswith(f"{_CLEAN_PREFIX} "):
         return None
     flair = lines[0][len(_CLEAN_PREFIX) + 1:]
-    if flair not in {"Delightful!", ":tada:"}:
-        return None
     reviewed = _REVIEWED_COMMIT_LINE.fullmatch(lines[1])
     if reviewed is None:
         return None
@@ -232,7 +231,14 @@ def _parse_observed_duplicate_clean_echo(body: str) -> str | None:
         'Codex can also answer questions or update the PR. Try commenting "@codex address that feedback".',
         "</details>",
     ]
-    return prefix if lines == expected else None
+    if lines != expected:
+        return None
+    direct_prefix = _compat_parse_clean_result(body)
+    if direct_prefix == prefix:
+        return prefix
+    if direct_prefix is None and flair in _DUPLICATE_ONLY_CLEAN_FLAIRS:
+        return prefix
+    return None
 
 
 def _same_generation_clean_echoes(
