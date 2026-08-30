@@ -106,7 +106,7 @@ For substantial work:
 4. inspect the full exact diff before readiness;
 5. verify current repository state and any external coordinates referenced by the change when those facts are material;
 6. mark Ready only after implementation/self-review is complete;
-7. merge only when repository-required exact-head checks pass and there are no unresolved review findings;
+7. merge only when repository-required exact-head checks pass and there are no unresolved review findings; a P2 may be non-blocking only after its exact review thread is resolved and a trusted maintainer has recorded the required same-repository follow-up Issue;
 8. use squash merge unless a future repository policy explicitly requires another method;
 9. delete the source branch after successful merge when it has no continuing purpose.
 

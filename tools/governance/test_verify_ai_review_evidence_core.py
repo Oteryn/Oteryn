@@ -6,6 +6,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import os
 import tempfile
 from pathlib import Path
 
@@ -20,7 +21,11 @@ POLICY = json.loads(
 
 
 def git(repo: Path, *args: str) -> str:
-    return subprocess.check_output(["git", *args], cwd=repo, text=True).strip()
+    env = os.environ | {
+        "GIT_AUTHOR_DATE": "2026-08-20T08:00:00+00:00",
+        "GIT_COMMITTER_DATE": "2026-08-20T08:00:00+00:00",
+    }
+    return subprocess.check_output(["git", *args], cwd=repo, text=True, env=env).strip()
 
 
 def make_repo(*, non_neutral_after_review: bool = False) -> tuple[Path, str, str]:
