@@ -230,6 +230,7 @@ def test_current_codex_summary_preserves_blocking_finding_in_summary_body() -> N
 def _verify_summary_merge_reuse_with_echoes(
     *, echo_prefix: str | None = None, echo_stamp: str = "2026-08-20T10:00:59Z",
     echo_extra: str = "", echo_count: int = 1,
+    echo_first_line: str = "Codex Review: Didn't find any major issues. Delightful!",
 ) -> dict:
     repo, reviewed, _ = _v1.core_tests.make_repo()
     _v1.core_tests.git(repo, "reset", "--hard", reviewed)
@@ -256,7 +257,7 @@ def _verify_summary_merge_reuse_with_echoes(
             prefix,
             stamp=echo_stamp,
             text=(
-                "Codex Review: Didn't find any major issues. Delightful!\n\n"
+                f"{echo_first_line}\n\n"
                 f"**Reviewed commit:** `{prefix}`\n\n"
                 "<details> <summary>ℹ️ About Codex in GitHub</summary>\n"
                 f"standard Codex review wrapper{echo_extra}\n"
@@ -305,6 +306,14 @@ def test_current_codex_summary_does_not_suppress_post_reaction_clean_echo() -> N
 def test_current_codex_summary_does_not_suppress_blocking_clean_echo() -> None:
     _v1.core_tests.expect_fail(
         lambda: _verify_summary_merge_reuse_with_echoes(echo_extra="\n[P1] Security boundary bypass")
+    )
+
+
+def test_current_codex_summary_does_not_suppress_contradictory_clean_echo() -> None:
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary_merge_reuse_with_echoes(
+            echo_first_line="Codex Review: Didn't find any major issues. Merge is unsafe."
+        )
     )
 
 
