@@ -81,6 +81,13 @@
     "Remote_Desktop_Commander.give_feedback_to_desktop_commander",
     "Remote_Desktop_Commander.get_prompts"
   ],
+  "remote_desktop_call_gate": {
+    "schema_version": 1,
+    "argument_binding": "exact_after_nonsemantic_filter",
+    "nonsemantic_arguments": [
+      "deviceId"
+    ]
+  },
   "resume_preflight_required_fields": [
     "verified_at",
     "repository",
