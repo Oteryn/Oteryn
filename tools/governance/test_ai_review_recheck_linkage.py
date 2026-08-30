@@ -94,7 +94,7 @@ class PaginationTests(unittest.TestCase):
 
 
 class TrustedWorkflowBaseBindingTests(unittest.TestCase):
-    def test_write_capable_workflow_executes_only_live_base_authority(self):
+    def test_write_capable_workflow_is_never_loaded_from_pr_review_candidate_context(self):
         workflow = (
             Path(__file__).resolve().parents[2]
             / ".github"
@@ -102,13 +102,12 @@ class TrustedWorkflowBaseBindingTests(unittest.TestCase):
             / "governance-ai-review-recheck.yml"
         ).read_text(encoding="utf-8")
 
+        self.assertIn("actions: write", workflow)
+        self.assertNotIn("pull_request_review:", workflow)
+        self.assertIn("issue_comment:", workflow)
         self.assertIn("id: live-pr", workflow)
         self.assertIn("/pulls/{pr_number}", workflow)
         self.assertIn("ref: ${{ steps.live-pr.outputs.base_sha }}", workflow)
-        self.assertNotIn(
-            "ref: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}",
-            workflow,
-        )
         self.assertIn("EXPECTED_BASE_SHA: ${{ steps.live-pr.outputs.base_sha }}", workflow)
         self.assertIn("git rev-parse HEAD", workflow)
         self.assertIn('live_base_ref = str(((payload.get("base") or {}).get("ref")) or "")', workflow)
@@ -118,7 +117,6 @@ class TrustedWorkflowBaseBindingTests(unittest.TestCase):
             workflow.index("EXPECTED_BASE_SHA: ${{ steps.live-pr.outputs.base_sha }}"),
             workflow.index("python3 tools/governance/ai_review_recheck.py"),
         )
-
 
 
 if __name__ == "__main__":
