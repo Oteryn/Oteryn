@@ -4,6 +4,10 @@ on:
   issue_comment:
     types: [created, edited]
 
+# Security invariant: this write-capable workflow intentionally does not consume
+# github.event.pull_request.base.sha; pull_request_review workflow definitions are
+# candidate-controlled. The live PR base is resolved from GitHub API under the
+# default-branch issue_comment workflow authority before any Actions mutation.
 permissions:
   actions: write
   contents: read
