@@ -965,6 +965,13 @@ def test_current_codex_summary_reuses_review_after_clean_merge_up_with_keep_it_u
     assert found["review_source_kind"] == "issue_comment_result"
 
 
+def test_current_codex_summary_reuses_review_after_clean_merge_up_with_keep_them_coming_duplicate_echo() -> None:
+    found = _verify_summary_merge_reuse_with_echoes(
+        echo_first_line="Codex Review: Didn't find any major issues. Keep them coming!"
+    )
+    assert found["review_source_kind"] == "issue_comment_result"
+
+
 def test_current_codex_summary_reuses_review_after_clean_merge_up_with_swish_duplicate_echo() -> None:
     found = _verify_summary_merge_reuse_with_echoes(
         echo_first_line="Codex Review: Didn't find any major issues. Swish!"
@@ -1013,7 +1020,7 @@ def test_all_compat_v1_direct_flairs_are_guarded_duplicate_echoes() -> None:
 
 
 def test_duplicate_only_flairs_are_not_direct_authoritative_results() -> None:
-    for flair in ("Delightful!", ":tada:"):
+    for flair in ("Delightful!", ":tada:", "Keep them coming!"):
         repo, _, final = _v1.core_tests.make_repo()
         current = _v1.core_tests.issue_comment(
             10, _v1.core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
