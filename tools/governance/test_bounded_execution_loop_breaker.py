@@ -273,6 +273,36 @@ class LoopBreakerRegressionTests(unittest.TestCase):
         self.assertFalse(result.allowed)
         self.assertIn("loop_breaker", result.reason.lower())
 
+    def test_completed_audit_for_old_head_cannot_qualify_new_head(self):
+        previous = snapshot(phase="LOOP_BREAKER_AUDIT", task_head_sha="a" * 40, candidate_frozen=False, late_material_findings=2, audited_late_material_findings=2, post_freeze_material_head_changes=2, audited_post_freeze_material_head_changes=2, final_qualification_runs_since_audit=0, risk_ledger=clear_ledger())
+        current = copy.deepcopy(previous)
+        current["task_head_sha"] = "b" * 40
+        current["candidate_frozen"] = True
+        current["phase"] = "final_qualification"
+        current["final_qualification_runs_since_audit"] = 1
+        result = decide(previous, current, "enter_final_qualification", policy())
+        self.assertFalse(result.allowed)
+        self.assertIn("audit", result.reason.lower())
+
+    def test_qualification_requires_previous_durable_frozen_checkpoint(self):
+        previous = snapshot(phase="LOOP_BREAKER_AUDIT", candidate_frozen=False, late_material_findings=2, audited_late_material_findings=2, post_freeze_material_head_changes=2, audited_post_freeze_material_head_changes=2, final_qualification_runs_since_audit=0, risk_ledger=clear_ledger())
+        current = copy.deepcopy(previous)
+        current["candidate_frozen"] = True
+        current["phase"] = "final_qualification"
+        current["final_qualification_runs_since_audit"] = 1
+        result = decide(previous, current, "enter_final_qualification", policy())
+        self.assertFalse(result.allowed)
+        self.assertIn("frozen", result.reason.lower())
+
+    def test_record_audit_requires_acknowledged_run_dispatch(self):
+        previous = snapshot(phase="LOOP_BREAKER_AUDIT", late_material_findings=2, audited_late_material_findings=0, risk_ledger=pending_ledger())
+        current = copy.deepcopy(previous)
+        current["risk_ledger"] = clear_ledger()
+        current["audited_late_material_findings"] = 2
+        result = decide(previous, current, "record_loop_breaker_audit", policy())
+        self.assertFalse(result.allowed)
+        self.assertIn("audit", result.reason.lower())
+
     def test_loop_breaker_audit_may_advance_audited_counters_after_reopened_ledger(self):
         previous = snapshot(
             phase="LOOP_BREAKER_AUDIT",

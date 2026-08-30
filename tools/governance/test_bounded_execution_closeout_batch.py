@@ -95,6 +95,23 @@ class FrozenLineageTests(unittest.TestCase):
         result = decide(previous, current, "open_material_repair", POLICY)
         self.assertTrue(result.allowed)
 
+    def test_external_wait_does_not_persist_unreserved_repair_fields(self):
+        previous = snapshot(candidate_frozen=True)
+        envelope = make_material_fact_envelope(POLICY, repository=previous["repository"], task_id=previous["task_id"], frozen_head_sha=previous["task_head_sha"], reason="review_finding", source_evidence="review-thread:external-wait")
+        current = copy.deepcopy(previous)
+        current.update({"candidate_frozen": False, "blocking_dependency": "provider-result:pending", "dependency_kind": "external", "material_change": True, "material_change_reason": "review_finding", "material_change_evidence": "review-thread:external-wait", "material_fact_id": envelope["envelope_id"], "material_fact_head": previous["task_head_sha"], "material_fact_verified": True, "material_fact_envelope": envelope, "repair_generation_id": envelope["envelope_id"], "repair_base_head": previous["task_head_sha"], "post_freeze_material_head_changes": 1})
+        with tempfile.TemporaryDirectory() as directory:
+            outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
+            outbox.seed_checkpoint(previous["repository"], previous["task_id"], _checkpoint_digest(previous), snapshot=previous)
+            context = ExecutionContext(TestEvidenceAuthority(set(), {envelope["envelope_id"]}), outbox)
+            result = raw_decide(previous, current, "open_material_repair", POLICY, context=context)
+            self.assertFalse(result.allowed)
+            self.assertEqual(result.state, "WAITING_EXTERNAL")
+            loaded = outbox.load_checkpoint(previous["repository"], previous["task_id"])
+            self.assertTrue(loaded.snapshot["candidate_frozen"])
+            self.assertEqual(loaded.snapshot["repair_generation_id"], "")
+            self.assertEqual(loaded.snapshot["post_freeze_material_head_changes"], 0)
+
     def test_head_move_inside_already_open_repair_does_not_need_second_increment(self):
         previous = snapshot(
             candidate_frozen=False,
