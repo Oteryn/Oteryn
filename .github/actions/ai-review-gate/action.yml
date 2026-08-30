@@ -117,7 +117,7 @@ runs:
         set -euo pipefail
         POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
         CANDIDATE_ROOT="$GITHUB_WORKSPACE/$REPO_ROOT_INPUT"
-        python3 "$POLICY_ROOT/tools/governance/verify_ai_review_evidence.py" \
+        python3 "$POLICY_ROOT/tools/governance/verify_ai_review_evidence_v4.py" \
           --repo-root "$CANDIDATE_ROOT" \
           --policy-file "$POLICY_ROOT/ecosystem/ai-review-policy.json" \
           --repository "$REPOSITORY" \
