@@ -190,6 +190,14 @@ class TrustedTaskIdentity:
 class CheckpointLineageAuthority(Protocol):
     def latest_predecessor(self, trusted_task: TrustedTaskIdentity) -> dict | None: ...
     def proves_no_predecessor(self, trusted_task: TrustedTaskIdentity) -> bool: ...
+    def checkpoint_digest(self, checkpoint: dict) -> str: ...
+
+class CheckpointTransitionAuthority(Protocol):
+    def is_authorized_transition(
+        self,
+        historical_checkpoint: dict,
+        current_trusted_task: TrustedTaskIdentity,
+    ) -> bool: ...
 
 class BoundedLifecycleAuthority(Protocol):
     def canonical_state(self, trusted_task: TrustedTaskIdentity) -> str: ...
@@ -218,21 +226,30 @@ def validate_continuation_snapshot(
     *,
     trusted_task: TrustedTaskIdentity,
     lineage_authority: CheckpointLineageAuthority,
+    transition_authority: CheckpointTransitionAuthority,
     bounded_lifecycle_authority: BoundedLifecycleAuthority,
     mechanism_verifier: ResumeMechanismVerifier,
     remaining_work_authority: RemainingWorkAuthority,
+    validation_mode: str,  # "checkpoint_write" | "resume_read"
 ) -> None: ...
 def select_execution_surface(policy: dict, facts: dict) -> str: ...
 ```
 
 Reject unknown schema versions, missing authority references, duplicate vocabulary values, unknown dispositions/mechanisms/surfaces, invalid disposition/mechanism pairings, missing mandatory checkpoint semantics, malformed exact-head identities, empty/multiple `next_action` values and malformed booleans/integers where the schema expects another type.
 
-Before any lineage, resume or lifecycle decision, require the checkpoint to match the independently authenticated task context:
+Treat stable task identity and mutable execution coordinates differently. These stable fields MUST always match the independently authenticated task context before any lineage, resume or lifecycle decision:
 
 ```python
 snapshot["repository"] == trusted_task.repository
 snapshot["task_id"] == trusted_task.task_id
 snapshot["checkpoint_lineage_token"] == trusted_task.checkpoint_lineage_token
+```
+
+`trusted_task` MUST be supplied by an independently authenticated control-plane/task context and MUST NOT be constructed from snapshot fields inside `validate_continuation_snapshot`.
+
+For `validation_mode="checkpoint_write"`, the proposed checkpoint is current control-plane state, so its mutable coordinates MUST also equal the current trusted context before it can be persisted:
+
+```python
 snapshot["task_branch"] == trusted_task.task_branch
 snapshot["pr_applicable"] == trusted_task.pr_applicable
 snapshot.get("pr_id") == trusted_task.pr_id
@@ -240,13 +257,22 @@ snapshot["task_head_sha"] == trusted_task.task_head_sha
 snapshot["next_action"] == trusted_task.expected_next_action
 ```
 
-`trusted_task` MUST be supplied by an independently authenticated control-plane/task context and MUST NOT be constructed from snapshot fields inside `validate_continuation_snapshot`. At checkpoint creation it represents the authoritative current repository/task/branch/PR/exact-head/next-action coordinates. At resumption, resolve a **fresh** trusted context from GitHub/control-plane state before validation. A legitimate branch/head advance is accepted only after that authoritative state is reconciled into the fresh context; the stale checkpoint head or PR coordinates are historical evidence and never current checkout authority. Unexpected branch, PR, head or next-action drift fails closed.
+For `validation_mode="resume_read"`, **do not rewrite or directly compare historical mutable coordinates to fresh GitHub state**. Instead:
 
-The validator resolves the latest predecessor only with `lineage_authority.latest_predecessor(trusted_task)`. A raw prior snapshot, caller-selected predecessor SHA/digest, caller-provided `None`, or self-declared prior counters are never authoritative inputs. When the adapter returns no predecessor, the validator may treat the snapshot as first-generation only if `lineage_authority.proves_no_predecessor(trusted_task)` independently returns true; lookup failure, stale lineage, ambiguous lineage, or unverifiable absence fails closed.
+1. resolve `historical = lineage_authority.latest_predecessor(trusted_task)` from the durable lineage using only the stable trusted task identity;
+2. require the supplied checkpoint to be that exact authenticated historical record (same durable checkpoint digest and stable identity); a caller-selected older checkpoint, edited branch/PR/head/action, fabricated digest, or rewritten copy fails closed;
+3. preserve `historical["task_branch"]`, `pr_applicable`, `pr_id`, `task_head_sha`, and `next_action` as historical evidence;
+4. resolve a **fresh** `trusted_task` from GitHub/control-plane state;
+5. if the historical mutable coordinates differ from fresh trusted coordinates, require `transition_authority.is_authorized_transition(historical, trusted_task)` to prove the exact branch/PR/head/next-action transition from authoritative GitHub/control-plane evidence;
+6. after successful reconciliation, all **new** checkout/action/PR authority comes from `trusted_task`, never from rewritten snapshot fields.
+
+An unchanged resume may pass when the authenticated historical mutable coordinates already equal the fresh trusted context. A legitimate GitHub head/action advance may pass only through the transition authority. False/unknown/stale/ambiguous transition proof fails closed. This preserves immutable checkpoint history while allowing authorized live-state progress.
+
+When no predecessor exists, `checkpoint_write` may treat the snapshot as first-generation only if `lineage_authority.proves_no_predecessor(trusted_task)` independently returns true. `resume_read` with no authenticated predecessor always fails closed. Lookup failure, stale lineage, ambiguous lineage, unverifiable absence, and unknown `validation_mode` all fail closed.
 
 The snapshot's `bounded_lifecycle_state` is evidence only: it MUST equal `bounded_lifecycle_authority.canonical_state(trusted_task)`. `worker_disposition="terminal"` and `resume_mechanism="none_terminal"` are valid only when `bounded_lifecycle_authority.is_terminal(trusted_task)` is true. Conversely, when the trusted bounded lifecycle is terminal, any nonterminal worker disposition/resume pairing is rejected. The continuation layer does not decide which bounded states are terminal; that remains entirely delegated to `#69/#71`.
 
-For automatic waiting/rotation mechanisms, require `mechanism_verifier.is_live_and_bound(mechanism, locator, trusted_task, trusted_task.expected_next_action)` after first proving `snapshot["next_action"] == trusted_task.expected_next_action`; fail closed when the locator is absent, deleted, disabled, paused, fabricated, inaccessible, belongs to another task/lineage, or is bound to a different next action. Repeat the same check at resumption. For `release_waiting + github_native`, ignore/reject any caller-supplied completion boolean and require `remaining_work_authority.all_remaining_work_can_complete_without_agent_worker(trusted_task)` to prove the whole remaining task can reach a canonical terminal state without any later agent worker.
+For automatic waiting/rotation mechanisms during `checkpoint_write`, require `snapshot["next_action"] == trusted_task.expected_next_action` and then `mechanism_verifier.is_live_and_bound(mechanism, locator, trusted_task, trusted_task.expected_next_action)`. During `resume_read`, first authenticate the historical checkpoint and reconcile any live-state transition as above; then re-check the mechanism against the **fresh** `trusted_task` and `trusted_task.expected_next_action`. Fail closed when the locator is absent, deleted, disabled, paused, fabricated, inaccessible, belongs to another task/lineage, or is bound to a stale/different action. For `release_waiting + github_native`, ignore/reject any caller-supplied completion boolean and require `remaining_work_authority.all_remaining_work_can_complete_without_agent_worker(trusted_task)` against the fresh trusted state to prove the whole remaining task can reach a canonical terminal state without any later agent worker.
 
 - [ ] **Step 5: Add fail-closed disposition/resume compatibility and checkpoint-minimum tests**
 
@@ -303,7 +329,7 @@ trusted_task = TrustedTaskIdentity(
 )
 ```
 
-Add negative tests where the snapshot changes repository, task ID, lineage token, task branch, PR applicability/ID, exact head, or `next_action` while the trusted context remains unchanged; all must fail before lineage/resume dispatch. Add a fake lineage authority containing an unrelated checkpoint-free task and prove that changing all snapshot identity fields together still cannot make `proves_no_predecessor` authorize it. Add a resumption test where GitHub legitimately advances the head: the old checkpoint remains historical evidence, a fresh trusted context is resolved from authoritative live state, and the replacement worker may use the new head only after the transition is explicitly reconciled; a snapshot-selected new head without that proof fails closed.
+Add negative tests where the snapshot changes stable repository/task/lineage identity; these always fail before lineage/resume dispatch. In `checkpoint_write` mode, also reject any snapshot branch/PR/head/`next_action` mismatch against the current trusted context. Add a fake lineage authority containing an unrelated checkpoint-free task and prove that changing all snapshot identity fields together still cannot make `proves_no_predecessor` authorize it. For `resume_read`, add a trusted historical checkpoint at head A/action A and a fresh trusted GitHub context at head B/action B: require the supplied checkpoint digest to match the authoritative historical record, then allow use of B/action B only when `CheckpointTransitionAuthority` verifies exactly A→B/action A→B. Reject an edited historical checkpoint, caller-selected older checkpoint, snapshot rewritten to B before history authentication, transition proof for another PR/task, and false/unknown/stale transition proof. Also prove unchanged A→A resumes without manufacturing a transition.
 
 For every automatic mechanism, validity requires `is_live_and_bound(...)` to return true for the exact trusted task and `next_action`. Add parameterized negative cases where the locator is syntactically non-empty but the verifier reports deleted, disabled, paused, unknown, inaccessible, mismatched task/lineage, or mismatched next action. Explicitly prove that a live scheduled/Work task belonging to `OTHER-TASK` does not satisfy a checkpoint for `Oteryn/Oteryn#108`, and that the same locator bound to `next_action="other action"` fails. Repeat verification at resumption; if verification fails at either boundary, degrade to `stop_reinvoke_required`/`owner_reinvoke` and require truthful owner notification rather than preserving an automatic-resume claim.
 
