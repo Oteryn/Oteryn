@@ -1,4 +1,5 @@
 import copy
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -12,31 +13,18 @@ from bounded_execution_guard import (  # noqa: E402
 )
 
 
-POLICY = {
-    "schema_version": 1,
-    "states": ["RUNNING", "WAITING_EXTERNAL", "BLOCKED", "STALLED", "READY", "DONE"],
-    "progress_fingerprint_fields": [
-        "repository",
-        "task_id",
-        "task_head_sha",
-        "phase",
-        "blocking_dependency",
-        "dependency_kind",
-        "gate_state",
-        "review_generation",
-        "first_material_failure",
-    ],
-    "retry_budgets": {
-        "identical_failure_cycles": 2,
-        "heavy_validation_attempts": 2,
-        "external_review_invocations_per_fingerprint": 1,
-        "same_head_gate_rechecks_per_evidence_generation": 1,
-    },
-    "candidate_freeze": {
-        "forbidden_actions_without_material_change": ["mutate", "retrigger"]
-    },
-    "session_release_states": ["WAITING_EXTERNAL", "BLOCKED", "STALLED", "DONE"],
-}
+ROOT = Path(__file__).resolve().parents[2]
+POLICY = json.loads(
+    (ROOT / "ecosystem/bounded-autonomous-execution-policy.json").read_text(encoding="utf-8")
+)
+RISK_CLASSES = tuple(POLICY["loop_breaker"]["risk_classes"])
+
+
+def risk_ledger():
+    return {
+        name: {"status": "AUDITED_PASS", "reason": "focused unit coverage"}
+        for name in RISK_CLASSES
+    }
 
 
 def snapshot(**overrides):
@@ -50,7 +38,8 @@ def snapshot(**overrides):
         "blocking_dependency": "",
         "dependency_kind": "",
         "gate_state": "pending",
-        "review_generation": "",
+        "review_generation": "review-1",
+        "evidence_generation": "evidence-1",
         "first_material_failure": "",
         "identical_failure_cycles": 0,
         "heavy_validation_runs": 0,
@@ -58,6 +47,12 @@ def snapshot(**overrides):
         "same_head_gate_rechecks": 0,
         "completion_verified": False,
         "material_change": False,
+        "late_material_findings": 0,
+        "post_freeze_material_head_changes": 0,
+        "audited_late_material_findings": 0,
+        "audited_post_freeze_material_head_changes": 0,
+        "final_qualification_runs_since_audit": 0,
+        "risk_ledger": risk_ledger(),
         "updated_at": "2026-08-25T14:00:00Z",
         "narration": "first observation",
     }
@@ -167,7 +162,7 @@ class DecisionTests(unittest.TestCase):
                 with self.assertRaises(GuardError):
                     decide(previous, current, "observe", POLICY)
 
-    def test_retry_counters_may_restart_after_material_progress(self):
+    def test_retry_counters_may_restart_after_material_head_progress(self):
         previous = snapshot(
             task_head_sha="a" * 40,
             identical_failure_cycles=2,

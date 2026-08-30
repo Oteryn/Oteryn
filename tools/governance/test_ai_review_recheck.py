@@ -16,22 +16,24 @@ POLICY = {
 
 REPOSITORY = "Oteryn/Oteryn"
 HEAD = "a" * 40
+BASE = "b" * 40
 PR_NUMBER = 69
 
 
-def pr_payload(head=HEAD, repo=REPOSITORY, number=PR_NUMBER):
+def pr_payload(head=HEAD, base=BASE, repo=REPOSITORY, number=PR_NUMBER, state="open"):
     return {
         "number": number,
+        "state": state,
         "head": {"sha": head, "repo": {"full_name": repo}},
-        "base": {"ref": "main"},
+        "base": {"sha": base, "ref": "main"},
     }
 
 
-def review_event(actor="chatgpt-codex-connector[bot]", review_commit=HEAD, head=HEAD, repo=REPOSITORY):
+def review_event(actor="chatgpt-codex-connector[bot]", review_commit=HEAD):
     return {
         "sender": {"login": actor},
         "review": {"commit_id": review_commit},
-        "pull_request": pr_payload(head=head, repo=repo),
+        "pull_request": {"number": PR_NUMBER},
     }
 
 
@@ -60,8 +62,9 @@ def issue_comment_event(
 
 
 class FakeClient:
-    def __init__(self, *, pr=None, runs=None):
+    def __init__(self, *, pr=None, runs=None, second_pr=None):
         self.pr = pr or pr_payload()
+        self.second_pr = second_pr
         self.runs = list(runs or [])
         self.rerun_calls = []
         self.get_pr_calls = []
@@ -69,10 +72,12 @@ class FakeClient:
 
     def get_pull_request(self, number):
         self.get_pr_calls.append(number)
+        if self.second_pr is not None and len(self.get_pr_calls) > 1:
+            return self.second_pr
         return self.pr
 
-    def list_gate_runs(self, head_sha, pr_number):
-        self.list_gate_run_calls.append((head_sha, pr_number))
+    def list_gate_runs(self, head_sha, base_sha, pr_number):
+        self.list_gate_run_calls.append((head_sha, base_sha, pr_number))
         return list(self.runs)
 
     def rerun(self, run_id):
@@ -83,6 +88,7 @@ def run_payload(
     run_id=100,
     *,
     head=HEAD,
+    base=BASE,
     pr_number=PR_NUMBER,
     status="completed",
     conclusion="failure",
@@ -91,28 +97,34 @@ def run_payload(
 ):
     return {
         "id": run_id,
-        "head_sha": head,
+        "head_sha": base,
         "event": "pull_request_target",
         "status": status,
         "conclusion": conclusion,
         "run_attempt": attempt,
         "created_at": created,
-        "pull_requests": [{"number": pr_number}],
+        "pull_requests": [
+            {
+                "number": pr_number,
+                "head": {"sha": head},
+                "base": {"sha": base},
+            }
+        ],
     }
 
 
 class SelectorTests(unittest.TestCase):
-    def test_selects_latest_failed_attempt_one_for_exact_head_and_pr(self):
+    def test_selects_latest_failed_attempt_one_for_exact_coordinates(self):
         runs = [
             run_payload(100, created="2026-08-25T13:00:00Z"),
             run_payload(101, created="2026-08-25T14:00:00Z"),
-            run_payload(102, head="b" * 40, created="2026-08-25T15:00:00Z"),
+            run_payload(102, head="c" * 40, created="2026-08-25T15:00:00Z"),
         ]
-        self.assertEqual(select_rerun_run_id(runs, HEAD, PR_NUMBER), 101)
+        self.assertEqual(select_rerun_run_id(runs, HEAD, BASE, PR_NUMBER), 101)
 
     def test_same_head_run_for_other_pr_is_not_eligible(self):
         runs = [run_payload(200, pr_number=70)]
-        self.assertIsNone(select_rerun_run_id(runs, HEAD, PR_NUMBER))
+        self.assertIsNone(select_rerun_run_id(runs, HEAD, BASE, PR_NUMBER))
 
     def test_does_not_rerun_success_in_progress_or_attempt_two(self):
         for run in (
@@ -121,7 +133,9 @@ class SelectorTests(unittest.TestCase):
             run_payload(status="completed", conclusion="failure", attempt=2),
         ):
             with self.subTest(run=run):
-                self.assertIsNone(select_rerun_run_id([run], HEAD, PR_NUMBER))
+                self.assertIsNone(
+                    select_rerun_run_id([run], HEAD, BASE, PR_NUMBER)
+                )
 
 
 class EventTests(unittest.TestCase):
@@ -136,6 +150,7 @@ class EventTests(unittest.TestCase):
         )
         self.assertEqual(result.action, "NOOP_UNTRUSTED_ACTOR")
         self.assertEqual(client.rerun_calls, [])
+        self.assertEqual(client.get_pr_calls, [])
 
     def test_trusted_review_for_current_exact_head_reruns_once(self):
         client = FakeClient(runs=[run_payload(123)])
@@ -149,13 +164,14 @@ class EventTests(unittest.TestCase):
         self.assertEqual(result.action, "RERUN")
         self.assertEqual(result.run_id, 123)
         self.assertEqual(client.rerun_calls, [123])
-        self.assertEqual(client.list_gate_run_calls, [(HEAD, PR_NUMBER)])
+        self.assertEqual(client.get_pr_calls, [PR_NUMBER, PR_NUMBER])
+        self.assertEqual(client.list_gate_run_calls, [(HEAD, BASE, PR_NUMBER)])
 
     def test_stale_review_commit_does_not_rerun_current_head(self):
         client = FakeClient(runs=[run_payload(123)])
         result = process_event(
             "pull_request_review",
-            review_event(review_commit="b" * 40),
+            review_event(review_commit="c" * 40),
             REPOSITORY,
             POLICY,
             client,
@@ -173,15 +189,15 @@ class EventTests(unittest.TestCase):
             client,
         )
         self.assertEqual(result.action, "RERUN")
-        self.assertEqual(client.get_pr_calls, [PR_NUMBER])
+        self.assertEqual(client.get_pr_calls, [PR_NUMBER, PR_NUMBER])
         self.assertEqual(client.rerun_calls, [321])
-        self.assertEqual(client.list_gate_run_calls, [(HEAD, PR_NUMBER)])
+        self.assertEqual(client.list_gate_run_calls, [(HEAD, BASE, PR_NUMBER)])
 
     def test_issue_comment_result_for_old_head_is_noop(self):
         client = FakeClient(runs=[run_payload(321)])
         result = process_event(
             "issue_comment",
-            issue_comment_event(reviewed_commit=("b" * 40)[:10]),
+            issue_comment_event(reviewed_commit=("c" * 40)[:10]),
             REPOSITORY,
             POLICY,
             client,
@@ -200,6 +216,7 @@ class EventTests(unittest.TestCase):
             client,
         )
         self.assertEqual(result.action, "NOOP_NOT_REVIEW_RESULT")
+        self.assertEqual(client.get_pr_calls, [])
         self.assertEqual(client.list_gate_run_calls, [])
         self.assertEqual(client.rerun_calls, [])
 
@@ -213,19 +230,35 @@ class EventTests(unittest.TestCase):
             client,
         )
         self.assertEqual(result.action, "NOOP_AMBIGUOUS_REVIEW_RESULT")
+        self.assertEqual(client.get_pr_calls, [])
         self.assertEqual(client.list_gate_run_calls, [])
         self.assertEqual(client.rerun_calls, [])
 
     def test_cross_repository_pr_fails_closed(self):
-        client = FakeClient(runs=[run_payload()])
+        client = FakeClient(pr=pr_payload(repo="Other/Repo"), runs=[run_payload()])
         with self.assertRaises(ValueError):
             process_event(
                 "pull_request_review",
-                review_event(repo="Other/Repo"),
+                review_event(),
                 REPOSITORY,
                 POLICY,
                 client,
             )
+
+    def test_pr_move_between_selection_and_rerun_is_noop(self):
+        client = FakeClient(
+            runs=[run_payload(123)],
+            second_pr=pr_payload(head="c" * 40),
+        )
+        result = process_event(
+            "pull_request_review",
+            review_event(),
+            REPOSITORY,
+            POLICY,
+            client,
+        )
+        self.assertEqual(result.action, "NOOP_PR_MOVED")
+        self.assertEqual(client.rerun_calls, [])
 
 
 class WorkflowSafetyTests(unittest.TestCase):

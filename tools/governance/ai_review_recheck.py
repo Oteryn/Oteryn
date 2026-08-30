@@ -2,7 +2,8 @@
 """Bounded same-head re-evaluation for trusted asynchronous AI review evidence.
 
 The helper never mutates repository contents. It only re-runs the latest failed
-attempt-1 trusted AI review workflow for the current exact pull-request head.
+attempt-1 trusted AI review workflow for the current exact pull-request candidate
+and trusted base coordinates after authenticated review evidence arrives.
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REVIEWED_COMMIT_RE = re.compile(
     r"\*\*Reviewed commit:\*\*\s*`([0-9a-f]{10,40})`"
 )
+MAX_RUN_PAGES = 100
+RUNS_PER_PAGE = 100
 
 
 class RecheckError(ValueError):
@@ -30,7 +33,9 @@ class RecheckError(ValueError):
 
 class RecheckClient(Protocol):
     def get_pull_request(self, number: int) -> dict[str, Any]: ...
-    def list_gate_runs(self, head_sha: str, pr_number: int) -> list[dict[str, Any]]: ...
+    def list_gate_runs(
+        self, head_sha: str, base_sha: str, pr_number: int
+    ) -> list[dict[str, Any]]: ...
     def rerun(self, run_id: int) -> None: ...
 
 
@@ -40,6 +45,7 @@ class Result:
     reason: str
     run_id: int | None = None
     head_sha: str | None = None
+    base_sha: str | None = None
 
     def as_dict(self) -> dict[str, object]:
         return dataclasses.asdict(self)
@@ -65,40 +71,61 @@ def trusted_reviewer_logins(policy: dict[str, Any]) -> frozenset[str]:
     return frozenset(result)
 
 
+def _positive_pr_number(value: object) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise RecheckError("pull request number is missing or malformed")
+    return value
+
+
 def _pr_number(pr: dict[str, Any]) -> int:
     if not isinstance(pr, dict):
         raise RecheckError("pull request payload is not an object")
-    number = pr.get("number")
-    if not isinstance(number, int) or isinstance(number, bool) or number < 1:
-        raise RecheckError("pull request number is missing or malformed")
-    return number
+    return _positive_pr_number(pr.get("number"))
 
 
-def _current_head(pr: dict[str, Any], repository: str) -> str:
+def _sha(value: object, field: str) -> str:
+    if not isinstance(value, str) or SHA_RE.fullmatch(value) is None:
+        raise RecheckError(f"{field} is missing or malformed")
+    return value
+
+
+def _current_coordinates(
+    pr: dict[str, Any], repository: str
+) -> tuple[str, str]:
     if not isinstance(pr, dict):
         raise RecheckError("pull request payload is not an object")
     head = pr.get("head")
-    if not isinstance(head, dict):
-        raise RecheckError("pull request head is missing")
-    sha = head.get("sha")
-    repo = head.get("repo")
-    repo_name = repo.get("full_name") if isinstance(repo, dict) else None
-    if repo_name != repository:
+    base = pr.get("base")
+    if not isinstance(head, dict) or not isinstance(base, dict):
+        raise RecheckError("pull request head/base coordinates are missing")
+    head_repo = head.get("repo")
+    head_repo_name = head_repo.get("full_name") if isinstance(head_repo, dict) else None
+    if head_repo_name != repository:
         raise RecheckError(
-            f"cross-repository pull request is not eligible: expected {repository!r}, got {repo_name!r}"
+            f"cross-repository pull request is not eligible: expected {repository!r}, got {head_repo_name!r}"
         )
-    if not isinstance(sha, str) or SHA_RE.fullmatch(sha) is None:
-        raise RecheckError("pull request current head is missing or malformed")
-    return sha
+    return (
+        _sha(head.get("sha"), "pull request current head"),
+        _sha(base.get("sha"), "pull request current base"),
+    )
 
 
-def _run_links_pr(run: dict[str, Any], pr_number: int) -> bool:
+def _linked_pr_matches(
+    run: dict[str, Any], head_sha: str, base_sha: str, pr_number: int
+) -> bool:
     linked = run.get("pull_requests")
-    if not isinstance(linked, list) or not all(
-        isinstance(item, dict) for item in linked
-    ):
+    if not isinstance(linked, list) or not all(isinstance(item, dict) for item in linked):
         raise RecheckError("matching workflow run pull_requests is malformed")
-    return any(item.get("number") == pr_number for item in linked)
+    for item in linked:
+        if item.get("number") != pr_number:
+            continue
+        linked_head = item.get("head")
+        linked_base = item.get("base")
+        if not isinstance(linked_head, dict) or not isinstance(linked_base, dict):
+            raise RecheckError("linked pull request head/base coordinates are malformed")
+        if linked_head.get("sha") == head_sha and linked_base.get("sha") == base_sha:
+            return True
+    return False
 
 
 def _issue_comment_reviewed_prefix(event: dict[str, Any]) -> tuple[str, str | None]:
@@ -115,22 +142,25 @@ def _issue_comment_reviewed_prefix(event: dict[str, Any]) -> tuple[str, str | No
 
 
 def select_rerun_run_id(
-    runs: list[dict[str, Any]], head_sha: str, pr_number: int
+    runs: list[dict[str, Any]], head_sha: str, base_sha: str, pr_number: int
 ) -> int | None:
-    """Select the latest failed attempt-1 gate bound to exact PR and exact head."""
+    """Select the latest failed attempt-1 gate for exact PR/head/base coordinates."""
 
-    if SHA_RE.fullmatch(head_sha) is None:
-        raise RecheckError("head_sha must be lowercase 40-hex")
-    if not isinstance(pr_number, int) or isinstance(pr_number, bool) or pr_number < 1:
-        raise RecheckError("pr_number must be a positive integer")
+    _sha(head_sha, "head_sha")
+    _sha(base_sha, "base_sha")
+    _positive_pr_number(pr_number)
     if not isinstance(runs, list) or not all(isinstance(item, dict) for item in runs):
         raise RecheckError("workflow runs must be an object list")
 
     candidates: list[dict[str, Any]] = []
     for run in runs:
-        if run.get("head_sha") != head_sha or run.get("event") != "pull_request_target":
+        if run.get("event") != "pull_request_target":
             continue
-        if not _run_links_pr(run, pr_number):
+        # pull_request_target runs execute in trusted base context; candidate identity
+        # is carried by the linked PR coordinates, not run-level head_sha.
+        if run.get("head_sha") != base_sha:
+            continue
+        if not _linked_pr_matches(run, head_sha, base_sha, pr_number):
             continue
         run_id = run.get("id")
         if not isinstance(run_id, int) or isinstance(run_id, bool) or run_id < 1:
@@ -151,6 +181,18 @@ def select_rerun_run_id(
     if not isinstance(attempt, int) or isinstance(attempt, bool) or attempt != 1:
         return None
     return int(latest["id"])
+
+
+def _live_pr(
+    client: RecheckClient, number: int, repository: str
+) -> tuple[dict[str, Any], str, str]:
+    pr = client.get_pull_request(number)
+    if _pr_number(pr) != number:
+        raise RecheckError("pull request identity mismatch")
+    if pr.get("state") not in (None, "open"):
+        raise RecheckError("pull request is no longer open")
+    head_sha, base_sha = _current_coordinates(pr, repository)
+    return pr, head_sha, base_sha
 
 
 def process_event(
@@ -175,27 +217,19 @@ def process_event(
             "event actor is not a configured trusted reviewer",
         )
 
+    reviewed_prefix: str | None = None
+    review_commit: str | None = None
     if event_name == "pull_request_review":
-        pr = event.get("pull_request")
-        if not isinstance(pr, dict):
+        event_pr = event.get("pull_request")
+        if not isinstance(event_pr, dict):
             raise RecheckError("pull_request_review event is missing pull_request")
-        pr_number = _pr_number(pr)
-        head_sha = _current_head(pr, repository)
+        pr_number = _pr_number(event_pr)
         review = event.get("review")
         review_commit = review.get("commit_id") if isinstance(review, dict) else None
-        if not isinstance(review_commit, str) or SHA_RE.fullmatch(review_commit) is None:
-            raise RecheckError("pull request review commit_id is missing or malformed")
-        if review_commit != head_sha:
-            return Result(
-                "NOOP_STALE_REVIEW",
-                "review result is bound to an older pull-request head",
-                head_sha=head_sha,
-            )
+        review_commit = _sha(review_commit, "pull request review commit_id")
     elif event_name == "issue_comment":
         issue = event.get("issue")
-        if not isinstance(issue, dict) or not isinstance(
-            issue.get("pull_request"), dict
-        ):
+        if not isinstance(issue, dict) or not isinstance(issue.get("pull_request"), dict):
             return Result(
                 "NOOP_NOT_PULL_REQUEST",
                 "trusted reviewer comment is not on a pull request",
@@ -211,31 +245,44 @@ def process_event(
                 match_state,
                 "trusted reviewer comment contains multiple reviewed-commit identities",
             )
-        number = issue.get("number")
-        if not isinstance(number, int) or isinstance(number, bool) or number < 1:
-            raise RecheckError("issue_comment pull request number is invalid")
-        pr = client.get_pull_request(number)
-        resolved_number = _pr_number(pr)
-        if resolved_number != number:
-            raise RecheckError("issue_comment pull request identity mismatch")
-        pr_number = number
-        head_sha = _current_head(pr, repository)
-        if reviewed_prefix is None or not head_sha.startswith(reviewed_prefix):
-            return Result(
-                "NOOP_STALE_REVIEW",
-                "review result is bound to an older pull-request head",
-                head_sha=head_sha,
-            )
+        pr_number = _positive_pr_number(issue.get("number"))
     else:
         raise RecheckError(f"unsupported event name: {event_name!r}")
 
-    runs = client.list_gate_runs(head_sha, pr_number)
-    run_id = select_rerun_run_id(runs, head_sha, pr_number)
+    _, head_sha, base_sha = _live_pr(client, pr_number, repository)
+    if review_commit is not None and review_commit != head_sha:
+        return Result(
+            "NOOP_STALE_REVIEW",
+            "review result is bound to an older pull-request head",
+            head_sha=head_sha,
+            base_sha=base_sha,
+        )
+    if reviewed_prefix is not None and not head_sha.startswith(reviewed_prefix):
+        return Result(
+            "NOOP_STALE_REVIEW",
+            "review result is bound to an older pull-request head",
+            head_sha=head_sha,
+            base_sha=base_sha,
+        )
+
+    runs = client.list_gate_runs(head_sha, base_sha, pr_number)
+    run_id = select_rerun_run_id(runs, head_sha, base_sha, pr_number)
     if run_id is None:
         return Result(
             "NOOP_NO_ELIGIBLE_RUN",
-            "no exact-PR exact-head completed failed attempt-1 AI review gate run is eligible",
+            "no exact-PR exact-head exact-base completed failed attempt-1 AI review gate run is eligible",
             head_sha=head_sha,
+            base_sha=base_sha,
+        )
+
+    # Race guard immediately before mutation of workflow state.
+    _, fresh_head_sha, fresh_base_sha = _live_pr(client, pr_number, repository)
+    if fresh_head_sha != head_sha or fresh_base_sha != base_sha:
+        return Result(
+            "NOOP_PR_MOVED",
+            "pull-request head/base changed before same-head recheck",
+            head_sha=fresh_head_sha,
+            base_sha=fresh_base_sha,
         )
 
     client.rerun(run_id)
@@ -244,6 +291,7 @@ def process_event(
         "trusted reviewer result triggered one bounded exact-PR same-head gate re-evaluation",
         run_id=run_id,
         head_sha=head_sha,
+        base_sha=base_sha,
     )
 
 
@@ -302,24 +350,38 @@ class GitHubClient:
             raise RecheckError("GitHub pull request response is malformed")
         return payload
 
-    def list_gate_runs(self, head_sha: str, pr_number: int) -> list[dict[str, Any]]:
-        if SHA_RE.fullmatch(head_sha) is None:
-            raise RecheckError("head_sha must be lowercase 40-hex")
-        if not isinstance(pr_number, int) or isinstance(pr_number, bool) or pr_number < 1:
-            raise RecheckError("pr_number must be a positive integer")
+    def list_gate_runs(
+        self, head_sha: str, base_sha: str, pr_number: int
+    ) -> list[dict[str, Any]]:
+        _sha(head_sha, "head_sha")
+        _sha(base_sha, "base_sha")
+        _positive_pr_number(pr_number)
         workflow = urllib.parse.quote(self.workflow, safe="")
-        query = urllib.parse.urlencode(
-            {"event": "pull_request_target", "head_sha": head_sha, "per_page": "100"}
+        collected: list[dict[str, Any]] = []
+        for page in range(1, MAX_RUN_PAGES + 1):
+            query = urllib.parse.urlencode(
+                {
+                    "event": "pull_request_target",
+                    "per_page": str(RUNS_PER_PAGE),
+                    "page": str(page),
+                }
+            )
+            payload = self._request(
+                f"/repos/{self.repository}/actions/workflows/{workflow}/runs?{query}"
+            )
+            runs = payload.get("workflow_runs") if isinstance(payload, dict) else None
+            if not isinstance(runs, list) or not all(isinstance(item, dict) for item in runs):
+                raise RecheckError("GitHub workflow-run response is malformed")
+            collected.extend(runs)
+            if len(runs) < RUNS_PER_PAGE:
+                return collected
+        raise RecheckError(
+            f"trusted gate history exceeds bounded {MAX_RUN_PAGES * RUNS_PER_PAGE}-run scan"
         )
-        payload = self._request(
-            f"/repos/{self.repository}/actions/workflows/{workflow}/runs?{query}"
-        )
-        runs = payload.get("workflow_runs") if isinstance(payload, dict) else None
-        if not isinstance(runs, list) or not all(isinstance(item, dict) for item in runs):
-            raise RecheckError("GitHub workflow-run response is malformed")
-        return runs
 
     def rerun(self, run_id: int) -> None:
+        if not isinstance(run_id, int) or isinstance(run_id, bool) or run_id < 1:
+            raise RecheckError("run_id must be a positive integer")
         payload = self._request(
             f"/repos/{self.repository}/actions/runs/{run_id}/rerun",
             method="POST",
