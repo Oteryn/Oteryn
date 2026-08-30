@@ -415,6 +415,54 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             self.assertTrue(takeover.acknowledge_dispatch(second_reservation.reservation_key))
             self.assertIsNone(takeover.claim_pending_dispatch(repository, task_id))
 
+    def test_crashed_dispatched_work_can_be_reconciled_with_claim_generation_fencing(self):
+        repository = "Oteryn/Oteryn"
+        task_id = "OTERYN-DISPATCH-CRASH-RECOVERY"
+        initial = {"revision": 0}
+        reserved = {"revision": 1}
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "checkpoint.db"
+            outbox = SqliteCheckpointOutbox(database)
+            outbox.seed_checkpoint(repository, task_id, _checkpoint_digest(initial), snapshot=initial)
+            reservation = outbox.reserve(
+                repository=repository, task_id=task_id,
+                expected_checkpoint=_checkpoint_digest(initial),
+                next_checkpoint=_checkpoint_digest(reserved), next_snapshot=reserved,
+                action="mutate", scope=("material-generation-1",),
+            )
+            self.assertTrue(reservation.committed)
+            first_claim = outbox.claim_pending_dispatch(repository, task_id)
+            self.assertIsNotNone(first_claim)
+            first_generation = getattr(first_claim, "dispatch_generation", None)
+            self.assertIsInstance(first_generation, int)
+
+            takeover = SqliteCheckpointOutbox(database)
+            loader = getattr(takeover, "load_inflight_dispatch", None)
+            self.assertIsNotNone(loader)
+            inflight = loader(repository, task_id)
+            self.assertIsNotNone(inflight)
+            self.assertEqual(inflight.reservation_key, reservation.reservation_key)
+            self.assertEqual(inflight.dispatch_generation, first_generation)
+
+            requeue = getattr(takeover, "requeue_unacknowledged_dispatch", None)
+            self.assertIsNotNone(requeue)
+            self.assertTrue(requeue(reservation.reservation_key, first_generation))
+            second_claim = takeover.claim_pending_dispatch(repository, task_id)
+            self.assertIsNotNone(second_claim)
+            self.assertGreater(second_claim.dispatch_generation, first_generation)
+            self.assertFalse(
+                takeover.acknowledge_dispatch(
+                    reservation.reservation_key, first_generation
+                )
+            )
+            self.assertTrue(
+                takeover.acknowledge_dispatch(
+                    reservation.reservation_key, second_claim.dispatch_generation
+                )
+            )
+            self.assertIsNone(takeover.load_inflight_dispatch(repository, task_id))
+
+
     def test_transition_invalidates_committed_dispatch_but_blocks_dispatched_work(self):
         repository = "Oteryn/Oteryn"
         task_id = "OTERYN-TRANSITION-DISPATCH-FENCE"
