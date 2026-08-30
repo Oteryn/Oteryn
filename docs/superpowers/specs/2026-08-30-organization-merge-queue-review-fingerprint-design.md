@@ -24,7 +24,7 @@ Adopt this organization-wide model for `Oteryn/Oteryn`, `Oteryn/Oteryn-Game`, `O
 1. **PR candidate head** owns implementation, deterministic PR checks, risk classification and external review.
 2. **Review qualification** is bound to the META risk-bearing `review_fingerprint`, not to SHA equality alone.
 3. **GitHub Merge Queue** is the default protected-`main` integration authority.
-4. **Merge-group integration head** (`latest trusted main + candidate`) must pass the repository's required deterministic integration gate.
+4. **Merge-group integration head** (`latest trusted main + candidate`) must be qualified by a META-owned organization-ruleset workflow whose source is protected META `main`; a workflow definition taken from the synthetic/candidate tree is not merge authority.
 5. A `main` advance by itself does not force a new external review. Review is reused only when the machine policy proves the same tier/fingerprint and all ancestry/review-neutral/trusted-base conditions.
 6. A change to risk-bearing candidate content or a base change that changes the risk-bearing fingerprint requires fresh external review.
 7. Empty/no-op/checkpoint/retrigger commits are forbidden as evidence-refresh mechanisms.
@@ -60,12 +60,39 @@ This is the exact code combination that is eligible to enter protected `main`.
 
 Required repository checks remain exact-integration-head requirements. A prior PR-head build is not a substitute for a required `merge_group` build when the repository uses Merge Queue.
 
-Each required gate must support both:
+Required coverage must include both:
 
 - `pull_request` for candidate qualification; and
-- `merge_group` for integration qualification.
+- the protected-source ruleset workflow on `merge_group` for integration qualification.
 
-The final required status reported to the Merge Queue must prove the exact merge-group SHA it evaluated.
+The final required result reported to the Merge Queue must prove the exact merge-group SHA it evaluated. Configure the bridge with the ruleset's **Require workflows to pass before merging** rule, identified by source repository and workflow path, not as a loose required-status name that a candidate workflow could reproduce.
+
+### Trusted merge-group qualification bridge
+
+The integration authority is a META-owned organization-ruleset workflow triggered directly by `merge_group: checks_requested`. Its workflow and verifier are loaded from protected META `main` (the trusted source SHA `T`) and protected by the same R2/CODEOWNERS rules as the existing AI-review gate. Target-repository `merge_group` workflows execute from the synthetic tree and are candidate-controlled; they may provide non-authoritative diagnostics, but their conclusion alone cannot qualify the integration head.
+
+The bridge uses these exact identities:
+
+- `B`: `github.event.merge_group.base_sha`, the trusted base selected by the queue;
+- `I`: `github.event.merge_group.head_sha`, the exact synthetic integration head and required-result target;
+- `P`: the one same-repository, open, non-draft PR in the merge group;
+- `C`: the current exact head of `P` recorded by its active queue entry;
+- `R`: the externally reviewed head carried by the trusted review evidence;
+- `Q`: the exact protected-base workflow/policy source recorded by the PR #111 review envelope when candidate qualification was issued;
+- `T`: the protected META source SHA that supplied the ruleset workflow, policy and verifier.
+
+The initial queue configuration is `maximumEntriesToMerge = 1`. On every run the trusted bridge must:
+
+1. require `checks_requested`, exact repository ID/name, `refs/heads/main`, full SHAs and `github.sha == I`; re-fetch its own workflow run, jobs and check suite and require event `merge_group`, the configured source workflow identity and `check_suite.head_sha == I`;
+2. call the paginated REST `GET /repos/{owner}/{repo}/commits/{I}/pulls` endpoint and require exactly one result; server-fetch that PR and cross-check its repository/object ID, number, state, Draft flag, base branch and `head.sha == C` with GraphQL `PullRequest.mergeQueueEntry`, including entry identity, `baseCommit == B`, `headCommit == C` and the live single-PR queue configuration;
+3. fetch only `B`, `C`, `I` and required historical review objects into a credential-free bare Git object store; require `B` to be a protected-main ancestor, `C` and `B` to be ancestors of `I`, and `tree(I)` to equal the conflict-free merge tree independently reproduced from exactly `B + C` under the canonical clean-integration rule;
+4. locate the unique non-superseded PR #111-format review-envelope artifact through the server-derived trusted `pull_request_target` run/attempt for `P` and `C`; verify the artifact digest, canonical JSON, predicate type, repository/PR IDs, policy/classifier digests, evidence source and GitHub attestation constrained to the envelope's signer workflow/ref/digest `Q`, then prove `Q` was a protected trusted source allowed by policy at issuance. The rollout must persist that immutable artifact plus its run/attempt and envelope digest from the trusted gate; a missing, expired, deleted, duplicate or ambiguous locator fails closed and is recovered only by a same-head trusted re-evaluation, never a candidate commit;
+5. run the canonical reuse verifier from `T`: prove `R` is the attested reviewed ancestor of `C`, all `R..C` changes are permitted, `C` is the queued candidate inside `I`, the trusted-base lineage is valid, and classification of the exact `B..I` integration diff has the same tier and `review_fingerprint` as the attested qualification. A changed risk-bearing base/candidate, non-reproducible tree or any P0/P1 fails;
+6. run the protected-base provider aggregate test contract against a credential-free checkout of exact `I` in a separate unprivileged test job. A fresh trusted mediator job must never execute candidate code or consume candidate artifacts/caches; it re-fetches the test job/check conclusion and exact head from the Actions API, then emits and immediately verifies a PR #111-compatible integration envelope binding `T`, `Q`, repository/PR IDs, `B`, `C`, `R`, fingerprint, `I`, run/attempt/job/check-suite IDs and deterministic results.
+
+GitHub associates the required ruleset-workflow check suite with `I`; the workflow must assert that association before success. A skipped, cancelled, missing or non-success bridge run blocks the queue. Candidate workflows and the integration test job never receive `checks: write`, `statuses: write`, `id-token: write`, `attestations: write` or secrets. Only the isolated mediator job receives `actions: read`, `checks: read`, `contents: read`, `issues: read`, `pull-requests: read` and, solely for its own integration envelope, `id-token: write`, `attestations: write` and `artifact-metadata: write`; it does not need `contents: write`, `checks: write` or `statuses: write` because the ruleset workflow result is published by GitHub Actions.
+
+If organization ruleset workflows or the required cross-repository source-workflow access are unavailable, treat that as a capability blocker and keep strict freshness. Do not fall back to a candidate workflow or a same-name status. An alternative requires a separately reviewed dedicated GitHub App with its own expected-source App ID and the same server-side validations; it is not an implicit fallback in this rollout.
 
 ### External review
 
@@ -114,9 +141,11 @@ Initial safety configuration:
 
 - merge method: squash;
 - one PR per merge group unless later measured evidence justifies batching;
-- required repository aggregate gate must run for `merge_group`;
-- do not enable queue-required enforcement until the merge-group workflow has been proven on a canary;
-- do not disable strict branch freshness until queue-required enforcement is active and verified.
+- the trusted META ruleset workflow, not a candidate-local gate, is the required `merge_group` authority;
+- first merge and read back the ruleset workflow, verifier and provider contract from protected `main`;
+- then enable and require Merge Queue while strict branch freshness remains enabled;
+- enqueue one live canary, prove the required bridge result on its exact `I`, and read back the protected-main merge;
+- only after that proof disable strict branch freshness.
 
 A queue candidate that becomes invalid because trusted `main` changes again should be rebuilt/re-evaluated by GitHub. Agents must not mutate the task branch merely to wake the queue.
 
@@ -147,7 +176,7 @@ META owns the semantics of:
 
 Game, Platform and Atlas may configure only repository-specific facts such as:
 
-- aggregate required check names;
+- aggregate test contracts and diagnostic check names;
 - additional R2 path triggers;
 - runner/test requirements;
 - repository-specific merge-group validation.
@@ -160,14 +189,15 @@ Prefer a META-owned versioned machine policy/reusable action plus thin provider 
 
 For every active provider repository:
 
-1. required aggregate CI supports `pull_request` and `merge_group`;
-2. event parsing does not assume `github.event.pull_request` exists in a `merge_group` run;
-3. candidate and merge-group SHA/base identities are validated fail-closed;
-4. external-review gate consumes canonical META fingerprint evidence rather than local exact-SHA-only logic;
-5. branch/ruleset settings require Merge Queue after canary proof;
-6. strict up-to-date-before-merge is disabled after queue enforcement is active;
-7. no prompt/task may instruct an agent to merge-up solely because `main` moved when Merge Queue can perform final integration;
-8. no prompt/task may require fresh external review solely because a SHA changed if canonical fingerprint reuse succeeds.
+1. candidate CI supports `pull_request`, while the protected META ruleset workflow is the required `merge_group` authority;
+2. bridge event parsing does not assume `github.event.pull_request` exists and uses the REST commit association plus GraphQL queue entry to resolve exactly one PR;
+3. candidate, reviewed, base and integration SHA identities are validated fail-closed, including reproducible single-PR merge-tree proof;
+4. the bridge consumes and verifies the canonical META attestation/evidence and fingerprint rather than local exact-SHA-only logic;
+5. the organization ruleset binds the required workflow by protected source repository/path, not by a spoofable status name;
+6. branch/ruleset settings require Merge Queue during the canary while strict freshness is still enabled;
+7. strict up-to-date-before-merge is disabled only after the live canary merge and protected-main readback succeed;
+8. no prompt/task may instruct an agent to merge-up solely because `main` moved when Merge Queue can perform final integration;
+9. no prompt/task may require fresh external review solely because a SHA changed if canonical fingerprint reuse succeeds.
 
 ## Rollout order
 
@@ -175,8 +205,8 @@ Use staged migration, never a flag-day weakening of protection:
 
 1. refresh and terminalize/supersede the bounded-autonomous META work without duplicating it;
 2. publish canonical META merge-integration semantics and deterministic tests;
-3. add `merge_group` support to META required gates and prove a canary;
-4. enable META Merge Queue and switch off strict branch freshness only after proof;
+3. merge and read back the protected META ruleset workflow, attestation bridge and deterministic event/API fixtures while strict freshness remains active;
+4. enable/require META Merge Queue with one-PR groups while strict freshness remains active, enqueue a live canary, verify exact-`I` bridge success and protected-main readback, and only then switch off strict freshness;
 5. repeat provider adoption in Game, Platform and Atlas, allowing independent provider work where paths and settings are disjoint;
 6. add an organization drift audit comparing expected policy with live repository settings/workflow capabilities;
 7. remove/supersede stale local exact-head-only review language and close provider adoption Issues.
@@ -187,7 +217,8 @@ Use staged migration, never a flag-day weakening of protection:
 - If queue evidence is merely delayed, enter `WAITING_EXTERNAL`; do not commit to retrigger.
 - If an unrelated base advance preserves the fingerprint, reuse review and let the queue rebuild the integration candidate.
 - If a trusted-base change touches a reviewed risk-bearing path and changes fingerprint, require fresh review.
-- If Merge Queue is unavailable for a repository/account capability reason, record the exact capability gap. Do not silently weaken integration safety; use the existing strict-up-to-date model only as an explicit temporary fallback until the capability exists.
+- If the canary, trusted bridge, API mapping or readback fails, remove/roll back the queue-required rule to its captured pre-cutover state while strict freshness is still active; verify that fallback state before further work. Never remove strict freshness as part of a failed canary cleanup.
+- If Merge Queue, organization ruleset workflows or protected source-workflow access is unavailable for a repository/account capability reason, record the exact capability gap. Do not silently weaken integration safety; use the existing strict-up-to-date model only as an explicit temporary fallback until the capability exists.
 
 ## Current observed basis — locators only
 
@@ -196,7 +227,7 @@ At design time (2026-08-30), live inspection showed:
 - META protected `main` already contains risk-based AI-review fingerprint/reuse semantics, including unrelated-base-advance reuse under strict conditions;
 - META bounded-autonomous PR #71 was still open and Game adoption Issue #148 was still open;
 - Game `main` ruleset required `game-gate`, used strict required-status freshness, squash-only integration and stale-review dismissal on push;
-- Game `merge-gate.yml` was `pull_request`-specific and therefore requires explicit `merge_group` adaptation before Merge Queue can safely replace strict freshness.
+- Game `merge-gate.yml` was `pull_request`-specific; the provider therefore needs a protected-base test contract plus the trusted META ruleset bridge before Merge Queue can replace strict freshness. Merely adding a local `merge_group` trigger would not establish authority.
 
 These observations are not future authority. Every execution agent must refresh live GitHub before acting.
 
@@ -214,7 +245,8 @@ The programme is complete only when:
 
 - all four active Oteryn repositories use the same canonical META candidate/integration/review semantics;
 - Merge Queue is required for protected `main` where supported;
-- required aggregate checks pass on merge-group candidates;
+- a protected-source META ruleset workflow maps each single-PR group without ambiguity, verifies attested review/fingerprint/ancestry and publishes the required result on the exact integration SHA;
+- required aggregate tests pass inside that trusted workflow on merge-group candidates;
 - strict up-to-date-before-merge is no longer the normal author/agent integration mechanism;
 - fingerprint reuse works across qualifying unrelated `main` advances;
 - fingerprint changes still force fresh review;
