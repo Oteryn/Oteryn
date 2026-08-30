@@ -47,6 +47,7 @@ class PendingReservation:
     action: str
     scope: tuple[str, ...]
     dispatch_generation: int
+    dispatch_started: bool
 
 
 class CheckpointOutboxAdapter(Protocol):
@@ -83,6 +84,8 @@ class CheckpointOutboxAdapter(Protocol):
     ) -> PendingReservation | None: ...
 
     def claim_dispatch(self, reservation_key: str) -> bool: ...
+
+    def begin_dispatch(self, reservation_key: str, dispatch_generation: int) -> bool: ...
 
     def acknowledge_dispatch(
         self, reservation_key: str, dispatch_generation: int | None = None
@@ -224,6 +227,7 @@ class SqliteCheckpointOutbox:
                     acknowledged INTEGER NOT NULL DEFAULT 0,
                     invalidated INTEGER NOT NULL DEFAULT 0,
                     dispatch_generation INTEGER NOT NULL DEFAULT 0,
+                    dispatch_started INTEGER NOT NULL DEFAULT 0,
                     status TEXT NOT NULL CHECK (status IN ('committed', 'dispatched'))
                 )
                 """
@@ -242,6 +246,7 @@ class SqliteCheckpointOutbox:
                 ("acknowledged", "INTEGER NOT NULL DEFAULT 0"),
                 ("invalidated", "INTEGER NOT NULL DEFAULT 0"),
                 ("dispatch_generation", "INTEGER NOT NULL DEFAULT 0"),
+                ("dispatch_started", "INTEGER NOT NULL DEFAULT 0"),
             ):
                 if column not in outbox_columns:
                     connection.execute(
@@ -617,6 +622,7 @@ class SqliteCheckpointOutbox:
                     action=action,
                     scope=scope,
                     dispatch_generation=dispatch_generation + 1,
+                    dispatch_started=False,
                 )
             except Exception:
                 if connection.in_transaction:
@@ -639,6 +645,29 @@ class SqliteCheckpointOutbox:
             )
         return updated.rowcount == 1
 
+    def begin_dispatch(self, reservation_key: str, dispatch_generation: int) -> bool:
+        """Commit the irreversible boundary immediately before executing a side effect."""
+
+        if (
+            not isinstance(dispatch_generation, int)
+            or isinstance(dispatch_generation, bool)
+            or dispatch_generation < 1
+        ):
+            return False
+        with closing(self._connect()) as connection:
+            updated = connection.execute(
+                """
+                UPDATE bounded_execution_outbox
+                SET dispatch_started = 1
+                WHERE reservation_key = ? AND dispatch_generation = ?
+                  AND status = 'dispatched' AND dispatch_started = 0
+                  AND COALESCE(acknowledged, 0) = 0
+                  AND COALESCE(invalidated, 0) = 0
+                """,
+                (reservation_key, dispatch_generation),
+            )
+        return updated.rowcount == 1
+
     def load_inflight_dispatch(
         self, repository: str, task_id: str
     ) -> PendingReservation | None:
@@ -648,7 +677,8 @@ class SqliteCheckpointOutbox:
             rows = connection.execute(
                 """
                 SELECT reservation_key, expected_checkpoint, next_checkpoint,
-                       action, scope_json, sequence_no, dispatch_generation
+                       action, scope_json, sequence_no, dispatch_generation,
+                       dispatch_started
                 FROM bounded_execution_outbox
                 WHERE repository = ? AND task_id = ? AND status = 'dispatched'
                   AND COALESCE(acknowledged, 0) = 0
@@ -669,6 +699,7 @@ class SqliteCheckpointOutbox:
             scope_json,
             sequence_no,
             dispatch_generation,
+            dispatch_started,
         ) = rows[0]
         if (
             not isinstance(reservation_key, str)
@@ -684,6 +715,7 @@ class SqliteCheckpointOutbox:
             or not isinstance(dispatch_generation, int)
             or isinstance(dispatch_generation, bool)
             or dispatch_generation < 1
+            or dispatch_started not in (0, 1)
         ):
             raise ValueError("in-flight reservation metadata is unavailable or malformed")
         scope = _parse_scope_json(scope_json)
@@ -701,6 +733,7 @@ class SqliteCheckpointOutbox:
             action=action,
             scope=scope,
             dispatch_generation=dispatch_generation,
+            dispatch_started=bool(dispatch_started),
         )
 
     def requeue_unacknowledged_dispatch(
@@ -721,6 +754,7 @@ class SqliteCheckpointOutbox:
                 SET status = 'committed'
                 WHERE reservation_key = ? AND dispatch_generation = ?
                   AND status = 'dispatched'
+                  AND dispatch_started = 0
                   AND COALESCE(acknowledged, 0) = 0
                   AND COALESCE(invalidated, 0) = 0
                 """,

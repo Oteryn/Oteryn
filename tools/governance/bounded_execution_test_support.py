@@ -121,6 +121,7 @@ def decide_with_acknowledged_audit(previous: dict[str, Any], current: dict[str, 
         "repository", "task_id", "tier", "policy_id", "policy_digest",
         "classifier_revision", "risk_fingerprint",
     )) + (
+        f"task_head_sha:{prepared_current['task_head_sha']}",
         "loop_breaker_audit_generation:"
         f"{prepared_current['late_material_findings']}:"
         f"{prepared_current['post_freeze_material_head_changes']}",

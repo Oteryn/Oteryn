@@ -831,6 +831,7 @@ def _execution_prerequisite_reason(
 def _dispatch_scope(current: dict[str, Any], action: str) -> tuple[str, ...]:
     scope = list(_review_binding_scope(current.get("review_binding")))
     if action == "run_loop_breaker_audit":
+        scope.append(f"task_head_sha:{current['task_head_sha']}")
         scope.append(
             "loop_breaker_audit_generation:"
             f"{current['late_material_findings']}:"
@@ -1185,6 +1186,25 @@ def decide(
     ):
         state = "READY" if current["state"] == "RUNNING" else current["state"]
         return _decision(False, state, "final qualification admission is required before final checks/review/completion", False, progress, failure)
+
+    if (
+        requested_action in final_candidate_actions
+        and current["phase"] == "final_qualification"
+        and requested_action not in {"enter_final_qualification", "complete"}
+        and previous is not None
+        and (
+            not previous["candidate_frozen"]
+            or previous["task_head_sha"] != current["task_head_sha"]
+        )
+    ):
+        return _decision(
+            False,
+            "READY" if current["state"] == "RUNNING" else current["state"],
+            "final-candidate action requires the previous durable checkpoint to contain the same frozen technical candidate",
+            current["state"] in release_states,
+            progress,
+            failure,
+        )
 
     if requested_action == "enter_final_qualification":
         if current["phase"] != "final_qualification":
