@@ -55,7 +55,7 @@ def _validate(snapshot: dict[str, Any]) -> None:
         if not isinstance(snapshot[key], bool):
             raise ValueError(f"{key} must be boolean")
     for key in ("identical_cycle_count", "retry_count", "retry_limit"):
-        if not isinstance(snapshot[key], int) or snapshot[key] < 0:
+        if type(snapshot[key]) is not int or snapshot[key] < 0:
             raise ValueError(f"{key} must be a non-negative integer")
     for key in ("current_action", "waiting_reason", "failure_code", "previous_progress_fingerprint"):
         if not isinstance(snapshot[key], str):
