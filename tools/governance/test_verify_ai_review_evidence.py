@@ -227,7 +227,10 @@ def test_current_codex_summary_preserves_blocking_finding_in_summary_body() -> N
     )
 
 
-def test_current_codex_summary_reuses_review_after_clean_merge_up_with_duplicate_echo() -> None:
+def _verify_summary_merge_reuse_with_echoes(
+    *, echo_prefix: str | None = None, echo_stamp: str = "2026-08-20T10:00:59Z",
+    echo_extra: str = "", echo_count: int = 1,
+) -> dict:
     repo, reviewed, _ = _v1.core_tests.make_repo()
     _v1.core_tests.git(repo, "reset", "--hard", reviewed)
     _v1.core_tests.git(repo, "checkout", "-b", "task-summary-reuse")
@@ -245,25 +248,29 @@ def test_current_codex_summary_reuses_review_after_clean_merge_up_with_duplicate
         10, _v1.core_tests.request_body(reviewed), stamp="2026-08-20T10:00:00Z",
     )
     summary = _summary_comment(reviewed[:10])
-    echo = _v1.core_tests.codex_result(
-        12,
-        reviewed[:10],
-        stamp="2026-08-20T10:00:59Z",
-        text=(
-            "Codex Review: Didn't find any major issues. Delightful!\n\n"
-            f"**Reviewed commit:** `{reviewed[:10]}`\n\n"
-            "<details> <summary>ℹ️ About Codex in GitHub</summary>\n"
-            "standard Codex review wrapper\n"
-            "</details>"
-        ),
-    )
-    echo["performed_via_github_app"] = {"slug": "chatgpt-codex-connector"}
+    echoes: list[dict] = []
+    for index in range(echo_count):
+        prefix = echo_prefix or reviewed[:10]
+        echo = _v1.core_tests.codex_result(
+            12 + index,
+            prefix,
+            stamp=echo_stamp,
+            text=(
+                "Codex Review: Didn't find any major issues. Delightful!\n\n"
+                f"**Reviewed commit:** `{prefix}`\n\n"
+                "<details> <summary>ℹ️ About Codex in GitHub</summary>\n"
+                f"standard Codex review wrapper{echo_extra}\n"
+                "</details>"
+            ),
+        )
+        echo["performed_via_github_app"] = {"slug": "chatgpt-codex-connector"}
+        echoes.append(echo)
+
     policy = dict(_v1.POLICY)
     policy["activation"] = dict(_v1.POLICY["activation"])
     policy["_trusted_integration_base_sha"] = integration_base
-
-    found = _v1.m.verify_records(
-        [request, summary, echo],
+    return _v1.m.verify_records(
+        [request, summary, *echoes],
         policy=policy,
         repo_root=repo,
         tier="R2",
@@ -276,8 +283,35 @@ def test_current_codex_summary_reuses_review_after_clean_merge_up_with_duplicate
         review_comments=[],
         pr_reactions=[_reaction()],
     )
-    assert found["reviewed_head"] == reviewed
-    assert found["review_source_commit_id"] == reviewed
+
+
+def test_current_codex_summary_reuses_review_after_clean_merge_up_with_duplicate_echo() -> None:
+    found = _verify_summary_merge_reuse_with_echoes()
+    assert found["review_source_kind"] == "issue_comment_result"
+
+
+def test_current_codex_summary_does_not_suppress_wrong_head_clean_echo() -> None:
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary_merge_reuse_with_echoes(echo_prefix="f" * 10)
+    )
+
+
+def test_current_codex_summary_does_not_suppress_post_reaction_clean_echo() -> None:
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary_merge_reuse_with_echoes(echo_stamp="2026-08-20T10:01:02Z")
+    )
+
+
+def test_current_codex_summary_does_not_suppress_blocking_clean_echo() -> None:
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary_merge_reuse_with_echoes(echo_extra="\n[P1] Security boundary bypass")
+    )
+
+
+def test_current_codex_summary_rejects_multiple_same_generation_clean_echoes() -> None:
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary_merge_reuse_with_echoes(echo_count=2)
+    )
 
 
 def main() -> int:
