@@ -163,7 +163,7 @@ def test_canonical_instructions_gate_every_direct_remote_desktop_call() -> None:
     for text in (agents_text, contract_text):
         assert "every direct `Remote_Desktop_Commander.*` invocation" in text
         assert "local connector/tool registration" in text
-        assert "positive per-action" in text
+        assert "positive per-call" in text
         assert "must not invoke `Remote_Desktop_Commander.list_devices`" in text
         assert "A Remote Desktop `DENY` is not automatically a blocker" in text
         assert "validate_remote_desktop_call" in text
