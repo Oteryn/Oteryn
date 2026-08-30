@@ -177,10 +177,14 @@ from typing import Protocol
 class ExecutionSurfaceUnavailable(RuntimeError): ...
 
 @dataclass(frozen=True)
-class TrustedTaskIdentity:
+class StableTaskLineageKey:
     repository: str
     task_id: str
     checkpoint_lineage_token: str
+
+@dataclass(frozen=True)
+class TrustedTaskIdentity:
+    lineage_key: StableTaskLineageKey
     task_branch: str
     pr_applicable: bool
     pr_id: str | None
@@ -188,8 +192,8 @@ class TrustedTaskIdentity:
     expected_next_action: str
 
 class CheckpointLineageAuthority(Protocol):
-    def latest_predecessor(self, trusted_task: TrustedTaskIdentity) -> dict | None: ...
-    def proves_no_predecessor(self, trusted_task: TrustedTaskIdentity) -> bool: ...
+    def latest_predecessor(self, lineage_key: StableTaskLineageKey) -> dict | None: ...
+    def proves_no_predecessor(self, lineage_key: StableTaskLineageKey) -> bool: ...
     def checkpoint_digest(self, checkpoint: dict) -> str: ...
 
 class CheckpointTransitionAuthority(Protocol):
@@ -263,14 +267,14 @@ Reject unknown schema versions, missing authority references, duplicate vocabula
 Treat stable task identity and mutable execution coordinates differently. These stable fields MUST always match the independently authenticated task context before any lineage, resume or lifecycle decision:
 
 ```python
-snapshot["repository"] == trusted_task.repository
-snapshot["task_id"] == trusted_task.task_id
-snapshot["checkpoint_lineage_token"] == trusted_task.checkpoint_lineage_token
+snapshot["repository"] == trusted_task.lineage_key.repository
+snapshot["task_id"] == trusted_task.lineage_key.task_id
+snapshot["checkpoint_lineage_token"] == trusted_task.lineage_key.checkpoint_lineage_token
 ```
 
-`trusted_task` MUST be supplied by an independently authenticated control-plane/task context and MUST NOT be constructed from snapshot fields inside `validate_continuation_snapshot`.
+`trusted_task` and its `lineage_key` MUST be supplied by an independently authenticated control-plane/task context and MUST NOT be constructed from snapshot fields inside `validate_continuation_snapshot`. `StableTaskLineageKey` is the only key permitted for durable predecessor/no-predecessor lookup. It is immutable across branch, PR, head and `next_action` advances; those mutable coordinates belong only to the fresh execution context in `TrustedTaskIdentity`.
 
-For `validation_mode="checkpoint_write"`, first resolve `previous = lineage_authority.latest_predecessor(trusted_task)`. If a predecessor exists, authenticate it as the latest durable checkpoint and require `bounded_lifecycle_authority.preserves_retry_and_evidence_continuity(previous, snapshot, trusted_task)` to approve every canonical bounded generation/counter transition. This delegates reset/scope semantics entirely to `#69/#71`; the continuation layer never invents counter names, budgets, or reset rules. If the authority rejects, omits, cannot verify, or cannot load expected predecessor continuity, fail closed. If no continuation predecessor exists, first require `lineage_authority.proves_no_predecessor(trusted_task)` independently, **then** require `bounded_lifecycle_authority.matches_current_retry_and_evidence_state(snapshot, trusted_task)` so the first continuation checkpoint inherits any canonical bounded generations/counters already consumed before continuation tracking began. Absence of a continuation predecessor never implies a fresh bounded retry/evidence budget; unknown/unavailable/mismatched current bounded state fails closed.
+For `validation_mode="checkpoint_write"`, first resolve `previous = lineage_authority.latest_predecessor(trusted_task.lineage_key)`. If a predecessor exists, authenticate it as the latest durable checkpoint and require `bounded_lifecycle_authority.preserves_retry_and_evidence_continuity(previous, snapshot, trusted_task)` to approve every canonical bounded generation/counter transition. This delegates reset/scope semantics entirely to `#69/#71`; the continuation layer never invents counter names, budgets, or reset rules. If the authority rejects, omits, cannot verify, or cannot load expected predecessor continuity, fail closed. If no continuation predecessor exists, first require `lineage_authority.proves_no_predecessor(trusted_task.lineage_key)` independently, **then** require `bounded_lifecycle_authority.matches_current_retry_and_evidence_state(snapshot, trusted_task)` so the first continuation checkpoint inherits any canonical bounded generations/counters already consumed before continuation tracking began. Absence of a continuation predecessor never implies a fresh bounded retry/evidence budget; unknown/unavailable/mismatched current bounded state fails closed.
 
 The proposed checkpoint is current control-plane state, so its mutable coordinates MUST also equal the current trusted context before it can be persisted:
 
@@ -284,7 +288,7 @@ snapshot["next_action"] == trusted_task.expected_next_action
 
 For `validation_mode="resume_read"`, **do not rewrite or directly compare historical mutable coordinates or lifecycle/disposition to fresh control-plane state**. Instead:
 
-1. resolve `historical = lineage_authority.latest_predecessor(trusted_task)` from the durable lineage using only the stable trusted task identity;
+1. resolve `historical = lineage_authority.latest_predecessor(trusted_task.lineage_key)` from the durable lineage using **only** the immutable `StableTaskLineageKey`; branch, PR, head and `next_action` MUST NOT participate in predecessor selection;
 2. require the supplied checkpoint to be that exact authenticated historical record (same durable checkpoint digest and stable identity); a caller-selected older checkpoint, edited branch/PR/head/action, fabricated digest, or rewritten copy fails closed;
 3. preserve `historical["task_branch"]`, `pr_applicable`, `pr_id`, `task_head_sha`, `next_action`, `bounded_lifecycle_state`, `worker_disposition`, `resume_mechanism`, and `resume_locator` as historical evidence;
 4. resolve a **fresh** `trusted_task` from GitHub/control-plane state and independently resolve `fresh_lifecycle = bounded_lifecycle_authority.canonical_state(trusted_task)`;
@@ -362,7 +366,7 @@ trusted_task = TrustedTaskIdentity(
 )
 ```
 
-Add negative tests where the snapshot changes stable repository/task/lineage identity; these always fail before lineage/resume dispatch. In `checkpoint_write` mode, also reject any snapshot branch/PR/head/`next_action` mismatch against the current trusted context. Add a fake lineage authority containing an unrelated checkpoint-free task and prove that changing all snapshot identity fields together still cannot make `proves_no_predecessor` authorize it. For `resume_read`, add a trusted historical checkpoint at head A/action A and a fresh trusted GitHub context at head B/action B: require the supplied checkpoint digest to match the authoritative historical record, then allow use of B/action B only when `CheckpointTransitionAuthority` verifies exactly A→B/action A→B. Reject an edited historical checkpoint, caller-selected older checkpoint, snapshot rewritten to B before history authentication, transition proof for another PR/task, and false/unknown/stale transition proof. Also prove unchanged A→A resumes without manufacturing a transition.
+Add negative tests where the snapshot changes stable repository/task/lineage identity; these always fail before lineage/resume dispatch. Build one immutable `StableTaskLineageKey` and two fresh `TrustedTaskIdentity` values for the same lineage (head/action A and head/action B); prove both lineage lookups receive the exact same stable key while branch/PR/head/action differences are reconciled separately. Also prove that changing any immutable key field selects no predecessor/fails closed rather than being treated as mutable progress. In `checkpoint_write` mode, reject any snapshot branch/PR/head/`next_action` mismatch against the current trusted context. Add a fake lineage authority containing an unrelated checkpoint-free task and prove that changing all snapshot identity fields together still cannot make `proves_no_predecessor` authorize it. For `resume_read`, add a trusted historical checkpoint at head A/action A and a fresh trusted GitHub context at head B/action B: require the supplied checkpoint digest to match the authoritative historical record, then allow use of B/action B only when `CheckpointTransitionAuthority` verifies exactly A→B/action A→B. Reject an edited historical checkpoint, caller-selected older checkpoint, snapshot rewritten to B before history authentication, transition proof for another PR/task, and false/unknown/stale transition proof. Also prove unchanged A→A resumes without manufacturing a transition.
 
 At `checkpoint_write`, every automatic continuation claim requires `is_live_and_bound(...)` to return true for the exact trusted task and current `next_action`. Add parameterized negative cases where the locator is syntactically non-empty but the verifier reports deleted, disabled, paused, unknown, inaccessible, mismatched task/lineage, or mismatched next action. Explicitly prove that a live scheduled/Work task belonging to `OTHER-TASK` does not satisfy a checkpoint for `Oteryn/Oteryn#108`, and that the same locator bound to `next_action="other action"` fails.
 
@@ -444,7 +448,7 @@ First prove `resume_read` cannot substitute or rewrite predecessor retry/generat
 
 Exercise **both checkpoint-write boundaries** explicitly. First, when `latest_predecessor(trusted_task)` returns `None`, prove that `proves_no_predecessor(trusted_task)` alone is insufficient: the fake bounded authority must expose already-consumed generation/retry/evidence state and `matches_current_retry_and_evidence_state(...)` must reject a first continuation checkpoint that lowers, resets or omits any applicable canonical value; unknown/unavailable current bounded state also fails closed. A truly first continuation checkpoint is accepted only when both no-predecessor proof and current bounded-state match succeed.
 
-Then exercise the **successor write** boundary. After a valid resume, build `successor_snapshot` for fresh trusted state and call `validate_continuation_snapshot(..., validation_mode="checkpoint_write")` while `lineage_authority.latest_predecessor(trusted_task)` returns the authenticated historical checkpoint. The fake `BoundedLifecycleAuthority.preserves_retry_and_evidence_continuity(...)` must reject every reduced, reset or omitted applicable bounded generation/retry/evidence value relative to that authoritative predecessor, and must allow only transitions the canonical `#69/#71` authority declares valid. Test unavailable/ambiguous predecessor and unavailable continuity proof as fail-closed. The continuation validator delegates canonical counter scopes and legal reset semantics to bounded authority; it never redefines them.
+Then exercise the **successor write** boundary. After a valid resume, build `successor_snapshot` for fresh trusted state and call `validate_continuation_snapshot(..., validation_mode="checkpoint_write")` while `lineage_authority.latest_predecessor(trusted_task.lineage_key)` returns the authenticated historical checkpoint. The fake `BoundedLifecycleAuthority.preserves_retry_and_evidence_continuity(...)` must reject every reduced, reset or omitted applicable bounded generation/retry/evidence value relative to that authoritative predecessor, and must allow only transitions the canonical `#69/#71` authority declares valid. Test unavailable/ambiguous predecessor and unavailable continuity proof as fail-closed. The continuation validator delegates canonical counter scopes and legal reset semantics to bounded authority; it never redefines them.
 
 - [ ] **Step 8: Add executor-selection tests**
 

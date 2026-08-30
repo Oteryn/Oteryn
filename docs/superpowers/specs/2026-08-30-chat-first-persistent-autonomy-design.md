@@ -250,6 +250,10 @@ Truthfulness has two different verification boundaries. **Before release/checkpo
 
 If no worker-launching/preserving automatic mechanism exists when replacement worker action will be required, use `stop_reinvoke_required`. Never imply that regular Chat or GitHub-native control-plane progress will silently create a new foreground worker turn after the current response ends.
 
+## Immutable lineage identity versus mutable execution context
+
+Continuation history MUST be keyed by an immutable lineage identity containing only repository, governing task/Issue identity and an opaque checkpoint-lineage token. Branch, PR identity, exact head SHA and `next_action` are **mutable execution coordinates** and MUST NOT be part of the predecessor/no-predecessor lookup key. A released task may legitimately resume after any of those mutable coordinates advance; the same immutable lineage key must still resolve the same durable predecessor, after which a separate transition authority reconciles historical coordinates to fresh control-plane state. Changing an immutable lineage-key field is a different lineage and fails closed rather than being treated as ordinary progress.
+
 ## Durable checkpoint semantic minimum
 
 The organization defines a semantic minimum, not one universal provider file format.
@@ -371,7 +375,7 @@ The META implementation should provide a versioned machine policy and validator 
 5. `release_waiting + github_native` is allowed only when no later agent worker action remains anywhere in the task after GitHub-native progression;
 6. `release_waiting` paired with `scheduled_task`, `work_event_trigger`, or `work_persistent` requires a non-empty concrete locator; `github_native` also requires a concrete control-plane locator;
 7. `owner_reinvoke` cannot be presented as automatic continuation;
-8. continuation does not reset canonical retry/no-progress counters: a first continuation checkpoint with no continuation predecessor must still match the canonical bounded authority's current retry/evidence state, and every successor checkpoint write resolves the latest trusted predecessor and delegates retry/evidence continuity validation to that same authority;
+8. continuation history is resolved only by the immutable repository/task/lineage key; mutable branch/PR/head/next-action advances never change predecessor selection, and continuation does not reset canonical retry/no-progress counters: a first continuation checkpoint with no continuation predecessor must still match the canonical bounded authority's current retry/evidence state, while every successor checkpoint write resolves the latest trusted predecessor and delegates retry/evidence continuity validation to that same authority;
 9. frozen candidates cannot use checkpoint/retrigger commits as a continuation mechanism;
 10. Work selection requires a capability reason rather than effort alone;
 11. provider mapping may be stricter but cannot weaken organization task-lifetime truthfulness or bounded-execution safety;
