@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Focused behavior tests for the Remote Desktop per-action authorization gate."""
+"""Focused behavior tests for Remote Desktop authorization and provider policy adoption."""
 from __future__ import annotations
 
 import importlib.util
@@ -11,6 +11,18 @@ SPEC = importlib.util.spec_from_file_location("agent_execution_routing", MODULE_
 assert SPEC and SPEC.loader
 routing = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(routing)
+
+CALL_GATE_PATH = Path(__file__).with_name("remote_desktop_call_gate.py")
+CALL_GATE_SPEC = importlib.util.spec_from_file_location("remote_desktop_call_gate", CALL_GATE_PATH)
+assert CALL_GATE_SPEC and CALL_GATE_SPEC.loader
+call_gate = importlib.util.module_from_spec(CALL_GATE_SPEC)
+CALL_GATE_SPEC.loader.exec_module(call_gate)
+
+ADOPTION_PATH = Path(__file__).with_name("provider_policy_adoption.py")
+ADOPTION_SPEC = importlib.util.spec_from_file_location("provider_policy_adoption", ADOPTION_PATH)
+assert ADOPTION_SPEC and ADOPTION_SPEC.loader
+adoption = importlib.util.module_from_spec(ADOPTION_SPEC)
+ADOPTION_SPEC.loader.exec_module(adoption)
 
 REPO_ROOT = Path(__file__).parents[2]
 REPO = "Oteryn/Oteryn"
@@ -93,6 +105,7 @@ def exception_packet(reason: str) -> dict[str, object]:
         "lan_or_hardware": "Remote_Desktop_Commander.ping",
         "self_hosted_runner_diagnosis": "Remote_Desktop_Commander.list_processes",
     }
+    tool = tools.get(reason, "Remote_Desktop_Commander.get_config")
     execution.update(
         {
             "execution_target": "host_exception",
@@ -101,9 +114,25 @@ def exception_packet(reason: str) -> dict[str, object]:
             "remote_desktop_reason": reason,
             "equivalent_ci": None,
             "requested_host_actions": [actions.get(reason, "inspect_host_only_service")],
-            "requested_remote_desktop_tools": [tools.get(reason, "Remote_Desktop_Commander.get_config")],
+            "requested_remote_desktop_tools": [tool],
+            "requested_remote_desktop_calls": [{"tool": tool, "arguments": {}}],
         }
     )
+    return packet
+
+
+def start_process_exception_packet() -> dict[str, object]:
+    packet = exception_packet("self_hosted_runner_diagnosis")
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    tool = "Remote_Desktop_Commander.start_process"
+    execution["requested_remote_desktop_tools"] = [tool]
+    execution["requested_remote_desktop_calls"] = [
+        {
+            "tool": tool,
+            "arguments": {"command": "docker ps --format {{.ID}}", "timeout_ms": 5000},
+        }
+    ]
     return packet
 
 
@@ -137,6 +166,8 @@ def test_canonical_instructions_gate_every_direct_remote_desktop_call() -> None:
         assert "positive per-action" in text
         assert "must not invoke `Remote_Desktop_Commander.list_devices`" in text
         assert "A Remote Desktop `DENY` is not automatically a blocker" in text
+        assert "validate_remote_desktop_call" in text
+        assert "exact call arguments" in text
 
 
 def test_exception_requires_remote_tool_declaration() -> None:
@@ -333,6 +364,60 @@ def test_exact_reason_action_and_tool_is_allowed() -> None:
         live_state=live_state(),
         policy=policy(),
     ) == []
+
+
+def test_exact_call_arguments_are_required_for_remote_desktop() -> None:
+    packet = start_process_exception_packet()
+    assert call_gate.validate_remote_desktop_call(
+        "diagnose_self_hosted_runner",
+        "Remote_Desktop_Commander.start_process",
+        {"command": "docker ps --format {{.ID}}", "timeout_ms": 5000},
+        packet=packet,
+        live_state=live_state(),
+        policy=policy(),
+    ) == []
+    errors = call_gate.validate_remote_desktop_call(
+        "diagnose_self_hosted_runner",
+        "Remote_Desktop_Commander.start_process",
+        {"command": "docker rm -f production", "timeout_ms": 5000},
+        packet=packet,
+        live_state=live_state(),
+        policy=policy(),
+    )
+    assert errors == ["remote desktop call arguments do not match routing packet"]
+
+
+def test_nonsemantic_device_id_does_not_change_call_authorization() -> None:
+    packet = exception_packet("lan_or_hardware")
+    assert call_gate.validate_remote_desktop_call(
+        "perform_lan_or_hardware_acceptance",
+        "Remote_Desktop_Commander.ping",
+        {"deviceId": "runtime-selected-device"},
+        packet=packet,
+        live_state=live_state(),
+        policy=policy(),
+    ) == []
+
+
+def test_provider_policy_adoption_rejects_historical_parallel_first_contract() -> None:
+    stale = (
+        "The canonical organization policy is "
+        "Oteryn/Oteryn@8fac1d55805fc3372351ea0a55ad7728b3570ebc:ecosystem/agent-execution-routing-policy.json. "
+        "A substantial task packet must plan parallel-first. Serial work requires an explicit reason."
+    )
+    errors = adoption.validate_provider_agents_text("Game", stale)
+    assert "historical META execution-policy pin is forbidden" in errors
+    assert "parallel-first execution wording is forbidden" in errors
+
+
+def test_provider_policy_adoption_accepts_live_effort_aware_contract() -> None:
+    current = (
+        "The canonical organization execution-routing policy is the current protected `main` version of "
+        "`Oteryn/Oteryn:ecosystem/agent-execution-routing-policy.json`; historical commit pins are not authority. "
+        "Choose `single_agent` normally when one worker is proportionate and use `parallel_when_beneficial` only "
+        "when at least two materially independent workstreams justify the coordination cost."
+    )
+    assert adoption.validate_provider_agents_text("Atlas", current) == []
 
 
 if __name__ == "__main__":
