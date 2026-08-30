@@ -1,6 +1,6 @@
 # Organization Merge Queue + Review Fingerprint — Binding Safety Amendment
 
-**Status:** binding amendment to the Issue #102 target architecture carried by PR #117. Where this file conflicts with the original design, rollout plan, or reusable rollout prompt in the same PR, this amendment wins. Implementation must fail closed until these amended invariants are satisfied by protected-main code and live canary evidence.
+**Status:** binding amendment to the Issue #102 target architecture carried by PR #117. Where this file conflicts with the original design, rollout plan, or reusable rollout prompt in the same PR, this amendment wins. Implementation must fail closed until these amended invariants are satisfied by protected-main code and the applicable staged canary evidence.
 
 ## Why this amendment exists
 
@@ -17,9 +17,9 @@ GitHub may construct a later queue candidate from the selected base plus changes
 - bind the active queue entry/entries from server-side Merge Queue state, including PR object identity, `baseCommit`, `headCommit`, position/state, configured merge method, grouping strategy, build concurrency and merge limit;
 - require the method-aware independently reproduced integration tree to equal `tree(I)` exactly;
 - do not assume `B == protected main`; for a later queue entry, `B` may reflect a speculative predecessor that already represents entries ahead of it;
-- if the implementation only supports a single-entry topology initially, prove that topology with a real canary and reject any event whose live queue state contains an unmodelled predecessor/prefix. Do not silently treat unsupported multi-entry topology as equivalent.
+- if the implementation only supports a single-entry topology initially, reject any live event whose queue state contains an unmodelled predecessor/prefix. Do not silently treat unsupported multi-entry topology as equivalent.
 
-Initial rollout must include a canary that proves the exact topology actually supported. If a two-entry/predecessor canary is not yet supported, constrain rollout operationally to the proven topology and fail closed when the live queue does not match it.
+Phase C must provide deterministic fixtures for the supported topology and fail-closed unsupported cases. The live topology proof belongs to the staged post-enablement canary described below, because no real `merge_group` event exists before Merge Queue is enabled.
 
 ## 2. Historical review evidence requires a successful issuer run, not only a valid signature
 
@@ -100,16 +100,33 @@ Any reconciliation that changes risk-bearing verifier semantics requires fresh e
 
 ## Amended Phase-C acceptance gate
 
-Phase C is not ready for settings cutover until protected-main readback proves all of the following:
+Phase C is complete only when protected-main readback proves the **capability code** required for later cutover, without requiring a live queue event that cannot exist yet. Before any queue/ruleset enforcement mutation, require all of the following:
 
 - the dual-event protected META workflow exists at an exact protected source SHA;
 - historical PR #111-format evidence is discoverable through the durable artifact locator;
-- the consumer rejects valid attestations from non-success issuer runs/jobs/checks;
-- queue identity/topology is bound from event + live queue state and not inferred from `maximumEntriesToMerge`;
-- exact method-aware integration tree reproduction is tested;
+- the consumer deterministically rejects valid attestations from non-success issuer runs/jobs/checks;
+- queue identity/topology parsing is bound to event + server-side queue state and is not inferred from `maximumEntriesToMerge`;
+- deterministic fixtures cover the supported queue topology, unsupported predecessor/prefix cases, and exact method-aware integration-tree reproduction;
 - trusted helpers execute only from exact protected META source;
 - bridge/provider authority updates use versioned protected activation;
 - #114 permission contract is complete before provider consumption;
-- real canary/readback proves the exact topology and event path that will be enforced.
+- the exact files, workflow path, source SHA, expected ruleset selector and rollback baseline are read back from protected `main`.
 
-Until then, keep existing strict freshness and existing required checks in force. Do not weaken protection to make the bridge easier to deploy.
+**No live `merge_group` canary is required to exit Phase C.** Queue/ruleset enforcement and the first real synthetic integration candidate belong to the staged cutover phase below. Until that phase begins, keep existing strict freshness and existing required checks in force.
+
+## Amended Phase-D / Phase-3 live canary gate
+
+Only after the complete Phase-C capability is merged and read back from protected `main`:
+
+1. capture and positively read back the current protection/ruleset baseline with strict freshness still active;
+2. configure the protected-source required workflow in Evaluate/shadow mode where supported and verify source access;
+3. enable/require Merge Queue and activate the protected-source required workflow while **strict freshness remains enabled**;
+4. positively read back queue-required + bridge-required + strict-freshness-active state;
+5. enqueue one fresh/reopened real canary and prove the PR-admission leg followed by a distinct `merge_group` run on exact `I`;
+6. on that real event, prove event/server queue topology, exact `B/C/I` identities, the supported predecessor/prefix model, successful #111 issuer coordinates + durable envelope artifact, exact method-aware `tree(I)` reproduction, provider aggregate tests, and the required workflow result on `I`;
+7. verify the canary merge and protected-main readback;
+8. **only then** request strict-freshness disable and positively read back the complete final protected state.
+
+If the supported topology cannot be proven by the live canary, fail closed, keep/re-enable strict freshness, and do not widen the implementation by assumption. A two-entry/predecessor canary may be added later to widen supported topology, but unsupported live queue shapes remain blocked until explicitly modelled and proven.
+
+Do not weaken protection to make the bridge easier to deploy.
