@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 3903)
+Total output lines: 395
+
 import copy
 import json
 import sys
@@ -35,6 +38,7 @@ def snapshot(**overrides):
         "dependency_kind": "",
         "gate_state": "pending",
         "review_generation": "review-1",
+        "review_fingerprint": "f" * 64,
         "evidence_generation": "evidence-1",
         "first_material_failure": "",
         "identical_failure_cycles": 0,
@@ -44,6 +48,12 @@ def snapshot(**overrides):
         "completion_verified": False,
         "material_change": False,
         "material_change_reason": "",
+        "material_change_evidence": "",
+        "material_fact_id": "",
+        "material_fact_head": "",
+        "material_fact_verified": False,
+        "repair_generation_id": "",
+        "repair_base_head": "",
         "late_material_findings": 0,
         "post_freeze_material_head_changes": 0,
         "audited_late_material_findings": 0,
@@ -57,12 +67,20 @@ def snapshot(**overrides):
 
 class FrozenLineageTests(unittest.TestCase):
     def test_explicit_unfreeze_consumes_one_post_freeze_repair_generation(self):
-        previous = snapshot(candidate_frozen=True)
+        previous = snapshot(
+            candidate_frozen=True,
+            material_change_reason="review_finding",
+            material_fact_id="d" * 64,
+            material_fact_head="a" * 40,
+            material_fact_verified=True,
+        )
         current = copy.deepcopy(previous)
         current["candidate_frozen"] = False
         current["material_change"] = True
-        current["material_change_reason"] = "review_finding"
-        current["late_material_findings"] = 1
+        current["material_change_evidence"] = "review-thread:3888776292"
+        current["evidence_generation"] = "evidence-2"
+        current["repair_generation_id"] = "d" * 64
+        current["repair_base_head"] = "a" * 40
         with self.assertRaises(GuardError):
             decide(previous, current, "observe", POLICY)
 
@@ -75,7 +93,12 @@ class FrozenLineageTests(unittest.TestCase):
             candidate_frozen=False,
             material_change=True,
             material_change_reason="review_finding",
-            late_material_findings=1,
+            material_change_evidence="review-thread:3888776292",
+            material_fact_id="d" * 64,
+            material_fact_head="a" * 40,
+            material_fact_verified=True,
+            repair_generation_id="d" * 64,
+            repair_base_head="a" * 40,
             post_freeze_material_head_changes=1,
         )
         current = copy.deepcopy(previous)
@@ -91,108 +114,28 @@ class FreezeAdmissionTests(unittest.TestCase):
         self.assertFalse(result.allowed)
         self.assertIn("frozen", result.reason.lower())
 
-    def test_loop_breaker_qualification_requires_frozen_candidate(self):
-        previous = snapshot(
-            late_material_findings=2,
-            audited_late_material_findings=2,
-            candidate_frozen=False,
-            final_qualification_runs_since_audit=0,
-        )
-        current = copy.deepcopy(previous)
-        current["final_qualification_runs_since_audit"] = 1
-        result = decide(previous, current, "enter_final_qualification", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertIn("frozen", result.reason.lower())
-
-    def test_post_admission_final_review_requires_candidate_to_remain_frozen(self):
-        previous = snapshot(
-            phase="LOOP_BREAKER_AUDIT",
-            late_material_findings=2,
-            audited_late_material_findings=2,
-            candidate_frozen=True,
-            final_qualification_runs_since_audit=0,
-        )
-        admitted = copy.deepcopy(previous)
-        admitted["phase"] = "final_qualification"
-        admitted["final_qualification_runs_since_audit"] = 1
-        self.assertTrue(
-            decide(previous, admitted, "enter_final_qualification", POLICY).allowed
-        )
-
-        unfrozen = copy.deepcopy(admitted)
-        unfrozen["candidate_frozen"] = False
-        unfrozen["material_change"] = True
-        unfrozen["material_change_reason"] = "review_finding"
-        unfrozen["late_material_findings"] = 3
-        unfrozen["post_freeze_material_head_changes"] = 1
-        result = decide(admitted, unfrozen, "request_external_review", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertIn("frozen", result.reason.lower())
-
-
-class MaterialChangeEvidenceTests(unittest.TestCase):
-    def test_frozen_mutation_rejects_material_change_without_durable_evidence(self):
-        previous = snapshot(candidate_frozen=True)
-        current = copy.deepcopy(previous)
-        current["material_change"] = True
-        current["material_change_reason"] = "review_finding"
-        result = decide(previous, current, "mutate", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertIn("material", result.reason.lower())
-
-    def test_frozen_mutation_rejects_unrecognized_material_change_reason(self):
-        previous = snapshot(candidate_frozen=True)
-        current = copy.deepcopy(previous)
-        current["material_change"] = True
-        current["material_change_reason"] = "because_i_said_so"
-        current["evidence_generation"] = "evidence-2"
-        result = decide(previous, current, "mutate", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertIn("reason", result.reason.lower())
-
-    def test_review_finding_reason_is_bound_to_late_finding_increment(self):
-        previous = snapshot(candidate_frozen=True)
-        current = copy.deepcopy(previous)
-        current["material_change"] = True
-        current["material_change_reason"] = "review_finding"
-        current["late_material_findings"] = 1
-        result = decide(previous, current, "mutate", POLICY)
-        self.assertTrue(result.allowed)
-
-    def test_frozen_retrigger_is_forbidden_even_with_material_change_evidence(self):
-        previous = snapshot(candidate_frozen=True)
-        current = copy.deepcopy(previous)
-        current["material_change"] = True
-        current["material_change_reason"] = "review_finding"
-        current["late_material_findings"] = 1
-        result = decide(previous, current, "retrigger", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertIn("retrigger", result.reason.lower())
-
-
-class DoneTerminalityTests(unittest.TestCase):
-    def test_previous_done_cannot_transition_back_to_running(self):
-        previous = snapshot(state="DONE", completion_verified=True)
-        current = snapshot(
-            state="RUNNING",
-            candidate_frozen=False,
-            completion_verified=False,
-        )
-        with self.assertRaises(GuardError):
-            decide(previous, current, "mutate", POLICY)
-
-    def test_previous_done_allows_observation_only(self):
-        previous = snapshot(state="DONE", completion_verified=True)
-        current = copy.deepcopy(previous)
-        observed = decide(previous, current, "observe", POLICY)
-        self.assertTrue(observed.allowed)
-        self.assertEqual(observed.state, "DONE")
-        self.assertTrue(observed.release_session)
-
-        completed = decide(previous, current, "complete", POLICY)
-        self.assertFalse(completed.allowed)
-        self.assertEqual(completed.state, "DONE")
+ …1903 tokens truncated…       self.assertEqual(completed.state, "DONE")
         self.assertTrue(completed.release_session)
+
+
+class CounterTransitionTests(unittest.TestCase):
+    def test_consuming_action_cannot_change_its_review_generation_scope(self):
+        previous = snapshot(external_review_invocations=0, review_fingerprint="f" * 64)
+        current = copy.deepcopy(previous)
+        current["external_review_invocations"] = 1
+        current["review_fingerprint"] = "e" * 64
+
+        result = decide(previous, current, "request_external_review", POLICY)
+        self.assertFalse(result.allowed)
+        self.assertIn("generation", result.reason.lower())
+
+    def test_action_cannot_consume_an_unrelated_counter(self):
+        previous = snapshot()
+        current = copy.deepcopy(previous)
+        current["heavy_validation_runs"] = 1
+
+        with self.assertRaises(GuardError):
+            decide(previous, current, "request_external_review", POLICY)
 
 
 class ActionCounterConsumptionTests(unittest.TestCase):

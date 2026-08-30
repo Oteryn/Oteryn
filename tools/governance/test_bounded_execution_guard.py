@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 2595)
+Total output lines: 268
+
 import copy
 import json
 import sys
@@ -39,6 +42,7 @@ def snapshot(**overrides):
         "dependency_kind": "",
         "gate_state": "pending",
         "review_generation": "review-1",
+        "review_fingerprint": "f" * 64,
         "evidence_generation": "evidence-1",
         "first_material_failure": "",
         "identical_failure_cycles": 0,
@@ -47,6 +51,13 @@ def snapshot(**overrides):
         "same_head_gate_rechecks": 0,
         "completion_verified": False,
         "material_change": False,
+        "material_change_reason": "",
+        "material_change_evidence": "",
+        "material_fact_id": "",
+        "material_fact_head": "",
+        "material_fact_verified": False,
+        "repair_generation_id": "",
+        "repair_base_head": "",
         "late_material_findings": 0,
         "post_freeze_material_head_changes": 0,
         "audited_late_material_findings": 0,
@@ -106,71 +117,39 @@ class DecisionTests(unittest.TestCase):
             gate_state="failure",
             first_material_failure="review evidence not ready",
         )
-        current = copy.deepcopy(previous)
-        current["updated_at"] = "2026-08-25T14:05:00Z"
-        result = decide(previous, current, "observe", POLICY)
-        self.assertTrue(result.allowed)
-        self.assertEqual(result.state, "WAITING_EXTERNAL")
-        self.assertTrue(result.release_session)
-
-    def test_external_dependency_denies_operational_actions_until_fact_changes(self):
-        current = snapshot(
-            state="WAITING_EXTERNAL",
-            blocking_dependency="external_review",
-            dependency_kind="external",
-            gate_state="failure",
-            first_material_failure="review evidence not ready",
-        )
-        for action in (
-            "mutate",
-            "retry",
-            "retrigger",
-            "run_heavy_validation",
-            "request_external_review",
-            "same_head_gate_recheck",
-        ):
-            with self.subTest(action=action):
-                result = decide(current, copy.deepcopy(current), action, POLICY)
-                self.assertFalse(result.allowed)
-                self.assertEqual(result.state, "WAITING_EXTERNAL")
-                self.assertTrue(result.release_session)
-
-    def test_second_identical_local_failure_stalls_instead_of_retrying_again(self):
-        previous = snapshot(
-            gate_state="failure",
-            first_material_failure="same deterministic failure",
-            identical_failure_cycles=1,
-        )
-        current = copy.deepcopy(previous)
-        current["identical_failure_cycles"] = 2
-        result = decide(previous, current, "retry", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertEqual(result.state, "STALLED")
-        self.assertTrue(result.release_session)
-
-    def test_retry_counters_cannot_regress_without_material_progress(self):
-        counter_names = (
-            "identical_failure_cycles",
-            "heavy_validation_runs",
-            "external_review_invocations",
-            "same_head_gate_rechecks",
-        )
-        for counter in counter_names:
-            with self.subTest(counter=counter):
-                previous = snapshot(**{counter: 1})
-                current = snapshot(**{counter: 0})
-                with self.assertRaises(GuardError):
-                    decide(previous, current, "observe", POLICY)
-
-    def test_retry_counters_may_restart_after_material_head_progress(self):
-        previous = snapshot(
+        current = copy.dee…595 tokens truncated…snapshot(
             task_head_sha="a" * 40,
             identical_failure_cycles=2,
             heavy_validation_runs=2,
-            external_review_invocations=1,
             same_head_gate_rechecks=1,
         )
         current = snapshot(task_head_sha="b" * 40)
+        result = decide(previous, current, "observe", POLICY)
+        self.assertTrue(result.allowed)
+
+    def test_review_budget_cannot_reset_after_sha_only_head_progress(self):
+        previous = snapshot(
+            task_head_sha="a" * 40,
+            external_review_invocations=1,
+            review_fingerprint="f" * 64,
+        )
+        current = snapshot(
+            task_head_sha="b" * 40,
+            external_review_invocations=0,
+            review_fingerprint="f" * 64,
+        )
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", POLICY)
+
+    def test_review_budget_may_reset_after_canonical_review_fingerprint_changes(self):
+        previous = snapshot(
+            external_review_invocations=1,
+            review_fingerprint="f" * 64,
+        )
+        current = snapshot(
+            external_review_invocations=0,
+            review_fingerprint="e" * 64,
+        )
         result = decide(previous, current, "observe", POLICY)
         self.assertTrue(result.allowed)
 

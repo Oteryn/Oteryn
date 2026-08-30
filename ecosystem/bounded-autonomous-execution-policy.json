@@ -19,8 +19,11 @@
     "dependency_kind",
     "gate_state",
     "review_generation",
+    "review_fingerprint",
     "evidence_generation",
-    "first_material_failure"
+    "first_material_failure",
+    "material_fact_id",
+    "material_fact_head"
   ],
   "retry_budgets": {
     "identical_failure_cycles": 2,
@@ -37,8 +40,7 @@
       "task_head_sha"
     ],
     "external_review_invocations": [
-      "task_head_sha",
-      "review_generation"
+      "review_fingerprint"
     ],
     "same_head_gate_rechecks": [
       "task_head_sha",
