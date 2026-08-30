@@ -76,7 +76,9 @@ def default_packet() -> dict[str, object]:
             "github_preflight": preflight(),
         },
         "parallel_execution": {
-            "lane_strategy": "parallel_first",
+            "effort": "medium",
+            "lane_strategy": "single_agent",
+            "decision_basis": "one shared governance contract is faster with one writer",
             "lanes": [lane("policy", ["docs/agents/schemas/**"])],
             "integration_order": ["policy"],
         },
@@ -200,6 +202,32 @@ def test_malformed_policy_freshness_and_matrix_fail_closed() -> None:
     for malformed_policy in malformed_policies:
         errors = routing.validate_packet(default_packet(), live_state=live_state(), policy=malformed_policy)
         assert any(error.startswith("policy ") for error in errors)
+
+
+def test_malformed_effort_planning_policy_fails_closed() -> None:
+    cases = (
+        ("strategies", ["parallel_first"], "policy parallel_lane_rules.strategies must be the canonical effort-aware strategy set"),
+        ("effort_levels", ["medium"], "policy parallel_lane_rules.effort_levels must be the canonical effort set"),
+        ("decision_basis_required", False, "policy parallel_lane_rules.decision_basis_required must be true"),
+        ("single_agent_lane_count", 2, "policy parallel_lane_rules.single_agent_lane_count must be 1"),
+        ("parallel_minimum_lanes", 1, "policy parallel_lane_rules.parallel_minimum_lanes must be 2"),
+    )
+    for field, invalid_value, expected_error in cases:
+        malformed_policy = policy()
+        rules = malformed_policy["parallel_lane_rules"]
+        assert isinstance(rules, dict)
+        rules.update(
+            {
+                "strategies": ["single_agent", "parallel_when_beneficial"],
+                "effort_levels": ["low", "medium", "high"],
+                "decision_basis_required": True,
+                "single_agent_lane_count": 1,
+                "parallel_minimum_lanes": 2,
+            }
+        )
+        rules[field] = invalid_value
+        errors = routing.validate_packet(default_packet(), live_state=live_state(), policy=malformed_policy)
+        assert expected_error in errors
 
 
 def test_resume_required_fields_policy_is_exact_and_fail_closed() -> None:
@@ -441,6 +469,68 @@ def test_multi_lane_task_requires_parallel_plan() -> None:
     assert "multi-lane task requires lane_strategy" in routing.validate_packet(packet, live_state=live_state(), policy=policy())
 
 
+def test_single_agent_is_a_first_class_strategy_without_serial_exception() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    assert "serial_reason" not in parallel
+    assert routing.validate_packet(packet, live_state=live_state(), policy=policy()) == []
+
+
+def test_single_agent_requires_exactly_one_lane() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lanes"] = [lane("one", ["src/one/**"]), lane("two", ["src/two/**"])]
+    parallel["integration_order"] = ["one", "two"]
+    assert "single_agent requires exactly one lane" in routing.validate_packet(
+        packet, live_state=live_state(), policy=policy()
+    )
+
+
+def test_parallel_when_beneficial_requires_at_least_two_lanes() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lane_strategy"] = "parallel_when_beneficial"
+    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    assert "parallel_when_beneficial requires at least two lanes" in errors
+
+
+def test_parallel_when_beneficial_accepts_two_independent_lanes() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["lane_strategy"] = "parallel_when_beneficial"
+    parallel["decision_basis"] = "two disjoint workstreams can progress independently"
+    parallel["lanes"] = [lane("one", ["src/one/**"]), lane("two", ["src/two/**"])]
+    parallel["integration_order"] = ["one", "two"]
+    assert routing.validate_packet(packet, live_state=live_state(), policy=policy()) == []
+
+
+def test_effort_and_decision_basis_are_required() -> None:
+    for field, expected_error in (
+        ("effort", "parallel_execution.effort is not allowed"),
+        ("decision_basis", "parallel_execution.decision_basis is required"),
+    ):
+        packet = default_packet()
+        parallel = packet["parallel_execution"]
+        assert isinstance(parallel, dict)
+        del parallel[field]
+        errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+        assert expected_error in errors
+
+
+def test_effort_must_use_the_closed_policy_set() -> None:
+    packet = default_packet()
+    parallel = packet["parallel_execution"]
+    assert isinstance(parallel, dict)
+    parallel["effort"] = "extreme"
+    assert "parallel_execution.effort is not allowed" in routing.validate_packet(
+        packet, live_state=live_state(), policy=policy()
+    )
+
+
 def test_overlapping_parallel_lanes_fail() -> None:
     packet = default_packet()
     parallel = packet["parallel_execution"]
@@ -549,16 +639,6 @@ def test_unknown_lane_dependency_fails() -> None:
     assert isinstance(parallel, dict)
     parallel["lanes"] = [lane("policy", ["docs/agents/schemas/**"], depends_on=["missing"])]
     assert "lane 'policy' depends_on unknown lane 'missing'" in routing.validate_packet(
-        packet, live_state=live_state(), policy=policy()
-    )
-
-
-def test_serial_plan_requires_a_concrete_reason() -> None:
-    packet = default_packet()
-    parallel = packet["parallel_execution"]
-    assert isinstance(parallel, dict)
-    parallel["lane_strategy"] = "serial_with_reason"
-    assert "serial_with_reason requires serial_reason" in routing.validate_packet(
         packet, live_state=live_state(), policy=policy()
     )
 
@@ -1072,8 +1152,7 @@ def test_cli_rejects_fail_open_execution_routing_bypasses() -> None:
         assert isinstance(parallel, dict)
         parallel["lanes"] = []
         parallel["integration_order"] = []
-        output = assert_rejected(packet, "parallel_first requires at least one lane")
-        assert "parallel_first requires a non-empty integration_order" in output
+        assert_rejected(packet, "single_agent requires exactly one lane")
 
         packet = default_packet()
         parallel = packet["parallel_execution"]
