@@ -53,6 +53,7 @@ CANONICAL_MATERIAL_CHANGE_REASONS = {
     "semantic_reconciliation",
     "changed_governing_authority",
 }
+CANONICAL_FROZEN_FORBIDDEN_ACTIONS = {"mutate", "retrigger"}
 LOOP_BREAKER_COUNTER_FIELDS = (
     "late_material_findings",
     "post_freeze_material_head_changes",
@@ -385,6 +386,12 @@ def validate_policy(policy: dict[str, Any]) -> None:
     forbidden = freeze.get("forbidden_actions_without_material_change") if isinstance(freeze, dict) else None
     if not isinstance(forbidden, list) or not forbidden or not all(isinstance(x, str) and x for x in forbidden):
         raise GuardError("candidate_freeze forbidden action list is invalid")
+    if (
+        not CANONICAL_FROZEN_FORBIDDEN_ACTIONS.issubset(set(forbidden))
+        or len(set(forbidden)) != len(forbidden)
+        or any(action not in SUPPORTED_ACTIONS for action in forbidden)
+    ):
+        raise GuardError("candidate_freeze forbidden action list must retain canonical forbidden actions")
     material_reasons = freeze.get("material_change_reasons") if isinstance(freeze, dict) else None
     if (
         not isinstance(material_reasons, list)
@@ -684,6 +691,9 @@ def _validate_history(
         for field in ("material_fact_envelope", "repair_generation_id", "repair_base_head"):
             if current[field] != previous[field]:
                 raise GuardError("an open repair generation must retain its trusted material fact and base coordinates")
+    if action == "refreeze_candidate":
+        if previous["candidate_frozen"] or not current["candidate_frozen"] or not repair_open:
+            raise GuardError("refreeze_candidate must transition an open repair from candidate_frozen=false to true")
     if not previous["candidate_frozen"] and current["candidate_frozen"] and repair_open:
         if action != "refreeze_candidate":
             raise GuardError("refreeze requires the reserved refreeze_candidate control-plane action")
