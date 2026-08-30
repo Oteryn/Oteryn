@@ -343,6 +343,66 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             self.assertTrue(outbox.claim_dispatch(winner.reservation_key))
             self.assertFalse(outbox.claim_dispatch(winner.reservation_key))
 
+    def test_takeover_atomically_claims_pending_dispatches_in_commit_order(self):
+        repository = "Oteryn/Oteryn"
+        task_id = "OTERYN-DISPATCH-RECOVERY"
+        initial = {"revision": 0}
+        first = {"revision": 1}
+        second = {"revision": 2}
+        initial_checkpoint = _checkpoint_digest(initial)
+        first_checkpoint = _checkpoint_digest(first)
+        second_checkpoint = _checkpoint_digest(second)
+
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "checkpoint.db"
+            producer = SqliteCheckpointOutbox(database)
+            producer.seed_checkpoint(
+                repository, task_id, initial_checkpoint, snapshot=initial
+            )
+            first_reservation = producer.reserve(
+                repository=repository,
+                task_id=task_id,
+                expected_checkpoint=initial_checkpoint,
+                next_checkpoint=first_checkpoint,
+                next_snapshot=first,
+                action="retry",
+                scope=("failure-generation-1",),
+            )
+            second_reservation = producer.reserve(
+                repository=repository,
+                task_id=task_id,
+                expected_checkpoint=first_checkpoint,
+                next_checkpoint=second_checkpoint,
+                next_snapshot=second,
+                action="run_heavy_validation",
+                scope=("validation-generation-2",),
+            )
+            self.assertTrue(first_reservation.committed)
+            self.assertTrue(second_reservation.committed)
+
+            # Simulate a process crash: the returned reservation keys are not
+            # handed to a dispatcher. A fresh takeover must recover them from
+            # durable task-scoped outbox state without guessing either key.
+            takeover = SqliteCheckpointOutbox(database)
+            first_pending = takeover.claim_pending_dispatch(repository, task_id)
+            self.assertIsNotNone(first_pending)
+            self.assertEqual(first_pending.reservation_key, first_reservation.reservation_key)
+            self.assertEqual(first_pending.repository, repository)
+            self.assertEqual(first_pending.task_id, task_id)
+            self.assertEqual(first_pending.expected_checkpoint, initial_checkpoint)
+            self.assertEqual(first_pending.next_checkpoint, first_checkpoint)
+            self.assertEqual(first_pending.action, "retry")
+            self.assertEqual(first_pending.scope, ("failure-generation-1",))
+
+            second_pending = takeover.claim_pending_dispatch(repository, task_id)
+            self.assertIsNotNone(second_pending)
+            self.assertEqual(second_pending.reservation_key, second_reservation.reservation_key)
+            self.assertEqual(second_pending.expected_checkpoint, first_checkpoint)
+            self.assertEqual(second_pending.next_checkpoint, second_checkpoint)
+            self.assertEqual(second_pending.action, "run_heavy_validation")
+            self.assertEqual(second_pending.scope, ("validation-generation-2",))
+            self.assertIsNone(takeover.claim_pending_dispatch(repository, task_id))
+
     def test_durable_outbox_persists_recoverable_snapshot_for_takeover(self):
         previous = snapshot(
             state="READY",
