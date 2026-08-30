@@ -227,6 +227,28 @@ def test_current_codex_summary_preserves_blocking_finding_in_summary_body() -> N
     )
 
 
+def _observed_duplicate_echo_body(
+    prefix: str, *, first_line: str,
+    extra: str = "",
+) -> str:
+    return (
+        f"{first_line}\n\n"
+        f"**Reviewed commit:** `{prefix}`\n\n"
+        "<details> <summary>ℹ️ About Codex in GitHub</summary>\n"
+        "<br/>\n\n"
+        "[Your team has set up Codex to review pull requests in this repo]"
+        "(https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n"
+        "- Open a pull request for review\n"
+        "- Mark a draft as ready\n"
+        "- Comment \"@codex review\".\n\n"
+        "If Codex has suggestions, it will comment; otherwise it will react with 👍.\n\n\n\n\n"
+        "Codex can also answer questions or update the PR. Try commenting "
+        f"\"@codex address that feedback\".{extra}\n"
+        "            \n"
+        "</details>"
+    )
+
+
 def _verify_summary_merge_reuse_with_echoes(
     *, echo_prefix: str | None = None, echo_stamp: str = "2026-08-20T10:00:59Z",
     echo_extra: str = "", echo_count: int = 1,
@@ -256,12 +278,10 @@ def _verify_summary_merge_reuse_with_echoes(
             12 + index,
             prefix,
             stamp=echo_stamp,
-            text=(
-                f"{echo_first_line}\n\n"
-                f"**Reviewed commit:** `{prefix}`\n\n"
-                "<details> <summary>ℹ️ About Codex in GitHub</summary>\n"
-                f"standard Codex review wrapper{echo_extra}\n"
-                "</details>"
+            text=_observed_duplicate_echo_body(
+                prefix,
+                first_line=echo_first_line,
+                extra=echo_extra,
             ),
         )
         echo["performed_via_github_app"] = {"slug": "chatgpt-codex-connector"}
