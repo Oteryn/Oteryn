@@ -34,13 +34,17 @@ class AiReviewRecheckWorkflowTests(unittest.TestCase):
         self.assertIn("chatgpt-codex-connector[bot]", workflow)
 
     def test_execution_policy_review_fix_regressions(self):
-        proc = subprocess.run(
-            [sys.executable, str(ROOT / "tools/governance/test_execution_policy_review_fixes.py")],
-            cwd=ROOT,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+        for script in (
+            "tools/governance/test_execution_policy_review_fixes.py",
+            "tools/governance/test_final_review_regressions.py",
+        ):
+            proc = subprocess.run(
+                [sys.executable, str(ROOT / script)],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
 
 if __name__ == "__main__":
