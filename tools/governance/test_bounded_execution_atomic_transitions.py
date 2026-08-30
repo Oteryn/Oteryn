@@ -83,6 +83,14 @@ class AllowEvidenceAuthority:
     def verify_material_fact_envelope(self, envelope):
         return True
 
+    def verify_completion(self, candidate):
+        return True
+
+
+class DenyCompletionAuthority(AllowEvidenceAuthority):
+    def verify_completion(self, candidate):
+        return False
+
 
 class RecordingOutbox:
     def __init__(self):
@@ -142,6 +150,24 @@ class AtomicTransitionRegressionTests(unittest.TestCase):
         expected["state"] = "DONE"
         self.assertEqual(outbox.next_checkpoint, _checkpoint_digest(expected))
         self.assertNotEqual(outbox.next_checkpoint, _checkpoint_digest(current))
+
+    def test_completion_requires_trusted_exact_candidate_evidence(self):
+        previous = with_binding(snapshot(completion_verified=False))
+        current = with_binding(snapshot(completion_verified=True))
+        outbox = RecordingOutbox()
+
+        result = raw_decide(
+            previous,
+            current,
+            "complete",
+            POLICY,
+            context=ExecutionContext(DenyCompletionAuthority(), outbox),
+        )
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "READY")
+        self.assertIn("trusted_completion", result.reason)
+        self.assertIsNone(outbox.next_checkpoint)
 
     def test_async_review_reserves_waiting_external_and_releases_worker(self):
         previous = snapshot(state="READY", external_review_invocations=0)
