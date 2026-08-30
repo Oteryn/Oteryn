@@ -268,6 +268,22 @@ class AtomicTransitionRegressionTests(unittest.TestCase):
                 self.assertEqual(outbox.next_checkpoint, _checkpoint_digest(expected))
                 self.assertIsNone(outbox.action)
 
+    def test_external_wait_without_durable_context_fails_closed_before_transition(self):
+        current = snapshot(
+            state="READY",
+            phase="implementation",
+            candidate_frozen=False,
+            blocking_dependency="provider-result:pending",
+            dependency_kind="external",
+        )
+
+        result = raw_decide(None, current, "mutate", POLICY)
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "READY")
+        self.assertFalse(result.release_session)
+        self.assertIn("reservation_required", result.reason)
+
     def test_completion_requires_prior_durable_frozen_final_candidate(self):
         previous = with_binding(
             snapshot(
