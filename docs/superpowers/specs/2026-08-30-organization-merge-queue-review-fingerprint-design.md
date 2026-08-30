@@ -2,6 +2,8 @@
 
 **Status:** approved target architecture for Issue #102; implementation is not canonical until the relevant META and provider PRs merge to protected `main`.
 
+**Binding amendment:** `docs/superpowers/specs/2026-08-30-organization-merge-queue-review-fingerprint-amendment.md`. This design and that amendment are one authority packet; where they conflict, the amendment has higher precedence and must be applied before implementation or rollout.
+
 ## Problem
 
 Oteryn currently has several individually sensible safety rules that can combine into a retry loop:
