@@ -1,8 +1,6 @@
 name: META trusted AI review same-head recheck
 
 on:
-  pull_request_review:
-    types: [submitted]
   issue_comment:
     types: [created, edited]
 
@@ -12,25 +10,20 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: meta-ai-review-recheck-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  group: meta-ai-review-recheck-${{ github.event.issue.number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   recheck:
     if: >-
       github.actor == 'chatgpt-codex-connector[bot]' &&
+      github.event.issue.pull_request &&
       (
-        github.event_name == 'pull_request_review' ||
+        github.event.action == 'created' ||
         (
-          github.event.issue.pull_request &&
-          (
-            github.event.action == 'created' ||
-            (
-              github.event.action == 'edited' &&
-              contains(github.event.comment.body, '<!-- codex-pull-request-review-summary -->') &&
-              contains(github.event.comment.body, '✅ **Completed**')
-            )
-          )
+          github.event.action == 'edited' &&
+          contains(github.event.comment.body, '<!-- codex-pull-request-review-summary -->') &&
+          contains(github.event.comment.body, '✅ **Completed**')
         )
       )
     runs-on: ubuntu-latest
@@ -41,7 +34,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
-          REVIEW_PR: ${{ github.event.pull_request.number }}
           COMMENT_PR: ${{ github.event.issue.number }}
         run: |
           set -euo pipefail
@@ -52,7 +44,7 @@ jobs:
 
           repository = os.environ["REPOSITORY"]
           event_name = os.environ["EVENT_NAME"]
-          pr_number = int(os.environ["REVIEW_PR"] or os.environ["COMMENT_PR"])
+          pr_number = int(os.environ["COMMENT_PR"])
           token = os.environ["GH_TOKEN"]
 
           def api(path, *, method="GET"):
@@ -123,6 +115,7 @@ jobs:
           latest = max(candidates, key=lambda item: (str(item.get("created_at") or ""), int(item.get("id") or 0)))
           status = latest.get("status")
           conclusion = latest.get("conclusion")
+          attempt = latest.get("run_attempt")
           if status != "completed":
               print(f"trusted gate run {latest['id']} is {status}; no duplicate recheck")
               raise SystemExit(0)
@@ -131,6 +124,12 @@ jobs:
               raise SystemExit(0)
           if conclusion not in {"failure", "cancelled", "timed_out"}:
               print(f"trusted gate conclusion {conclusion!r} is not eligible for automatic recheck")
+              raise SystemExit(0)
+          if type(attempt) is not int or attempt != 1:
+              print(
+                  f"trusted gate run {latest['id']} attempt {attempt!r} is not eligible; "
+                  "recheck budget exhausted"
+              )
               raise SystemExit(0)
 
           current = api(f"/repos/{repository}/pulls/{pr_number}")
