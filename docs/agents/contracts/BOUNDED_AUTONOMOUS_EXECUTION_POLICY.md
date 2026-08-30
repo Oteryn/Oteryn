@@ -34,9 +34,9 @@ Every substantial autonomous task must be classifiable as one of:
 
 ## Material progress and evidence generations
 
-Progress is measured from durable facts, not activity volume. The organization progress fingerprint is computed from the machine policy's selected fields, including repository/task identity, exact task head, phase, blocking dependency, dependency kind, gate state, review generation, **evidence generation**, and first material failure.
+Progress is measured from durable facts, not activity volume. The organization progress fingerprint is computed from the machine policy's selected fields, including repository/task identity, exact task head, phase, blocking dependency, dependency kind, gate state, the trusted review-binding scope, and first material failure. Raw caller-supplied `review_generation` and `evidence_generation` labels are retained only as descriptive checkpoint coordinates; they are not progress or retry-budget authority.
 
-`evidence_generation` is a stable normalized coordinate for material non-repository facts that can legitimately change while the Git head does not, for example:
+Material non-repository progress must be represented by a trusted durable coordinate, such as a changed canonical review binding or verified material-fact envelope. Examples include:
 
 - a required dependency advances;
 - authenticated review evidence arrives;
@@ -104,7 +104,7 @@ Canonical scopes are:
 - `identical_failure_cycles` — exact task head plus failure fingerprint;
 - `heavy_validation_runs` — exact task head;
 - `external_review_invocations` — trusted canonical review-binding scope (repository/task, tier, immutable policy ID/digest, classifier revision and risk fingerprint), never SHA alone;
-- `same_head_gate_rechecks` — exact task head plus evidence generation.
+- `same_head_gate_rechecks` — exact task head plus trusted canonical review-binding scope.
 
 A continuation/takeover may not bypass an exhausted budget by omitting a previous snapshot. Exhaustion recorded in the current durable state is authoritative. Each bounded action reserves exactly one increment in a proposed current checkpoint relative to its durable previous checkpoint; a replay without that increment is denied. A generation reset is a separate transition that resets only its own counter to zero. Boolean JSON values are not valid integer counters and fail closed.
 

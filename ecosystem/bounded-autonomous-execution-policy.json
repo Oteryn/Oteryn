@@ -18,9 +18,7 @@
     "blocking_dependency",
     "dependency_kind",
     "gate_state",
-    "review_generation",
     "review_binding_scope",
-    "evidence_generation",
     "first_material_failure",
     "material_fact_envelope_id"
   ],
@@ -43,7 +41,7 @@
     ],
     "same_head_gate_rechecks": [
       "task_head_sha",
-      "evidence_generation"
+      "review_binding_scope"
     ]
   },
   "candidate_freeze": {

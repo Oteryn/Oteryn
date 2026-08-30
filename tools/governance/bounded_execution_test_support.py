@@ -108,3 +108,34 @@ def decide(previous: dict[str, Any] | None, current: dict[str, Any], action: str
             policy,
             context=ExecutionContext(TestEvidenceAuthority(bindings, envelopes), outbox),
         )
+
+
+def decide_with_acknowledged_audit(previous: dict[str, Any], current: dict[str, Any], policy: dict[str, Any]):
+    """Record an audit only after its exact durable dispatch has been claimed and ACKed."""
+
+    prepared_previous = _prepared(previous, policy)
+    prepared_current = _prepared(current, policy)
+    assert prepared_previous is not None and prepared_current is not None
+    binding = prepared_current["review_binding"]
+    scope = tuple(binding[key] for key in (
+        "repository", "task_id", "tier", "policy_id", "policy_digest",
+        "classifier_revision", "risk_fingerprint",
+    )) + (
+        "loop_breaker_audit_generation:"
+        f"{prepared_current['late_material_findings']}:"
+        f"{prepared_current['post_freeze_material_head_changes']}",
+    )
+    with tempfile.TemporaryDirectory() as directory:
+        outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
+        checkpoint = _checkpoint_digest(prepared_previous)
+        outbox.seed_checkpoint(prepared_previous["repository"], prepared_previous["task_id"], checkpoint, snapshot=prepared_previous)
+        reservation = outbox.reserve(
+            repository=prepared_previous["repository"], task_id=prepared_previous["task_id"],
+            expected_checkpoint=checkpoint, next_checkpoint=checkpoint,
+            next_snapshot=prepared_previous, action="run_loop_breaker_audit", scope=scope,
+        )
+        assert reservation.committed
+        assert outbox.claim_dispatch(reservation.reservation_key)
+        assert outbox.acknowledge_dispatch(reservation.reservation_key)
+        authority = TestEvidenceAuthority({binding["binding_id"]}, set())
+        return guard_decide(prepared_previous, prepared_current, "record_loop_breaker_audit", policy, context=ExecutionContext(authority, outbox))

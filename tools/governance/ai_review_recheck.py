@@ -245,7 +245,16 @@ def process_event(
 
     sender = event.get("sender")
     actor = sender.get("login") if isinstance(sender, dict) else None
-    if not isinstance(actor, str) or actor not in trusted_reviewer_logins(policy):
+    comment = event.get("comment") if event_name == "issue_comment" else None
+    marker = policy.get("p2_follow_up", {}).get("evidence_wakeup_marker")
+    maintainer_wakeup = (
+        isinstance(comment, dict)
+        and isinstance(marker, str)
+        and comment.get("body") == marker
+        and comment.get("author_association")
+        in set(policy.get("p2_follow_up", {}).get("trusted_maintainer_associations", []))
+    )
+    if (not isinstance(actor, str) or actor not in trusted_reviewer_logins(policy)) and not maintainer_wakeup:
         return Result(
             "NOOP_UNTRUSTED_ACTOR",
             "event actor is not a configured trusted reviewer",
@@ -268,7 +277,7 @@ def process_event(
                 "NOOP_NOT_PULL_REQUEST",
                 "trusted reviewer comment is not on a pull request",
             )
-        match_state, reviewed_prefix = _issue_comment_reviewed_prefix(event)
+        match_state, reviewed_prefix = ("MATCH", None) if maintainer_wakeup else _issue_comment_reviewed_prefix(event)
         if match_state == "NOOP_NOT_REVIEW_RESULT":
             return Result(
                 match_state,

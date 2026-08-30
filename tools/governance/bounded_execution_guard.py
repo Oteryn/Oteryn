@@ -133,9 +133,7 @@ CANONICAL_PROGRESS_FINGERPRINT_FIELDS = (
     "blocking_dependency",
     "dependency_kind",
     "gate_state",
-    "review_generation",
     "review_binding_scope",
-    "evidence_generation",
     "first_material_failure",
     "material_fact_envelope_id",
 )
@@ -143,7 +141,7 @@ EXPECTED_COUNTER_SCOPES = {
     "identical_failure_cycles": ["task_head_sha", "failure_fingerprint"],
     "heavy_validation_runs": ["task_head_sha"],
     "external_review_invocations": ["review_binding_scope"],
-    "same_head_gate_rechecks": ["task_head_sha", "evidence_generation"],
+    "same_head_gate_rechecks": ["task_head_sha", "review_binding_scope"],
 }
 
 
@@ -613,7 +611,6 @@ def failure_fingerprint(snapshot: dict[str, Any]) -> str:
             "blocking_dependency": snapshot.get("blocking_dependency", ""),
             "dependency_kind": snapshot.get("dependency_kind", ""),
             "gate_state": snapshot.get("gate_state", ""),
-            "evidence_generation": snapshot.get("evidence_generation", ""),
             "first_material_failure": snapshot.get("first_material_failure", ""),
         }
     )
@@ -627,7 +624,7 @@ def _counter_scope(snapshot: dict[str, Any], field: str) -> tuple[str, ...]:
     if field == "external_review_invocations":
         return _review_binding_scope(snapshot.get("review_binding"))
     if field == "same_head_gate_rechecks":
-        return (snapshot["task_head_sha"], snapshot["evidence_generation"])
+        return (snapshot["task_head_sha"], *_review_binding_scope(snapshot.get("review_binding")))
     raise GuardError(f"unknown retry counter field: {field}")
 
 
@@ -677,6 +674,15 @@ def _validate_history(
             raise GuardError(f"snapshot.{field} cannot decrease")
 
     head_changed = current["task_head_sha"] != previous["task_head_sha"]
+    if (
+        head_changed
+        and (_loop_triggered(previous, policy) or _loop_triggered(current, policy))
+        and _ledger_terminal(previous, policy)
+        and _ledger_terminal(current, policy)
+    ):
+        raise GuardError(
+            "a terminal loop-breaker audit ledger is bound to its audited technical head and must reopen on head change"
+        )
     repair_opening = previous["candidate_frozen"] and not current["candidate_frozen"]
     repair_open = bool(previous["repair_generation_id"])
     post_freeze_increased = (
@@ -808,6 +814,10 @@ def _execution_prerequisite_reason(
         return None
     if context is None:
         return "reservation_required: durable checkpoint/outbox and trusted authority are not configured"
+    if action == "open_material_repair":
+        envelope = current.get("material_fact_envelope")
+        if not isinstance(envelope, dict) or not context.evidence_authority.verify_material_fact_envelope(envelope):
+            return "trusted_material_fact_envelope_required: repair evidence is absent, mismatched, or unverified"
     # An already-observed external dependency is non-dispatch control-plane work:
     # let the external-wait branch persist WAITING_EXTERNAL even without review authority.
     if current["dependency_kind"] == "external" and current["blocking_dependency"] and action != "complete":
@@ -815,10 +825,6 @@ def _execution_prerequisite_reason(
     binding = current.get("review_binding")
     if not isinstance(binding, dict) or not context.evidence_authority.verify_review_binding(binding):
         return "trusted_review_binding_required: review binding is absent, mismatched, or unverified"
-    if action == "open_material_repair":
-        envelope = current.get("material_fact_envelope")
-        if not isinstance(envelope, dict) or not context.evidence_authority.verify_material_fact_envelope(envelope):
-            return "trusted_material_fact_envelope_required: repair evidence is absent, mismatched, or unverified"
     return None
 
 
@@ -1075,6 +1081,16 @@ def decide(
         )
 
     if current["state"] in {"BLOCKED", "STALLED"} and requested_action not in {"observe", "complete"}:
+        if (
+            previous is not None
+            and previous["state"] not in release_states
+            and context is not None
+        ):
+            return _transition_state(
+                context, previous, current, current["state"],
+                "blocked or stalled task is non-actionable until material progress is recorded",
+                allowed=False, release_session=True, progress=progress, failure=failure,
+            )
         return _decision(
             False,
             current["state"],
@@ -1135,6 +1151,21 @@ def decide(
             return _decision(False, current["state"], "LOOP_BREAKER_AUDIT is already current for the observed generation", False, progress, failure)
         return allow(current["state"], "LOOP_BREAKER_AUDIT may run as one bounded batched risk-ledger generation", False)
 
+    if requested_action == "record_loop_breaker_audit":
+        assert context is not None
+        audit_scope = _dispatch_scope(current, "run_loop_breaker_audit")
+        if not context.checkpoint_outbox.has_acknowledged_dispatch(
+            current["repository"], current["task_id"], "run_loop_breaker_audit", audit_scope
+        ):
+            return _decision(
+                False,
+                current["state"],
+                "loop-breaker audit ledger certification requires the exact audit dispatch generation to be dispatched and acknowledged",
+                current["state"] in release_states,
+                progress,
+                failure,
+            )
+
     if loop_triggered and not loop_current and requested_action in LOOP_BREAKER_FINAL_ACTIONS:
         state = "READY" if current["state"] == "RUNNING" else current["state"]
         return _decision(
@@ -1156,6 +1187,14 @@ def decide(
         return _decision(False, state, "final qualification admission is required before final checks/review/completion", False, progress, failure)
 
     if requested_action == "enter_final_qualification":
+        if current["phase"] != "final_qualification":
+            return _decision(False, "READY", "enter_final_qualification must persist phase final_qualification", False, progress, failure)
+        if (
+            previous is None
+            or not previous["candidate_frozen"]
+            or previous["task_head_sha"] != current["task_head_sha"]
+        ):
+            return _decision(False, "READY", "enter_final_qualification requires the previous durable checkpoint to already contain the same frozen technical candidate", False, progress, failure)
         if loop_triggered:
             if previous is None:
                 return _decision(False, "READY", "record the durable pre-admission audit snapshot before consuming final qualification", False, progress, failure)

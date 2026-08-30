@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from bounded_execution_guard import GuardError, progress_fingerprint  # noqa: E402
-from bounded_execution_test_support import decide  # noqa: E402
+from bounded_execution_test_support import decide, decide_with_acknowledged_audit  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -83,7 +83,8 @@ def snapshot(**overrides):
 class PolicyContractTests(unittest.TestCase):
     def test_policy_declares_evidence_generation_and_loop_breaker(self):
         raw = policy()
-        self.assertIn("evidence_generation", raw["progress_fingerprint_fields"])
+        self.assertNotIn("evidence_generation", raw["progress_fingerprint_fields"])
+        self.assertNotIn("review_generation", raw["progress_fingerprint_fields"])
         self.assertIn("review_binding_scope", raw["progress_fingerprint_fields"])
         self.assertEqual(
             raw["retry_counter_scopes"]["external_review_invocations"],
@@ -106,10 +107,10 @@ class PolicyContractTests(unittest.TestCase):
                 with self.assertRaises(GuardError):
                     decide(None, snapshot(), "observe", weakened)
 
-    def test_material_evidence_generation_changes_progress_fingerprint(self):
+    def test_caller_evidence_generation_does_not_change_progress_fingerprint(self):
         first = snapshot(evidence_generation="evidence-1")
         second = snapshot(evidence_generation="evidence-2")
-        self.assertNotEqual(
+        self.assertEqual(
             progress_fingerprint(first, policy()),
             progress_fingerprint(second, policy()),
         )
@@ -283,7 +284,7 @@ class LoopBreakerRegressionTests(unittest.TestCase):
         current = copy.deepcopy(previous)
         current["risk_ledger"] = clear_ledger()
         current["audited_late_material_findings"] = 2
-        result = decide(previous, current, "record_loop_breaker_audit", policy())
+        result = decide_with_acknowledged_audit(previous, current, policy())
         self.assertTrue(result.allowed)
 
     def test_audit_cannot_self_advance_from_already_terminal_ledger(self):
@@ -308,7 +309,7 @@ class LoopBreakerRegressionTests(unittest.TestCase):
         )
         result = decide(None, current, "enter_final_qualification", policy())
         self.assertFalse(result.allowed)
-        self.assertIn("record", result.reason.lower())
+        self.assertIn("previous", result.reason.lower())
 
         admitted = copy.deepcopy(current)
         admitted["final_qualification_runs_since_audit"] = 1

@@ -88,6 +88,10 @@ class CheckpointOutboxAdapter(Protocol):
         self, reservation_key: str, dispatch_generation: int | None = None
     ) -> bool: ...
 
+    def has_acknowledged_dispatch(
+        self, repository: str, task_id: str, action: str, scope: tuple[str, ...]
+    ) -> bool: ...
+
 
 def _canonical_snapshot(snapshot: dict[str, Any]) -> str:
     if not isinstance(snapshot, dict):
@@ -747,3 +751,22 @@ class SqliteCheckpointOutbox:
                 (reservation_key, generation),
             )
         return updated.rowcount == 1
+
+    def has_acknowledged_dispatch(
+        self, repository: str, task_id: str, action: str, scope: tuple[str, ...]
+    ) -> bool:
+        """Prove that the exact scoped dispatch generation completed and was ACKed."""
+
+        scope_json = _canonical_scope_json(scope)
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT 1 FROM bounded_execution_outbox
+                WHERE repository = ? AND task_id = ? AND action = ? AND scope_json = ?
+                  AND status = 'dispatched' AND acknowledged = 1
+                  AND invalidated = 0 AND dispatch_generation > 0
+                LIMIT 1
+                """,
+                (repository, task_id, action, scope_json),
+            ).fetchone()
+        return row is not None
