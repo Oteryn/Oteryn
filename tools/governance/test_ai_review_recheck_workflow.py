@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class AiReviewRecheckWorkflowTests(unittest.TestCase):
     def test_review_evidence_recheck_is_same_head_non_mutating_and_paginated(self):
         workflow = (ROOT / ".github/workflows/governance-ai-review-recheck.yml").read_text(encoding="utf-8")
-        self.assertIn("pull_request_review:", workflow)
+        self.assertNotIn("pull_request_review:", workflow)
         self.assertIn("issue_comment:", workflow)
         self.assertIn("actions: write", workflow)
         self.assertIn("contents: read", workflow)
@@ -32,6 +32,10 @@ class AiReviewRecheckWorkflowTests(unittest.TestCase):
         self.assertIn("pull_request_target", workflow)
         self.assertIn("governance-ai-review.yml", workflow)
         self.assertIn("chatgpt-codex-connector[bot]", workflow)
+        self.assertIn('latest.get("run_attempt")', workflow)
+        self.assertIn("attempt != 1", workflow)
+        self.assertIn("recheck budget exhausted", workflow)
+        self.assertNotIn("REVIEW_PR", workflow)
 
     def test_execution_policy_review_fix_regressions(self):
         for script in (
