@@ -5,6 +5,7 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -53,24 +54,21 @@ jobs:
               Path('SECURITY.md'),
               Path('.github/CODEOWNERS'),
               Path('.github/dependabot.yml'),
-              Path('.github/workflows/governance-ai-review-recheck.yml'),
               Path('docs/architecture/adr/0001-ecosystem-topology-authority.md'),
-              Path('docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md'),
               Path('docs/ci/CI_CONTRACT.md'),
               Path('docs/testing/ECOSYSTEM_TEST_STRATEGY.md'),
               Path('docs/release/RELEASE_COORDINATION.md'),
               Path('ecosystem/repositories.json'),
               Path('ecosystem/governance-desired-state.json'),
               Path('ecosystem/compatibility.schema.json'),
-              Path('ecosystem/bounded-autonomous-execution-policy.json'),
+              Path('ecosystem/agent-execution-routing-policy.json'),
               Path('tools/governance/audit_github_readonly.py'),
               Path('tools/governance/audit_github_readonly_core.py'),
               Path('tools/governance/test_audit_github_readonly.py'),
               Path('tools/governance/test_audit_github_readonly_terminal.py'),
-              Path('tools/governance/bounded_execution_guard.py'),
-              Path('tools/governance/test_bounded_execution_guard.py'),
-              Path('tools/governance/ai_review_recheck.py'),
-              Path('tools/governance/test_ai_review_recheck.py'),
+              Path('tools/governance/agent_execution_routing.py'),
+              Path('tools/governance/test_agent_execution_routing.py'),
+              Path('tools/governance/test_remote_desktop_action_gate.py'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
           if missing:
@@ -182,6 +180,13 @@ jobs:
           python3 tools/governance/test_audit_github_readonly.py
           python3 tools/governance/test_audit_github_readonly_terminal.py
 
+      - name: Validate agent execution routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/governance/test_agent_execution_routing.py
+          python3 tools/governance/test_remote_desktop_action_gate.py
+
       - name: Validate AI review risk policy
         shell: bash
         run: |
@@ -202,44 +207,6 @@ jobs:
           if policy['review_tiers']['R2']['reviewer_class'] != 'deep':
               raise SystemExit('R2 must require the deep reviewer class')
           print('AI review policy contract PASS')
-          PY
-
-      - name: Validate bounded autonomous execution
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/governance/test_bounded_execution_guard.py
-          python3 tools/governance/test_ai_review_recheck.py
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          policy_path = Path('ecosystem/bounded-autonomous-execution-policy.json')
-          policy = json.loads(policy_path.read_text(encoding='utf-8'))
-          expected_states = {'RUNNING', 'WAITING_EXTERNAL', 'BLOCKED', 'STALLED', 'READY', 'DONE'}
-          if policy.get('schema_version') != 1:
-              raise SystemExit('bounded execution policy schema_version must be 1')
-          if set(policy.get('states', [])) != expected_states or len(policy.get('states', [])) != len(expected_states):
-              raise SystemExit('bounded execution states do not match canonical state set')
-          budgets = policy.get('retry_budgets')
-          required_budgets = {
-              'identical_failure_cycles',
-              'heavy_validation_attempts',
-              'external_review_invocations_per_fingerprint',
-              'same_head_gate_rechecks_per_evidence_generation',
-          }
-          if not isinstance(budgets, dict) or set(budgets) != required_budgets:
-              raise SystemExit('bounded execution retry budgets do not match canonical fields')
-          if any(not isinstance(budgets[key], int) or budgets[key] < 1 for key in required_budgets):
-              raise SystemExit('bounded execution retry budgets must be positive integers')
-          contract = Path('docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md').read_text(encoding='utf-8')
-          for state in expected_states:
-              if f'`{state}`' not in contract:
-                  raise SystemExit(f'bounded execution contract is missing state {state}')
-          for key, value in budgets.items():
-              if f'`{value}`' not in contract:
-                  raise SystemExit(f'bounded execution contract is missing configured budget value for {key}')
-          print('Bounded autonomous execution contract PASS')
           PY
 
       - name: Emit exact pull-request AI review classification

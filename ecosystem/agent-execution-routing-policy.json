@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "execution_targets": [
+    "github_actions",
+    "isolated_workspace",
+    "host_exception"
+  ],
+  "runner_classes": [
+    "github_hosted",
+    "organization_product_isolated",
+    "isolated_workspace",
+    "not_applicable"
+  ],
+  "target_runner_compatibility": {
+    "github_actions": [
+      "github_hosted",
+      "organization_product_isolated"
+    ],
+    "isolated_workspace": [
+      "isolated_workspace"
+    ],
+    "host_exception": [
+      "not_applicable"
+    ]
+  },
+  "preflight_freshness": {
+    "max_age_seconds": 900
+  },
+  "remote_desktop_reasons": [
+    "host_only_service",
+    "lan_or_hardware",
+    "self_hosted_runner_diagnosis"
+  ],
+  "remote_desktop_actions": [
+    "inspect_host_only_service",
+    "perform_lan_or_hardware_acceptance",
+    "diagnose_self_hosted_runner"
+  ],
+  "remote_desktop_reason_action_compatibility": {
+    "host_only_service": [
+      "inspect_host_only_service"
+    ],
+    "lan_or_hardware": [
+      "perform_lan_or_hardware_acceptance"
+    ],
+    "self_hosted_runner_diagnosis": [
+      "diagnose_self_hosted_runner"
+    ]
+  },
+  "known_remote_desktop_tools": [
+    "Remote_Desktop_Commander.list_devices",
+    "Remote_Desktop_Commander.who_am_i",
+    "Remote_Desktop_Commander.ping",
+    "Remote_Desktop_Commander.get_config",
+    "Remote_Desktop_Commander.read_file",
+    "Remote_Desktop_Commander.read_multiple_files",
+    "Remote_Desktop_Commander.list_directory",
+    "Remote_Desktop_Commander.start_search",
+    "Remote_Desktop_Commander.get_more_search_results",
+    "Remote_Desktop_Commander.stop_search",
+    "Remote_Desktop_Commander.list_searches",
+    "Remote_Desktop_Commander.get_file_info",
+    "Remote_Desktop_Commander.start_process",
+    "Remote_Desktop_Commander.read_process_output",
+    "Remote_Desktop_Commander.interact_with_process",
+    "Remote_Desktop_Commander.force_terminate",
+    "Remote_Desktop_Commander.list_sessions",
+    "Remote_Desktop_Commander.list_processes",
+    "Remote_Desktop_Commander.kill_process",
+    "Remote_Desktop_Commander.get_usage_stats",
+    "Remote_Desktop_Commander.get_recent_tool_calls"
+  ],
+  "always_forbidden_remote_desktop_tools": [
+    "Remote_Desktop_Commander.shutdown",
+    "Remote_Desktop_Commander.set_config_value",
+    "Remote_Desktop_Commander.write_file",
+    "Remote_Desktop_Commander.write_pdf",
+    "Remote_Desktop_Commander.create_directory",
+    "Remote_Desktop_Commander.move_file",
+    "Remote_Desktop_Commander.edit_block",
+    "Remote_Desktop_Commander.give_feedback_to_desktop_commander",
+    "Remote_Desktop_Commander.get_prompts"
+  ],
+  "resume_preflight_required_fields": [
+    "verified_at",
+    "repository",
+    "default_branch_sha",
+    "governing_issue",
+    "pull_request",
+    "task_head_sha"
+  ],
+  "forbidden_remote_desktop_actions_when_equivalent_ci": [
+    "poll_process_output",
+    "poll_docker_logs",
+    "poll_workflow_state",
+    "poll_git_state"
+  ],
+  "parallel_lane_rules": {
+    "strategies": [
+      "parallel_first",
+      "serial_with_reason"
+    ],
+    "required_lane_fields": [
+      "id",
+      "owned_paths",
+      "depends_on",
+      "branch_and_worktree",
+      "shared_leases"
+    ],
+    "one_writer_per_lane": true,
+    "unique_branch_and_worktree": true,
+    "overlap_requires_lease": true,
+    "constrained_resource_requires_lease": true,
+    "serial_requires_reason": true,
+    "integration_order_required": true
+  }
+}

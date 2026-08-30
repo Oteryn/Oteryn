@@ -42,6 +42,43 @@ If GitHub state cannot be read or written because of a real capability/permissio
 
 This gate does not prohibit Remote Desktop/Desktop Commander, Synology, WSL, Docker or local tooling. It constrains their role: execution after GitHub preflight, never authority in place of GitHub.
 
+## Default-deny Remote Desktop and parallel-first routing
+
+`ecosystem/agent-execution-routing-policy.json` is the canonical machine-readable routing policy for substantial new and resumed task packets. `tools/governance/agent_execution_routing.py` validates a declared packet against a caller-supplied, freshly verified GitHub state snapshot; `tools/governance/test_agent_execution_routing.py` and `tools/governance/test_remote_desktop_action_gate.py` are its deterministic behavior suites.
+
+The required execution order is:
+
+1. resolve and record the current GitHub control-plane state;
+2. use GitHub Actions or another repository-approved CI runner when it can perform the required work;
+3. use a worker-owned isolated workspace for authorized implementation and local deterministic checks;
+4. use a host exception only when the packet validates it.
+
+The packet records `execution_target`, `runner_class`, `equivalent_ci`, `remote_desktop`, `remote_desktop_reason`, `requested_host_actions`, `requested_remote_desktop_tools`, the GitHub preflight, and the parallel-execution plan. `github_actions` and `isolated_workspace` are default targets. `host_exception` requires `remote_desktop: exception`, `equivalent_ci: null`, and one closed reason:
+
+| Reason | Narrowly permitted need |
+| --- | --- |
+| `host_only_service` | A named service exists only on the host and no equivalent runner workflow can reach it. |
+| `lan_or_hardware` | An in-scope LAN device, physical hardware, or other host-bound acceptance operation is required. |
+| `self_hosted_runner_diagnosis` | A verified runner or workflow failure requires host-level diagnosis. |
+
+Remote Desktop/Desktop Commander is otherwise denied. The presence of a checkout, shell, Docker daemon, toolchain, or a ready Remote Desktop session is not a reason. A valid exception is limited to its recorded semantic host action and exact connector tool identifiers and does not authorize general development, alternative repository authority, an unrecorded host mutation, or a different direct connector call.
+
+Out-of-band capability discovery may inspect local connector/tool registration, registered function names, descriptions and argument schemas without invoking the Remote Desktop connector. By contrast, every direct `Remote_Desktop_Commander.*` invocation is an exception-only operation and requires a fresh valid host-exception packet plus a positive per-action decision from `validate_remote_desktop_action(...)` for the exact semantic host action and exact connector function immediately before the call. A positive decision for one tool or action never authorizes another.
+
+Agents must not invoke `Remote_Desktop_Commander.list_devices` merely to discover whether Remote Desktop is connected or usable. The prohibition extends to `who_am_i`, `ping`, `get_config`, filesystem/search/process/session/terminal/history functions and all other direct Remote Desktop functions unless an already proven host-only need has been encoded in a valid exception and the exact call passes the per-action gate. Read-only or metadata-looking connector calls are not discovery exemptions. Unknown Remote Desktop tool identifiers fail closed, and tool identifiers listed by policy as always forbidden cannot be authorized through the existing reasons. A Remote Desktop `DENY` is not automatically a blocker; agents continue through GitHub, GitHub Actions, repository-native connectors or isolated workspaces when those routes can perform useful authorized work.
+
+When `equivalent_ci` identifies a capable workflow, agents MUST NOT use Remote Desktop/Desktop Commander to poll process output, Docker logs, workflow state, or Git state. Agents observe the GitHub workflow's status, logs, and artifacts through GitHub and follow the applicable bounded-wait policy. They do not replace CI observation with repeated manual host polling.
+
+### Fresh preflight for starts and resumptions
+
+Before starting or resuming a mutation, the routing packet's `github_preflight` MUST be newly verified against current GitHub facts. It includes `verified_at`, `repository`, `default_branch_sha`, `governing_issue`, `pull_request`, and `task_head_sha`. The validator compares every required identity with the fresh `live_state` supplied by the caller. Earlier handoffs, local worktrees, branches, sessions, caches, and logs are evidence to inspect, not authority and not a preflight substitute.
+
+### Parallel-first task planning
+
+Task preparation MUST first evaluate a dependency graph and create independently mergeable lanes whenever their paths and resources can be separated safely. The `parallel_execution` record requires a `lane_strategy`, lanes, and an `integration_order`. Each lane declares an ID, owned repository-relative paths, dependencies, a dedicated branch/worktree, and shared leases.
+
+One lane has one active writer and no two lanes share a writable branch or worktree. Shared mutable paths, a limited test slot, a shared browser/runtime, a release manifest, or another constrained resource must be represented by a structured lease with one holder and a release condition. The integration order must respect dependencies. `serial_with_reason` is allowed only when it records the concrete dependency, shared mutable surface, constrained capacity, or integration boundary that prevents parallel execution.
+
 ## Parallel-agent Git concurrency and late integration
 
 For substantial mutating work in permanent Oteryn repositories, agents MUST distinguish three revision coordinates:
@@ -107,31 +144,66 @@ A textual overlap or changed filename alone is not proof of semantic invalidatio
 
 Repository-local instructions may impose stricter safety, review, validation or integration rules, but MUST NOT weaken these minimum non-invalidation and late-integration semantics.
 
-## Access discovery before blocking
+## Capability truthfulness and tool discovery before blocking
 
-Before reporting:
+Available tools, connectors and exposed actions in the **current session** are the source of truth for technical execution capability. UI mode labels, assumptions about Chat/Work/Codex, a previously rejected handoff, a missing local checkout, a missing `gh` binary, an unauthenticated local CLI, or an earlier agent statement are not capability evidence.
 
-- "I don't have access";
-- "I cannot inspect the repository";
-- "execution is blocked";
+Before reporting that repository work cannot continue, GitHub is read-only, commit/push/PR is unavailable, a mode switch is required, or another execution capability is missing, an agent MUST:
 
-an agent MUST:
+1. inspect local connector/tool registration and schemas for relevant tools without invoking Remote Desktop merely to discover its runtime state;
+2. inspect current authentication/context and repository permissions when the available repository-native connector exposes that evidence;
+3. prefer repository-native operations for repository state and lifecycle work, especially GitHub repository/file/branch/commit/PR/Issue/review/check actions;
+4. if the preferred operation is unavailable or fails, evaluate every safe, authorized fallback that can legitimately perform the same task before asking the owner to switch modes, repeat work manually, or take over the operation;
+5. classify the exact limitation as one of: missing tool/action, unauthenticated context, permission denied, operation unsupported, repository/policy restriction, transient transport/service failure, or another specifically observed condition;
+6. continue any remaining useful authorized work that is not blocked by that exact limitation.
 
-1. inspect available tools and execution capabilities;
-2. check available authentication/context;
-3. determine whether the limitation is:
-   - missing tool;
-   - missing permission;
-   - temporary failure;
-   - repository policy restriction.
+A rejected request to enter Work mode or another UI mode does **not** revoke or disable other tools that remain exposed in the session. An agent MUST NOT infer that it lost GitHub write access, repository access, terminal access, or another capability solely because a handoff or mode change was declined.
 
-A generic access disclaimer without capability discovery is invalid.
+### Repository-native first
+
+For repository inspection, file changes, branches, commits, pushes, pull requests, Issues, reviews, checks and merge state, use an available repository-native connector/action before routing ordinary work through Remote Desktop/Desktop Commander or a host-local clone. Local `git`/`gh` may be used when authorized and genuinely needed, but a missing or unauthenticated local CLI is not proof that the repository connector is unavailable.
+
+Remote Desktop/Desktop Commander remains governed by the default-deny host-exception policy above. It MUST NOT become the routine fallback for normal repository work merely because it is technically reachable.
+
+### Non-destructive capability discovery
+
+Capability discovery itself MUST be observational and least-mutating. Agents MUST NOT create throwaway branches, files, commits, comments, PRs, workflow runs, deployments, or other durable state merely to prove that write access exists.
+
+Use local connector/tool registration and argument-schema discovery, authenticated repository identity, permission metadata and repository-native harmless reads first. This out-of-band schema discovery is distinct from invoking a connector function. Agents must not invoke `Remote_Desktop_Commander.list_devices` as a capability probe, and must not call `who_am_i`, `ping`, `get_config`, filesystem/process/session/terminal/search/history functions or another direct Remote Desktop function merely to establish that the connector works. If an actual host-only need is proven, construct a fresh narrow exception and require a positive per-action decision for the exact tool immediately before the first direct call.
+
+A Remote Desktop `DENY` is not automatically a blocker. After denial, continue any useful authorized repository work through GitHub, GitHub Actions, repository-native connectors or isolated workspaces. When a write operation is actually part of the authorized task, successful execution of that real task mutation may establish the relevant non-Remote-Desktop capability; do not manufacture a no-op probe.
+
+### Prohibited unverified blocker claims
+
+The following statements are invalid unless directly supported by current-session evidence from the applicable tools/actions:
+
+- "I only have read access to GitHub."
+- "I cannot commit/push/create a PR from this session."
+- "This requires Work mode."
+- "Because Work mode was rejected, I cannot continue."
+- "There is no write channel."
+- "I need Remote Desktop to edit the repository."
+- "The repository cannot be modified from Chat mode."
+
+Equivalent wording is equally invalid. If the exact capability has not been checked, report it as `UNKNOWN` and perform the required discovery rather than presenting it as a blocker.
+
+### Required blocker evidence
+
+A genuine capability blocker report MUST identify:
+
+- the exact operation required;
+- the exact tool/connector/action inspected or attempted;
+- the observed authentication, permission, unsupported-operation, policy, transport or service failure;
+- the relevant safe authorized fallback paths that were checked and why they could not complete the operation;
+- the smallest missing capability or permission needed to proceed.
+
+Do not generalize one failed action into a broader claim such as "GitHub is read-only" unless the broader limitation was actually verified.
 
 Capability and authentication discovery is observational only. Tool availability, authentication, repository visibility, a successful check, or apparent technical ability to perform an action NEVER grants or broadens authority to perform that action.
 
 ## Capability classification
 
-Agents must classify the current environment:
+Agents must classify the current environment from verified evidence rather than assumptions about the UI mode:
 
 ### Execution available
 
@@ -139,11 +211,11 @@ The agent may inspect, modify, test and perform repository operations only withi
 
 ### Read-only
 
-The agent may inspect, audit and report findings but MUST NOT claim implementation completion.
+Use this classification only after the relevant write capability has been checked and the current tool/auth/permission evidence proves that mutation is unavailable or prohibited. The agent may inspect, audit and report findings but MUST NOT claim implementation completion.
 
 ### No external capability
 
-The agent may prepare patches, commands and handoff instructions, but must state the exact missing capability.
+Use this classification only after relevant tool/action discovery shows no usable external execution path. The agent may prepare patches, commands and handoff instructions, but must state the exact missing capability.
 
 ## Autonomous continuation mode
 

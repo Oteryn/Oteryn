@@ -10,8 +10,6 @@ It does **not** own Game, Platform or Atlas runtime implementation.
 
 Agents MUST follow `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`.
 
-Agents MUST also follow `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md`. Autonomous continuation is progress-sensitive: a stable candidate must not be mutated merely to retrigger CI/review, unchanged external dependencies use `WAITING_EXTERNAL`, exhausted identical local retries use `STALLED`, and waiting/stalled sessions release active worker ownership until a material fact changes.
-
 Agents MAY use the `synology oteryn` developer MCP when it is available and the current task authorizes the relevant operation. They MUST follow `docs/agents/contracts/SYNOLOGY_MCP_EXECUTION_POLICY.md`: Synology MCP is an additional runtime/local evidence and execution path, not a replacement for GitHub. GitHub live state remains authoritative for repository, branch, commit, PR, issue, review, CI/check and release facts, and required GitHub verification/workflows MUST NOT be skipped because MCP access exists.
 
 Before declaring a task blocked because of access limitations, agents must discover available capabilities, distinguish tool absence from permission/policy restrictions, and continue useful work when any safe execution path remains.
@@ -25,6 +23,26 @@ GitHub is the authoritative repository control plane for repo identity, default 
 Agents MUST complete the GitHub preflight defined in `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` before mutating any local/remote checkout or starting host-local implementation/execution that can change repository or external state. If GitHub preflight is genuinely unavailable, host-local tools may still be used for the safe read-only analysis and patch/handoff preparation permitted by the central contract, but not to mutate or bypass GitHub lifecycle authority.
 
 Host-local filesystems, clones, worktrees, containers and shells are execution/cache planes only. They MUST NOT be used to select authoritative repository state or bypass GitHub lifecycle. Durable local changes receive no completion credit until committed, pushed to the approved GitHub branch/PR and verified against the remote exact head.
+
+## Execution-routing policy
+
+`ecosystem/agent-execution-routing-policy.json` is the canonical machine-readable policy for substantial new or resumed task packets. Validate a packet against a freshly obtained GitHub snapshot with:
+
+```text
+python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-execution-routing-policy.json --packet <packet.json> --live-state <fresh-github-state.json>
+```
+
+Use this execution order: current GitHub state; GitHub Actions or another repository-approved CI runner; a worker-owned isolated workspace; then, only when validated, a narrowly authorized host exception. Remote Desktop/Desktop Commander is **default-deny**. It may be used only when the packet sets `remote_desktop: exception`, `execution_target: host_exception`, no equivalent CI exists, and `remote_desktop_reason` is exactly one of `host_only_service`, `lan_or_hardware`, or `self_hosted_runner_diagnosis`.
+
+Capability discovery may inspect local connector/tool registration and argument schemas without invoking Remote Desktop. By contrast, every direct `Remote_Desktop_Commander.*` invocation requires a fresh valid host-exception packet and a positive per-action decision from `validate_remote_desktop_action(...)` for both the exact semantic host action and exact connector tool identifier immediately before that call. The packet must declare that connector function in `requested_remote_desktop_tools`; a prior positive decision for a different action or tool does not carry forward.
+
+Agents must not invoke `Remote_Desktop_Commander.list_devices` merely to prove that Remote Desktop is reachable. The same rule applies to `who_am_i`, `ping`, `get_config`, filesystem/search/process/session/terminal/history functions and any other direct connector call: metadata-looking or read-only calls are still exception-only. Unknown connector functions fail closed, and functions classified by policy as always forbidden cannot be admitted through the three existing reasons. A Remote Desktop `DENY` is not automatically a blocker; continue through GitHub, GitHub Actions or an isolated workspace whenever those routes can perform useful authorized work.
+
+The exception authorizes the minimum recorded host action and exact requested connector tools, not a replacement source of truth. A convenient local checkout, shell, Docker daemon, toolchain, or available Remote Desktop session is never an exception reason. When an equivalent CI workflow exists, agents MUST NOT use Remote Desktop/Desktop Commander to poll process output, Docker logs, workflow state, or Git state; inspect the equivalent GitHub workflow, its logs, status, and artifacts instead.
+
+Before resuming work, obtain and record a new GitHub preflight with the repository, current default-branch SHA, governing Issue, PR, task-head SHA, and verification timestamp. A prior handoff, local branch, worktree, session, cache, or log is evidence only and cannot satisfy that preflight.
+
+Project task preparation is **parallel-first**. Record a dependency graph and create independent lanes where safe. Every lane needs an ID, owned paths, one isolated branch/worktree, dependencies, shared-resource leases, and an integration order. Lanes MUST NOT share writable branches or worktrees. A shared mutable surface or constrained resource requires an explicit lease with one holder and a release condition. Serial work is allowed only as `serial_with_reason` with its concrete constraint recorded.
 
 ## Organization runner routing
 
