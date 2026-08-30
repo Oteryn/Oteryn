@@ -34,6 +34,17 @@
     "quota_unavailable_result": "WAITING_REVIEW_QUOTA",
     "allow_clean_trusted_base_merge_reuse": true
   },
+  "p2_follow_up": {
+    "outcome": "ACCEPTED_WITH_FOLLOW_UP",
+    "thread_must_be_resolved": true,
+    "tracker_reply_format": "Tracked in #<issue>.",
+    "tracker_must_be_open_same_repository_issue": true,
+    "trusted_maintainer_associations": [
+      "OWNER",
+      "MEMBER",
+      "COLLABORATOR"
+    ]
+  },
   "review_neutral_globs": [
     "docs/evidence/**",
     "docs/agents/tasks/archive/**",
