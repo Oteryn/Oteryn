@@ -62,13 +62,15 @@ def issue_comment_event(
 
 
 class FakeClient:
-    def __init__(self, *, pr=None, runs=None, second_pr=None):
+    def __init__(self, *, pr=None, runs=None, second_pr=None, active_evidence=True):
         self.pr = pr or pr_payload()
         self.second_pr = second_pr
         self.runs = list(runs or [])
         self.rerun_calls = []
         self.get_pr_calls = []
         self.list_gate_run_calls = []
+        self.active_evidence = active_evidence
+        self.evidence_calls = []
 
     def get_pull_request(self, number):
         self.get_pr_calls.append(number)
@@ -79,6 +81,13 @@ class FakeClient:
     def list_gate_runs(self, head_sha, base_sha, pr_number):
         self.list_gate_run_calls.append((head_sha, base_sha, pr_number))
         return list(self.runs)
+
+    def verify_active_review_evidence(self, head_sha, base_sha, pr_number):
+        self.evidence_calls.append((head_sha, base_sha, pr_number))
+        if isinstance(self.active_evidence, list):
+            index = min(len(self.evidence_calls) - 1, len(self.active_evidence) - 1)
+            return self.active_evidence[index]
+        return bool(self.active_evidence)
 
     def rerun(self, run_id):
         self.rerun_calls.append(run_id)
@@ -246,6 +255,56 @@ class EventTests(unittest.TestCase):
         self.assertEqual(client.rerun_calls, [321])
         self.assertEqual(client.list_gate_run_calls, [(HEAD, BASE, PR_NUMBER)])
 
+    def test_same_head_issue_comment_cannot_consume_recheck_without_active_generation_evidence(self):
+        client = FakeClient(runs=[run_payload(321)], active_evidence=False)
+        sleeps = []
+        result = process_event(
+            "issue_comment",
+            issue_comment_event(),
+            REPOSITORY,
+            POLICY,
+            client,
+            sleep_fn=sleeps.append,
+        )
+        self.assertEqual(result.action, "NOOP_UNVERIFIED_REVIEW_GENERATION")
+        self.assertEqual(client.rerun_calls, [])
+        self.assertEqual(len(client.evidence_calls), 12)
+        self.assertEqual(len(sleeps), 11)
+
+    def test_active_generation_evidence_can_arrive_during_bounded_recheck_wakeup(self):
+        client = FakeClient(
+            runs=[run_payload(322)],
+            active_evidence=[False, True],
+        )
+        sleeps = []
+        result = process_event(
+            "issue_comment",
+            issue_comment_event(),
+            REPOSITORY,
+            POLICY,
+            client,
+            sleep_fn=sleeps.append,
+        )
+        self.assertEqual(result.action, "RERUN")
+        self.assertEqual(client.rerun_calls, [322])
+        self.assertEqual(len(client.evidence_calls), 2)
+        self.assertEqual(len(sleeps), 1)
+
+    def test_completed_summary_edit_is_only_a_wakeup_not_authority(self):
+        event = issue_comment_event(include_reviewed_commit=False)
+        event["comment"]["body"] = (
+            "<!-- codex-pull-request-review-summary -->\n\n"
+            "## Codex Review Summary\n\n"
+            "| ?? **Code Review** | ? **Completed** <relative-time datetime=\"2026-08-30T15:00:00Z\">"
+            "2026-08-30T15:00:00Z</relative-time> | `aaaaaaaaaa` | Manual request |"
+        )
+        client = FakeClient(runs=[run_payload(323)], active_evidence=False)
+        result = process_event(
+            "issue_comment", event, REPOSITORY, POLICY, client, sleep_fn=lambda _: None
+        )
+        self.assertEqual(result.action, "NOOP_UNVERIFIED_REVIEW_GENERATION")
+        self.assertEqual(client.rerun_calls, [])
+
     def test_issue_comment_result_for_old_head_is_noop(self):
         client = FakeClient(runs=[run_payload(321)])
         result = process_event(
@@ -326,6 +385,12 @@ class WorkflowSafetyTests(unittest.TestCase):
         self.assertIn("actions: write", workflow)
         self.assertIn("contents: read", workflow)
         self.assertNotIn("contents: write", workflow)
+        self.assertIn("types: [created, edited]", workflow)
+        self.assertIn("path: candidate", workflow)
+        self.assertIn("persist-credentials: false", workflow)
+        self.assertIn("submodules: false", workflow)
+        self.assertIn("lfs: false", workflow)
+        self.assertIn("OTERYN_CANDIDATE_ROOT", workflow)
 
 
 if __name__ == "__main__":

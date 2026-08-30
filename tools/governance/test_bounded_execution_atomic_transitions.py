@@ -372,6 +372,42 @@ class AtomicTransitionRegressionTests(unittest.TestCase):
                 self.assertEqual(outbox.next_checkpoint, _checkpoint_digest(expected))
                 self.assertIsNone(outbox.action)
 
+    def test_exhausted_local_actions_persist_stalled_before_release(self):
+        cases = (
+            ("retry", "identical_failure_cycles", 1, 2),
+            ("run_heavy_validation", "heavy_validation_runs", 2, 3),
+        )
+        for action, field, before, after in cases:
+            with self.subTest(action=action):
+                previous = with_binding(
+                    snapshot(
+                        state="READY",
+                        gate_state="failure",
+                        first_material_failure="unchanged deterministic failure",
+                        **{field: before},
+                    )
+                )
+                current = copy.deepcopy(previous)
+                current[field] = after
+                outbox = RecordingOutbox()
+
+                result = raw_decide(
+                    previous,
+                    current,
+                    action,
+                    POLICY,
+                    context=ExecutionContext(AllowEvidenceAuthority(), outbox),
+                )
+
+                self.assertFalse(result.allowed)
+                self.assertEqual(result.state, "STALLED")
+                self.assertTrue(result.release_session)
+                expected = copy.deepcopy(current)
+                expected["state"] = "STALLED"
+                self.assertEqual(outbox.next_checkpoint, _checkpoint_digest(expected))
+                self.assertEqual(outbox.next_snapshot, expected)
+                self.assertIsNone(outbox.action)
+
     def test_terminal_ledger_certification_requires_record_action_even_when_counters_match(self):
         previous = snapshot(
             state="READY",

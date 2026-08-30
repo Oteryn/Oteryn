@@ -472,6 +472,57 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             self.assertEqual(after_transition.checkpoint, _checkpoint_digest(second))
             self.assertEqual(after_transition.snapshot, second)
 
+    def test_nonmaterial_observer_metadata_cannot_mint_repeated_mutation_reservations(self):
+        previous = snapshot(
+            state="RUNNING",
+            phase="implementation",
+            candidate_frozen=False,
+            updated_at="2026-08-30T15:00:00Z",
+            narration="first observation",
+        )
+        binding = make_review_binding(
+            POLICY,
+            repository=previous["repository"],
+            task_id=previous["task_id"],
+            base_head_sha="b" * 40,
+            head_sha=previous["task_head_sha"],
+            tier="R2",
+            classifier_revision="metadata-replay-test-v1",
+            risk_fingerprint=previous["review_fingerprint"],
+        )
+        previous["review_binding"] = binding
+        first = copy.deepcopy(previous)
+        first["updated_at"] = "2026-08-30T15:01:00Z"
+        first["narration"] = "same material work, new prose"
+        second = copy.deepcopy(first)
+        second["updated_at"] = "2026-08-30T15:02:00Z"
+        second["narration"] = "another prose-only change"
+
+        with tempfile.TemporaryDirectory() as directory:
+            outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
+            outbox.seed_checkpoint(
+                previous["repository"],
+                previous["task_id"],
+                _checkpoint_digest(previous),
+                snapshot=previous,
+            )
+            authority = TestEvidenceAuthority({binding["binding_id"]}, set())
+            context = ExecutionContext(authority, outbox)
+
+            first_result = raw_decide(previous, first, "mutate", POLICY, context=context)
+            self.assertTrue(first_result.allowed)
+            second_result = raw_decide(first, second, "mutate", POLICY, context=context)
+
+            self.assertFalse(second_result.allowed)
+            self.assertEqual(second_result.reason, "reservation_replay")
+            self.assertEqual(first_result.reservation_key, second_result.reservation_key)
+
+    def test_snapshot_rejects_unknown_noncanonical_fields(self):
+        current = snapshot()
+        current["invented_timestamp_alias"] = "2026-08-30T15:03:00Z"
+        with self.assertRaisesRegex(GuardError, "canonical fields"):
+            decide(None, current, "observe", POLICY)
+
     def test_frozen_candidate_rejects_self_attested_material_change(self):
         previous = snapshot(candidate_frozen=True)
         current = copy.deepcopy(previous)
