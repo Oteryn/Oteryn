@@ -958,6 +958,13 @@ def test_current_codex_summary_reuses_review_after_clean_merge_up_with_tada_dupl
     assert found["review_source_kind"] == "issue_comment_result"
 
 
+def test_current_codex_summary_reuses_review_after_clean_merge_up_with_keep_it_up_duplicate_echo() -> None:
+    found = _verify_summary_merge_reuse_with_echoes(
+        echo_first_line="Codex Review: Didn't find any major issues. Keep it up!"
+    )
+    assert found["review_source_kind"] == "issue_comment_result"
+
+
 def test_current_codex_summary_reuses_review_after_clean_merge_up_with_swish_duplicate_echo() -> None:
     found = _verify_summary_merge_reuse_with_echoes(
         echo_first_line="Codex Review: Didn't find any major issues. Swish!"
