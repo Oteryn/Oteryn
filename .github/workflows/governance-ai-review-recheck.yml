@@ -23,10 +23,57 @@ jobs:
       (github.event_name == 'issue_comment' && github.event.issue.pull_request)
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout trusted default-branch recheck authority
+      - name: Resolve live pull-request base
+        id: live-pr
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          python3 - "$GITHUB_OUTPUT" <<'PY'
+          import json
+          import os
+          import re
+          import sys
+          import urllib.request
+
+          repository = os.environ["REPOSITORY"]
+          pr_number = os.environ["PR_NUMBER"]
+          if not pr_number.isdigit() or int(pr_number) < 1:
+              raise SystemExit("pull-request number is invalid")
+          request = urllib.request.Request(
+              f"https://api.github.com/repos/{repository}/pulls/{pr_number}",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "oteryn-ai-review-live-base/1",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=20) as response:
+              payload = json.load(response)
+          live_base_payload = payload.get("base") or {}
+          live_base = str(live_base_payload.get("sha") or "")
+          live_base_ref = str(live_base_payload.get("ref") or "")
+          if re.fullmatch(r"[0-9a-f]{40}", live_base) is None:
+              raise SystemExit("live pull-request base SHA is invalid")
+          if live_base_ref != os.environ["DEFAULT_BRANCH"]:
+              raise SystemExit("pull request no longer targets the protected default branch")
+          event_base = os.environ.get("EVENT_BASE_SHA", "")
+          if event_base and event_base != live_base:
+              raise SystemExit("pull-request review event base is stale; refusing write-capable recheck")
+          with open(sys.argv[1], "a", encoding="utf-8") as output:
+              output.write(f"base_sha={live_base}\n")
+          PY
+
+      - name: Checkout trusted live-base recheck authority
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}
+          ref: ${{ steps.live-pr.outputs.base_sha }}
           fetch-depth: 1
           persist-credentials: false
 
@@ -34,6 +81,38 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          EXPECTED_BASE_SHA: ${{ steps.live-pr.outputs.base_sha }}
         run: |
           set -euo pipefail
+          CHECKED_OUT_BASE="$(git rev-parse HEAD)"
+          export CHECKED_OUT_BASE
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.request
+
+          expected = os.environ["EXPECTED_BASE_SHA"]
+          checked_out = os.environ["CHECKED_OUT_BASE"]
+          if re.fullmatch(r"[0-9a-f]{40}", expected) is None or checked_out != expected:
+              raise SystemExit("checked-out recheck authority does not match resolved live base")
+          repository = os.environ["REPOSITORY"]
+          pr_number = os.environ["PR_NUMBER"]
+          request = urllib.request.Request(
+              f"https://api.github.com/repos/{repository}/pulls/{pr_number}",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "oteryn-ai-review-live-base/1",
+              },
+          )
+          with urllib.request.urlopen(request, timeout=20) as response:
+              payload = json.load(response)
+          live_base = str(((payload.get("base") or {}).get("sha")) or "")
+          if live_base != expected:
+              raise SystemExit("live pull-request base moved after authority checkout; refusing recheck")
+          PY
           python3 tools/governance/ai_review_recheck.py

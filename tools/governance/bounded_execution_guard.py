@@ -996,7 +996,18 @@ def decide(
                 failure=failure,
             )
         if requested_action != "complete":
-            return _decision(False, "WAITING_EXTERNAL", "external dependency is pending; operational work is forbidden", True, progress, failure)
+            assert context is not None
+            return _transition_state(
+                context,
+                previous,
+                current,
+                "WAITING_EXTERNAL",
+                "external dependency is pending; operational work is forbidden",
+                allowed=False,
+                release_session=True,
+                progress=progress,
+                failure=failure,
+            )
 
     if previous is not None and previous["state"] in {"BLOCKED", "STALLED"} and same_progress and requested_action != "complete":
         return _decision(
