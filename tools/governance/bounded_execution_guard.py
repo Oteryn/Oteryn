@@ -917,7 +917,36 @@ def decide(
 
     if current["dependency_kind"] == "external" and current["blocking_dependency"] and current["state"] != "WAITING_EXTERNAL":
         if requested_action == "observe":
-            return _decision(True, "WAITING_EXTERNAL", "external dependency is pending", True, progress, failure)
+            if context is None:
+                return _decision(
+                    False,
+                    current["state"],
+                    "reservation_required: external waiting must be durably reserved before ownership is released",
+                    False,
+                    progress,
+                    failure,
+                )
+            binding = current.get("review_binding")
+            if not isinstance(binding, dict) or not context.evidence_authority.verify_review_binding(binding):
+                return _decision(
+                    False,
+                    current["state"],
+                    "trusted_review_binding_required: external waiting transition is unverified",
+                    False,
+                    progress,
+                    failure,
+                )
+            return _reserve_execution(
+                context,
+                previous,
+                current,
+                "observe",
+                "WAITING_EXTERNAL",
+                "external dependency is pending",
+                True,
+                progress,
+                failure,
+            )
         if requested_action != "complete":
             return _decision(False, "WAITING_EXTERNAL", "external dependency is pending; operational work is forbidden", True, progress, failure)
 
@@ -1023,6 +1052,21 @@ def decide(
         return allow("READY", "qualification admission is within the current bounded audit generation", False)
 
     if requested_action == "complete":
+        if (
+            previous is None
+            or not previous["candidate_frozen"]
+            or previous["phase"] != "final_qualification"
+            or previous["task_head_sha"] != current["task_head_sha"]
+        ):
+            state = current["state"] if current["state"] in release_states else "READY"
+            return _decision(
+                False,
+                state,
+                "DONE requires a previous durable checkpoint for the same frozen final_qualification candidate",
+                state in release_states,
+                progress,
+                failure,
+            )
         if (
             not current["candidate_frozen"]
             or current["phase"] != "final_qualification"
