@@ -822,6 +822,17 @@ def _execution_prerequisite_reason(
     return None
 
 
+def _dispatch_scope(current: dict[str, Any], action: str) -> tuple[str, ...]:
+    scope = list(_review_binding_scope(current.get("review_binding")))
+    if action == "run_loop_breaker_audit":
+        scope.append(
+            "loop_breaker_audit_generation:"
+            f"{current['late_material_findings']}:"
+            f"{current['post_freeze_material_head_changes']}"
+        )
+    return tuple(scope)
+
+
 def _reserve_execution(
     context: ExecutionContext,
     previous: dict[str, Any] | None,
@@ -841,7 +852,7 @@ def _reserve_execution(
         next_checkpoint=_checkpoint_digest(next_snapshot),
         next_snapshot=next_snapshot,
         action=action,
-        scope=_review_binding_scope(current.get("review_binding")),
+        scope=_dispatch_scope(current, action),
     )
     if not reservation.committed:
         return Decision(

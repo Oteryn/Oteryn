@@ -216,6 +216,14 @@ def _live_pr(
     if pr.get("state") not in (None, "open"):
         raise RecheckError("pull request is no longer open")
     head_sha, base_sha = _current_coordinates(pr, repository)
+    base = pr.get("base") or {}
+    base_repo = base.get("repo") or {}
+    base_ref = base.get("ref")
+    default_branch = base_repo.get("default_branch")
+    if not isinstance(base_ref, str) or not base_ref or not isinstance(default_branch, str) or not default_branch:
+        raise RecheckError("pull request base/default branch authority is missing")
+    if base_ref != default_branch:
+        raise RecheckError("pull request no longer targets the repository default branch")
     return pr, head_sha, base_sha
 
 

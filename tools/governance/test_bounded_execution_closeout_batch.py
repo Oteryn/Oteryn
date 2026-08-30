@@ -415,6 +415,54 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             self.assertTrue(takeover.acknowledge_dispatch(second_reservation.reservation_key))
             self.assertIsNone(takeover.claim_pending_dispatch(repository, task_id))
 
+    def test_transition_invalidates_committed_dispatch_but_blocks_dispatched_work(self):
+        repository = "Oteryn/Oteryn"
+        task_id = "OTERYN-TRANSITION-DISPATCH-FENCE"
+        initial = {"revision": 0}
+        reserved = {"revision": 1}
+        waiting = {"revision": 2, "state": "WAITING_EXTERNAL"}
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "checkpoint.db"
+            outbox = SqliteCheckpointOutbox(database)
+            outbox.seed_checkpoint(repository, task_id, _checkpoint_digest(initial), snapshot=initial)
+            reservation = outbox.reserve(repository=repository, task_id=task_id, expected_checkpoint=_checkpoint_digest(initial), next_checkpoint=_checkpoint_digest(reserved), next_snapshot=reserved, action="mutate", scope=("material-generation-1",))
+            self.assertTrue(reservation.committed)
+            transition = outbox.transition(repository=repository, task_id=task_id, expected_checkpoint=_checkpoint_digest(reserved), next_checkpoint=_checkpoint_digest(waiting), next_snapshot=waiting, reason="external dependency is pending", scope=())
+            self.assertTrue(transition.committed)
+            self.assertIsNone(outbox.claim_pending_dispatch(repository, task_id))
+            self.assertFalse(outbox.claim_dispatch(reservation.reservation_key))
+
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "checkpoint.db"
+            outbox = SqliteCheckpointOutbox(database)
+            outbox.seed_checkpoint(repository, task_id, _checkpoint_digest(initial), snapshot=initial)
+            reservation = outbox.reserve(repository=repository, task_id=task_id, expected_checkpoint=_checkpoint_digest(initial), next_checkpoint=_checkpoint_digest(reserved), next_snapshot=reserved, action="mutate", scope=("material-generation-1",))
+            self.assertIsNotNone(outbox.claim_pending_dispatch(repository, task_id))
+            transition = outbox.transition(repository=repository, task_id=task_id, expected_checkpoint=_checkpoint_digest(reserved), next_checkpoint=_checkpoint_digest(waiting), next_snapshot=waiting, reason="external dependency is pending", scope=())
+            self.assertFalse(transition.committed)
+            self.assertEqual(transition.reason, "dispatch_in_flight")
+
+    def test_loop_breaker_audit_is_once_per_material_generation(self):
+        pending = ledger()
+        pending["identity_binding"] = {"status": "PENDING", "reason": ""}
+        previous = snapshot(state="READY", phase="LOOP_BREAKER_AUDIT", late_material_findings=2, audited_late_material_findings=0, risk_ledger=pending)
+        previous["review_binding"] = make_review_binding(POLICY, repository=previous["repository"], task_id=previous["task_id"], base_head_sha="b" * 40, head_sha=previous["task_head_sha"], tier="R2", classifier_revision="audit-generation-test-v1", risk_fingerprint="f" * 64)
+        first = copy.deepcopy(previous)
+        with tempfile.TemporaryDirectory() as directory:
+            outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
+            outbox.seed_checkpoint(previous["repository"], previous["task_id"], _checkpoint_digest(previous), snapshot=previous)
+            authority = TestEvidenceAuthority({previous["review_binding"]["binding_id"]}, set())
+            context = ExecutionContext(authority, outbox)
+            result = raw_decide(previous, first, "run_loop_breaker_audit", POLICY, context=context)
+            self.assertTrue(result.allowed)
+            self.assertIsNotNone(outbox.claim_pending_dispatch(previous["repository"], previous["task_id"]))
+            self.assertTrue(outbox.acknowledge_dispatch(result.reservation_key))
+            second = copy.deepcopy(first)
+            second["material_fact_id"] = "d" * 64
+            repeated = raw_decide(first, second, "run_loop_breaker_audit", POLICY, context=context)
+            self.assertFalse(repeated.allowed)
+            self.assertIn("audit", repeated.reason.lower())
+
     def test_durable_outbox_persists_recoverable_snapshot_for_takeover(self):
         previous = snapshot(
             state="READY",

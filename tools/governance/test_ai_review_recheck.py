@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from ai_review_recheck import process_event, select_rerun_run_id  # noqa: E402
+from ai_review_recheck import RecheckError, process_event, select_rerun_run_id  # noqa: E402
 
 
 POLICY = {
@@ -20,12 +20,12 @@ BASE = "b" * 40
 PR_NUMBER = 69
 
 
-def pr_payload(head=HEAD, base=BASE, repo=REPOSITORY, number=PR_NUMBER, state="open"):
+def pr_payload(head=HEAD, base=BASE, repo=REPOSITORY, number=PR_NUMBER, state="open", base_ref="main", default_branch="main"):
     return {
         "number": number,
         "state": state,
         "head": {"sha": head, "repo": {"full_name": repo}},
-        "base": {"sha": base, "ref": "main"},
+        "base": {"sha": base, "ref": base_ref, "repo": {"full_name": repo, "default_branch": default_branch}},
     }
 
 
@@ -356,6 +356,12 @@ class EventTests(unittest.TestCase):
                 POLICY,
                 client,
             )
+
+    def test_base_ref_retarget_with_same_sha_fails_closed(self):
+        client = FakeClient(runs=[run_payload(123)], second_pr=pr_payload(base_ref="release", default_branch="main"))
+        with self.assertRaisesRegex(RecheckError, "default branch"):
+            process_event("pull_request_review", review_event(), REPOSITORY, POLICY, client)
+        self.assertEqual(client.rerun_calls, [])
 
     def test_pr_move_between_selection_and_rerun_is_noop(self):
         client = FakeClient(

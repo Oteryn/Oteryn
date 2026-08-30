@@ -75,6 +75,7 @@ jobs:
               raise SystemExit("pull-request review event base is stale; refusing write-capable recheck")
           with open(sys.argv[1], "a", encoding="utf-8") as output:
               output.write(f"base_sha={live_base}\n")
+              output.write(f"base_ref={live_base_ref}\n")
               output.write(f"head_sha={live_head}\n")
           PY
 
@@ -102,6 +103,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           EXPECTED_BASE_SHA: ${{ steps.live-pr.outputs.base_sha }}
+          EXPECTED_BASE_REF: ${{ steps.live-pr.outputs.base_ref }}
           EXPECTED_HEAD_SHA: ${{ steps.live-pr.outputs.head_sha }}
           OTERYN_CANDIDATE_ROOT: ${{ github.workspace }}/candidate
           OTERYN_AI_REVIEW_POLICY: ecosystem/ai-review-policy.json
@@ -116,6 +118,7 @@ jobs:
           import urllib.request
 
           expected = os.environ["EXPECTED_BASE_SHA"]
+          expected_base_ref = os.environ["EXPECTED_BASE_REF"]
           expected_head = os.environ["EXPECTED_HEAD_SHA"]
           checked_out = os.environ["CHECKED_OUT_BASE"]
           if re.fullmatch(r"[0-9a-f]{40}", expected) is None or checked_out != expected:
@@ -136,9 +139,24 @@ jobs:
           with urllib.request.urlopen(request, timeout=20) as response:
               payload = json.load(response)
           live_base = str(((payload.get("base") or {}).get("sha")) or "")
+          live_base_ref = str(((payload.get("base") or {}).get("ref")) or "")
           live_head = str(((payload.get("head") or {}).get("sha")) or "")
+          repository_request = urllib.request.Request(
+              f"https://api.github.com/repos/{repository}",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "oteryn-ai-review-live-base/1",
+              },
+          )
+          with urllib.request.urlopen(repository_request, timeout=20) as response:
+              repository_payload = json.load(response)
+          live_default_branch = str(repository_payload.get("default_branch") or "")
           if live_base != expected or live_head != expected_head:
               raise SystemExit("live pull-request head/base moved after authority checkout; refusing recheck")
+          if live_base_ref != expected_base_ref or live_default_branch != expected_base_ref:
+              raise SystemExit("live pull-request base ref/default branch moved after authority checkout; refusing recheck")
           PY
           test "$(git -C "$OTERYN_CANDIDATE_ROOT" rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
           python3 tools/governance/ai_review_recheck.py

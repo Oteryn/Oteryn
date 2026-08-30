@@ -215,6 +215,7 @@ class SqliteCheckpointOutbox:
                     scope_json TEXT,
                     sequence_no INTEGER,
                     acknowledged INTEGER NOT NULL DEFAULT 0,
+                    invalidated INTEGER NOT NULL DEFAULT 0,
                     status TEXT NOT NULL CHECK (status IN ('committed', 'dispatched'))
                 )
                 """
@@ -231,6 +232,7 @@ class SqliteCheckpointOutbox:
                 ("scope_json", "TEXT"),
                 ("sequence_no", "INTEGER"),
                 ("acknowledged", "INTEGER NOT NULL DEFAULT 0"),
+                ("invalidated", "INTEGER NOT NULL DEFAULT 0"),
             ):
                 if column not in outbox_columns:
                     connection.execute(
@@ -346,10 +348,25 @@ class SqliteCheckpointOutbox:
             if actual_checkpoint != expected_checkpoint:
                 connection.execute("ROLLBACK")
                 return Reservation(False, key, "checkpoint_cas_conflict")
+            scope_json = _canonical_scope_json(scope)
+            if action == "run_loop_breaker_audit":
+                repeated_scope = connection.execute(
+                    """
+                    SELECT 1 FROM bounded_execution_outbox
+                    WHERE repository = ? AND task_id = ? AND action = ?
+                      AND scope_json = ? AND COALESCE(invalidated, 0) = 0
+                    LIMIT 1
+                    """,
+                    (repository, task_id, action, scope_json),
+                ).fetchone()
+                if repeated_scope is not None:
+                    connection.execute("ROLLBACK")
+                    return Reservation(False, key, "loop_breaker_audit_generation_replay")
             in_flight = connection.execute(
                 """
                 SELECT 1 FROM bounded_execution_outbox
                 WHERE repository = ? AND task_id = ?
+                  AND COALESCE(invalidated, 0) = 0
                   AND (status = 'committed' OR (status = 'dispatched' AND COALESCE(acknowledged, 0) = 0))
                 LIMIT 1
                 """,
@@ -422,6 +439,38 @@ class SqliteCheckpointOutbox:
         )
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
+            checkpoint_row = connection.execute(
+                "SELECT checkpoint FROM bounded_execution_checkpoint WHERE repository = ? AND task_id = ?",
+                (repository, task_id),
+            ).fetchone()
+            actual_checkpoint = checkpoint_row[0] if checkpoint_row is not None else None
+            if actual_checkpoint != expected_checkpoint:
+                connection.execute("ROLLBACK")
+                return Reservation(False, key, "checkpoint_cas_conflict")
+            dispatched = connection.execute(
+                """
+                SELECT 1 FROM bounded_execution_outbox
+                WHERE repository = ? AND task_id = ?
+                  AND status = 'dispatched'
+                  AND COALESCE(acknowledged, 0) = 0
+                  AND COALESCE(invalidated, 0) = 0
+                LIMIT 1
+                """,
+                (repository, task_id),
+            ).fetchone()
+            if dispatched is not None:
+                connection.execute("ROLLBACK")
+                return Reservation(False, key, "dispatch_in_flight")
+            connection.execute(
+                """
+                UPDATE bounded_execution_outbox
+                SET invalidated = 1
+                WHERE repository = ? AND task_id = ?
+                  AND status = 'committed'
+                  AND COALESCE(invalidated, 0) = 0
+                """,
+                (repository, task_id),
+            )
             if not self._advance_checkpoint(
                 connection,
                 repository=repository,
@@ -484,6 +533,7 @@ class SqliteCheckpointOutbox:
                            action, scope_json, sequence_no
                     FROM bounded_execution_outbox
                     WHERE repository = ? AND task_id = ? AND status = 'committed'
+                      AND COALESCE(invalidated, 0) = 0
                     ORDER BY CASE WHEN sequence_no IS NULL THEN 0 ELSE 1 END,
                              sequence_no ASC, reservation_key ASC
                     LIMIT 1
@@ -537,6 +587,7 @@ class SqliteCheckpointOutbox:
                     UPDATE bounded_execution_outbox
                     SET status = 'dispatched'
                     WHERE reservation_key = ? AND status = 'committed'
+                      AND COALESCE(invalidated, 0) = 0
                     """,
                     (reservation_key,),
                 )
@@ -566,6 +617,7 @@ class SqliteCheckpointOutbox:
                 UPDATE bounded_execution_outbox
                 SET status = 'dispatched'
                 WHERE reservation_key = ? AND status = 'committed'
+                  AND COALESCE(invalidated, 0) = 0
                 """,
                 (reservation_key,),
             )

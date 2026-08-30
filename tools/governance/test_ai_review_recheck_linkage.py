@@ -111,6 +111,9 @@ class TrustedWorkflowBaseBindingTests(unittest.TestCase):
         )
         self.assertIn("EXPECTED_BASE_SHA: ${{ steps.live-pr.outputs.base_sha }}", workflow)
         self.assertIn("git rev-parse HEAD", workflow)
+        self.assertIn('live_base_ref = str(((payload.get("base") or {}).get("ref")) or "")', workflow)
+        self.assertIn('live_default_branch = str(repository_payload.get("default_branch") or "")', workflow)
+        self.assertIn("live_base_ref != expected_base_ref or live_default_branch != expected_base_ref", workflow)
         self.assertLess(
             workflow.index("EXPECTED_BASE_SHA: ${{ steps.live-pr.outputs.base_sha }}"),
             workflow.index("python3 tools/governance/ai_review_recheck.py"),
