@@ -3,10 +3,21 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
+
 class ExecutionContractTests(unittest.TestCase):
-    def test_central_contract_requires_bounded_wait_and_stall_states(self):
-        text = (ROOT / "docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md").read_text(encoding="utf-8")
-        for marker in ["WAITING_EXTERNAL", "STALLED", "candidate_frozen", "progress_fingerprint", "failure_fingerprint", "no-op/retrigger", "must end the active session"]:
+    def test_bounded_contract_requires_wait_and_stall_states(self):
+        text = (
+            ROOT / "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md"
+        ).read_text(encoding="utf-8")
+        for marker in [
+            "WAITING_EXTERNAL",
+            "STALLED",
+            "candidate_frozen",
+            "progress_fingerprint",
+            "failure_fingerprint",
+            "no-op/retrigger",
+            "release the active session",
+        ]:
             self.assertIn(marker, text)
         self.assertIn("EXECUTION_STATE_CONTRACT.json", text)
         self.assertIn("new or materially updated substantial task", text)
@@ -20,9 +31,11 @@ class ExecutionContractTests(unittest.TestCase):
 
     def test_root_bootstrap_forbids_trigger_commits_and_active_waiting(self):
         text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md", text)
         self.assertIn("no-op/retrigger commit", text)
         self.assertIn("WAITING_EXTERNAL", text)
-        self.assertIn("must not remain active", text)
+        self.assertIn("must release the active worker", text)
+
 
 if __name__ == "__main__":
     unittest.main()
