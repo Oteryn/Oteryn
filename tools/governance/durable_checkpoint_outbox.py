@@ -35,6 +35,19 @@ class CheckpointRecord:
     snapshot: dict[str, Any]
 
 
+@dataclasses.dataclass(frozen=True)
+class PendingReservation:
+    """One atomically claimed durable dispatch recovered by a takeover worker."""
+
+    reservation_key: str
+    repository: str
+    task_id: str
+    expected_checkpoint: str | None
+    next_checkpoint: str
+    action: str
+    scope: tuple[str, ...]
+
+
 class CheckpointOutboxAdapter(Protocol):
     """Atomically advance recoverable checkpoints and dispatch reservations."""
 
@@ -64,6 +77,10 @@ class CheckpointOutboxAdapter(Protocol):
 
     def load_checkpoint(self, repository: str, task_id: str) -> CheckpointRecord | None: ...
 
+    def claim_pending_dispatch(
+        self, repository: str, task_id: str
+    ) -> PendingReservation | None: ...
+
     def claim_dispatch(self, reservation_key: str) -> bool: ...
 
 
@@ -82,6 +99,31 @@ def _validated_snapshot_payload(snapshot: dict[str, Any], expected_digest: str) 
     if _snapshot_digest(payload) != expected_digest:
         raise ValueError("checkpoint digest does not match canonical snapshot")
     return payload
+
+
+def _canonical_scope_json(scope: tuple[str, ...]) -> str:
+    if not isinstance(scope, tuple) or not all(
+        isinstance(item, str) and item for item in scope
+    ):
+        raise ValueError("reservation scope must be a tuple of non-empty strings")
+    return json.dumps(list(scope), separators=(",", ":"), ensure_ascii=True)
+
+
+def _parse_scope_json(scope_json: str) -> tuple[str, ...]:
+    if not isinstance(scope_json, str):
+        raise ValueError("pending reservation scope is unavailable")
+    try:
+        payload = json.loads(scope_json)
+    except json.JSONDecodeError as error:
+        raise ValueError("pending reservation scope is malformed") from error
+    if not isinstance(payload, list) or not all(
+        isinstance(item, str) and item for item in payload
+    ):
+        raise ValueError("pending reservation scope must be a string list")
+    scope = tuple(payload)
+    if _canonical_scope_json(scope) != scope_json:
+        raise ValueError("pending reservation scope is not canonical")
+    return scope
 
 
 def _reservation_key(
@@ -150,11 +192,31 @@ class SqliteCheckpointOutbox:
                     reservation_key TEXT PRIMARY KEY,
                     repository TEXT NOT NULL,
                     task_id TEXT NOT NULL,
+                    expected_checkpoint TEXT,
+                    next_checkpoint TEXT,
                     action TEXT NOT NULL,
+                    scope_json TEXT,
+                    sequence_no INTEGER,
                     status TEXT NOT NULL CHECK (status IN ('committed', 'dispatched'))
                 )
                 """
             )
+            outbox_columns = {
+                row[1]
+                for row in connection.execute(
+                    "PRAGMA table_info(bounded_execution_outbox)"
+                ).fetchall()
+            }
+            for column, definition in (
+                ("expected_checkpoint", "TEXT"),
+                ("next_checkpoint", "TEXT"),
+                ("scope_json", "TEXT"),
+                ("sequence_no", "INTEGER"),
+            ):
+                if column not in outbox_columns:
+                    connection.execute(
+                        f"ALTER TABLE bounded_execution_outbox ADD COLUMN {column} {definition}"
+                    )
 
     def seed_checkpoint(
         self,
@@ -239,6 +301,7 @@ class SqliteCheckpointOutbox:
         scope: tuple[str, ...],
     ) -> Reservation:
         snapshot_json = _validated_snapshot_payload(next_snapshot, next_checkpoint)
+        scope_json = _canonical_scope_json(scope)
         key = _reservation_key(
             repository,
             task_id,
@@ -266,13 +329,32 @@ class SqliteCheckpointOutbox:
             ):
                 connection.execute("ROLLBACK")
                 return Reservation(False, key, "checkpoint_cas_conflict")
+            sequence_row = connection.execute(
+                """
+                SELECT COALESCE(MAX(sequence_no), 0) + 1
+                FROM bounded_execution_outbox
+                WHERE repository = ? AND task_id = ?
+                """,
+                (repository, task_id),
+            ).fetchone()
+            sequence_no = int(sequence_row[0])
             connection.execute(
                 """
                 INSERT INTO bounded_execution_outbox(
-                    reservation_key, repository, task_id, action, status
-                ) VALUES (?, ?, ?, ?, 'committed')
+                    reservation_key, repository, task_id, expected_checkpoint,
+                    next_checkpoint, action, scope_json, sequence_no, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'committed')
                 """,
-                (key, repository, task_id, action),
+                (
+                    key,
+                    repository,
+                    task_id,
+                    expected_checkpoint,
+                    next_checkpoint,
+                    action,
+                    scope_json,
+                    sequence_no,
+                ),
             )
             connection.execute("COMMIT")
         return Reservation(True, key, "reservation_committed")
@@ -341,6 +423,98 @@ class SqliteCheckpointOutbox:
         if _snapshot_digest(canonical) != checkpoint:
             raise ValueError("recoverable checkpoint snapshot digest mismatch")
         return CheckpointRecord(checkpoint=checkpoint, snapshot=snapshot)
+
+    def claim_pending_dispatch(
+        self, repository: str, task_id: str
+    ) -> PendingReservation | None:
+        """Atomically claim the oldest recoverable dispatch for one task.
+
+        This crash-recovery path does not require the reservation key returned
+        to the previous process. Legacy committed rows without complete metadata
+        fail closed instead of being skipped or guessed.
+        """
+
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    """
+                    SELECT reservation_key, expected_checkpoint, next_checkpoint,
+                           action, scope_json, sequence_no
+                    FROM bounded_execution_outbox
+                    WHERE repository = ? AND task_id = ? AND status = 'committed'
+                    ORDER BY CASE WHEN sequence_no IS NULL THEN 0 ELSE 1 END,
+                             sequence_no ASC, reservation_key ASC
+                    LIMIT 1
+                    """,
+                    (repository, task_id),
+                ).fetchone()
+                if row is None:
+                    connection.execute("ROLLBACK")
+                    return None
+
+                (
+                    reservation_key,
+                    expected_checkpoint,
+                    next_checkpoint,
+                    action,
+                    scope_json,
+                    sequence_no,
+                ) = row
+                if (
+                    not isinstance(reservation_key, str)
+                    or not reservation_key
+                    or (
+                        expected_checkpoint is not None
+                        and not isinstance(expected_checkpoint, str)
+                    )
+                    or not isinstance(next_checkpoint, str)
+                    or not next_checkpoint
+                    or not isinstance(action, str)
+                    or not action
+                    or not isinstance(sequence_no, int)
+                    or isinstance(sequence_no, bool)
+                    or sequence_no < 1
+                ):
+                    raise ValueError(
+                        "pending reservation metadata is unavailable or malformed"
+                    )
+                scope = _parse_scope_json(scope_json)
+                expected_key = _reservation_key(
+                    repository,
+                    task_id,
+                    expected_checkpoint,
+                    next_checkpoint,
+                    action,
+                    scope,
+                )
+                if reservation_key != expected_key:
+                    raise ValueError("pending reservation key integrity check failed")
+
+                updated = connection.execute(
+                    """
+                    UPDATE bounded_execution_outbox
+                    SET status = 'dispatched'
+                    WHERE reservation_key = ? AND status = 'committed'
+                    """,
+                    (reservation_key,),
+                )
+                if updated.rowcount != 1:
+                    raise RuntimeError("pending reservation claim conflict")
+                connection.execute("COMMIT")
+                return PendingReservation(
+                    reservation_key=reservation_key,
+                    repository=repository,
+                    task_id=task_id,
+                    expected_checkpoint=expected_checkpoint,
+                    next_checkpoint=next_checkpoint,
+                    action=action,
+                    scope=scope,
+                )
+            except Exception:
+                if connection.in_transaction:
+                    connection.execute("ROLLBACK")
+                raise
 
     def claim_dispatch(self, reservation_key: str) -> bool:
         """Grant exactly one dispatcher the committed reservation."""
