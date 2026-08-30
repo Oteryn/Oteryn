@@ -111,6 +111,20 @@ class RecordingOutbox:
         self.action = action
         return Reservation(True, "atomic-transition-test", "reservation_committed")
 
+    def transition(
+        self,
+        *,
+        repository,
+        task_id,
+        expected_checkpoint,
+        next_checkpoint,
+        reason,
+        scope,
+    ):
+        self.next_checkpoint = next_checkpoint
+        self.action = None
+        return Reservation(True, "atomic-transition-test", "transition_committed")
+
     def claim_dispatch(self, reservation_key):
         return True
 
@@ -253,6 +267,33 @@ class AtomicTransitionRegressionTests(unittest.TestCase):
         self.assertEqual(result.state, "READY")
         self.assertIn("previous", result.reason)
         self.assertIsNone(outbox.next_checkpoint)
+
+    def test_exhausted_async_action_persists_waiting_without_dispatch(self):
+        for action, field in (
+            ("request_external_review", "external_review_invocations"),
+            ("same_head_gate_recheck", "same_head_gate_rechecks"),
+        ):
+            with self.subTest(action=action):
+                previous = with_binding(snapshot(state="READY", **{field: 1}))
+                current = copy.deepcopy(previous)
+                current[field] = 2
+                outbox = RecordingOutbox()
+
+                result = raw_decide(
+                    previous,
+                    current,
+                    action,
+                    POLICY,
+                    context=ExecutionContext(AllowEvidenceAuthority(), outbox),
+                )
+
+                self.assertFalse(result.allowed)
+                self.assertEqual(result.state, "WAITING_EXTERNAL")
+                self.assertTrue(result.release_session)
+                expected = copy.deepcopy(current)
+                expected["state"] = "WAITING_EXTERNAL"
+                self.assertEqual(outbox.next_checkpoint, _checkpoint_digest(expected))
+                self.assertIsNone(outbox.action)
 
     def test_terminal_ledger_certification_requires_record_action_even_when_counters_match(self):
         previous = snapshot(
