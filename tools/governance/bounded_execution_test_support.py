@@ -36,6 +36,9 @@ class TestEvidenceAuthority:
     def verify_material_fact_envelope(self, envelope: dict[str, Any]) -> bool:
         return envelope.get("envelope_id") in self.envelope_ids
 
+    def verify_completion(self, candidate: dict[str, Any]) -> bool:
+        return candidate.get("completion_verified") is True
+
 
 def _prepared(snapshot: dict[str, Any] | None, policy: dict[str, Any]) -> dict[str, Any] | None:
     if snapshot is None:

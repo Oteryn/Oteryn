@@ -140,6 +140,8 @@ class TrustedEvidenceAuthority(Protocol):
 
     def verify_material_fact_envelope(self, envelope: dict[str, Any]) -> bool: ...
 
+    def verify_completion(self, candidate: dict[str, Any]) -> bool: ...
+
 
 @dataclasses.dataclass(frozen=True)
 class ExecutionContext:
@@ -1089,8 +1091,19 @@ def decide(
             return _decision(False, state, "DONE is forbidden until the loop-breaker risk ledger is terminal", state in release_states, progress, failure)
         if not current["completion_verified"]:
             state = current["state"] if current["state"] in release_states else "READY"
-            return _decision(False, state, "DONE is forbidden until completion is independently verified", state in release_states, progress, failure)
-        return allow("DONE", "completion evidence is verified", True)
+            return _decision(False, state, "DONE is forbidden until completion verification is requested", state in release_states, progress, failure)
+        assert context is not None
+        if not context.evidence_authority.verify_completion(current):
+            state = current["state"] if current["state"] in release_states else "READY"
+            return _decision(
+                False,
+                state,
+                "trusted_completion_required: exact candidate completion evidence is absent, mismatched, or unverified",
+                state in release_states,
+                progress,
+                failure,
+            )
+        return allow("DONE", "trusted completion evidence is verified", True)
 
     forbidden_when_frozen = set(policy["candidate_freeze"]["forbidden_actions_without_material_change"])
     if current["candidate_frozen"] and requested_action in forbidden_when_frozen:
