@@ -13,11 +13,12 @@ import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REVIEWED_COMMIT_RE = re.compile(
@@ -25,6 +26,9 @@ REVIEWED_COMMIT_RE = re.compile(
 )
 MAX_RUN_PAGES = 100
 RUNS_PER_PAGE = 100
+MAX_GATE_COMPLETION_POLLS = 12
+GATE_COMPLETION_POLL_SECONDS = 5.0
+NONTERMINAL_RUN_STATUSES = frozenset({"queued", "in_progress", "pending", "requested", "waiting"})
 
 
 class RecheckError(ValueError):
@@ -141,10 +145,10 @@ def _issue_comment_reviewed_prefix(event: dict[str, Any]) -> tuple[str, str | No
     return "MATCH", matches[0]
 
 
-def select_rerun_run_id(
+def _latest_matching_gate_run(
     runs: list[dict[str, Any]], head_sha: str, base_sha: str, pr_number: int
-) -> int | None:
-    """Select the latest failed attempt-1 gate for exact PR/head/base coordinates."""
+) -> dict[str, Any] | None:
+    """Return the latest exact-PR exact-head exact-base trusted gate run."""
 
     _sha(head_sha, "head_sha")
     _sha(base_sha, "base_sha")
@@ -168,11 +172,20 @@ def select_rerun_run_id(
         candidates.append(run)
     if not candidates:
         return None
-
-    latest = max(
+    return max(
         candidates,
         key=lambda item: (str(item.get("created_at") or ""), int(item["id"])),
     )
+
+
+def select_rerun_run_id(
+    runs: list[dict[str, Any]], head_sha: str, base_sha: str, pr_number: int
+) -> int | None:
+    """Select the latest failed attempt-1 gate for exact PR/head/base coordinates."""
+
+    latest = _latest_matching_gate_run(runs, head_sha, base_sha, pr_number)
+    if latest is None:
+        return None
     if latest.get("status") != "completed":
         return None
     if latest.get("conclusion") != "failure":
@@ -201,6 +214,8 @@ def process_event(
     repository: str,
     policy: dict[str, Any],
     client: RecheckClient,
+    *,
+    sleep_fn: Callable[[float], None] = time.sleep,
 ) -> Result:
     """Process one trusted reviewer result event with a bounded same-head rerun."""
 
@@ -265,15 +280,46 @@ def process_event(
             base_sha=base_sha,
         )
 
-    runs = client.list_gate_runs(head_sha, base_sha, pr_number)
-    run_id = select_rerun_run_id(runs, head_sha, base_sha, pr_number)
-    if run_id is None:
-        return Result(
-            "NOOP_NO_ELIGIBLE_RUN",
-            "no exact-PR exact-head exact-base completed failed attempt-1 AI review gate run is eligible",
-            head_sha=head_sha,
-            base_sha=base_sha,
-        )
+    run_id: int | None = None
+    for poll_index in range(MAX_GATE_COMPLETION_POLLS):
+        runs = client.list_gate_runs(head_sha, base_sha, pr_number)
+        run_id = select_rerun_run_id(runs, head_sha, base_sha, pr_number)
+        if run_id is not None:
+            break
+
+        latest = _latest_matching_gate_run(runs, head_sha, base_sha, pr_number)
+        if latest is None:
+            return Result(
+                "NOOP_NO_ELIGIBLE_RUN",
+                "no exact-PR exact-head exact-base AI review gate run is eligible",
+                head_sha=head_sha,
+                base_sha=base_sha,
+            )
+        attempt = latest.get("run_attempt")
+        status = latest.get("status")
+        if (
+            not isinstance(attempt, int)
+            or isinstance(attempt, bool)
+            or attempt != 1
+            or status not in NONTERMINAL_RUN_STATUSES
+        ):
+            return Result(
+                "NOOP_NO_ELIGIBLE_RUN",
+                "latest exact-PR exact-head exact-base gate is not a failed or pending attempt-1 run",
+                head_sha=head_sha,
+                base_sha=base_sha,
+            )
+        if poll_index == MAX_GATE_COMPLETION_POLLS - 1:
+            return Result(
+                "NOOP_GATE_STILL_RUNNING",
+                "matching attempt-1 AI review gate remained nonterminal through the bounded completion wait",
+                run_id=int(latest["id"]),
+                head_sha=head_sha,
+                base_sha=base_sha,
+            )
+        sleep_fn(GATE_COMPLETION_POLL_SECONDS)
+
+    assert run_id is not None
 
     # Race guard immediately before mutation of workflow state.
     _, fresh_head_sha, fresh_base_sha = _live_pr(client, pr_number, repository)

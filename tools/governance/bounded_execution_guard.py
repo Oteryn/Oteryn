@@ -1019,7 +1019,7 @@ def decide(
                 failure=failure,
             )
 
-    if previous is not None and previous["state"] in {"BLOCKED", "STALLED"} and same_progress and requested_action != "complete":
+    if previous is not None and previous["state"] in {"WAITING_EXTERNAL", "BLOCKED", "STALLED"} and same_progress and requested_action != "complete":
         return _decision(
             requested_action == "observe",
             previous["state"],
@@ -1048,8 +1048,11 @@ def decide(
     }
     if (
         requested_action in final_candidate_actions
-        and current["phase"] == "final_qualification"
         and not current["candidate_frozen"]
+        and (
+            requested_action == "enter_final_qualification"
+            or current["phase"] == "final_qualification"
+        )
     ):
         return _decision(
             False,
