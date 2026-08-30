@@ -371,7 +371,7 @@ The META implementation should provide a versioned machine policy and validator 
 5. `release_waiting + github_native` is allowed only when no later agent worker action remains anywhere in the task after GitHub-native progression;
 6. `release_waiting` paired with `scheduled_task`, `work_event_trigger`, or `work_persistent` requires a non-empty concrete locator; `github_native` also requires a concrete control-plane locator;
 7. `owner_reinvoke` cannot be presented as automatic continuation;
-8. continuation does not reset canonical retry/no-progress counters: every successor checkpoint write resolves the latest trusted predecessor and delegates retry/evidence continuity validation to the canonical bounded-execution authority;
+8. continuation does not reset canonical retry/no-progress counters: a first continuation checkpoint with no continuation predecessor must still match the canonical bounded authority's current retry/evidence state, and every successor checkpoint write resolves the latest trusted predecessor and delegates retry/evidence continuity validation to that same authority;
 9. frozen candidates cannot use checkpoint/retrigger commits as a continuation mechanism;
 10. Work selection requires a capability reason rather than effort alone;
 11. provider mapping may be stricter but cannot weaken organization task-lifetime truthfulness or bounded-execution safety;
