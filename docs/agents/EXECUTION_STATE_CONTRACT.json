@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "oteryn-bounded-execution-state-v1",
-  "authority": "docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md",
+  "authority": "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md",
   "allowed_statuses": [
     "RUNNING",
     "READY",
