@@ -782,12 +782,12 @@ def _execution_prerequisite_reason(
 ) -> str | None:
     if action == "observe":
         return None
+    if context is None:
+        return "reservation_required: durable checkpoint/outbox and trusted authority are not configured"
     # An already-observed external dependency is non-dispatch control-plane work:
     # let the external-wait branch persist WAITING_EXTERNAL even without review authority.
     if current["dependency_kind"] == "external" and current["blocking_dependency"] and action != "complete":
         return None
-    if context is None:
-        return "reservation_required: durable checkpoint/outbox and trusted authority are not configured"
     binding = current.get("review_binding")
     if not isinstance(binding, dict) or not context.evidence_authority.verify_review_binding(binding):
         return "trusted_review_binding_required: review binding is absent, mismatched, or unverified"
