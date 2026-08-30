@@ -1043,6 +1043,16 @@ def decide(
                 failure=failure,
             )
 
+    if previous is not None and previous["state"] not in release_states and same_progress and requested_action in {"mutate", "retrigger"}:
+        return _decision(
+            False,
+            current["state"],
+            "unchanged operational action requires material progress",
+            current["state"] in release_states,
+            progress,
+            failure,
+        )
+
     if previous is not None and previous["state"] in {"WAITING_EXTERNAL", "BLOCKED", "STALLED"} and same_progress and requested_action != "complete":
         return _decision(
             requested_action == "observe",

@@ -83,6 +83,8 @@ class CheckpointOutboxAdapter(Protocol):
 
     def claim_dispatch(self, reservation_key: str) -> bool: ...
 
+    def acknowledge_dispatch(self, reservation_key: str) -> bool: ...
+
 
 def _canonical_snapshot(snapshot: dict[str, Any]) -> str:
     if not isinstance(snapshot, dict):
@@ -212,6 +214,7 @@ class SqliteCheckpointOutbox:
                     action TEXT NOT NULL,
                     scope_json TEXT,
                     sequence_no INTEGER,
+                    acknowledged INTEGER NOT NULL DEFAULT 0,
                     status TEXT NOT NULL CHECK (status IN ('committed', 'dispatched'))
                 )
                 """
@@ -227,6 +230,7 @@ class SqliteCheckpointOutbox:
                 ("next_checkpoint", "TEXT"),
                 ("scope_json", "TEXT"),
                 ("sequence_no", "INTEGER"),
+                ("acknowledged", "INTEGER NOT NULL DEFAULT 0"),
             ):
                 if column not in outbox_columns:
                     connection.execute(
@@ -334,6 +338,26 @@ class SqliteCheckpointOutbox:
             if replay is not None:
                 connection.execute("ROLLBACK")
                 return Reservation(False, key, "reservation_replay")
+            checkpoint_row = connection.execute(
+                "SELECT checkpoint FROM bounded_execution_checkpoint WHERE repository = ? AND task_id = ?",
+                (repository, task_id),
+            ).fetchone()
+            actual_checkpoint = checkpoint_row[0] if checkpoint_row is not None else None
+            if actual_checkpoint != expected_checkpoint:
+                connection.execute("ROLLBACK")
+                return Reservation(False, key, "checkpoint_cas_conflict")
+            in_flight = connection.execute(
+                """
+                SELECT 1 FROM bounded_execution_outbox
+                WHERE repository = ? AND task_id = ?
+                  AND (status = 'committed' OR (status = 'dispatched' AND COALESCE(acknowledged, 0) = 0))
+                LIMIT 1
+                """,
+                (repository, task_id),
+            ).fetchone()
+            if in_flight is not None:
+                connection.execute("ROLLBACK")
+                return Reservation(False, key, "dispatch_in_flight")
             if not self._advance_checkpoint(
                 connection,
                 repository=repository,
@@ -542,6 +566,22 @@ class SqliteCheckpointOutbox:
                 UPDATE bounded_execution_outbox
                 SET status = 'dispatched'
                 WHERE reservation_key = ? AND status = 'committed'
+                """,
+                (reservation_key,),
+            )
+        return updated.rowcount == 1
+
+    def acknowledge_dispatch(self, reservation_key: str) -> bool:
+        """Acknowledge completion so the task may reserve its next action."""
+
+        with closing(self._connect()) as connection:
+            updated = connection.execute(
+                """
+                UPDATE bounded_execution_outbox
+                SET acknowledged = 1
+                WHERE reservation_key = ?
+                  AND status = 'dispatched'
+                  AND COALESCE(acknowledged, 0) = 0
                 """,
                 (reservation_key,),
             )
