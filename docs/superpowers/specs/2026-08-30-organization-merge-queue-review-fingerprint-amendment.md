@@ -73,7 +73,7 @@ A provider-contract change must not weaken required capabilities simply by being
 
 A protected ruleset workflow is not sufficient if it executes local helpers resolved from the target/candidate workspace.
 
-Trusted bridge actions/helpers must resolve from the exact protected META source SHA `T` — for example by `$/...` source-relative local-action resolution when applicable or an explicit credential-free checkout of exact `T`. Plain candidate/default-workspace `./...` helper resolution is forbidden for trusted mediator logic.
+Trusted bridge actions/helpers must resolve from the exact protected META source SHA `T` using only supported GitHub Actions mechanisms. The trusted job may, for example, checkout exact `T` into a dedicated credential-free path and execute scripts from that path, or reference a repository action as `Oteryn/Oteryn/<path>@<full T SHA>` where GitHub's cross-repository access rules permit it. Plain candidate/default-workspace `./...` helper resolution is forbidden for trusted mediator logic. Do not invent source-relative `uses:` syntax that GitHub Actions does not support.
 
 External actions must remain pinned by full commit SHA.
 
@@ -107,7 +107,7 @@ Phase C is complete only when protected-main readback proves the **capability co
 - the consumer deterministically rejects valid attestations from non-success issuer runs/jobs/checks;
 - queue identity/topology parsing is bound to event + server-side queue state and is not inferred from `maximumEntriesToMerge`;
 - deterministic fixtures cover the supported queue topology, unsupported predecessor/prefix cases, and exact method-aware integration-tree reproduction;
-- trusted helpers execute only from exact protected META source;
+- trusted helpers execute only from exact protected META source using supported checkout/repository-action resolution;
 - bridge/provider authority updates use versioned protected activation;
 - #114 permission contract is complete before provider consumption;
 - the exact files, workflow path, source SHA, expected ruleset selector and rollback baseline are read back from protected `main`.
