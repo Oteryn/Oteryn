@@ -102,6 +102,9 @@ def _is_unique_string_list(value: object) -> bool:
 def _policy_errors(policy: dict[str, object]) -> list[str]:
     """Reject malformed policy data before it can authorize a packet."""
     errors: list[str] = []
+    if policy.get("schema_version") != 2:
+        errors.append("policy schema_version must be 2")
+
     targets_value = policy.get("execution_targets")
     runners_value = policy.get("runner_classes")
     if not _is_unique_string_list(targets_value):
@@ -152,8 +155,41 @@ def _policy_errors(policy: dict[str, object]) -> list[str]:
         errors.append("policy Remote Desktop known and always-forbidden tool sets must be disjoint")
 
     lane_rules = policy.get("parallel_lane_rules")
-    if not isinstance(lane_rules, dict) or lane_rules.get("unique_branch_and_worktree") is not True:
-        errors.append("policy parallel_lane_rules.unique_branch_and_worktree must be true")
+    if not isinstance(lane_rules, dict):
+        errors.append("policy parallel_lane_rules must be an object")
+    else:
+        strategies_value = lane_rules.get("strategies")
+        if (
+            not _is_unique_string_list(strategies_value)
+            or set(strategies_value) != {"single_agent", "parallel_when_beneficial"}
+        ):
+            errors.append(
+                "policy parallel_lane_rules.strategies must be the canonical effort-aware strategy set"
+            )
+        effort_levels_value = lane_rules.get("effort_levels")
+        if (
+            not _is_unique_string_list(effort_levels_value)
+            or set(effort_levels_value) != {"low", "medium", "high"}
+        ):
+            errors.append("policy parallel_lane_rules.effort_levels must be the canonical effort set")
+        if lane_rules.get("decision_basis_required") is not True:
+            errors.append("policy parallel_lane_rules.decision_basis_required must be true")
+        single_agent_lane_count = lane_rules.get("single_agent_lane_count")
+        if (
+            not isinstance(single_agent_lane_count, int)
+            or isinstance(single_agent_lane_count, bool)
+            or single_agent_lane_count != 1
+        ):
+            errors.append("policy parallel_lane_rules.single_agent_lane_count must be 1")
+        parallel_minimum_lanes = lane_rules.get("parallel_minimum_lanes")
+        if (
+            not isinstance(parallel_minimum_lanes, int)
+            or isinstance(parallel_minimum_lanes, bool)
+            or parallel_minimum_lanes != 2
+        ):
+            errors.append("policy parallel_lane_rules.parallel_minimum_lanes must be 2")
+        if lane_rules.get("unique_branch_and_worktree") is not True:
+            errors.append("policy parallel_lane_rules.unique_branch_and_worktree must be true")
 
     required_fields = policy.get("resume_preflight_required_fields")
     if required_fields != list(_CANONICAL_RESUME_PREFLIGHT_FIELDS):
@@ -321,6 +357,14 @@ def _has_dependency_cycle(lanes: list[dict[str, object]], lane_ids: set[str]) ->
 
 def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], errors: list[str]) -> None:
     rules = _mapping(policy.get("parallel_lane_rules"))
+    effort_levels = {value for value in _list(rules.get("effort_levels")) if isinstance(value, str)}
+    effort = parallel.get("effort")
+    if not _is_closed_value(effort, effort_levels):
+        errors.append("parallel_execution.effort is not allowed")
+    decision_basis = parallel.get("decision_basis")
+    if not isinstance(decision_basis, str) or not decision_basis.strip():
+        errors.append("parallel_execution.decision_basis is required")
+
     strategies = {value for value in _list(rules.get("strategies")) if isinstance(value, str)}
     strategy = parallel.get("lane_strategy")
     lanes_value = parallel.get("lanes")
@@ -334,14 +378,12 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
             errors.append("multi-lane task requires lane_strategy")
         else:
             errors.append("lane_strategy is not allowed")
-    if strategy == "parallel_first" and not lanes:
-        errors.append("parallel_first requires at least one lane")
-    if strategy == "parallel_first" and not _list(parallel.get("integration_order")):
-        errors.append("parallel_first requires a non-empty integration_order")
-    if strategy == "serial_with_reason":
-        serial_reason = parallel.get("serial_reason")
-        if not isinstance(serial_reason, str) or not serial_reason.strip():
-            errors.append("serial_with_reason requires serial_reason")
+    if strategy == "single_agent" and len(lanes) != 1:
+        errors.append("single_agent requires exactly one lane")
+    if strategy == "parallel_when_beneficial" and len(lanes) < 2:
+        errors.append("parallel_when_beneficial requires at least two lanes")
+    if strategy == "parallel_when_beneficial" and not _list(parallel.get("integration_order")):
+        errors.append("parallel_when_beneficial requires a non-empty integration_order")
 
     required_lane_fields = {value for value in _list(rules.get("required_lane_fields")) if isinstance(value, str)}
     lane_ids: set[str] = set()

@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "execution_targets": [
     "github_actions",
     "isolated_workspace",
@@ -97,9 +97,17 @@
   ],
   "parallel_lane_rules": {
     "strategies": [
-      "parallel_first",
-      "serial_with_reason"
+      "single_agent",
+      "parallel_when_beneficial"
     ],
+    "effort_levels": [
+      "low",
+      "medium",
+      "high"
+    ],
+    "decision_basis_required": true,
+    "single_agent_lane_count": 1,
+    "parallel_minimum_lanes": 2,
     "required_lane_fields": [
       "id",
       "owned_paths",
@@ -111,7 +119,6 @@
     "unique_branch_and_worktree": true,
     "overlap_requires_lease": true,
     "constrained_resource_requires_lease": true,
-    "serial_requires_reason": true,
     "integration_order_required": true
   }
 }
