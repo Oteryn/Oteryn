@@ -98,6 +98,26 @@ PR #120 repairs canonical duplicate-clean-result normalization on protected META
 
 Any reconciliation that changes risk-bearing verifier semantics requires fresh exact-head classification/review according to the canonical fingerprint policy. Do not treat a textual merge-up as automatically review-neutral.
 
+## 9. Legacy required status contexts must be replaced before the first queue canary
+
+The protected dual-event workflow does not automatically satisfy or supersede legacy required status contexts. A repository may currently require checks such as META `meta-gate` / `ai-review-gate`, Game `game-gate`, Platform `platform-gate`, or Atlas `atlas-gate` / `provenance-gate` whose existing workflow triggers are PR-only or otherwise cannot succeed on synthetic `merge_group` head `I`.
+
+Leaving such contexts required while enabling Merge Queue creates a deterministic deadlock: the new protected bridge may succeed on `I`, but the legacy required context can never report success for `I`.
+
+Before enqueueing the first canary in each repository:
+
+1. inventory the complete live set of required status contexts/ruleset workflow requirements and classify each as either exact-`merge_group` capable or PR-only/non-authoritative;
+2. prove the protected dual-event workflow's PR-admission leg succeeds while **strict freshness and all legacy required contexts remain active**;
+3. prove that every deterministic/security property enforced by each legacy required context is preserved in the protected dual-event workflow and/or its protected provider aggregate contract; do not remove a legacy requirement until its coverage has an explicit replacement mapping;
+4. make the protected dual-event workflow Active/required and positively read it back while strict freshness and legacy required contexts are still active;
+5. atomically/serially update protection so every legacy context that cannot succeed on `merge_group` becomes non-required, while the protected dual-event workflow remains required and strict freshness remains enabled;
+6. positively read back the exact final pre-canary requirement set: protected dual-event workflow required, strict freshness `true`, no PR-only/non-`merge_group`-capable legacy context still required, and preserved merge/thread/CODEOWNERS protections;
+7. only after that readback may Merge Queue be required/enabled for the live canary if it was not already enabled for configuration purposes, and no canary may be enqueued until the same pre-canary readback remains true.
+
+Legacy workflows may remain enabled as diagnostic/PR feedback after their required-status role is removed. Their names must not be reused to impersonate the protected source-workflow authority.
+
+The same replacement rule applies provider-by-provider. Do not assume that adding the META protected workflow makes Game/Platform/Atlas legacy aggregate required contexts queue-compatible.
+
 ## Amended Phase-C acceptance gate
 
 Phase C is complete only when protected-main readback proves the **capability code** required for later cutover, without requiring a live queue event that cannot exist yet. Before any queue/ruleset enforcement mutation, require all of the following:
@@ -110,6 +130,7 @@ Phase C is complete only when protected-main readback proves the **capability co
 - trusted helpers execute only from exact protected META source using supported checkout/repository-action resolution;
 - bridge/provider authority updates use versioned protected activation;
 - #114 permission contract is complete before provider consumption;
+- deterministic tests/fixtures describe how legacy required contexts are mapped to protected replacement coverage before becoming non-required;
 - the exact files, workflow path, source SHA, expected ruleset selector and rollback baseline are read back from protected `main`.
 
 **No live `merge_group` canary is required to exit Phase C.** Queue/ruleset enforcement and the first real synthetic integration candidate belong to the staged cutover phase below. Until that phase begins, keep existing strict freshness and existing required checks in force.
@@ -118,15 +139,17 @@ Phase C is complete only when protected-main readback proves the **capability co
 
 Only after the complete Phase-C capability is merged and read back from protected `main`:
 
-1. capture and positively read back the current protection/ruleset baseline with strict freshness still active;
+1. capture and positively read back the current protection/ruleset baseline with strict freshness still active, including the exact legacy required-context set;
 2. configure the protected-source required workflow in Evaluate/shadow mode where supported and verify source access;
-3. enable/require Merge Queue and activate the protected-source required workflow while **strict freshness remains enabled**;
-4. positively read back queue-required + bridge-required + strict-freshness-active state;
-5. enqueue one fresh/reopened real canary and prove the PR-admission leg followed by a distinct `merge_group` run on exact `I`;
-6. on that real event, prove event/server queue topology, exact `B/C/I` identities, the supported predecessor/prefix model, successful #111 issuer coordinates + durable envelope artifact, exact method-aware `tree(I)` reproduction, provider aggregate tests, and the required workflow result on `I`;
-7. verify the canary merge and protected-main readback;
-8. **only then** request strict-freshness disable and positively read back the complete final protected state.
+3. activate/require the protected dual-event workflow while **strict freshness and legacy required contexts remain enabled**, then prove/read back a successful PR-admission result;
+4. verify explicit coverage replacement for each legacy required context, then make every PR-only/non-`merge_group`-capable legacy context non-required while keeping the protected dual-event workflow required and strict freshness enabled;
+5. positively read back the pre-canary protection state: protected dual-event workflow required, strict freshness `true`, no incompatible legacy required context remains, and other protections unchanged;
+6. configure/enable/require Merge Queue with the intended topology/merge method while strict freshness remains enabled, then positively read back queue-required + bridge-required + strict-freshness-active state;
+7. enqueue one fresh/reopened real canary and prove the PR-admission leg followed by a distinct `merge_group` run on exact `I`;
+8. on that real event, prove event/server queue topology, exact `B/C/I` identities, the supported predecessor/prefix model, successful #111 issuer coordinates + durable envelope artifact, exact method-aware `tree(I)` reproduction, provider aggregate tests, and the required workflow result on `I`;
+9. verify the canary merge and protected-main readback;
+10. **only then** request strict-freshness disable and positively read back the complete final protected state.
 
-If the supported topology cannot be proven by the live canary, fail closed, keep/re-enable strict freshness, and do not widen the implementation by assumption. A two-entry/predecessor canary may be added later to widen supported topology, but unsupported live queue shapes remain blocked until explicitly modelled and proven.
+If any required-context replacement or pre-canary readback is failed, missing or ambiguous, do not enqueue the canary. Restore/retain the captured legacy protection while strict freshness remains active and stop fail-closed. If the supported topology cannot be proven by the live canary, fail closed, keep/re-enable strict freshness, and do not widen the implementation by assumption. A two-entry/predecessor canary may be added later to widen supported topology, but unsupported live queue shapes remain blocked until explicitly modelled and proven.
 
 Do not weaken protection to make the bridge easier to deploy.
