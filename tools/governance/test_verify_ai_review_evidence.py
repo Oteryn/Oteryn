@@ -88,6 +88,33 @@ def _reaction(*, login: str = "chatgpt-codex-connector[bot]",
     }
 
 
+def _p2_review(head: str, *, review_id: int = 701,
+               login: str = "chatgpt-codex-connector[bot]",
+               submitted_at: str = "2026-08-20T10:01:00Z") -> dict:
+    return {
+        "id": review_id,
+        "commit_id": head,
+        "state": "COMMENTED",
+        "body": "",
+        "submitted_at": submitted_at,
+        "user": {"login": login},
+        "pull_request_url": "https://api.github.com/repos/Oteryn/Test/pulls/7",
+    }
+
+
+def _p2_inline(review_id: int = 701, *, login: str = "chatgpt-codex-connector[bot]",
+               body: str = "[P2] Document the reusable permission contract") -> dict:
+    return {
+        "id": 702,
+        "pull_request_review_id": review_id,
+        "body": body,
+        "created_at": "2026-08-20T10:01:00Z",
+        "updated_at": "2026-08-20T10:01:00Z",
+        "user": {"login": login},
+        "pull_request_url": "https://api.github.com/repos/Oteryn/Test/pulls/7",
+    }
+
+
 def _verify_summary(*, summary_prefix: str | None = None,
                     completed: str = "2026-08-20T10:01:00Z",
                     trigger: str = "Manual request",
@@ -95,7 +122,8 @@ def _verify_summary(*, summary_prefix: str | None = None,
                     updated: str = "2026-08-20T10:01:02Z",
                     reactions: list[dict] | None = None,
                     request_updated: str | None = None,
-                    extra_reviews: list[dict] | None = None) -> dict:
+                    extra_reviews: list[dict] | None = None,
+                    review_comments: list[dict] | None = None) -> dict:
     repo, _, final = _v1.core_tests.make_repo()
     current = _v1.core_tests.issue_comment(
         10,
@@ -121,7 +149,7 @@ def _verify_summary(*, summary_prefix: str | None = None,
         pr_number=7,
         token="x",
         reviews=[_v1.core_tests.request_anchor(current, final), *(extra_reviews or [])],
-        review_comments=[],
+        review_comments=review_comments or [],
         pr_reactions=[_reaction()] if reactions is None else reactions,
     )
 
@@ -136,6 +164,112 @@ def test_current_codex_summary_requires_trusted_pr_reaction() -> None:
     _v1.core_tests.expect_fail(lambda: _verify_summary(reactions=[]))
     _v1.core_tests.expect_fail(
         lambda: _verify_summary(reactions=[_reaction(login="someone-else")])
+    )
+
+
+def test_current_codex_summary_accepts_exact_trusted_p2_without_reaction() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    found = _verify_summary(
+        reactions=[],
+        extra_reviews=[_p2_review(final)],
+        review_comments=[_p2_inline()],
+    )
+    assert found["review_source_kind"] == "issue_comment_result"
+
+
+def test_current_codex_summary_rejects_p2_from_wrong_head() -> None:
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary(
+            reactions=[],
+            extra_reviews=[_p2_review("f" * 40)],
+            review_comments=[_p2_inline()],
+        )
+    )
+
+
+def test_current_codex_summary_rejects_p2_from_untrusted_reviewer() -> None:
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary(
+            reactions=[],
+            extra_reviews=[_p2_review("a" * 40, login="untrusted-bot")],
+            review_comments=[_p2_inline(login="untrusted-bot")],
+        )
+    )
+
+
+def test_current_codex_summary_rejects_p2_without_inline_finding() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary(reactions=[], extra_reviews=[_p2_review(final)])
+    )
+
+
+def test_current_codex_summary_preserves_p1_blocking_with_p2_completion() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary(
+            reactions=[],
+            extra_reviews=[_p2_review(final)],
+            review_comments=[
+                _p2_inline(),
+                _p2_inline(review_id=701, body="[P1] Security boundary bypass"),
+            ],
+        )
+    )
+
+
+def test_current_codex_summary_rejects_p2_submitted_after_completion() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary(
+            reactions=[],
+            extra_reviews=[_p2_review(final, submitted_at="2026-08-20T10:01:01Z")],
+            review_comments=[_p2_inline()],
+        )
+    )
+
+
+def test_current_codex_summary_rejects_ambiguous_exact_p2_reviews() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary(
+            reactions=[],
+            extra_reviews=[_p2_review(final), _p2_review(final, review_id=703)],
+            review_comments=[_p2_inline()],
+        )
+    )
+
+
+def test_current_codex_summary_rejects_p2_with_ambiguous_trusted_reactions() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary(
+            reactions=[_reaction(reaction_id=1), _reaction(reaction_id=2)],
+            extra_reviews=[_p2_review(final)],
+            review_comments=[_p2_inline()],
+        )
+    )
+
+
+def test_current_codex_summary_rejects_fractional_p2_review_identity() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary(
+            reactions=[],
+            extra_reviews=[_p2_review(final)],
+            review_comments=[_p2_inline(review_id=701.9)],
+        )
+    )
+
+
+def test_current_codex_summary_rejects_fractional_p2_parent_review_identity() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary(
+            reactions=[],
+            extra_reviews=[_p2_review(final, review_id=701.9)],
+            review_comments=[_p2_inline()],
+        )
     )
 
 

@@ -36,6 +36,10 @@ _CODEX_SUMMARY_ROW = re.compile(
 _REVIEWED_COMMIT_LINE = re.compile(
     r'^\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`$', re.MULTILINE
 )
+_P2_FINDING_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?"
+    r"(?:\[P2\]|P2\b|(?:<sub>){1,2}!\[P2 Badge\])"
+)
 
 
 def _compat_parse_clean_result(body: str) -> str | None:
@@ -91,6 +95,10 @@ def _utc_timestamp(raw: object) -> datetime | None:
     if parsed.tzinfo is None:
         return None
     return parsed.astimezone(timezone.utc)
+
+
+def _strict_positive_int(raw: object) -> int | None:
+    return raw if type(raw) is int and raw > 0 else None
 
 
 def _parse_completed_summary(body: str) -> tuple[datetime, str] | None:
@@ -203,10 +211,65 @@ def _same_generation_clean_echoes(
     return echoes
 
 
+def _trusted_nonblocking_p2_time(
+    *, reviews: list[dict], review_comments: list[dict], trusted_logins: set[str],
+    reviewed_head: str, repository: str, pr_number: int, request_at: datetime,
+    completed_at: datetime,
+) -> datetime | None:
+    """Return the unique exact-head trusted P2 review timestamp, or no evidence."""
+    pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
+    candidates: dict[int, datetime] = {}
+    for review in reviews:
+        login = str((review.get("user") or {}).get("login", "")).casefold()
+        if (
+            login not in trusted_logins
+            or review.get("pull_request_url") != pull_url
+            or review.get("commit_id") != reviewed_head
+            or review.get("state") != "COMMENTED"
+        ):
+            continue
+        review_id = _strict_positive_int(review.get("id"))
+        if review_id is None:
+            raise RuntimeError("trusted P2 review identity is malformed")
+        submitted_at = _utc_timestamp(review.get("submitted_at"))
+        if submitted_at is None:
+            raise RuntimeError("trusted P2 review timestamp is malformed")
+        if request_at < submitted_at <= completed_at:
+            candidates[review_id] = submitted_at
+
+    p2_review_ids: set[int] = set()
+    for comment in review_comments:
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        if login not in trusted_logins or comment.get("pull_request_url") != pull_url:
+            continue
+        review_id = _strict_positive_int(comment.get("pull_request_review_id"))
+        if review_id is None:
+            if _P2_FINDING_RE.search(str(comment.get("body") or "")):
+                raise RuntimeError("trusted P2 inline finding identity is malformed")
+            continue
+        if review_id not in candidates:
+            continue
+        created_at = _utc_timestamp(comment.get("created_at"))
+        updated_at = _utc_timestamp(comment.get("updated_at"))
+        if (
+            created_at is None
+            or updated_at != created_at
+            or not (request_at < created_at <= completed_at)
+        ):
+            raise RuntimeError("trusted P2 inline finding metadata is malformed")
+        if _P2_FINDING_RE.search(str(comment.get("body") or "")):
+            p2_review_ids.add(review_id)
+
+    if len(candidates) != 1 or len(p2_review_ids) != 1:
+        return None
+    review_id = next(iter(p2_review_ids))
+    return candidates[review_id]
+
+
 def _normalize_current_codex_summary(
     comments: list[dict], *, pr_reactions: list[dict], policy: dict,
     repo_root: str | Path, tier: str, fingerprint: str, head: str,
-    repository: str, pr_number: int, reviews: list[dict],
+    repository: str, pr_number: int, reviews: list[dict], review_comments: list[dict],
 ) -> list[dict]:
     configured_logins = {
         str(login).casefold()
@@ -279,24 +342,42 @@ def _normalize_current_codex_summary(
             and reaction_at > request_at
         ):
             matching_reactions.append(reaction)
-    if len(matching_reactions) != 1:
-        raise RuntimeError("current Codex summary requires exactly one trusted post-completion PR reaction")
-    reaction_at_raw = str(matching_reactions[0].get("created_at") or "")
-    reaction_at = _utc_timestamp(reaction_at_raw)
-    if reaction_at is None:
-        raise RuntimeError("trusted Codex reaction timestamp is malformed")
-
-    redundant_echoes = _same_generation_clean_echoes(
-        comments,
-        summary=summary,
-        trusted_logins=trusted_logins,
-        repo_root=repo_root,
-        reviewed_head=reviewed_head,
-        request_at=request_at,
-        reaction_at=reaction_at,
-        repository=repository,
-        pr_number=pr_number,
-    )
+    if len(matching_reactions) > 1:
+        raise RuntimeError("current Codex summary has ambiguous trusted post-completion PR reactions")
+    if len(matching_reactions) == 1:
+        reaction_at_raw = str(matching_reactions[0].get("created_at") or "")
+        reaction_at = _utc_timestamp(reaction_at_raw)
+        if reaction_at is None:
+            raise RuntimeError("trusted Codex reaction timestamp is malformed")
+        redundant_echoes = _same_generation_clean_echoes(
+            comments,
+            summary=summary,
+            trusted_logins=trusted_logins,
+            repo_root=repo_root,
+            reviewed_head=reviewed_head,
+            request_at=request_at,
+            reaction_at=reaction_at,
+            repository=repository,
+            pr_number=pr_number,
+        )
+    else:
+        p2_at = _trusted_nonblocking_p2_time(
+            reviews=reviews,
+            review_comments=review_comments,
+            trusted_logins=trusted_logins,
+            reviewed_head=reviewed_head,
+            repository=repository,
+            pr_number=pr_number,
+            request_at=request_at,
+            completed_at=completed_at,
+        )
+        if p2_at is None:
+            raise RuntimeError(
+                "current Codex summary requires one trusted post-completion PR reaction "
+                "or one exact trusted P2 review"
+            )
+        reaction_at_raw = p2_at.isoformat().replace("+00:00", "Z")
+        redundant_echoes = []
 
     synthetic = deepcopy(summary)
     synthetic["body"] = (
@@ -331,6 +412,7 @@ def _compat_verify_records_v3(comments: list[dict], **kwargs) -> dict:
             repository=kwargs["repository"],
             pr_number=kwargs["pr_number"],
             reviews=kwargs.get("reviews") or [],
+            review_comments=kwargs.get("review_comments") or [],
         )
     return _compat_verify_records_v2(comments, **kwargs)
 
