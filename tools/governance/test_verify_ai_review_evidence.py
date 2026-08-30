@@ -227,6 +227,59 @@ def test_current_codex_summary_preserves_blocking_finding_in_summary_body() -> N
     )
 
 
+def test_current_codex_summary_reuses_review_after_clean_merge_up_with_duplicate_echo() -> None:
+    repo, reviewed, _ = _v1.core_tests.make_repo()
+    _v1.core_tests.git(repo, "reset", "--hard", reviewed)
+    _v1.core_tests.git(repo, "checkout", "-b", "task-summary-reuse")
+    _v1.core_tests.git(repo, "checkout", "master")
+    upstream = repo / "upstream.py"
+    upstream.write_text("VALUE = 1\n", encoding="utf-8")
+    _v1.core_tests.git(repo, "add", ".")
+    _v1.core_tests.git(repo, "commit", "-m", "independent upstream")
+    integration_base = _v1.core_tests.git(repo, "rev-parse", "HEAD")
+    _v1.core_tests.git(repo, "checkout", "task-summary-reuse")
+    _v1.core_tests.git(repo, "merge", "--no-ff", "master", "-m", "merge current main")
+    final = _v1.core_tests.git(repo, "rev-parse", "HEAD")
+
+    request = _v1.core_tests.issue_comment(
+        10, _v1.core_tests.request_body(reviewed), stamp="2026-08-20T10:00:00Z",
+    )
+    summary = _summary_comment(reviewed[:10])
+    echo = _v1.core_tests.codex_result(
+        12,
+        reviewed[:10],
+        stamp="2026-08-20T10:00:59Z",
+        text=(
+            "Codex Review: Didn't find any major issues. Delightful!\n\n"
+            f"**Reviewed commit:** `{reviewed[:10]}`\n\n"
+            "<details> <summary>ℹ️ About Codex in GitHub</summary>\n"
+            "standard Codex review wrapper\n"
+            "</details>"
+        ),
+    )
+    echo["performed_via_github_app"] = {"slug": "chatgpt-codex-connector"}
+    policy = dict(_v1.POLICY)
+    policy["activation"] = dict(_v1.POLICY["activation"])
+    policy["_trusted_integration_base_sha"] = integration_base
+
+    found = _v1.m.verify_records(
+        [request, summary, echo],
+        policy=policy,
+        repo_root=repo,
+        tier="R2",
+        fingerprint=_v1.core_tests.ISSUE_FP,
+        head=final,
+        repository="Oteryn/Test",
+        pr_number=7,
+        token="x",
+        reviews=[_v1.core_tests.request_anchor(request, reviewed)],
+        review_comments=[],
+        pr_reactions=[_reaction()],
+    )
+    assert found["reviewed_head"] == reviewed
+    assert found["review_source_commit_id"] == reviewed
+
+
 def main() -> int:
     inherited = [
         value for name, value in sorted(vars(_v1).items())
