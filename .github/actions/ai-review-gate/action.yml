@@ -21,8 +21,8 @@ inputs:
     required: true
   github-token:
     description: >-
-      Caller token contract: contents:read, actions:read, checks:read, issues:read,
-      and pull-requests:read. Provider wrappers must grant all five read scopes and
+      Caller token contract: contents: read, actions: read, checks: read, issues: read,
+      and pull-requests: read. Provider wrappers must grant all five read scopes and
       must not broaden them merely to consume this action.
     required: true
 outputs:
