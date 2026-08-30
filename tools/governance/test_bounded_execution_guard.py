@@ -251,13 +251,15 @@ class DecisionTests(unittest.TestCase):
         self.assertFalse(result.allowed)
         self.assertNotEqual(result.state, "DONE")
 
-        verified = snapshot(
+        previous = snapshot(
             state="READY",
             phase="final_qualification",
             candidate_frozen=True,
-            completion_verified=True,
+            completion_verified=False,
         )
-        result = decide(None, verified, "complete", POLICY)
+        verified = copy.deepcopy(previous)
+        verified["completion_verified"] = True
+        result = decide(previous, verified, "complete", POLICY)
         self.assertTrue(result.allowed)
         self.assertEqual(result.state, "DONE")
 
