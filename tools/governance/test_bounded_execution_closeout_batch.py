@@ -155,6 +155,22 @@ class FreezeAdmissionTests(unittest.TestCase):
         self.assertFalse(result.allowed)
         self.assertIn("frozen", result.reason.lower())
 
+    def test_loop_audit_phase_cannot_admit_final_qualification_before_freeze(self):
+        previous = snapshot(
+            phase="LOOP_BREAKER_AUDIT",
+            late_material_findings=2,
+            audited_late_material_findings=2,
+            candidate_frozen=False,
+            final_qualification_runs_since_audit=0,
+        )
+        current = copy.deepcopy(previous)
+        current["final_qualification_runs_since_audit"] = 1
+
+        result = decide(previous, current, "enter_final_qualification", POLICY)
+
+        self.assertFalse(result.allowed)
+        self.assertIn("frozen", result.reason.lower())
+
     def test_post_admission_final_review_requires_candidate_to_remain_frozen(self):
         previous = snapshot(
             phase="LOOP_BREAKER_AUDIT",
@@ -666,6 +682,24 @@ class ActionCounterConsumptionTests(unittest.TestCase):
         result = decide(None, current, "request_external_review", POLICY)
         self.assertFalse(result.allowed)
         self.assertIn("previous", result.reason.lower())
+
+
+class ReleasedStateTransitionTests(unittest.TestCase):
+    def test_waiting_external_cannot_resume_operational_work_without_material_progress(self):
+        previous = snapshot(
+            state="WAITING_EXTERNAL",
+            blocking_dependency="",
+            dependency_kind="",
+        )
+        current = copy.deepcopy(previous)
+        current["state"] = "RUNNING"
+
+        result = decide(previous, current, "mutate", POLICY)
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "WAITING_EXTERNAL")
+        self.assertTrue(result.release_session)
+        self.assertIn("material progress", result.reason.lower())
 
 
 class WaitingStateTests(unittest.TestCase):

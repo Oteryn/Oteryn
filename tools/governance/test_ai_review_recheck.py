@@ -167,6 +167,59 @@ class EventTests(unittest.TestCase):
         self.assertEqual(client.get_pr_calls, [PR_NUMBER, PR_NUMBER])
         self.assertEqual(client.list_gate_run_calls, [(HEAD, BASE, PR_NUMBER)])
 
+    def test_trusted_review_waits_boundedly_for_matching_attempt_one_to_finish(self):
+        class SequencedClient(FakeClient):
+            def __init__(self):
+                super().__init__(runs=[])
+                self.batches = [
+                    [run_payload(456, status="in_progress", conclusion=None)],
+                    [run_payload(456, status="completed", conclusion="failure")],
+                ]
+
+            def list_gate_runs(self, head_sha, base_sha, pr_number):
+                self.list_gate_run_calls.append((head_sha, base_sha, pr_number))
+                index = min(len(self.list_gate_run_calls) - 1, len(self.batches) - 1)
+                return list(self.batches[index])
+
+        sleeps = []
+        client = SequencedClient()
+        result = process_event(
+            "pull_request_review",
+            review_event(),
+            REPOSITORY,
+            POLICY,
+            client,
+            sleep_fn=sleeps.append,
+        )
+
+        self.assertEqual(result.action, "RERUN")
+        self.assertEqual(result.run_id, 456)
+        self.assertEqual(client.rerun_calls, [456])
+        self.assertEqual(len(client.list_gate_run_calls), 2)
+        self.assertEqual(len(sleeps), 1)
+        self.assertGreater(sleeps[0], 0)
+
+    def test_matching_in_progress_gate_wait_is_bounded_and_never_reruns_early(self):
+        client = FakeClient(
+            runs=[run_payload(789, status="in_progress", conclusion=None)]
+        )
+        sleeps = []
+
+        result = process_event(
+            "pull_request_review",
+            review_event(),
+            REPOSITORY,
+            POLICY,
+            client,
+            sleep_fn=sleeps.append,
+        )
+
+        self.assertEqual(result.action, "NOOP_GATE_STILL_RUNNING")
+        self.assertEqual(client.rerun_calls, [])
+        self.assertEqual(len(client.list_gate_run_calls), 12)
+        self.assertEqual(len(sleeps), 11)
+        self.assertTrue(all(delay == 5.0 for delay in sleeps))
+
     def test_stale_review_commit_does_not_rerun_current_head(self):
         client = FakeClient(runs=[run_payload(123)])
         result = process_event(
