@@ -956,6 +956,7 @@ def verify_live_review_evidence(
         token=token,
         reviews=_v1._core.fetch_reviews(repository, pr_number, token),
         review_comments=_v1._core.fetch_review_comments(repository, pr_number, token),
+        review_threads=fetch_review_threads(repository, pr_number, token),
         pr_reactions=fetch_pr_reactions(repository, pr_number, token),
     )
 

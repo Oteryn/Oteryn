@@ -46,6 +46,7 @@ class PendingReservation:
     next_checkpoint: str
     action: str
     scope: tuple[str, ...]
+    dispatch_generation: int
 
 
 class CheckpointOutboxAdapter(Protocol):
@@ -83,7 +84,9 @@ class CheckpointOutboxAdapter(Protocol):
 
     def claim_dispatch(self, reservation_key: str) -> bool: ...
 
-    def acknowledge_dispatch(self, reservation_key: str) -> bool: ...
+    def acknowledge_dispatch(
+        self, reservation_key: str, dispatch_generation: int | None = None
+    ) -> bool: ...
 
 
 def _canonical_snapshot(snapshot: dict[str, Any]) -> str:
@@ -216,6 +219,7 @@ class SqliteCheckpointOutbox:
                     sequence_no INTEGER,
                     acknowledged INTEGER NOT NULL DEFAULT 0,
                     invalidated INTEGER NOT NULL DEFAULT 0,
+                    dispatch_generation INTEGER NOT NULL DEFAULT 0,
                     status TEXT NOT NULL CHECK (status IN ('committed', 'dispatched'))
                 )
                 """
@@ -233,6 +237,7 @@ class SqliteCheckpointOutbox:
                 ("sequence_no", "INTEGER"),
                 ("acknowledged", "INTEGER NOT NULL DEFAULT 0"),
                 ("invalidated", "INTEGER NOT NULL DEFAULT 0"),
+                ("dispatch_generation", "INTEGER NOT NULL DEFAULT 0"),
             ):
                 if column not in outbox_columns:
                     connection.execute(
@@ -530,7 +535,7 @@ class SqliteCheckpointOutbox:
                 row = connection.execute(
                     """
                     SELECT reservation_key, expected_checkpoint, next_checkpoint,
-                           action, scope_json, sequence_no
+                           action, scope_json, sequence_no, dispatch_generation
                     FROM bounded_execution_outbox
                     WHERE repository = ? AND task_id = ? AND status = 'committed'
                       AND COALESCE(invalidated, 0) = 0
@@ -551,6 +556,7 @@ class SqliteCheckpointOutbox:
                     action,
                     scope_json,
                     sequence_no,
+                    dispatch_generation,
                 ) = row
                 if (
                     not isinstance(reservation_key, str)
@@ -566,6 +572,9 @@ class SqliteCheckpointOutbox:
                     or not isinstance(sequence_no, int)
                     or isinstance(sequence_no, bool)
                     or sequence_no < 1
+                    or not isinstance(dispatch_generation, int)
+                    or isinstance(dispatch_generation, bool)
+                    or dispatch_generation < 0
                 ):
                     raise ValueError(
                         "pending reservation metadata is unavailable or malformed"
@@ -585,7 +594,8 @@ class SqliteCheckpointOutbox:
                 updated = connection.execute(
                     """
                     UPDATE bounded_execution_outbox
-                    SET status = 'dispatched'
+                    SET status = 'dispatched',
+                        dispatch_generation = dispatch_generation + 1
                     WHERE reservation_key = ? AND status = 'committed'
                       AND COALESCE(invalidated, 0) = 0
                     """,
@@ -602,6 +612,7 @@ class SqliteCheckpointOutbox:
                     next_checkpoint=next_checkpoint,
                     action=action,
                     scope=scope,
+                    dispatch_generation=dispatch_generation + 1,
                 )
             except Exception:
                 if connection.in_transaction:
@@ -615,7 +626,8 @@ class SqliteCheckpointOutbox:
             updated = connection.execute(
                 """
                 UPDATE bounded_execution_outbox
-                SET status = 'dispatched'
+                SET status = 'dispatched',
+                    dispatch_generation = dispatch_generation + 1
                 WHERE reservation_key = ? AND status = 'committed'
                   AND COALESCE(invalidated, 0) = 0
                 """,
@@ -623,8 +635,103 @@ class SqliteCheckpointOutbox:
             )
         return updated.rowcount == 1
 
-    def acknowledge_dispatch(self, reservation_key: str) -> bool:
+    def load_inflight_dispatch(
+        self, repository: str, task_id: str
+    ) -> PendingReservation | None:
+        """Load the one exact unacknowledged claim for authoritative reconciliation."""
+
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT reservation_key, expected_checkpoint, next_checkpoint,
+                       action, scope_json, sequence_no, dispatch_generation
+                FROM bounded_execution_outbox
+                WHERE repository = ? AND task_id = ? AND status = 'dispatched'
+                  AND COALESCE(acknowledged, 0) = 0
+                  AND COALESCE(invalidated, 0) = 0
+                ORDER BY sequence_no ASC, reservation_key ASC
+                """,
+                (repository, task_id),
+            ).fetchall()
+        if not rows:
+            return None
+        if len(rows) != 1:
+            raise ValueError("multiple in-flight reservations violate task serialization")
+        (
+            reservation_key,
+            expected_checkpoint,
+            next_checkpoint,
+            action,
+            scope_json,
+            sequence_no,
+            dispatch_generation,
+        ) = rows[0]
+        if (
+            not isinstance(reservation_key, str)
+            or not reservation_key
+            or (expected_checkpoint is not None and not isinstance(expected_checkpoint, str))
+            or not isinstance(next_checkpoint, str)
+            or not next_checkpoint
+            or not isinstance(action, str)
+            or not action
+            or not isinstance(sequence_no, int)
+            or isinstance(sequence_no, bool)
+            or sequence_no < 1
+            or not isinstance(dispatch_generation, int)
+            or isinstance(dispatch_generation, bool)
+            or dispatch_generation < 1
+        ):
+            raise ValueError("in-flight reservation metadata is unavailable or malformed")
+        scope = _parse_scope_json(scope_json)
+        expected_key = _reservation_key(
+            repository, task_id, expected_checkpoint, next_checkpoint, action, scope
+        )
+        if reservation_key != expected_key:
+            raise ValueError("in-flight reservation key integrity check failed")
+        return PendingReservation(
+            reservation_key=reservation_key,
+            repository=repository,
+            task_id=task_id,
+            expected_checkpoint=expected_checkpoint,
+            next_checkpoint=next_checkpoint,
+            action=action,
+            scope=scope,
+            dispatch_generation=dispatch_generation,
+        )
+
+    def requeue_unacknowledged_dispatch(
+        self, reservation_key: str, dispatch_generation: int
+    ) -> bool:
+        """Explicitly requeue an exact claim after authoritative worker-loss proof."""
+
+        if (
+            not isinstance(dispatch_generation, int)
+            or isinstance(dispatch_generation, bool)
+            or dispatch_generation < 1
+        ):
+            return False
+        with closing(self._connect()) as connection:
+            updated = connection.execute(
+                """
+                UPDATE bounded_execution_outbox
+                SET status = 'committed'
+                WHERE reservation_key = ? AND dispatch_generation = ?
+                  AND status = 'dispatched'
+                  AND COALESCE(acknowledged, 0) = 0
+                  AND COALESCE(invalidated, 0) = 0
+                """,
+                (reservation_key, dispatch_generation),
+            )
+        return updated.rowcount == 1
+
+    def acknowledge_dispatch(
+        self, reservation_key: str, dispatch_generation: int | None = None
+    ) -> bool:
         """Acknowledge completion so the task may reserve its next action."""
+
+        generation = 1 if dispatch_generation is None else dispatch_generation
+        if not isinstance(generation, int) or isinstance(generation, bool) or generation < 1:
+            return False
 
         with closing(self._connect()) as connection:
             updated = connection.execute(
@@ -632,9 +739,11 @@ class SqliteCheckpointOutbox:
                 UPDATE bounded_execution_outbox
                 SET acknowledged = 1
                 WHERE reservation_key = ?
+                  AND dispatch_generation = ?
                   AND status = 'dispatched'
                   AND COALESCE(acknowledged, 0) = 0
+                  AND COALESCE(invalidated, 0) = 0
                 """,
-                (reservation_key,),
+                (reservation_key, generation),
             )
         return updated.rowcount == 1
