@@ -128,10 +128,10 @@ def _parse_completed_summary(body: str) -> tuple[datetime, str] | None:
     return completed, match.group(2)
 
 
-def _eligible_summary_anchor(
+def _matching_eligible_anchors(
     *, policy: dict, repo_root: str | Path, tier: str, fingerprint: str,
     head: str, repository: str, pr_number: int, reviews: list[dict],
-) -> tuple[dict, dict[str, str]]:
+) -> list[tuple[dict, dict[str, str]]]:
     required_class = policy["review_tiers"][tier]["reviewer_class"]
     allowed_classes = {required_class} if required_class == "deep" else {"fast", "deep"}
     matches: list[tuple[dict, dict[str, str]]] = []
@@ -153,9 +153,35 @@ def _eligible_summary_anchor(
             and _v1._core.reviewer_allowed(policy, reviewer_class, reviewer_id)
         ):
             matches.append((review, anchor))
+    return matches
+
+
+def _eligible_summary_anchor(
+    *, policy: dict, repo_root: str | Path, tier: str, fingerprint: str,
+    head: str, repository: str, pr_number: int, reviews: list[dict],
+) -> tuple[dict, dict[str, str]]:
+    matches = _matching_eligible_anchors(
+        policy=policy, repo_root=repo_root, tier=tier, fingerprint=fingerprint,
+        head=head, repository=repository, pr_number=pr_number, reviews=reviews,
+    )
     if len(matches) != 1:
         raise RuntimeError("current Codex summary requires one eligible immutable request anchor")
     return matches[0]
+
+
+def _envelope_reviewed_heads(
+    *, policy: dict, repo_root: str | Path, tier: str, fingerprint: str,
+    head: str, repository: str, pr_number: int, reviews: list[dict],
+) -> tuple[str, ...]:
+    """Inspect both current PR head and the sole reusable anchored generation."""
+    matches = _matching_eligible_anchors(
+        policy=policy, repo_root=repo_root, tier=tier, fingerprint=fingerprint,
+        head=head, repository=repository, pr_number=pr_number, reviews=reviews,
+    )
+    if len(matches) > 1:
+        raise RuntimeError("review-evidence envelope has ambiguous eligible immutable request anchors")
+    anchored_head = matches[0][1]["REVIEWED_HEAD"] if matches else head
+    return tuple(dict.fromkeys((head, anchored_head)))
 
 
 def _parse_observed_duplicate_clean_echo(body: str) -> str | None:
@@ -659,15 +685,16 @@ def _normalize_current_codex_summary(
         and str((comment.get("user") or {}).get("login", "")).casefold() in configured_logins
     ]
     if not summary_candidates:
-        _reject_unenveloped_current_head_findings(
-            reviews=reviews,
-            review_comments=review_comments,
-            policy=policy,
-            comments=comments,
-            reviewed_head=head,
-            repository=repository,
-            pr_number=pr_number,
+        reviewed_heads = _envelope_reviewed_heads(
+            policy=policy, repo_root=repo_root, tier=tier, fingerprint=fingerprint,
+            head=head, repository=repository, pr_number=pr_number, reviews=reviews,
         )
+        for reviewed_head in reviewed_heads:
+            _reject_unenveloped_current_head_findings(
+                reviews=reviews, review_comments=review_comments, policy=policy,
+                comments=comments, reviewed_head=reviewed_head,
+                repository=repository, pr_number=pr_number,
+            )
         return comments, None
     if len(summary_candidates) != 1:
         raise RuntimeError("trusted Codex review summary is ambiguous")
@@ -715,6 +742,11 @@ def _normalize_current_codex_summary(
         raise RuntimeError("Codex summary completion does not follow the current request")
     if summary_updated_at is None or summary_updated_at < completed_at:
         raise RuntimeError("Codex summary update timestamp precedes completion")
+    if head != reviewed_head:
+        _reject_unenveloped_current_head_findings(
+            reviews=reviews, review_comments=review_comments, policy=policy,
+            comments=comments, reviewed_head=head, repository=repository, pr_number=pr_number,
+        )
 
     matching_reactions: list[dict] = []
     for reaction in pr_reactions:
@@ -798,15 +830,18 @@ def _compat_verify_records_v3(comments: list[dict], **kwargs) -> dict:
     tracker_issues = kwargs.pop("tracker_issues", None)
     accepted_follow_up: dict | None = None
     if pr_reactions is None:
-        _reject_unenveloped_current_head_findings(
+        reviewed_heads = _envelope_reviewed_heads(
+            policy=kwargs["policy"], repo_root=kwargs["repo_root"], tier=kwargs["tier"],
+            fingerprint=kwargs["fingerprint"], head=kwargs["head"],
+            repository=kwargs["repository"], pr_number=kwargs["pr_number"],
             reviews=kwargs.get("reviews") or [],
-            review_comments=kwargs.get("review_comments") or [],
-            policy=kwargs["policy"],
-            comments=comments,
-            reviewed_head=kwargs["head"],
-            repository=kwargs["repository"],
-            pr_number=kwargs["pr_number"],
         )
+        for reviewed_head in reviewed_heads:
+            _reject_unenveloped_current_head_findings(
+                reviews=kwargs.get("reviews") or [], review_comments=kwargs.get("review_comments") or [],
+                policy=kwargs["policy"], comments=comments, reviewed_head=reviewed_head,
+                repository=kwargs["repository"], pr_number=kwargs["pr_number"],
+            )
     else:
         if not isinstance(pr_reactions, list) or any(not isinstance(item, dict) for item in pr_reactions):
             raise RuntimeError("pull request reactions response is malformed")

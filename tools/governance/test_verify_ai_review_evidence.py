@@ -705,6 +705,7 @@ def _verify_summary_merge_reuse_with_echoes(
     *, echo_prefix: str | None = None, echo_stamp: str = "2026-08-20T10:00:59Z",
     echo_extra: str = "", echo_count: int = 1,
     echo_first_line: str = "Codex Review: Didn't find any major issues. Delightful!",
+    descendant_p2: bool = False,
 ) -> dict:
     repo, reviewed, _ = _v1.core_tests.make_repo()
     _v1.core_tests.git(repo, "reset", "--hard", reviewed)
@@ -752,15 +753,52 @@ def _verify_summary_merge_reuse_with_echoes(
         repository="Oteryn/Test",
         pr_number=7,
         token="x",
-        reviews=[_v1.core_tests.request_anchor(request, reviewed)],
-        review_comments=[],
+        reviews=[_v1.core_tests.request_anchor(request, reviewed), *(
+            [_p2_review(final)] if descendant_p2 else []
+        )],
+        review_comments=[_p2_inline()] if descendant_p2 else [],
         pr_reactions=[_reaction()],
     )
+
+
+def test_classic_clean_merge_up_rechecks_the_anchored_generation_for_p2() -> None:
+    repo, reviewed, _ = _v1.core_tests.make_repo()
+    _v1.core_tests.git(repo, "reset", "--hard", reviewed)
+    _v1.core_tests.git(repo, "checkout", "-b", "task-classic-reuse")
+    _v1.core_tests.git(repo, "checkout", "master")
+    (repo / "upstream.py").write_text("VALUE = 1\n", encoding="utf-8")
+    _v1.core_tests.git(repo, "add", ".")
+    _v1.core_tests.git(repo, "commit", "-m", "independent upstream")
+    integration_base = _v1.core_tests.git(repo, "rev-parse", "HEAD")
+    _v1.core_tests.git(repo, "checkout", "task-classic-reuse")
+    _v1.core_tests.git(repo, "merge", "--no-ff", "master", "-m", "merge current main")
+    final = _v1.core_tests.git(repo, "rev-parse", "HEAD")
+    request = _v1.core_tests.issue_comment(
+        10, _v1.core_tests.request_body(reviewed), stamp="2026-08-20T10:00:00Z",
+    )
+    result = _v1.core_tests.codex_result(11, reviewed[:10], stamp="2026-08-20T10:01:00Z")
+    policy = dict(_policy())
+    policy["activation"] = dict(policy["activation"])
+    policy["_trusted_integration_base_sha"] = integration_base
+    for finding_head in (reviewed, final):
+        _v1.core_tests.expect_fail(lambda finding_head=finding_head: _v1.m.verify_records(
+            [request, result], policy=policy, repo_root=repo, tier="R2",
+            fingerprint=_v1.core_tests.ISSUE_FP, head=final, repository="Oteryn/Test",
+            pr_number=7, token="x",
+            reviews=[_v1.core_tests.request_anchor(request, reviewed), _p2_review(finding_head)],
+            review_comments=[_p2_inline()],
+        ))
 
 
 def test_current_codex_summary_reuses_review_after_clean_merge_up_with_duplicate_echo() -> None:
     found = _verify_summary_merge_reuse_with_echoes()
     assert found["review_source_kind"] == "issue_comment_result"
+
+
+def test_current_codex_summary_reuse_rejects_descendant_p2() -> None:
+    _v1.core_tests.expect_fail(
+        lambda: _verify_summary_merge_reuse_with_echoes(descendant_p2=True)
+    )
 
 
 def test_current_codex_summary_does_not_suppress_wrong_head_clean_echo() -> None:
