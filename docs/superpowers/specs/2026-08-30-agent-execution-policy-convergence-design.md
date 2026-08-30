@@ -18,6 +18,14 @@ Argument matching is exact after removing only policy-declared non-semantic runt
 
 A host-exception packet declares `requested_remote_desktop_calls` as exact `{tool, arguments}` records. An undeclared call, changed command, extra semantic argument, malformed declaration or unknown tool fails closed. The existing always-forbidden tool set remains always forbidden.
 
+## Bounded autonomous execution
+
+The previously separate META stall-loop work from PR #73 is consolidated into this rollout instead of being restarted or discarded. Its executable state/guard implementation, workflow and regressions are preserved; bounded lifecycle authority is intentionally modularized into `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md` rather than expanding the already broad access/continuation contract.
+
+The bounded policy defines `RUNNING`, `READY`, `WAITING_EXTERNAL`, `BLOCKED`, `STALLED` and `DONE`, candidate freeze, material progress/failure fingerprints, bounded retry budgets and the no-op/retrigger mutation prohibition. Root `AGENTS.md` makes that policy and `docs/agents/EXECUTION_STATE_CONTRACT.json` mandatory for substantial autonomous work. `WAITING_EXTERNAL` releases the active worker and is never merge-ready or complete.
+
+This modularization preserves the anti-loop semantics while keeping capability/access policy separate from scheduling/no-progress state transitions. The META gate executes all imported #73 regressions on every candidate.
+
 ## Provider convergence and drift detection
 
 A deterministic provider-adoption validator rejects:
@@ -29,10 +37,10 @@ A deterministic provider-adoption validator rejects:
 
 META regression tests prove both stale and accepted provider text. After META becomes canonical, each provider updates only its root execution-routing section while preserving stricter provider-local safety/testing rules.
 
-Platform currently has active PR #1270 writing root `AGENTS.md`; this rollout must not create a concurrent second writer for that path. Platform convergence is reconciled through the existing branch/PR or a formally superseding path only after preserving its unrelated anti-loop work.
+Game PR #150, Platform PR #1270 and Atlas PR #182 already own their respective root `AGENTS.md` paths for the bounded-execution rollout. This convergence therefore updates those existing branches/PRs after META is canonical rather than creating competing writers. Their anti-loop additions are preserved and their dependency is retargeted from superseded META PR #73 to the merged convergence authority.
 
 ## Validation
 
-META requires RED/GREEN evidence for call binding and provider adoption, all existing routing regressions, full `meta-gate`, exact changed-file/diff review and required AI review according to the live risk classifier. Provider adoption requires repository-native exact-head CI/review gates and changed-file/diff review.
+META requires RED/GREEN evidence for call binding and provider adoption, all existing routing and bounded-execution regressions, full `meta-gate`, exact changed-file/diff review and required AI review according to the live risk classifier. Provider adoption requires repository-native exact-head CI/review gates and changed-file/diff review.
 
 No host, deployment, production, secret, ruleset or branch-protection mutation is part of this change.
