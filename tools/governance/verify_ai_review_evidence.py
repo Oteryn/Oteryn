@@ -33,6 +33,9 @@ _CODEX_SUMMARY_ROW = re.compile(
     r'<relative-time datetime="([^"]+)">[^<]*</relative-time> '
     r'\| `([0-9a-f]{7,40})` \| Manual request \|$'
 )
+_REVIEWED_COMMIT_LINE = re.compile(
+    r'^\*\*Reviewed commit:\*\* `([0-9a-f]{7,40})`$', re.MULTILINE
+)
 
 
 def _compat_parse_clean_result(body: str) -> str | None:
@@ -135,6 +138,48 @@ def _eligible_summary_anchor(
     return matches[0]
 
 
+def _same_generation_clean_echoes(
+    comments: list[dict], *, summary: dict, trusted_logins: set[str],
+    repo_root: str | Path, reviewed_head: str, request_at: datetime,
+    reaction_at: datetime, repository: str, pr_number: int,
+) -> list[dict]:
+    """Find at most one redundant clean-result echo superseded by summary+reaction."""
+    echoes: list[dict] = []
+    for comment in comments:
+        if comment is summary:
+            continue
+        login = str((comment.get("user") or {}).get("login", "")).casefold()
+        app_slug = str((comment.get("performed_via_github_app") or {}).get("slug", ""))
+        if (
+            login not in trusted_logins
+            or app_slug != _CODEX_SUMMARY_APP
+            or not _v1._core._issue_comment_identity(comment, repository, pr_number)
+        ):
+            continue
+        created_at = _utc_timestamp(comment.get("created_at"))
+        updated_at = _utc_timestamp(comment.get("updated_at"))
+        if created_at is None or updated_at is None or updated_at != created_at:
+            continue
+        if not (request_at < created_at <= reaction_at):
+            continue
+        body = str(comment.get("body") or "")
+        first_line = body.strip().splitlines()[0] if body.strip() else ""
+        if first_line != _CLEAN_PREFIX and not first_line.startswith(f"{_CLEAN_PREFIX} "):
+            continue
+        if _v1._core.BLOCKING_FINDING_RE.search(body):
+            raise RuntimeError("P0/P1 Codex finding exists in the same-generation clean echo")
+        matches = _REVIEWED_COMMIT_LINE.findall(body)
+        if len(matches) != 1:
+            continue
+        resolved = _v1._core.resolve_reviewed_prefix(repo_root, matches[0])
+        if resolved != reviewed_head:
+            continue
+        echoes.append(comment)
+    if len(echoes) > 1:
+        raise RuntimeError("same-generation Codex clean echo is ambiguous")
+    return echoes
+
+
 def _normalize_current_codex_summary(
     comments: list[dict], *, pr_reactions: list[dict], policy: dict,
     repo_root: str | Path, tier: str, fingerprint: str, head: str,
@@ -214,6 +259,21 @@ def _normalize_current_codex_summary(
     if len(matching_reactions) != 1:
         raise RuntimeError("current Codex summary requires exactly one trusted post-completion PR reaction")
     reaction_at_raw = str(matching_reactions[0].get("created_at") or "")
+    reaction_at = _utc_timestamp(reaction_at_raw)
+    if reaction_at is None:
+        raise RuntimeError("trusted Codex reaction timestamp is malformed")
+
+    redundant_echoes = _same_generation_clean_echoes(
+        comments,
+        summary=summary,
+        trusted_logins=trusted_logins,
+        repo_root=repo_root,
+        reviewed_head=reviewed_head,
+        request_at=request_at,
+        reaction_at=reaction_at,
+        repository=repository,
+        pr_number=pr_number,
+    )
 
     synthetic = deepcopy(summary)
     synthetic["body"] = (
@@ -223,7 +283,12 @@ def _normalize_current_codex_summary(
     synthetic["created_at"] = reaction_at_raw
     synthetic["updated_at"] = reaction_at_raw
 
-    return [synthetic if comment is summary else comment for comment in comments]
+    redundant_ids = {id(comment) for comment in redundant_echoes}
+    return [
+        synthetic if comment is summary else comment
+        for comment in comments
+        if id(comment) not in redundant_ids
+    ]
 
 
 def _compat_verify_records_v3(comments: list[dict], **kwargs) -> dict:
