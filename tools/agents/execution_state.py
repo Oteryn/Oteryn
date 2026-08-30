@@ -76,6 +76,7 @@ def validate_checkpoint(
     if not isinstance(candidate_head, str) or (candidate_head and not SHA_RE.fullmatch(candidate_head)):
         errors.append("candidate_head_sha must be empty or a lowercase 40-hex SHA")
 
+    failure_fingerprint = checkpoint.get("failure_fingerprint")
     for key in ("progress_fingerprint", "failure_fingerprint"):
         value = checkpoint.get(key)
         if not isinstance(value, str) or (value and not FP_RE.fullmatch(value)):
@@ -109,7 +110,12 @@ def validate_checkpoint(
     retry_limit = checkpoint.get("retry_limit")
     identical_cycle_count = checkpoint.get("identical_cycle_count")
     if all(_non_negative_int(value) for value in (retry_count, retry_limit, identical_cycle_count)):
-        exhausted = retry_count > retry_limit or (
+        recorded_failure_without_retry = (
+            isinstance(failure_fingerprint, str)
+            and bool(failure_fingerprint)
+            and retry_limit == 0
+        )
+        exhausted = recorded_failure_without_retry or retry_count > retry_limit or (
             identical_cycle_count >= 2 and retry_count >= retry_limit
         )
         if exhausted and status not in set(contract["transition_rules"]["retry_exhaustion_terminal_states"]):
