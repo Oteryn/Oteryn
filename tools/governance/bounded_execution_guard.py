@@ -695,6 +695,10 @@ def _validate_history(
                 "refreeze requires a changed trusted review risk binding, not a SHA-only move"
             )
 
+    ledger_certified = not _ledger_terminal(previous, policy) and _ledger_terminal(current, policy)
+    if ledger_certified and action != "record_loop_breaker_audit":
+        raise GuardError("terminal risk-ledger certification may occur only through record_loop_breaker_audit")
+
     audit_advanced = (
         current["audited_late_material_findings"] > previous["audited_late_material_findings"]
         or current["audited_post_freeze_material_head_changes"] > previous["audited_post_freeze_material_head_changes"]
