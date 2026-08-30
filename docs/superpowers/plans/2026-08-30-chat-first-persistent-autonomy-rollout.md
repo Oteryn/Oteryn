@@ -217,6 +217,8 @@ Build one valid baseline snapshot containing at least these always-required chec
     "task_id": "Oteryn/Oteryn#108",
     "task_branch": "governance/example",
     "task_head_sha": "0123456789abcdef0123456789abcdef01234567",
+    "pr_applicable": True,
+    "pr_id": "110",
     "phase": "qualification",
     "bounded_lifecycle_state": "RUNNING",
     "last_material_progress": "focused tests green",
@@ -230,7 +232,7 @@ Build one valid baseline snapshot containing at least these always-required chec
 }
 ```
 
-Parameterize deletion of every always-required field and assert `validate_continuation_snapshot(...)` rejects the snapshot. Also reject an invalid/non-40-hex `task_head_sha`, empty or non-string `next_action`, multiple next actions encoded as a list, non-list `completed_material_work`/`validation_evidence_refs`/`blockers`, and a missing `pr_id` when the snapshot declares `pr_applicable=true`. Conditionally required evidence such as first material failure, rejected hypotheses, bounded retry/evidence-generation state and context-pressure classification must be required when the corresponding condition/fact says that semantic applies; the validator must not require fabricated values when it does not apply.
+Parameterize deletion of every always-required field, including `pr_applicable`, and assert `validate_continuation_snapshot(...)` rejects the snapshot. Require `pr_applicable` to be a real boolean in every snapshot. When `pr_applicable=true`, require a non-empty canonical `pr_id`; when `pr_applicable=false`, `pr_id` is not required and must not be fabricated. Also reject an invalid/non-40-hex `task_head_sha`, empty or non-string `next_action`, multiple next actions encoded as a list, non-list `completed_material_work`/`validation_evidence_refs`/`blockers`, and a missing/empty `pr_id` when `pr_applicable=true`. Conditionally required evidence such as first material failure, rejected hypotheses, bounded retry/evidence-generation state and context-pressure classification must be required when the corresponding condition/fact says that semantic applies; the validator must not require fabricated values when it does not apply.
 
 - [ ] **Step 6: Add task-lifetime separation tests**
 
@@ -592,22 +594,23 @@ Record exact merged `main` and verify required Atlas gates.
 
 - [ ] **Step 1: Write RED live-audit fixtures**
 
-Add provider fixtures that fail for:
+Add continuation-owned provider fixtures that fail for:
 
 ```text
-- stale #72/#73 canonical dependency;
-- stale parallel-first / serial-exception requirement where current META is effort-aware;
+- stale #72/#73 canonical dependency in the continuation-adoption reference;
 - provider statement that a local foreground/session/command/context limit terminates the whole task;
 - provider statement that owner_reinvoke is automatic continuation;
 - provider statement that same_session or github_native alone qualifies rotate_resumable;
 - provider missing the protected META continuation policy reference/version after adoption.
 ```
 
+Execution-routing/provider-policy drift such as stale `parallel-first` / serial-exception requirements remains owned by `#104/#107`; do **not** add a duplicate Task 8 RED fixture for that behavior. Run the existing `#107` provider-drift tests only as regression coverage so this task proves coexistence without absorbing that authority.
+
 Do not attempt to persist ephemeral per-task provider write authorization in desired-state policy; authorization must instead be verified at the provider mutation boundary by the executing task. Do not flag an explicitly owner-excluded provider for missing continuation adoption; verify the durable scope-reduction record instead.
 
 - [ ] **Step 2: Prove RED**
 
-Run the focused live-audit regression suite. Expected new drift cases fail before implementation.
+Run the focused continuation-owned live-audit regression suite. Expected new continuation drift cases fail before implementation. Existing `#107` execution-policy drift tests are regression-only here and are expected to retain their current canonical behavior rather than become new RED cases for `#108`.
 
 - [ ] **Step 3: Implement exact structured drift checks**
 
@@ -615,7 +618,7 @@ Prefer machine policy references/versions and bounded explicit markers. Do not c
 
 - [ ] **Step 4: Run full applicable META governance tests**
 
-Require continuation tests, existing execution-routing/provider-adoption tests, bounded-execution tests, and live-audit regressions to pass together.
+Require continuation tests, existing `#107` execution-routing/provider-drift regressions, bounded-execution tests, and live-audit regressions to pass together. Passing another lifecycle's regression suite confirms non-regression only; it does not transfer its ownership into `#108`.
 
 - [ ] **Step 5: Qualify and merge drift enforcement**
 
