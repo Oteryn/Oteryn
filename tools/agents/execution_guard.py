@@ -109,8 +109,12 @@ def evaluate_snapshot(snapshot: dict[str, Any]) -> dict[str, str]:
         and snapshot["retry_count"] >= snapshot["retry_limit"]
     ):
         decision, state, reason = "STALL", "STALLED", "identical material state exceeded bounded retry budget"
-    elif snapshot["retry_count"] >= snapshot["retry_limit"] and snapshot["retry_limit"] == 0:
-        decision, state, reason = "STALL", "STALLED", "no retry is permitted for this unchanged failure"
+    elif (
+        snapshot["failure_code"]
+        and snapshot["retry_count"] >= snapshot["retry_limit"]
+        and snapshot["retry_limit"] == 0
+    ):
+        decision, state, reason = "STALL", "STALLED", "no retry is permitted for this failure"
     else:
         decision, state, reason = "CONTINUE", "RUNNING", "bounded execution may continue"
 
