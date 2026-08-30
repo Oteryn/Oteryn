@@ -4,7 +4,7 @@ on:
   pull_request_review:
     types: [submitted]
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
 permissions:
   actions: write
@@ -57,10 +57,17 @@ jobs:
           with urllib.request.urlopen(request, timeout=20) as response:
               payload = json.load(response)
           live_base_payload = payload.get("base") or {}
+          live_head_payload = payload.get("head") or {}
           live_base = str(live_base_payload.get("sha") or "")
           live_base_ref = str(live_base_payload.get("ref") or "")
+          live_head = str(live_head_payload.get("sha") or "")
+          live_head_repo = str(((live_head_payload.get("repo") or {}).get("full_name")) or "")
           if re.fullmatch(r"[0-9a-f]{40}", live_base) is None:
               raise SystemExit("live pull-request base SHA is invalid")
+          if re.fullmatch(r"[0-9a-f]{40}", live_head) is None:
+              raise SystemExit("live pull-request head SHA is invalid")
+          if live_head_repo != repository:
+              raise SystemExit("cross-repository pull request is not eligible for write-capable recheck")
           if live_base_ref != os.environ["DEFAULT_BRANCH"]:
               raise SystemExit("pull request no longer targets the protected default branch")
           event_base = os.environ.get("EVENT_BASE_SHA", "")
@@ -68,6 +75,7 @@ jobs:
               raise SystemExit("pull-request review event base is stale; refusing write-capable recheck")
           with open(sys.argv[1], "a", encoding="utf-8") as output:
               output.write(f"base_sha={live_base}\n")
+              output.write(f"head_sha={live_head}\n")
           PY
 
       - name: Checkout trusted live-base recheck authority
@@ -77,6 +85,16 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Checkout candidate as inert Git data
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.live-pr.outputs.head_sha }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+          submodules: false
+          lfs: false
+
       - name: Re-evaluate one eligible failed gate on the same exact head
         shell: bash
         env:
@@ -84,6 +102,9 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
           EXPECTED_BASE_SHA: ${{ steps.live-pr.outputs.base_sha }}
+          EXPECTED_HEAD_SHA: ${{ steps.live-pr.outputs.head_sha }}
+          OTERYN_CANDIDATE_ROOT: ${{ github.workspace }}/candidate
+          OTERYN_AI_REVIEW_POLICY: ecosystem/ai-review-policy.json
         run: |
           set -euo pipefail
           CHECKED_OUT_BASE="$(git rev-parse HEAD)"
@@ -95,9 +116,12 @@ jobs:
           import urllib.request
 
           expected = os.environ["EXPECTED_BASE_SHA"]
+          expected_head = os.environ["EXPECTED_HEAD_SHA"]
           checked_out = os.environ["CHECKED_OUT_BASE"]
           if re.fullmatch(r"[0-9a-f]{40}", expected) is None or checked_out != expected:
               raise SystemExit("checked-out recheck authority does not match resolved live base")
+          if re.fullmatch(r"[0-9a-f]{40}", expected_head) is None:
+              raise SystemExit("resolved candidate head is invalid")
           repository = os.environ["REPOSITORY"]
           pr_number = os.environ["PR_NUMBER"]
           request = urllib.request.Request(
@@ -112,7 +136,9 @@ jobs:
           with urllib.request.urlopen(request, timeout=20) as response:
               payload = json.load(response)
           live_base = str(((payload.get("base") or {}).get("sha")) or "")
-          if live_base != expected:
-              raise SystemExit("live pull-request base moved after authority checkout; refusing recheck")
+          live_head = str(((payload.get("head") or {}).get("sha")) or "")
+          if live_base != expected or live_head != expected_head:
+              raise SystemExit("live pull-request head/base moved after authority checkout; refusing recheck")
           PY
+          test "$(git -C "$OTERYN_CANDIDATE_ROOT" rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
           python3 tools/governance/ai_review_recheck.py

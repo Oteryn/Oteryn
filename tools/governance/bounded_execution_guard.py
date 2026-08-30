@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 from typing import Any, Protocol
 
-from durable_checkpoint_outbox import CheckpointOutboxAdapter
+from durable_checkpoint_outbox import CheckpointOutboxAdapter, checkpoint_digest
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -108,6 +108,23 @@ SUPPORTED_ACTIONS = {
     "record_loop_breaker_audit",
 }
 MAX_ORGANIZATION_LOOP_BREAKER_THRESHOLD = 2
+CANONICAL_SNAPSHOT_REQUIRED_FIELDS = frozenset({
+    "repository", "task_id", "state", "phase", "task_head_sha",
+    "candidate_frozen", "blocking_dependency", "dependency_kind", "gate_state",
+    "review_generation", "review_fingerprint", "evidence_generation",
+    "first_material_failure", "identical_failure_cycles", "heavy_validation_runs",
+    "external_review_invocations", "same_head_gate_rechecks", "completion_verified",
+    "material_change", "material_change_reason", "material_change_evidence",
+    "material_fact_id", "material_fact_head", "material_fact_verified",
+    "repair_generation_id", "repair_base_head", "late_material_findings",
+    "post_freeze_material_head_changes", "audited_late_material_findings",
+    "audited_post_freeze_material_head_changes", "final_qualification_runs_since_audit",
+})
+CANONICAL_SNAPSHOT_OPTIONAL_FIELDS = frozenset({
+    "review_binding", "material_fact_envelope", "risk_ledger", "updated_at", "narration"
+})
+
+
 CANONICAL_PROGRESS_FINGERPRINT_FIELDS = (
     "repository",
     "task_id",
@@ -486,6 +503,13 @@ def _ledger_terminal(snapshot: dict[str, Any], policy: dict[str, Any]) -> bool:
 def validate_snapshot(snapshot: dict[str, Any], policy: dict[str, Any]) -> None:
     if not isinstance(snapshot, dict):
         raise GuardError("snapshot must be an object")
+    keys = set(snapshot)
+    missing = CANONICAL_SNAPSHOT_REQUIRED_FIELDS - keys
+    unknown = keys - CANONICAL_SNAPSHOT_REQUIRED_FIELDS - CANONICAL_SNAPSHOT_OPTIONAL_FIELDS
+    if missing or unknown:
+        raise GuardError(
+            f"snapshot must contain canonical fields only; missing={sorted(missing)!r}, unknown={sorted(unknown)!r}"
+        )
     if not isinstance(snapshot.get("repository"), str) or snapshot["repository"].count("/") != 1:
         raise GuardError("snapshot.repository must use owner/name form")
     if not isinstance(snapshot.get("task_id"), str) or not snapshot["task_id"].strip():
@@ -770,9 +794,9 @@ def _decision(
 
 
 def _checkpoint_digest(snapshot: dict[str, Any]) -> str:
-    """Use the complete validated snapshot for CAS, never a caller revision."""
+    """Use material durable identity for CAS while persisting the full snapshot."""
 
-    return _digest(snapshot)
+    return checkpoint_digest(snapshot)
 
 
 def _execution_prerequisite_reason(
@@ -1209,7 +1233,7 @@ def decide(
         if exhausted:
             state, release = _counter_denial_state(requested_action, current)
             reason = f"{requested_action} counter budget is exhausted for its durable generation"
-            if requested_action in {"request_external_review", "same_head_gate_recheck"}:
+            if state in release_states:
                 assert context is not None
                 return _transition_state(
                     context,

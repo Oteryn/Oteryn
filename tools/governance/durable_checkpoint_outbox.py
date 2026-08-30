@@ -90,14 +90,29 @@ def _canonical_snapshot(snapshot: dict[str, Any]) -> str:
     return json.dumps(snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
-def _snapshot_digest(snapshot_json: str) -> str:
-    return hashlib.sha256(snapshot_json.encode("utf-8")).hexdigest()
+NONMATERIAL_CHECKPOINT_FIELDS = frozenset({"updated_at", "narration"})
+
+
+def checkpoint_digest(snapshot: dict[str, Any]) -> str:
+    """Hash durable material execution identity, excluding observer-only metadata."""
+
+    if not isinstance(snapshot, dict):
+        raise ValueError("checkpoint snapshot must be an object")
+    material = {
+        key: value
+        for key, value in snapshot.items()
+        if key not in NONMATERIAL_CHECKPOINT_FIELDS
+    }
+    payload = json.dumps(
+        material, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _validated_snapshot_payload(snapshot: dict[str, Any], expected_digest: str) -> str:
     payload = _canonical_snapshot(snapshot)
-    if _snapshot_digest(payload) != expected_digest:
-        raise ValueError("checkpoint digest does not match canonical snapshot")
+    if checkpoint_digest(snapshot) != expected_digest:
+        raise ValueError("checkpoint digest does not match material snapshot identity")
     return payload
 
 
@@ -420,8 +435,10 @@ class SqliteCheckpointOutbox:
         if not isinstance(snapshot, dict):
             raise ValueError("recoverable checkpoint snapshot must be an object")
         canonical = _canonical_snapshot(snapshot)
-        if _snapshot_digest(canonical) != checkpoint:
-            raise ValueError("recoverable checkpoint snapshot digest mismatch")
+        if canonical != snapshot_json:
+            raise ValueError("recoverable checkpoint snapshot is not canonical JSON")
+        if checkpoint_digest(snapshot) != checkpoint:
+            raise ValueError("recoverable checkpoint material digest mismatch")
         return CheckpointRecord(checkpoint=checkpoint, snapshot=snapshot)
 
     def claim_pending_dispatch(

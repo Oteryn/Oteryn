@@ -20,6 +20,9 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
+import ai_review_policy
+import verify_ai_review_evidence
+
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REVIEWED_COMMIT_RE = re.compile(
     r"\*\*Reviewed commit:\*\*\s*`([0-9a-f]{10,40})`"
@@ -29,6 +32,9 @@ RUNS_PER_PAGE = 100
 MAX_GATE_COMPLETION_POLLS = 12
 GATE_COMPLETION_POLL_SECONDS = 5.0
 NONTERMINAL_RUN_STATUSES = frozenset({"queued", "in_progress", "pending", "requested", "waiting"})
+MAX_ACTIVE_EVIDENCE_POLLS = 12
+ACTIVE_EVIDENCE_POLL_SECONDS = 5.0
+CODEX_SUMMARY_MARKER = "<!-- codex-pull-request-review-summary -->"
 
 
 class RecheckError(ValueError):
@@ -40,6 +46,9 @@ class RecheckClient(Protocol):
     def list_gate_runs(
         self, head_sha: str, base_sha: str, pr_number: int
     ) -> list[dict[str, Any]]: ...
+    def verify_active_review_evidence(
+        self, head_sha: str, base_sha: str, pr_number: int
+    ) -> bool: ...
     def rerun(self, run_id: int) -> None: ...
 
 
@@ -139,6 +148,8 @@ def _issue_comment_reviewed_prefix(event: dict[str, Any]) -> tuple[str, str | No
         return "NOOP_NOT_REVIEW_RESULT", None
     matches = REVIEWED_COMMIT_RE.findall(body)
     if not matches:
+        if CODEX_SUMMARY_MARKER in body and "**Completed**" in body:
+            return "MATCH", None
         return "NOOP_NOT_REVIEW_RESULT", None
     if len(matches) != 1:
         return "NOOP_AMBIGUOUS_REVIEW_RESULT", None
@@ -321,6 +332,23 @@ def process_event(
 
     assert run_id is not None
 
+    active_evidence = False
+    for evidence_poll_index in range(MAX_ACTIVE_EVIDENCE_POLLS):
+        if client.verify_active_review_evidence(head_sha, base_sha, pr_number):
+            active_evidence = True
+            break
+        if evidence_poll_index == MAX_ACTIVE_EVIDENCE_POLLS - 1:
+            break
+        sleep_fn(ACTIVE_EVIDENCE_POLL_SECONDS)
+    if not active_evidence:
+        return Result(
+            "NOOP_UNVERIFIED_REVIEW_GENERATION",
+            "active exact-tier exact-fingerprint review evidence was not verified within the bounded wakeup window",
+            run_id=run_id,
+            head_sha=head_sha,
+            base_sha=base_sha,
+        )
+
     # Race guard immediately before mutation of workflow state.
     _, fresh_head_sha, fresh_base_sha = _live_pr(client, pr_number, repository)
     if fresh_head_sha != head_sha or fresh_base_sha != base_sha:
@@ -350,6 +378,8 @@ class GitHubClient:
         api_url: str = "https://api.github.com",
         workflow: str = "governance-ai-review.yml",
         timeout: float = 30.0,
+        candidate_root: str | Path | None = None,
+        policy_path: str | Path = "ecosystem/ai-review-policy.json",
     ) -> None:
         if repository.count("/") != 1:
             raise RecheckError("repository must use owner/name form")
@@ -360,6 +390,8 @@ class GitHubClient:
         self.api_url = api_url.rstrip("/")
         self.workflow = workflow
         self.timeout = timeout
+        self.candidate_root = Path(candidate_root) if candidate_root is not None else None
+        self.policy_path = Path(policy_path)
 
     def _request(self, path: str, *, method: str = "GET") -> Any:
         request = urllib.request.Request(
@@ -425,6 +457,41 @@ class GitHubClient:
             f"trusted gate history exceeds bounded {MAX_RUN_PAGES * RUNS_PER_PAGE}-run scan"
         )
 
+    def verify_active_review_evidence(
+        self, head_sha: str, base_sha: str, pr_number: int
+    ) -> bool:
+        if self.candidate_root is None:
+            raise RecheckError("OTERYN_CANDIDATE_ROOT is required for active review verification")
+        if not self.candidate_root.is_dir():
+            raise RecheckError("candidate inert checkout is unavailable")
+        try:
+            classification = ai_review_policy.evaluate(
+                base_sha,
+                head_sha,
+                self.candidate_root,
+                self.policy_path,
+            )
+            if (
+                classification.get("tier") not in {"R1", "R2"}
+                or classification.get("external_review") != "required"
+            ):
+                return False
+            policy = json.loads(self.policy_path.read_text(encoding="utf-8"))
+            verify_ai_review_evidence.verify_live_review_evidence(
+                repository=self.repository,
+                pr_number=pr_number,
+                token=self.token,
+                policy=policy,
+                repo_root=self.candidate_root,
+                tier=classification["tier"],
+                fingerprint=classification["review_fingerprint"],
+                head=head_sha,
+                base=base_sha,
+            )
+            return True
+        except (RuntimeError, ValueError, OSError, json.JSONDecodeError):
+            return False
+
     def rerun(self, run_id: int) -> None:
         if not isinstance(run_id, int) or isinstance(run_id, bool) or run_id < 1:
             raise RecheckError("run_id must be a positive integer")
@@ -446,6 +513,7 @@ def main() -> int:
     policy_path = os.environ.get(
         "OTERYN_AI_REVIEW_POLICY", "ecosystem/ai-review-policy.json"
     )
+    candidate_root = os.environ.get("OTERYN_CANDIDATE_ROOT", "")
 
     if not event_path:
         raise RecheckError("GITHUB_EVENT_PATH is required")
@@ -459,7 +527,12 @@ def main() -> int:
         event,
         repository,
         policy,
-        GitHubClient(repository, token),
+        GitHubClient(
+            repository,
+            token,
+            candidate_root=candidate_root or None,
+            policy_path=policy_path,
+        ),
     )
     print(json.dumps(result.as_dict(), sort_keys=True))
     return 0
