@@ -268,6 +268,35 @@ class AtomicTransitionRegressionTests(unittest.TestCase):
         self.assertIn("previous", result.reason)
         self.assertIsNone(outbox.next_checkpoint)
 
+    def test_denied_external_operational_action_persists_waiting_without_dispatch(self):
+        previous = with_binding(
+            snapshot(
+                state="READY",
+                phase="implementation",
+                candidate_frozen=False,
+                blocking_dependency="external-review:123",
+                dependency_kind="external",
+            )
+        )
+        current = copy.deepcopy(previous)
+        outbox = RecordingOutbox()
+
+        result = raw_decide(
+            previous,
+            current,
+            "mutate",
+            POLICY,
+            context=ExecutionContext(AllowEvidenceAuthority(), outbox),
+        )
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "WAITING_EXTERNAL")
+        self.assertTrue(result.release_session)
+        expected = copy.deepcopy(current)
+        expected["state"] = "WAITING_EXTERNAL"
+        self.assertEqual(outbox.next_checkpoint, _checkpoint_digest(expected))
+        self.assertIsNone(outbox.action)
+
     def test_exhausted_async_action_persists_waiting_without_dispatch(self):
         for action, field in (
             ("request_external_review", "external_review_invocations"),

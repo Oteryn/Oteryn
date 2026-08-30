@@ -93,5 +93,30 @@ class PaginationTests(unittest.TestCase):
         self.assertTrue(all("head_sha=" not in path for path in paths))
 
 
+class TrustedWorkflowBaseBindingTests(unittest.TestCase):
+    def test_write_capable_workflow_executes_only_live_base_authority(self):
+        workflow = (
+            Path(__file__).resolve().parents[2]
+            / ".github"
+            / "workflows"
+            / "governance-ai-review-recheck.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("id: live-pr", workflow)
+        self.assertIn("/pulls/{pr_number}", workflow)
+        self.assertIn("ref: ${{ steps.live-pr.outputs.base_sha }}", workflow)
+        self.assertNotIn(
+            "ref: ${{ github.event.pull_request.base.sha || github.event.repository.default_branch }}",
+            workflow,
+        )
+        self.assertIn("EXPECTED_BASE_SHA: ${{ steps.live-pr.outputs.base_sha }}", workflow)
+        self.assertIn("git rev-parse HEAD", workflow)
+        self.assertLess(
+            workflow.index("EXPECTED_BASE_SHA: ${{ steps.live-pr.outputs.base_sha }}"),
+            workflow.index("python3 tools/governance/ai_review_recheck.py"),
+        )
+
+
+
 if __name__ == "__main__":
     unittest.main()
