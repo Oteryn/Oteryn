@@ -353,12 +353,17 @@ def test_trusted_base_workflow_never_executes_candidate_code() -> None:
     assert "pull_request_target:" in workflow
     assert "ref: ${{ github.event.pull_request.base.sha }}" in workflow
     assert "path: trusted" in workflow
-    assert "ref: ${{ github.event.pull_request.head.sha }}" in workflow
-    assert "path: candidate" in workflow
-    assert workflow.count("persist-credentials: false") == 2
+    assert "ref: ${{ github.event.pull_request.head.sha }}" not in workflow
+    assert "path: candidate" not in workflow
+    assert workflow.count("persist-credentials: false") == 1
     assert "uses: ./trusted/.github/actions/ai-review-gate" in workflow
-    assert "repo-root: candidate" in workflow
-    assert "repo-root:" in action and "CANDIDATE_ROOT" in action
+    assert "repo-root: candidate" not in workflow
+    assert "repo-root:" not in action and "CANDIDATE_ROOT" not in action
+    assert "git init --bare" in action
+    assert "oteryn-candidate.git" in action
+    assert '"https://github.com/${REPOSITORY}.git" "$BASE_SHA" "$HEAD_SHA"' in action
+    assert 'trusted_review_attestation.py" preflight' in action
+    assert 'trusted_review_attestation.py" issue' in action
     assert "requires trusted pull_request_target context" in action
 
 

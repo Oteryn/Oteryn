@@ -36,27 +36,42 @@ class FakeAudit(m.Audit):
         raise AssertionError(f"unexpected API call: {path}")
 
 
-def check_run(name: str, run_id: int, pr_number: int) -> dict:
-    return {
+def check_run(name: str, run_id: int, pr_number: int, *, head_sha: str | None = None) -> dict:
+    value = {
         "name": name,
         "app": {"id": ACTIONS_APP_ID},
         "details_url": f"https://github.com/Oteryn/Test/actions/runs/{run_id}/job/{run_id + 1000}",
         "pull_requests": [{"number": pr_number}],
     }
+    if head_sha is not None:
+        value["head_sha"] = head_sha
+    return value
 
 
-def test_pull_request_target_is_read_from_current_base_commit() -> None:
+def target_run(main: str, head: str, *, pr_number: int = 7) -> dict:
+    repository = {
+        "id": 1,
+        "name": "Test",
+        "url": "https://api.github.com/repos/Oteryn/Test",
+    }
+    return {
+        "event": "pull_request_target",
+        "head_sha": head,
+        "workflow_id": 1,
+        "pull_requests": [{
+            "number": pr_number,
+            "base": {"ref": "main", "sha": main, "repo": repository},
+            "head": {"sha": head, "repo": repository},
+        }],
+    }
+
+
+def test_pull_request_target_is_read_from_current_candidate_commit() -> None:
     main = "a" * 40
     head = "b" * 40
     audit = FakeAudit({
         "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
-        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {
-            "check_runs": [check_run("ai-review-gate", 301, 7)],
-        },
-        "/repos/Oteryn/Test/actions/runs/301": {
-            "event": "pull_request_target", "head_sha": main, "workflow_id": 1,
-            "pull_requests": [{"number": 7, "head": {"sha": head}}],
-        },
+        "/repos/Oteryn/Test/actions/runs/301": target_run(main, head),
         "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
             "number": 7,
             "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
@@ -66,7 +81,10 @@ def test_pull_request_target_is_read_from_current_base_commit() -> None:
             "status": "ahead", "merge_base_commit": {"sha": main},
         },
         f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {
-            "check_runs": [check_run("meta-gate", 302, 7)],
+            "check_runs": [
+                check_run("meta-gate", 302, 7),
+                check_run("ai-review-gate", 301, 7, head_sha=head),
+            ],
         },
         "/repos/Oteryn/Test/actions/runs/302": {
             "event": "pull_request", "head_sha": head, "workflow_id": 1,
@@ -113,12 +131,17 @@ def test_disabled_pull_request_target_workflow_does_not_prove_gate() -> None:
     head = "b" * 40
     audit = FakeAudit({
         "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
-        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {"check_runs": [check_run("ai-review-gate", 307, 7)]},
-        "/repos/Oteryn/Test/actions/runs/307": {"event": "pull_request_target", "head_sha": main, "workflow_id": 9, "pull_requests": [{"number": 7, "head": {"sha": head}}]},
+        "/repos/Oteryn/Test/actions/runs/307": {
+            **target_run(main, head),
+            "workflow_id": 9,
+        },
         "/repos/Oteryn/Test/actions/workflows/9": {"state": "disabled_manually"},
         "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{"number": 7, "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}}, "base": {"ref": "main"}}],
         f"/repos/Oteryn/Test/compare/{main}...{head}": {"status": "ahead", "merge_base_commit": {"sha": main}},
-        f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {"check_runs": [check_run("meta-gate", 308, 7)]},
+        f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {"check_runs": [
+            check_run("meta-gate", 308, 7),
+            check_run("ai-review-gate", 307, 7, head_sha=head),
+        ]},
         "/repos/Oteryn/Test/actions/runs/308": {"event": "pull_request", "head_sha": head, "workflow_id": 1},
     })
     observed = audit.representative_check_sources("Oteryn/Test", {"meta-gate", "ai-review-gate"}, ACTIONS_APP_ID)
@@ -130,13 +153,7 @@ def test_pull_request_target_for_other_pr_does_not_prove_gate() -> None:
     head = "b" * 40
     audit = FakeAudit({
         "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
-        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {
-            "check_runs": [check_run("ai-review-gate", 303, 99)],
-        },
-        "/repos/Oteryn/Test/actions/runs/303": {
-            "event": "pull_request_target", "head_sha": main, "workflow_id": 1,
-            "pull_requests": [{"number": 99, "head": {"sha": "c" * 40}}],
-        },
+        "/repos/Oteryn/Test/actions/runs/303": target_run(main, head, pr_number=99),
         "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
             "number": 7,
             "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
@@ -146,7 +163,10 @@ def test_pull_request_target_for_other_pr_does_not_prove_gate() -> None:
             "status": "ahead", "merge_base_commit": {"sha": main},
         },
         f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {
-            "check_runs": [check_run("meta-gate", 304, 7)],
+            "check_runs": [
+                check_run("meta-gate", 304, 7),
+                check_run("ai-review-gate", 303, 7, head_sha=head),
+            ],
         },
         "/repos/Oteryn/Test/actions/runs/304": {
             "event": "pull_request", "head_sha": head, "workflow_id": 1,
@@ -167,13 +187,7 @@ def test_stale_pull_request_target_generation_does_not_prove_current_head() -> N
     head = "c" * 40
     audit = FakeAudit({
         "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
-        f"/repos/Oteryn/Test/commits/{main}/check-runs?per_page=100": {
-            "check_runs": [check_run("ai-review-gate", 305, 7)],
-        },
-        "/repos/Oteryn/Test/actions/runs/305": {
-            "event": "pull_request_target", "head_sha": main, "workflow_id": 1,
-            "pull_requests": [{"number": 7, "head": {"sha": old_head}}],
-        },
+        "/repos/Oteryn/Test/actions/runs/305": target_run(main, old_head),
         "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
             "number": 7,
             "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
@@ -183,9 +197,76 @@ def test_stale_pull_request_target_generation_does_not_prove_current_head() -> N
             "status": "ahead", "merge_base_commit": {"sha": main},
         },
         f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {
-            "check_runs": [check_run("meta-gate", 306, 7)],
+            "check_runs": [
+                check_run("meta-gate", 306, 7),
+                check_run("ai-review-gate", 305, 7, head_sha=head),
+            ],
         },
         "/repos/Oteryn/Test/actions/runs/306": {
+            "event": "pull_request", "head_sha": head, "workflow_id": 1,
+        },
+    })
+    observed = audit.representative_check_sources(
+        "Oteryn/Test", {"meta-gate", "ai-review-gate"}, ACTIONS_APP_ID
+    )
+    assert not m.expected_sources_satisfied(
+        observed, {"meta-gate", "ai-review-gate"}, ACTIONS_APP_ID
+    )
+
+
+def test_stale_pull_request_target_base_does_not_prove_current_pr() -> None:
+    main = "a" * 40
+    head = "b" * 40
+    stale_base = "c" * 40
+    run = target_run(main, head)
+    run["pull_requests"][0]["base"]["sha"] = stale_base
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
+        "/repos/Oteryn/Test/actions/runs/311": run,
+        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
+            "number": 7,
+            "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
+            "base": {"ref": "main"},
+        }],
+        f"/repos/Oteryn/Test/compare/{main}...{head}": {
+            "status": "ahead", "merge_base_commit": {"sha": main},
+        },
+        f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {"check_runs": [
+            check_run("meta-gate", 312, 7),
+            check_run("ai-review-gate", 311, 7, head_sha=head),
+        ]},
+        "/repos/Oteryn/Test/actions/runs/312": {
+            "event": "pull_request", "head_sha": head, "workflow_id": 1,
+        },
+    })
+    observed = audit.representative_check_sources(
+        "Oteryn/Test", {"meta-gate", "ai-review-gate"}, ACTIONS_APP_ID
+    )
+    assert not m.expected_sources_satisfied(
+        observed, {"meta-gate", "ai-review-gate"}, ACTIONS_APP_ID
+    )
+
+
+def test_stale_target_check_run_head_does_not_prove_current_pr() -> None:
+    main = "a" * 40
+    head = "b" * 40
+    old_head = "c" * 40
+    audit = FakeAudit({
+        "/repos/Oteryn/Test/branches/main": {"commit": {"sha": main}},
+        "/repos/Oteryn/Test/actions/runs/313": target_run(main, head),
+        "/repos/Oteryn/Test/pulls?state=open&base=main&sort=updated&direction=desc&per_page=20": [{
+            "number": 7,
+            "head": {"sha": head, "repo": {"full_name": "Oteryn/Test"}},
+            "base": {"ref": "main"},
+        }],
+        f"/repos/Oteryn/Test/compare/{main}...{head}": {
+            "status": "ahead", "merge_base_commit": {"sha": main},
+        },
+        f"/repos/Oteryn/Test/commits/{head}/check-runs?per_page=100": {"check_runs": [
+            check_run("meta-gate", 314, 7),
+            check_run("ai-review-gate", 313, 7, head_sha=old_head),
+        ]},
+        "/repos/Oteryn/Test/actions/runs/314": {
             "event": "pull_request", "head_sha": head, "workflow_id": 1,
         },
     })
