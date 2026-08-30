@@ -19,10 +19,6 @@ inputs:
   github-token:
     description: GITHUB_TOKEN with pull-requests:read and issues:read.
     required: true
-  repo-root:
-    description: Candidate git repository path relative to GITHUB_WORKSPACE.
-    required: false
-    default: .
 outputs:
   tier:
     description: R0, R1 or R2.
@@ -33,6 +29,12 @@ outputs:
   reviewer-class:
     description: none, fast or deep.
     value: ${{ steps.classify.outputs.reviewer_class }}
+  envelope-path:
+    description: Canonical trusted review-evidence envelope, ready to attest.
+    value: ${{ steps.issue.outputs.envelope-path }}
+  envelope-sha256:
+    description: SHA-256 binding identifier for the exact envelope bytes.
+    value: ${{ steps.issue.outputs.envelope-sha256 }}
 runs:
   using: composite
   steps:
@@ -66,31 +68,79 @@ runs:
         with open(sys.argv[1],'a',encoding='utf-8') as out:
             for key,value in expected.items(): out.write(f'{key}={value}\n')
         PY
-    - id: classify
-      name: Classify exact pull-request diff
+    - name: Re-read and bind exact same-repository PR facts from GitHub
       shell: bash
       env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPOSITORY: ${{ steps.bind.outputs.repository }}
+        REPOSITORY_ID: ${{ github.event.repository.id }}
+        PR_NUMBER: ${{ steps.bind.outputs.pr }}
         BASE_SHA: ${{ steps.bind.outputs.base }}
         HEAD_SHA: ${{ steps.bind.outputs.head }}
-        REPO_ROOT_INPUT: ${{ inputs.repo-root }}
+        DRAFT: ${{ steps.bind.outputs.draft }}
       run: |
         set -euo pipefail
         POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
-        RESULT="$RUNNER_TEMP/oteryn-ai-review-result.json"
-        CANDIDATE_ROOT="$GITHUB_WORKSPACE/$REPO_ROOT_INPUT"
-        git -C "$CANDIDATE_ROOT" cat-file -e "${BASE_SHA}^{commit}"
-        git -C "$CANDIDATE_ROOT" cat-file -e "${HEAD_SHA}^{commit}"
-        python3 "$POLICY_ROOT/tools/governance/ai_review_policy.py" --repo-root "$CANDIDATE_ROOT" --policy-file "$POLICY_ROOT/ecosystem/ai-review-policy.json" --base "$BASE_SHA" --head "$HEAD_SHA" > "$RESULT"
-        python3 - "$RESULT" "$GITHUB_OUTPUT" "$GITHUB_STEP_SUMMARY" <<'PY'
-        import json, sys
-        result=json.load(open(sys.argv[1],encoding='utf-8')); reviewer=result['reviewer_class'] or 'none'
-        with open(sys.argv[2],'a',encoding='utf-8') as out:
-            out.write(f"tier={result['tier']}\n"); out.write(f"fingerprint={result['review_fingerprint']}\n"); out.write(f"reviewer_class={reviewer}\n")
-        with open(sys.argv[3],'a',encoding='utf-8') as summary:
-            summary.write("## Oteryn AI review classification\n\n")
-            summary.write(f"- tier: `{result['tier']}`\n- reviewer class: `{reviewer}`\n- fingerprint: `{result['review_fingerprint']}`\n")
-            summary.write(f"- reasons: `{'; '.join(result['reasons'])}`\n")
-        PY
+        python3 "$POLICY_ROOT/tools/governance/trusted_review_attestation.py" preflight \
+          --repository "$REPOSITORY" --repository-id "$REPOSITORY_ID" --pr-number "$PR_NUMBER" \
+          --base "$BASE_SHA" --head "$HEAD_SHA" --draft "$DRAFT" --token "$GH_TOKEN"
+    - name: Fetch candidate as inert bare Git objects
+      shell: bash
+      env:
+        REPOSITORY: ${{ steps.bind.outputs.repository }}
+        BASE_SHA: ${{ steps.bind.outputs.base }}
+        HEAD_SHA: ${{ steps.bind.outputs.head }}
+      run: |
+        set -euo pipefail
+        BARE_GIT_DIR="$RUNNER_TEMP/oteryn-candidate.git"
+        git init --bare "$BARE_GIT_DIR"
+        git -C "$BARE_GIT_DIR" -c protocol.file.allow=never fetch --no-tags --quiet \
+          "https://github.com/${REPOSITORY}.git" "$BASE_SHA" "$HEAD_SHA"
+        git -C "$BARE_GIT_DIR" cat-file -e "${BASE_SHA}^{commit}"
+        git -C "$BARE_GIT_DIR" cat-file -e "${HEAD_SHA}^{commit}"
+    - id: issue
+      name: Classify, validate and issue canonical review envelope
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPOSITORY: ${{ steps.bind.outputs.repository }}
+        REPOSITORY_ID: ${{ github.event.repository.id }}
+        PR_NUMBER: ${{ steps.bind.outputs.pr }}
+        BASE_SHA: ${{ steps.bind.outputs.base }}
+        HEAD_SHA: ${{ steps.bind.outputs.head }}
+        DRAFT: ${{ steps.bind.outputs.draft }}
+        WORKFLOW_REF: ${{ github.workflow_ref }}
+        WORKFLOW_SHA: ${{ github.workflow_sha }}
+        WORKFLOW_RUN_ID: ${{ github.run_id }}
+        WORKFLOW_JOB: ${{ github.job }}
+        BARE_GIT_DIR: ${{ runner.temp }}/oteryn-candidate.git
+        ENVELOPE_PATH: ${{ runner.temp }}/oteryn-trusted-review-envelope.json
+        GITHUB_OUTPUT_PATH: ${{ github.output }}
+      run: |
+        set -euo pipefail
+        POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
+        python3 "$POLICY_ROOT/tools/governance/trusted_review_attestation.py" issue \
+          --repository "$REPOSITORY" --repository-id "$REPOSITORY_ID" --pr-number "$PR_NUMBER" \
+          --base "$BASE_SHA" --head "$HEAD_SHA" --draft "$DRAFT" --token "$GH_TOKEN" \
+          --workflow-ref "$WORKFLOW_REF" --workflow-sha "$WORKFLOW_SHA" \
+          --workflow-run-id "$WORKFLOW_RUN_ID" --workflow-job "$WORKFLOW_JOB" \
+          --bare-git-dir "$BARE_GIT_DIR" --policy-file "$POLICY_ROOT/ecosystem/ai-review-policy.json" \
+          --classifier-file "$POLICY_ROOT/tools/governance/ai_review_policy.py" \
+          --output "$ENVELOPE_PATH" --github-output "$GITHUB_OUTPUT_PATH"
+    - id: classify
+      name: Publish trusted classification outputs
+      shell: bash
+      env:
+        TIER: ${{ steps.issue.outputs.tier }}
+        FINGERPRINT: ${{ steps.issue.outputs.fingerprint }}
+        REVIEWER_CLASS: ${{ steps.issue.outputs.reviewer-class }}
+      run: |
+        set -euo pipefail
+        test "$TIER" = R0 || test "$TIER" = R1 || test "$TIER" = R2
+        test "${#FINGERPRINT}" = 64
+        printf 'tier=%s\nfingerprint=%s\n' "$TIER" "$FINGERPRINT" >> "$GITHUB_OUTPUT"
+        test "$REVIEWER_CLASS" = none || test "$REVIEWER_CLASS" = fast || test "$REVIEWER_CLASS" = deep
+        printf 'reviewer_class=%s\n' "$REVIEWER_CLASS" >> "$GITHUB_OUTPUT"
     - name: Accept R0 without external AI
       if: ${{ steps.classify.outputs.tier == 'R0' }}
       shell: bash
@@ -112,18 +162,6 @@ runs:
         REPOSITORY: ${{ steps.bind.outputs.repository }}
         PR_NUMBER: ${{ steps.bind.outputs.pr }}
         GH_TOKEN: ${{ inputs.github-token }}
-        REPO_ROOT_INPUT: ${{ inputs.repo-root }}
       run: |
         set -euo pipefail
-        POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
-        CANDIDATE_ROOT="$GITHUB_WORKSPACE/$REPO_ROOT_INPUT"
-        python3 "$POLICY_ROOT/tools/governance/verify_ai_review_evidence.py" \
-          --repo-root "$CANDIDATE_ROOT" \
-          --policy-file "$POLICY_ROOT/ecosystem/ai-review-policy.json" \
-          --repository "$REPOSITORY" \
-          --pr-number "$PR_NUMBER" \
-          --tier "$REVIEW_TIER" \
-          --fingerprint "$REVIEW_FINGERPRINT" \
-          --head "$HEAD_SHA" \
-          --base "$BASE_SHA" \
-          --token "$GH_TOKEN"
+        echo 'External evidence was verified before issuance from trusted base against inert bare Git objects.'

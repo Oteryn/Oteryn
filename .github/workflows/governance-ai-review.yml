@@ -6,9 +6,13 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 
 permissions:
+  actions: read
   contents: read
   issues: read
   pull-requests: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 
 concurrency:
   group: meta-ai-review-${{ github.event.pull_request.number }}
@@ -36,27 +40,8 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Checkout candidate as inert Git data
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: ${{ github.repository }}
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: candidate
-          fetch-depth: 0
-          persist-credentials: false
-          submodules: false
-          lfs: false
-
-      - name: Verify exact candidate objects
-        shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          git -C candidate cat-file -e "${BASE_SHA}^{commit}"
-          git -C candidate cat-file -e "${HEAD_SHA}^{commit}"
-      - name: Run trusted base review gate against candidate data
+      - id: review-gate
+        name: Run trusted base review gate against inert candidate objects
         uses: ./trusted/.github/actions/ai-review-gate
         with:
           base-sha: ${{ github.event.pull_request.base.sha }}
@@ -65,4 +50,42 @@ jobs:
           repository: ${{ github.repository }}
           pr-number: ${{ github.event.pull_request.number }}
           github-token: ${{ github.token }}
-          repo-root: candidate
+
+      - id: attest-review-envelope
+        name: Attest canonical trusted review envelope
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ steps.review-gate.outputs.envelope-path }}
+          predicate-type: https://oteryn.dev/bounded-execution-evidence/v1
+          predicate-path: ${{ steps.review-gate.outputs.envelope-path }}
+
+      - name: Verify GitHub attestation, exact predicate and live coordinates
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_ID: ${{ github.event.repository.id }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          WORKFLOW_JOB: ${{ github.job }}
+          ENVELOPE_PATH: ${{ steps.review-gate.outputs.envelope-path }}
+          ENVELOPE_SHA256: ${{ steps.review-gate.outputs.envelope-sha256 }}
+          ATTESTATION_RESULT: ${{ runner.temp }}/oteryn-trusted-review-attestation-verify.json
+        run: |
+          set -euo pipefail
+          test "sha256:$(sha256sum "$ENVELOPE_PATH" | awk '{print $1}')" = "$ENVELOPE_SHA256"
+          gh attestation verify "$ENVELOPE_PATH" \
+            --repo "$REPOSITORY" \
+            --predicate-type https://oteryn.dev/bounded-execution-evidence/v1 \
+            --signer-workflow "$REPOSITORY/.github/workflows/governance-ai-review.yml" \
+            --signer-digest "$BASE_SHA" \
+            --deny-self-hosted-runners \
+            --format json > "$ATTESTATION_RESULT"
+          python3 trusted/tools/governance/trusted_review_attestation.py verify \
+            --repository "$REPOSITORY" --repository-id "$REPOSITORY_ID" --pr-number "$PR_NUMBER" \
+            --base "$BASE_SHA" --head "$HEAD_SHA" --draft "$DRAFT" --token "$GH_TOKEN" \
+            --workflow-run-id "$WORKFLOW_RUN_ID" --workflow-job "$WORKFLOW_JOB" \
+            --envelope "$ENVELOPE_PATH" --attestation-result "$ATTESTATION_RESULT"
