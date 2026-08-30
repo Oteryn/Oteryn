@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from copy import deepcopy
+
 import test_verify_ai_review_evidence_compat_v1 as _v1
 
 
@@ -90,12 +92,14 @@ def _reaction(*, login: str = "chatgpt-codex-connector[bot]",
 
 def _p2_review(head: str, *, review_id: int = 701,
                login: str = "chatgpt-codex-connector[bot]",
+               state: str = "COMMENTED",
+               body: str = "",
                submitted_at: str = "2026-08-20T10:01:00Z") -> dict:
     return {
         "id": review_id,
         "commit_id": head,
-        "state": "COMMENTED",
-        "body": "",
+        "state": state,
+        "body": body,
         "submitted_at": submitted_at,
         "user": {"login": login},
         "pull_request_url": "https://api.github.com/repos/Oteryn/Test/pulls/7",
@@ -103,9 +107,10 @@ def _p2_review(head: str, *, review_id: int = 701,
 
 
 def _p2_inline(review_id: int = 701, *, login: str = "chatgpt-codex-connector[bot]",
-               body: str = "[P2] Document the reusable permission contract") -> dict:
+               body: str = "[P2] Document the reusable permission contract",
+               comment_id: int = 702) -> dict:
     return {
-        "id": 702,
+        "id": comment_id,
         "pull_request_review_id": review_id,
         "body": body,
         "created_at": "2026-08-20T10:01:00Z",
@@ -113,6 +118,82 @@ def _p2_inline(review_id: int = 701, *, login: str = "chatgpt-codex-connector[bo
         "user": {"login": login},
         "pull_request_url": "https://api.github.com/repos/Oteryn/Test/pulls/7",
     }
+
+
+def _p2_thread(*, comment_id: int = 702, resolved: bool = True, tracker: str = "Tracked in #114.",
+               disposition_login: str = "blakinio",
+               disposition_association: str = "MEMBER",
+               disposition_edited: bool = False) -> dict:
+    return {
+        "id": "thread-702",
+        "isResolved": resolved,
+        "comments": {
+            "nodes": [
+                {
+                    "fullDatabaseId": str(comment_id),
+                    "body": "[P2] Document the reusable permission contract",
+                    "author": {"login": "chatgpt-codex-connector[bot]"},
+                    "authorAssociation": "NONE",
+                    "createdAt": "2026-08-20T10:01:00Z",
+                    "lastEditedAt": None,
+                },
+                {
+                    "fullDatabaseId": "703",
+                    "body": tracker,
+                    "author": {"login": disposition_login},
+                    "authorAssociation": disposition_association,
+                    "createdAt": "2026-08-20T10:01:01Z",
+                    "lastEditedAt": (
+                        "2026-08-20T10:01:02Z" if disposition_edited else None
+                    ),
+                },
+            ],
+            "pageInfo": {"hasNextPage": False},
+        },
+    }
+
+
+def _tracker_issue(number: int = 114) -> dict:
+    return {
+        "number": number,
+        "state": "open",
+        "repository_url": "https://api.github.com/repos/Oteryn/Test",
+        "url": f"https://api.github.com/repos/Oteryn/Test/issues/{number}",
+    }
+
+
+def _policy() -> dict:
+    policy = deepcopy(_v1.POLICY)
+    policy["p2_follow_up"] = {
+        "outcome": "ACCEPTED_WITH_FOLLOW_UP",
+        "thread_must_be_resolved": True,
+        "tracker_reply_format": "Tracked in #<issue>.",
+        "tracker_must_be_open_same_repository_issue": True,
+        "trusted_maintainer_associations": ["OWNER", "MEMBER", "COLLABORATOR"],
+    }
+    return policy
+
+
+def _codex_review_envelope(head: str, *, extra: str = "") -> str:
+    prefix = head[:10]
+    lines = [
+        "### 💡 Codex Review",
+        "Here are some automated review suggestions for this pull request.",
+        f"**Reviewed commit:** `{prefix}`",
+        "<details> <summary>ℹ️ About Codex in GitHub</summary>",
+        "<br/>",
+        "[Your team has set up Codex to review pull requests in this repo]"
+        "(https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you",
+        "- Open a pull request for review",
+        "- Mark a draft as ready",
+        '- Comment "@codex review".',
+        "If Codex has suggestions, it will comment; otherwise it will react with 👍.",
+        'Codex can also answer questions or update the PR. Try commenting "@codex address that feedback".',
+        "</details>",
+    ]
+    if extra:
+        lines.insert(3, extra)
+    return "\n\n".join(lines)
 
 
 def _verify_summary(*, summary_prefix: str | None = None,
@@ -123,7 +204,10 @@ def _verify_summary(*, summary_prefix: str | None = None,
                     reactions: list[dict] | None = None,
                     request_updated: str | None = None,
                     extra_reviews: list[dict] | None = None,
-                    review_comments: list[dict] | None = None) -> dict:
+                    review_comments: list[dict] | None = None,
+                    extra_comments: list[dict] | None = None,
+                    review_threads: list[dict] | None = None,
+                    tracker_issues: dict[int, dict] | None = None) -> dict:
     repo, _, final = _v1.core_tests.make_repo()
     current = _v1.core_tests.issue_comment(
         10,
@@ -138,9 +222,18 @@ def _verify_summary(*, summary_prefix: str | None = None,
         app_slug=app_slug,
         updated=updated,
     )
+    kwargs = {
+        "reviews": [_v1.core_tests.request_anchor(current, final), *(extra_reviews or [])],
+        "review_comments": review_comments or [],
+        "pr_reactions": [_reaction()] if reactions is None else reactions,
+    }
+    if review_threads is not None:
+        kwargs["review_threads"] = review_threads
+    if tracker_issues is not None:
+        kwargs["tracker_issues"] = tracker_issues
     return _v1.m.verify_records(
-        [current, summary],
-        policy=_v1.POLICY,
+        [current, summary, *(extra_comments or [])],
+        policy=_policy(),
         repo_root=repo,
         tier="R2",
         fingerprint=_v1.core_tests.ISSUE_FP,
@@ -148,9 +241,7 @@ def _verify_summary(*, summary_prefix: str | None = None,
         repository="Oteryn/Test",
         pr_number=7,
         token="x",
-        reviews=[_v1.core_tests.request_anchor(current, final), *(extra_reviews or [])],
-        review_comments=review_comments or [],
-        pr_reactions=[_reaction()] if reactions is None else reactions,
+        **kwargs,
     )
 
 
@@ -167,14 +258,241 @@ def test_current_codex_summary_requires_trusted_pr_reaction() -> None:
     )
 
 
-def test_current_codex_summary_accepts_exact_trusted_p2_without_reaction() -> None:
+def test_current_codex_summary_rejects_unresolved_p2_without_reaction() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        reactions=[], extra_reviews=[_p2_review(final)], review_comments=[_p2_inline()],
+    ))
+
+
+def test_current_codex_summary_accepts_resolved_tracked_p2_without_reaction() -> None:
     repo, _, final = _v1.core_tests.make_repo()
     found = _verify_summary(
         reactions=[],
-        extra_reviews=[_p2_review(final)],
+        extra_reviews=[_p2_review(final, body=_codex_review_envelope(final))],
         review_comments=[_p2_inline()],
+        review_threads=[_p2_thread()],
+        tracker_issues={114: _tracker_issue()},
     )
     assert found["review_source_kind"] == "issue_comment_result"
+    assert found["review_outcome"] == "ACCEPTED_WITH_FOLLOW_UP"
+    assert found["follow_up_issue_numbers"] == [114]
+
+
+def test_current_codex_summary_accepts_64_bit_graphql_comment_identity() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    comment_id = 3_889_251_323
+    found = _verify_summary(
+        reactions=[], extra_reviews=[_p2_review(final)],
+        review_comments=[_p2_inline(comment_id=comment_id)],
+        review_threads=[_p2_thread(comment_id=comment_id)],
+        tracker_issues={114: _tracker_issue()},
+    )
+    assert found["finding_comment_ids"] == [comment_id]
+
+
+def test_current_codex_summary_rejects_unresolved_tracked_p2_without_reaction() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        reactions=[], extra_reviews=[_p2_review(final)], review_comments=[_p2_inline()],
+        review_threads=[_p2_thread(resolved=False)], tracker_issues={114: _tracker_issue()},
+    ))
+
+
+def test_current_codex_summary_rejects_unresolved_p2_even_with_clean_reaction() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        extra_reviews=[_p2_review(final)], review_comments=[_p2_inline()],
+    ))
+
+
+def test_current_codex_summary_rejects_p2_outside_eligible_review_even_with_clean_reaction() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    cases = [
+        (_p2_review(final, state="CHANGES_REQUESTED"), _p2_inline()),
+        (_p2_review(final, submitted_at="2026-08-20T10:01:01Z"), _p2_inline()),
+        (_p2_review(final, review_id=703), _p2_inline(review_id=703)),
+    ]
+    for review, inline in cases:
+        _v1.core_tests.expect_fail(lambda: _verify_summary(
+            extra_reviews=[review], review_comments=[inline],
+        ))
+
+
+def test_current_codex_summary_rejects_ambiguous_or_top_level_p2_with_clean_reaction() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        extra_reviews=[_p2_review(final), _p2_review(final, review_id=703)],
+        review_comments=[_p2_inline(), _p2_inline(review_id=703)],
+    ))
+    top_level_p2 = _v1.core_tests.issue_comment(
+        12,
+        "[P2] This finding is not attached to an inline review thread",
+        login="chatgpt-codex-connector[bot]",
+        stamp="2026-08-20T10:01:01Z",
+    )
+    _v1.core_tests.expect_fail(lambda: _verify_summary(extra_comments=[top_level_p2]))
+
+
+def test_current_codex_summary_rejects_unclassified_or_escalated_review_body() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    for state in ("COMMENTED", "CHANGES_REQUESTED"):
+        _v1.core_tests.expect_fail(lambda: _verify_summary(
+            extra_reviews=[_p2_review(
+                final, state=state, body="Please fix the unsafe boundary before merge."
+            )],
+        ))
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        extra_reviews=[_p2_review(
+            final, body=_codex_review_envelope(final, extra="Please fix the unsafe boundary before merge.")
+        )],
+    ))
+
+
+def test_current_codex_summary_preserves_clean_approved_review_path() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    found = _verify_summary(extra_reviews=[_p2_review(final, state="APPROVED")])
+    assert found["review_source_kind"] == "issue_comment_result"
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        extra_reviews=[_p2_review(
+            final, state="APPROVED", body="Please fix the unsafe boundary before merge."
+        )],
+    ))
+
+
+def test_issue_comment_clean_result_rejects_current_head_p2_without_summary() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    current = _v1.core_tests.issue_comment(
+        10, _v1.core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
+    )
+    result = _v1.core_tests.codex_result(
+        11, final[:10], stamp="2026-08-20T10:01:00Z",
+        text=_v1._live_clean_text(final, "Keep it up!"),
+    )
+    _v1.core_tests.expect_fail(lambda: _v1.m.verify_records(
+        [current, result],
+        policy=_policy(),
+        repo_root=repo,
+        tier="R2",
+        fingerprint=_v1.core_tests.ISSUE_FP,
+        head=final,
+        repository="Oteryn/Test",
+        pr_number=7,
+        token="x",
+        reviews=[
+            _v1.core_tests.request_anchor(current, final),
+            _p2_review(final),
+        ],
+        review_comments=[_p2_inline()],
+    ))
+
+
+def test_issue_comment_clean_result_rejects_unenveloped_current_head_findings() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    current = _v1.core_tests.issue_comment(
+        10, _v1.core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
+    )
+    result = _v1.core_tests.codex_result(
+        11, final[:10], stamp="2026-08-20T10:01:00Z",
+        text=_v1._live_clean_text(final, "Keep it up!"),
+    )
+    anchor = _v1.core_tests.request_anchor(current, final)
+    top_level_p2 = _v1.core_tests.issue_comment(
+        12, "[P2] Do not accept a top-level finding", login="chatgpt-codex-connector[bot]",
+        stamp="2026-08-20T10:01:01Z",
+    )
+    cases = [
+        ([anchor, _p2_review(final, body="Unsafe boundary before merge.")], [], [current, result]),
+        ([anchor, _p2_review(final, state="CHANGES_REQUESTED", body="Unsafe boundary before merge.")], [], [current, result]),
+        ([anchor, _p2_review(final, state="APPROVED", body="Unsafe boundary before merge.")], [], [current, result]),
+        ([anchor, _p2_review(final)], [_p2_inline(body="Unsafe boundary before merge.")], [current, result]),
+        ([anchor], [_p2_inline(review_id=999)], [current, result]),
+        ([anchor], [_p2_inline(review_id=999, body="[P1] Unsafe boundary before merge.")], [current, result]),
+        ([anchor], [_p2_inline(review_id=999, body="Unsafe orphan classification")], [current, result]),
+        ([_p2_review("not-a-sha", review_id=999)], [_p2_inline(
+            review_id=999, body="[P1] Unsafe malformed review head"
+        )], [current, result]),
+        ([anchor], [], [current, result, top_level_p2]),
+    ]
+    for reviews, review_comments, comments in cases:
+        _v1.core_tests.expect_fail(lambda reviews=reviews, review_comments=review_comments, comments=comments:
+            _v1.m.verify_records(
+                comments,
+                policy=_policy(),
+                repo_root=repo,
+                tier="R2",
+                fingerprint=_v1.core_tests.ISSUE_FP,
+                head=final,
+                repository="Oteryn/Test",
+                pr_number=7,
+                token="x",
+                reviews=reviews,
+                review_comments=review_comments,
+            )
+        )
+
+
+def test_current_codex_summary_rejects_edited_or_untrusted_p2_disposition() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    for thread in (
+        _p2_thread(disposition_edited=True),
+        _p2_thread(disposition_association="CONTRIBUTOR"),
+    ):
+        _v1.core_tests.expect_fail(lambda: _verify_summary(
+            reactions=[], extra_reviews=[_p2_review(final)], review_comments=[_p2_inline()],
+            review_threads=[thread], tracker_issues={114: _tracker_issue()},
+        ))
+
+
+def test_current_codex_summary_rejects_bad_p2_tracker_identity_or_state() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    invalid_issues = []
+    closed = _tracker_issue()
+    closed["state"] = "closed"
+    invalid_issues.append(closed)
+    cross_repository = _tracker_issue()
+    cross_repository["repository_url"] = "https://api.github.com/repos/Oteryn/Other"
+    invalid_issues.append(cross_repository)
+    pull_request = _tracker_issue()
+    pull_request["pull_request"] = {}
+    invalid_issues.append(pull_request)
+    for issue in invalid_issues:
+        _v1.core_tests.expect_fail(lambda: _verify_summary(
+            reactions=[], extra_reviews=[_p2_review(final)], review_comments=[_p2_inline()],
+            review_threads=[_p2_thread()], tracker_issues={114: issue},
+        ))
+
+
+def test_current_codex_summary_rejects_unclassified_current_generation_inline() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    inline = _p2_inline(body="Please account for this review concern")
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        reactions=[], extra_reviews=[_p2_review(final)], review_comments=[inline],
+        review_threads=[_p2_thread()], tracker_issues={114: _tracker_issue()},
+    ))
+
+
+def test_current_codex_summary_rejects_orphan_blocking_inline_finding() -> None:
+    for severity in ("P0", "P1"):
+        _v1.core_tests.expect_fail(lambda severity=severity: _verify_summary(
+            review_comments=[_p2_inline(
+                review_id=999, body=f"[{severity}] Unsafe boundary before merge."
+            )],
+        ))
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        review_comments=[_p2_inline(review_id=999, body="Unsafe orphan classification")],
+    ))
+    for malformed_id in (None, 701.9, True):
+        _v1.core_tests.expect_fail(lambda malformed_id=malformed_id: _verify_summary(
+            review_comments=[_p2_inline(
+                review_id=malformed_id, body="Unsafe malformed classification"
+            )],
+        ))
+    for malformed_head in (None, "", "not-a-sha", True):
+        _v1.core_tests.expect_fail(lambda malformed_head=malformed_head: _verify_summary(
+            extra_reviews=[_p2_review(malformed_head, review_id=999)],
+            review_comments=[_p2_inline(review_id=999, body="[P1] Unsafe malformed review head")],
+        ))
 
 
 def test_current_codex_summary_rejects_p2_from_wrong_head() -> None:

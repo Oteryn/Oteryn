@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 import re
 import types
+import urllib.request
 from pathlib import Path
 
 _ENTRYPOINT = Path(__file__).resolve()
@@ -40,6 +41,9 @@ _P2_FINDING_RE = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?"
     r"(?:\[P2\]|P2\b|(?:<sub>){1,2}!\[P2 Badge\])"
 )
+_TRACKED_P2_REPLY_RE = re.compile(r"^Tracked in #([1-9][0-9]*)\.$")
+_TRUSTED_MAINTAINER_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+_POSITIVE_DECIMAL_RE = re.compile(r"^[1-9][0-9]*$")
 
 
 def _compat_parse_clean_result(body: str) -> str | None:
@@ -99,6 +103,14 @@ def _utc_timestamp(raw: object) -> datetime | None:
 
 def _strict_positive_int(raw: object) -> int | None:
     return raw if type(raw) is int and raw > 0 else None
+
+
+def _strict_graphql_database_id(raw: object) -> int | None:
+    if type(raw) is int and raw > 0:
+        return raw
+    if isinstance(raw, str) and _POSITIVE_DECIMAL_RE.fullmatch(raw):
+        return int(raw)
+    return None
 
 
 def _parse_completed_summary(body: str) -> tuple[datetime, str] | None:
@@ -211,43 +223,314 @@ def _same_generation_clean_echoes(
     return echoes
 
 
-def _trusted_nonblocking_p2_time(
-    *, reviews: list[dict], review_comments: list[dict], trusted_logins: set[str],
+def _fetch_graphql(query: str, variables: dict[str, object], token: str) -> dict:
+    request = urllib.request.Request(
+        "https://api.github.com/graphql",
+        data=json.dumps({"query": query, "variables": variables}).encode("utf-8"),
+        method="POST",
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {token}",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "oteryn-ai-review-gate",
+        },
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        value = json.load(response)
+    if not isinstance(value, dict) or value.get("errors") or not isinstance(value.get("data"), dict):
+        raise RuntimeError("GitHub GraphQL review-thread response is malformed")
+    return value["data"]
+
+
+def fetch_review_threads(repository: str, pr_number: int, token: str) -> list[dict]:
+    """Fetch complete review-thread state; a truncated nested connection fails closed."""
+    if not re.fullmatch(r"[^/\s]+/[^/\s]+", repository) or pr_number <= 0:
+        raise RuntimeError("review-thread request identity is malformed")
+    owner, name = repository.split("/", 1)
+    query = """
+query($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100, after: $after) {
+        nodes {
+          id
+          isResolved
+          comments(first: 100) {
+            nodes {
+              fullDatabaseId
+              body
+              author { login }
+              authorAssociation
+              createdAt
+              lastEditedAt
+            }
+            pageInfo { hasNextPage }
+          }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}
+"""
+    threads: list[dict] = []
+    after: str | None = None
+    while True:
+        data = _fetch_graphql(
+            query, {"owner": owner, "name": name, "number": pr_number, "after": after}, token
+        )
+        pull_request = ((data.get("repository") or {}).get("pullRequest"))
+        connection = (pull_request or {}).get("reviewThreads") if isinstance(pull_request, dict) else None
+        if not isinstance(connection, dict):
+            raise RuntimeError("GitHub review-thread connection is malformed")
+        nodes = connection.get("nodes")
+        page_info = connection.get("pageInfo")
+        if not isinstance(nodes, list) or any(not isinstance(node, dict) for node in nodes):
+            raise RuntimeError("GitHub review-thread nodes are malformed")
+        if not isinstance(page_info, dict) or type(page_info.get("hasNextPage")) is not bool:
+            raise RuntimeError("GitHub review-thread pagination is malformed")
+        for thread in nodes:
+            comments = thread.get("comments")
+            comment_page = comments.get("pageInfo") if isinstance(comments, dict) else None
+            if not isinstance(comment_page, dict) or comment_page.get("hasNextPage") is not False:
+                raise RuntimeError("GitHub review-thread comments are truncated or malformed")
+        threads.extend(nodes)
+        if page_info["hasNextPage"] is False:
+            return threads
+        cursor = page_info.get("endCursor")
+        if not isinstance(cursor, str) or not cursor:
+            raise RuntimeError("GitHub review-thread cursor is malformed")
+        after = cursor
+
+
+def _thread_comment_map(review_threads: object) -> dict[int, tuple[dict, list[dict]]]:
+    if not isinstance(review_threads, list) or any(not isinstance(thread, dict) for thread in review_threads):
+        raise RuntimeError("review-thread evidence is missing or malformed")
+    by_comment: dict[int, tuple[dict, list[dict]]] = {}
+    for thread in review_threads:
+        thread_id = thread.get("id")
+        comments = thread.get("comments")
+        nodes = comments.get("nodes") if isinstance(comments, dict) else None
+        page_info = comments.get("pageInfo") if isinstance(comments, dict) else None
+        if (
+            not isinstance(thread_id, str)
+            or not thread_id
+            or type(thread.get("isResolved")) is not bool
+            or not isinstance(nodes, list)
+            or any(not isinstance(node, dict) for node in nodes)
+            or not isinstance(page_info, dict)
+            or page_info.get("hasNextPage") is not False
+        ):
+            raise RuntimeError("review-thread evidence is malformed or truncated")
+        for node in nodes:
+            comment_id = _strict_graphql_database_id(node.get("fullDatabaseId"))
+            if comment_id is None or comment_id in by_comment:
+                raise RuntimeError("review-thread comment identity is malformed or ambiguous")
+            by_comment[comment_id] = (thread, nodes)
+    return by_comment
+
+
+def _trusted_review_body_is_nonfinding(body: str, reviewed_head: str) -> bool:
+    lines = [line.strip() for line in (body or "").splitlines() if line.strip()]
+    if len(lines) != 12 or lines[0] != "### 💡 Codex Review":
+        return False
+    reviewed = _REVIEWED_COMMIT_LINE.fullmatch(lines[2])
+    if reviewed is None or not reviewed_head.startswith(reviewed.group(1)):
+        return False
+    return lines == [
+        "### 💡 Codex Review",
+        "Here are some automated review suggestions for this pull request.",
+        lines[2],
+        "<details> <summary>ℹ️ About Codex in GitHub</summary>",
+        "<br/>",
+        "[Your team has set up Codex to review pull requests in this repo]"
+        "(https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you",
+        "- Open a pull request for review",
+        "- Mark a draft as ready",
+        '- Comment "@codex review".',
+        "If Codex has suggestions, it will comment; otherwise it will react with 👍.",
+        'Codex can also answer questions or update the PR. Try commenting "@codex address that feedback".',
+        "</details>",
+    ]
+
+
+def _open_same_repository_issue(
+    *, issue_number: int, repository: str, token: str, tracker_issues: dict[int, dict] | None,
+) -> dict:
+    if tracker_issues is None:
+        issue = _v1._core.fetch_json(
+            f"https://api.github.com/repos/{repository}/issues/{issue_number}", token
+        )
+    else:
+        issue = tracker_issues.get(issue_number)
+    expected_repository_url = f"https://api.github.com/repos/{repository}"
+    expected_issue_url = f"{expected_repository_url}/issues/{issue_number}"
+    if (
+        not isinstance(issue, dict)
+        or issue.get("number") != issue_number
+        or issue.get("state") != "open"
+        or issue.get("repository_url") != expected_repository_url
+        or issue.get("url") != expected_issue_url
+        or ("pull_request" in issue and issue.get("pull_request") is not None)
+    ):
+        raise RuntimeError("P2 follow-up tracker is not an open same-repository issue")
+    return issue
+
+
+def _p2_follow_up_config(policy: dict) -> tuple[str, set[str]]:
+    config = policy.get("p2_follow_up")
+    if not isinstance(config, dict):
+        raise RuntimeError("P2 follow-up policy is missing or malformed")
+    associations = config.get("trusted_maintainer_associations")
+    if (
+        config.get("outcome") != "ACCEPTED_WITH_FOLLOW_UP"
+        or config.get("thread_must_be_resolved") is not True
+        or config.get("tracker_reply_format") != "Tracked in #<issue>."
+        or config.get("tracker_must_be_open_same_repository_issue") is not True
+        or not isinstance(associations, list)
+        or set(associations) != _TRUSTED_MAINTAINER_ASSOCIATIONS
+        or len(associations) != len(_TRUSTED_MAINTAINER_ASSOCIATIONS)
+    ):
+        raise RuntimeError("P2 follow-up policy is missing or malformed")
+    return config["outcome"], set(associations)
+
+
+def _reject_unenveloped_current_head_findings(
+    *, reviews: list[dict], review_comments: list[dict], policy: dict,
+    comments: list[dict], reviewed_head: str, repository: str, pr_number: int,
+) -> None:
+    """Fail closed before legacy evidence can bypass current trusted review findings."""
+    trusted_logins = {
+        str(login).casefold()
+        for values in policy.get("reviewer_source_logins", {}).values()
+        for login in values
+    }
+    pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
+    current_review_ids: set[int] = set()
+    trusted_review_ids: set[int] = set()
+    for review in reviews:
+        if (
+            str((review.get("user") or {}).get("login", "")).casefold() not in trusted_logins
+            or review.get("pull_request_url") != pull_url
+        ):
+            continue
+        commit_id = review.get("commit_id")
+        if not isinstance(commit_id, str) or _v1._core.FULL_SHA.fullmatch(commit_id) is None:
+            raise RuntimeError("trusted review commit identity is malformed")
+        review_id = _strict_positive_int(review.get("id"))
+        if review_id is not None:
+            trusted_review_ids.add(review_id)
+        if commit_id != reviewed_head:
+            continue
+        review_body = str(review.get("body") or "")
+        if review.get("state") not in {"COMMENTED", "APPROVED"}:
+            raise RuntimeError("trusted current-head review has an escalated or unknown state")
+        if _P2_FINDING_RE.search(review_body):
+            raise RuntimeError("current-head P2 finding requires the accepted Codex summary and follow-up envelope")
+        if review_body and not _trusted_review_body_is_nonfinding(review_body, reviewed_head):
+            raise RuntimeError("trusted current-head review body is unclassified")
+        if review_id is not None:
+            current_review_ids.add(review_id)
+    for comment in review_comments:
+        if (
+            str((comment.get("user") or {}).get("login", "")).casefold() not in trusted_logins
+            or comment.get("pull_request_url") != pull_url
+        ):
+            continue
+        body = str(comment.get("body") or "")
+        review_id = _strict_positive_int(comment.get("pull_request_review_id"))
+        is_p2 = _P2_FINDING_RE.search(body) is not None
+        if review_id is None or review_id not in current_review_ids:
+            if review_id in trusted_review_ids:
+                continue
+            if body:
+                raise RuntimeError("trusted inline finding has no exact known parent review")
+            continue
+        if is_p2:
+            raise RuntimeError("current-head P2 finding requires the accepted Codex summary and follow-up envelope")
+        raise RuntimeError("trusted current-generation inline finding is unclassified")
+    for comment in comments:
+        if (
+            str((comment.get("user") or {}).get("login", "")).casefold() in trusted_logins
+            and _v1._core._issue_comment_identity(comment, repository, pr_number)
+            and _P2_FINDING_RE.search(str(comment.get("body") or ""))
+        ):
+            raise RuntimeError("trusted P2 finding must use the accepted summary and inline follow-up envelope")
+
+
+def _accepted_p2_follow_up(
+    *, comments: list[dict], reviews: list[dict], review_comments: list[dict], review_threads: object,
+    tracker_issues: dict[int, dict] | None, policy: dict, trusted_logins: set[str],
     reviewed_head: str, repository: str, pr_number: int, request_at: datetime,
-    completed_at: datetime,
-) -> datetime | None:
-    """Return the unique exact-head trusted P2 review timestamp, or no evidence."""
+    completed_at: datetime, token: str,
+) -> dict | None:
+    """Validate resolved exact-head P2 findings with durable same-repo issue tracking."""
+    outcome, trusted_maintainer_associations = _p2_follow_up_config(policy)
     pull_url = f"https://api.github.com/repos/{repository}/pulls/{pr_number}"
     candidates: dict[int, datetime] = {}
+    trusted_reviews: dict[int, dict] = {}
+    current_review_ids: set[int] = set()
     for review in reviews:
         login = str((review.get("user") or {}).get("login", "")).casefold()
         if (
             login not in trusted_logins
             or review.get("pull_request_url") != pull_url
-            or review.get("commit_id") != reviewed_head
-            or review.get("state") != "COMMENTED"
         ):
             continue
         review_id = _strict_positive_int(review.get("id"))
         if review_id is None:
             raise RuntimeError("trusted P2 review identity is malformed")
+        if review_id in trusted_reviews:
+            raise RuntimeError("trusted P2 review identity is ambiguous")
+        trusted_reviews[review_id] = review
+        commit_id = review.get("commit_id")
+        if not isinstance(commit_id, str) or _v1._core.FULL_SHA.fullmatch(commit_id) is None:
+            raise RuntimeError("trusted P2 review commit identity is malformed")
+        if commit_id != reviewed_head:
+            continue
+        current_review_ids.add(review_id)
+        review_body = str(review.get("body") or "")
+        review_state = review.get("state")
+        if review_state == "APPROVED":
+            if _P2_FINDING_RE.search(review_body):
+                raise RuntimeError("trusted P2 finding must be an inline root comment")
+            if review_body and not _trusted_review_body_is_nonfinding(review_body, reviewed_head):
+                raise RuntimeError("trusted current-head approved review body is unclassified")
+            continue
+        if review_state != "COMMENTED":
+            raise RuntimeError("trusted current-head review has an escalated or unknown state")
+        if _P2_FINDING_RE.search(review_body):
+            raise RuntimeError("trusted P2 finding must be an inline root comment")
+        if review_body and not _trusted_review_body_is_nonfinding(review_body, reviewed_head):
+            raise RuntimeError("trusted current-head review body is unclassified")
         submitted_at = _utc_timestamp(review.get("submitted_at"))
         if submitted_at is None:
             raise RuntimeError("trusted P2 review timestamp is malformed")
         if request_at < submitted_at <= completed_at:
+            if review_id in candidates:
+                raise RuntimeError("trusted P2 review identity is ambiguous")
             candidates[review_id] = submitted_at
 
-    p2_review_ids: set[int] = set()
+    candidate_review_id = next(iter(candidates)) if len(candidates) == 1 else None
+    review_at = candidates.get(candidate_review_id) if candidate_review_id is not None else None
+    p2_comments: list[dict] = []
+    p2_comment_ids: set[int] = set()
     for comment in review_comments:
         login = str((comment.get("user") or {}).get("login", "")).casefold()
         if login not in trusted_logins or comment.get("pull_request_url") != pull_url:
             continue
         review_id = _strict_positive_int(comment.get("pull_request_review_id"))
         if review_id is None:
-            if _P2_FINDING_RE.search(str(comment.get("body") or "")):
-                raise RuntimeError("trusted P2 inline finding identity is malformed")
+            if str(comment.get("body") or ""):
+                raise RuntimeError("trusted inline finding identity is malformed")
             continue
-        if review_id not in candidates:
+        parent_review = trusted_reviews.get(review_id)
+        if parent_review is None:
+            body = str(comment.get("body") or "")
+            if body:
+                raise RuntimeError("trusted inline finding parent review is missing")
+            continue
+        if review_id not in current_review_ids:
             continue
         created_at = _utc_timestamp(comment.get("created_at"))
         updated_at = _utc_timestamp(comment.get("updated_at"))
@@ -257,20 +540,114 @@ def _trusted_nonblocking_p2_time(
             or not (request_at < created_at <= completed_at)
         ):
             raise RuntimeError("trusted P2 inline finding metadata is malformed")
-        if _P2_FINDING_RE.search(str(comment.get("body") or "")):
-            p2_review_ids.add(review_id)
+        if comment.get("in_reply_to_id") is not None:
+            raise RuntimeError("trusted current-generation inline finding is not a root comment")
+        if not _P2_FINDING_RE.search(str(comment.get("body") or "")):
+            raise RuntimeError("trusted current-generation inline finding is unclassified")
+        if review_id != candidate_review_id:
+            raise RuntimeError("trusted P2 inline finding is outside the exact review generation")
+        comment_id = _strict_positive_int(comment.get("id"))
+        if comment_id is None or comment_id in p2_comment_ids:
+            raise RuntimeError("trusted P2 inline finding identity is malformed")
+        p2_comment_ids.add(comment_id)
+        p2_comments.append(comment)
 
-    if len(candidates) != 1 or len(p2_review_ids) != 1:
+    for comment in comments:
+        if (
+            str((comment.get("user") or {}).get("login", "")).casefold() in trusted_logins
+            and _v1._core._issue_comment_identity(comment, repository, pr_number)
+            and (created_at := _utc_timestamp(comment.get("created_at"))) is not None
+            and created_at > request_at
+            and _P2_FINDING_RE.search(str(comment.get("body") or ""))
+        ):
+            raise RuntimeError("trusted P2 finding must be an inline root comment")
+
+    if not p2_comments:
         return None
-    review_id = next(iter(p2_review_ids))
-    return candidates[review_id]
+    if review_at is None:
+        raise RuntimeError("trusted P2 review generation is missing or ambiguous")
+    if callable(review_threads):
+        review_threads = review_threads()
+
+    thread_by_comment = _thread_comment_map(review_threads)
+    thread_ids: set[str] = set()
+    issue_numbers: set[int] = set()
+    finding_ids: list[int] = []
+    accepted_at = review_at
+    for comment in p2_comments:
+        comment_id = _strict_positive_int(comment.get("id"))
+        if comment_id is None:
+            raise RuntimeError("trusted P2 inline finding identity is malformed")
+        thread_entry = thread_by_comment.get(comment_id)
+        if thread_entry is None:
+            raise RuntimeError("P2 inline finding has no exact review thread")
+        thread, nodes = thread_entry
+        if thread.get("isResolved") is not True:
+            raise RuntimeError("P2 review thread is unresolved")
+        root = next(
+            (node for node in nodes if _strict_graphql_database_id(node.get("fullDatabaseId")) == comment_id),
+            None,
+        )
+        if not isinstance(root, dict) or (
+            root.get("body") != comment.get("body")
+            or str((root.get("author") or {}).get("login", "")).casefold()
+            != str((comment.get("user") or {}).get("login", "")).casefold()
+            or root.get("createdAt") != comment.get("created_at")
+            or root.get("lastEditedAt") is not None
+        ):
+            raise RuntimeError("P2 review-thread root identity is malformed or edited")
+        root_at = _utc_timestamp(root.get("createdAt"))
+        if root_at is None:
+            raise RuntimeError("P2 review-thread root timestamp is malformed")
+
+        trusted_replies: list[tuple[dict, datetime, re.Match[str]]] = []
+        for node in nodes:
+            if node is root:
+                continue
+            association = str(node.get("authorAssociation") or "")
+            if association not in trusted_maintainer_associations:
+                continue
+            reply_at = _utc_timestamp(node.get("createdAt"))
+            tracker = _TRACKED_P2_REPLY_RE.fullmatch(str(node.get("body") or ""))
+            if (
+                node.get("lastEditedAt") is not None
+                or reply_at is None
+                or reply_at <= root_at
+                or tracker is None
+                or not str((node.get("author") or {}).get("login", "")).strip()
+            ):
+                raise RuntimeError("P2 follow-up disposition is malformed or edited")
+            trusted_replies.append((node, reply_at, tracker))
+        if len(trusted_replies) != 1:
+            raise RuntimeError("P2 follow-up requires exactly one trusted maintainer disposition")
+        _, disposition_at, tracker = trusted_replies[0]
+        issue_number = int(tracker.group(1))
+        _open_same_repository_issue(
+            issue_number=issue_number, repository=repository, token=token,
+            tracker_issues=tracker_issues,
+        )
+        thread_id = str(thread["id"])
+        thread_ids.add(thread_id)
+        issue_numbers.add(issue_number)
+        finding_ids.append(comment_id)
+        accepted_at = max(accepted_at, disposition_at)
+
+    return {
+        "review_outcome": outcome,
+        "accepted_at": accepted_at,
+        "p2_review_id": candidate_review_id,
+        "finding_comment_ids": sorted(finding_ids),
+        "review_thread_ids": sorted(thread_ids),
+        "follow_up_issue_numbers": sorted(issue_numbers),
+    }
 
 
 def _normalize_current_codex_summary(
     comments: list[dict], *, pr_reactions: list[dict], policy: dict,
     repo_root: str | Path, tier: str, fingerprint: str, head: str,
     repository: str, pr_number: int, reviews: list[dict], review_comments: list[dict],
-) -> list[dict]:
+    review_threads: object, tracker_issues: dict[int, dict] | None, token: str,
+) -> tuple[list[dict], dict | None]:
     configured_logins = {
         str(login).casefold()
         for values in policy.get("reviewer_source_logins", {}).values()
@@ -282,7 +659,16 @@ def _normalize_current_codex_summary(
         and str((comment.get("user") or {}).get("login", "")).casefold() in configured_logins
     ]
     if not summary_candidates:
-        return comments
+        _reject_unenveloped_current_head_findings(
+            reviews=reviews,
+            review_comments=review_comments,
+            policy=policy,
+            comments=comments,
+            reviewed_head=head,
+            repository=repository,
+            pr_number=pr_number,
+        )
+        return comments, None
     if len(summary_candidates) != 1:
         raise RuntimeError("trusted Codex review summary is ambiguous")
 
@@ -344,11 +730,31 @@ def _normalize_current_codex_summary(
             matching_reactions.append(reaction)
     if len(matching_reactions) > 1:
         raise RuntimeError("current Codex summary has ambiguous trusted post-completion PR reactions")
+    p2_trusted_logins = {
+        str(login).casefold()
+        for values in policy.get("reviewer_source_logins", {}).values()
+        for login in values
+    }
+    p2_follow_up = _accepted_p2_follow_up(
+        comments=comments, reviews=reviews, review_comments=review_comments, review_threads=review_threads,
+        tracker_issues=tracker_issues, policy=policy,
+        trusted_logins=p2_trusted_logins,
+        reviewed_head=reviewed_head,
+        repository=repository,
+        pr_number=pr_number,
+        request_at=request_at,
+        completed_at=completed_at,
+        token=token,
+    )
     if len(matching_reactions) == 1:
         reaction_at_raw = str(matching_reactions[0].get("created_at") or "")
         reaction_at = _utc_timestamp(reaction_at_raw)
         if reaction_at is None:
             raise RuntimeError("trusted Codex reaction timestamp is malformed")
+        if p2_follow_up is not None:
+            reaction_at_raw = max(reaction_at, p2_follow_up["accepted_at"]).isoformat().replace(
+                "+00:00", "Z"
+            )
         redundant_echoes = _same_generation_clean_echoes(
             comments,
             summary=summary,
@@ -361,22 +767,12 @@ def _normalize_current_codex_summary(
             pr_number=pr_number,
         )
     else:
-        p2_at = _trusted_nonblocking_p2_time(
-            reviews=reviews,
-            review_comments=review_comments,
-            trusted_logins=trusted_logins,
-            reviewed_head=reviewed_head,
-            repository=repository,
-            pr_number=pr_number,
-            request_at=request_at,
-            completed_at=completed_at,
-        )
-        if p2_at is None:
+        if p2_follow_up is None:
             raise RuntimeError(
                 "current Codex summary requires one trusted post-completion PR reaction "
-                "or one exact trusted P2 review"
+                "or resolved P2 follow-up evidence"
             )
-        reaction_at_raw = p2_at.isoformat().replace("+00:00", "Z")
+        reaction_at_raw = p2_follow_up["accepted_at"].isoformat().replace("+00:00", "Z")
         redundant_echoes = []
 
     synthetic = deepcopy(summary)
@@ -392,16 +788,29 @@ def _normalize_current_codex_summary(
         synthetic if comment is summary else comment
         for comment in comments
         if id(comment) not in redundant_ids
-    ]
+    ], p2_follow_up
 
 
 def _compat_verify_records_v3(comments: list[dict], **kwargs) -> dict:
     """Adapt the current Codex summary/reaction envelope into the preserved verifier."""
     pr_reactions = kwargs.pop("pr_reactions", None)
-    if pr_reactions is not None:
+    review_threads = kwargs.pop("review_threads", None)
+    tracker_issues = kwargs.pop("tracker_issues", None)
+    accepted_follow_up: dict | None = None
+    if pr_reactions is None:
+        _reject_unenveloped_current_head_findings(
+            reviews=kwargs.get("reviews") or [],
+            review_comments=kwargs.get("review_comments") or [],
+            policy=kwargs["policy"],
+            comments=comments,
+            reviewed_head=kwargs["head"],
+            repository=kwargs["repository"],
+            pr_number=kwargs["pr_number"],
+        )
+    else:
         if not isinstance(pr_reactions, list) or any(not isinstance(item, dict) for item in pr_reactions):
             raise RuntimeError("pull request reactions response is malformed")
-        comments = _normalize_current_codex_summary(
+        comments, accepted_follow_up = _normalize_current_codex_summary(
             comments,
             pr_reactions=pr_reactions,
             policy=kwargs["policy"],
@@ -413,8 +822,21 @@ def _compat_verify_records_v3(comments: list[dict], **kwargs) -> dict:
             pr_number=kwargs["pr_number"],
             reviews=kwargs.get("reviews") or [],
             review_comments=kwargs.get("review_comments") or [],
+            review_threads=review_threads,
+            tracker_issues=tracker_issues,
+            token=kwargs["token"],
         )
-    return _compat_verify_records_v2(comments, **kwargs)
+    result = _compat_verify_records_v2(comments, **kwargs)
+    if accepted_follow_up is not None:
+        result = dict(result)
+        result.update({
+            "review_outcome": accepted_follow_up["review_outcome"],
+            "p2_review_id": accepted_follow_up["p2_review_id"],
+            "finding_comment_ids": accepted_follow_up["finding_comment_ids"],
+            "review_thread_ids": accepted_follow_up["review_thread_ids"],
+            "follow_up_issue_numbers": accepted_follow_up["follow_up_issue_numbers"],
+        })
+    return result
 
 
 def fetch_pr_reactions(repository: str, pr_number: int, token: str) -> list[dict]:
@@ -451,6 +873,7 @@ def main() -> int:
         token=args.token,
         reviews=_v1._core.fetch_reviews(args.repository, args.pr_number, args.token),
         review_comments=_v1._core.fetch_review_comments(args.repository, args.pr_number, args.token),
+        review_threads=lambda: fetch_review_threads(args.repository, args.pr_number, args.token),
         pr_reactions=fetch_pr_reactions(args.repository, args.pr_number, args.token),
     )
     print(json.dumps(match, sort_keys=True))
