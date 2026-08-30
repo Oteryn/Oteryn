@@ -66,13 +66,13 @@ A frozen candidate may be changed only for a material reason such as:
 - semantic reconciliation with authoritative upstream change;
 - changed governing authority that materially affects the task.
 
-A legitimate repair is a durable transition, not a worker assertion. Before opening it, the frozen checkpoint records an allowlisted `material_change_reason`, a verified immutable `material_fact_id`, and `material_fact_head` equal to the exact frozen head. The next checkpoint opens one repair generation by changing `candidate_frozen` to `false`, retaining that same fact, recording its `repair_generation_id`/`repair_base_head`, and incrementing `post_freeze_material_head_changes` exactly once. Setting `material_change=true` in only the proposed snapshot is never sufficient.
+A legitimate repair is an atomic control-plane transition, not a worker assertion. `observe` may not alter freeze, material-fact, repair, counter, review-binding, completion or risk-ledger fields. Opening `open_material_repair` requires a `MaterialFactEnvelope` verified by a trusted authority and canonically tied to the repository, task, exact frozen head, immutable policy ID/digest, allowlisted reason and source evidence. The durable checkpoint/outbox must then compare-and-swap the prior checkpoint while it creates the one repair reservation. No snapshot boolean such as `material_fact_verified`, nor a proposed `material_change=true`, is evidence or authority. The committed repair checkpoint records the envelope ID as its `repair_generation_id`, retains `repair_base_head`, and increments `post_freeze_material_head_changes` exactly once.
 
-While that repair generation is open, its material fact and base coordinates remain immutable; one or more real technical changes may be made without consuming a second generation. Refreezing is allowed only after the candidate has a new technical head **and** a changed canonical review/risk fingerprint. `retrigger` is never a material repair action. The worker then freezes the new candidate before final qualification resumes.
+While that repair generation is open, its verified envelope and base coordinates remain immutable; one or more real technical changes may be made without consuming a second generation. Refreezing is a reserved transition and is allowed only after the candidate has a new technical head **and** a changed trusted review-risk binding. `retrigger` is never a material repair action. The worker then freezes the new candidate before final qualification resumes.
 
 `complete` is admitted only from `final_qualification` with that exact candidate frozen; verified completion evidence alone cannot bypass either invariant.
 
-The durable checkpoint writer must compare-and-swap the previous revision before dispatching a consumed action and use an idempotency key over task, generation scope, action and consumed count. The pure guard validates proposed transitions; it cannot make external dispatch persistence atomic by itself.
+Every consuming or security-sensitive action requires an injected durable checkpoint/outbox adapter. It atomically advances checkpoint `R → R+1`, creates one deterministic unique reservation, and permits dispatch only after that reservation committed; a CAS loser cannot dispatch and a replay can claim dispatch at most once. A standalone guard/CLI with no such adapter returns `allowed=false` with `reservation_required`. Snapshot revision/reservation fields are never a substitute for this protocol.
 
 ## No-op and retrigger prohibition
 
@@ -92,7 +92,7 @@ The canonical organization defaults are machine-readable in `ecosystem/bounded-a
 
 - identical unchanged failure cycles: `2`;
 - full/heavy validation attempts for one exact technical head: `2`;
-- primary external-review invocations for one canonical review fingerprint: `1`;
+- primary external-review invocations for one trusted canonical review binding: `1`;
 - automatic same-head AI-review gate rechecks for one exact head/evidence generation: `1`.
 
 Durable counters may reset only when **their own generation scope** changes. Unrelated phase, status, narration or gate-field changes do not reset a consumed budget.
@@ -103,7 +103,7 @@ Canonical scopes are:
 
 - `identical_failure_cycles` — exact task head plus failure fingerprint;
 - `heavy_validation_runs` — exact task head;
-- `external_review_invocations` — canonical review fingerprint (including its review tier/policy identity), never SHA alone;
+- `external_review_invocations` — trusted canonical review-binding scope (repository/task, tier, immutable policy ID/digest, classifier revision and risk fingerprint), never SHA alone;
 - `same_head_gate_rechecks` — exact task head plus evidence generation.
 
 A continuation/takeover may not bypass an exhausted budget by omitting a previous snapshot. Exhaustion recorded in the current durable state is authoritative. Each bounded action reserves exactly one increment in a proposed current checkpoint relative to its durable previous checkpoint; a replay without that increment is denied. A generation reset is a separate transition that resets only its own counter to zero. Boolean JSON values are not valid integer counters and fail closed.
@@ -111,6 +111,12 @@ A continuation/takeover may not bypass an exhausted budget by omitting a previou
 A zero-retry policy means no retry after a failed attempt; it does not prevent the initial attempt when no failure exists yet.
 
 A repository may lower these limits. Increasing them requires explicit provider justification and must not create an unbounded loop.
+
+## Trusted review bindings
+
+`review_fingerprint` supplied in a task snapshot is opaque legacy data and has no authorization or reset authority. A `ReviewBinding` is accepted only when its canonical digest validates and an injected trusted classifier/attestation authority verifies it. It binds repository, task, base/head, tier, policy ID/digest, classifier revision and risk fingerprint. The immutable tier/policy identity is included in the external-review generation scope. An arbitrary binding change fails closed; a trusted canonical risk change is the only path that can reset that review budget.
+
+The standalone guard is intentionally unable to manufacture these proofs. It may observe an unchanged snapshot, but it cannot execute a consuming or security-sensitive transition without both the trusted evidence authority and the durable checkpoint/outbox adapter.
 
 ## External waiting and session release
 

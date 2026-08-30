@@ -38,7 +38,7 @@ A completed audit must cover the whole observed late-finding/head-change generat
 
 ## Frozen-head accounting
 
-A durable transition from `candidate_frozen=true` to `candidate_frozen=false` opens one repair generation and increments `post_freeze_material_head_changes` exactly once, even if the technical head has not moved yet. It may open only from an already-recorded, independently verified material fact bound to the prior frozen head; a proposed `material_change=true` flag is not evidence. The generation retains immutable fact/base coordinates while repair is open, and refreezing requires both a new technical head and a changed canonical review/risk fingerprint.
+A durable transition from `candidate_frozen=true` to `candidate_frozen=false` opens one repair generation and increments `post_freeze_material_head_changes` exactly once, even if the technical head has not moved yet. It may open only through the reserved `open_material_repair` action with a trusted, canonical `MaterialFactEnvelope` bound to the prior frozen head, repository/task, policy ID/digest and source evidence; a proposed `material_change=true` flag or snapshot verification boolean is not evidence. The generation retains immutable envelope/base coordinates while repair is open, and refreezing requires both a new technical head and a changed trusted canonical review binding.
 
 This prevents the bypass `frozen A → unfrozen A → B` and makes the threshold enforceable from snapshot history rather than worker narration or SHA-only movement.
 
@@ -56,9 +56,9 @@ Retry budgets are non-negative integers; Python booleans are invalid.
 
 For `identical_failure_cycles`, a configured budget of `0` means **no retry after a material failure**. It does not suppress the initial attempt when no material failure exists yet. Heavy-validation/reviewer/recheck budgets of `0` mean those optional actions are not admitted for that policy generation.
 
-Counters remain monotonic inside their true generation scopes and cannot be reset by unrelated phase/status/narration changes or by omitting a previous snapshot when current durable exhaustion is already recorded. A bounded action consumes exactly one action-specific counter increment from the durable previous checkpoint; the action must be dispatched through compare-and-swap persistence and an idempotency key so a replay cannot spend the same reservation twice.
+Counters remain monotonic inside their true generation scopes and cannot be reset by unrelated phase/status/narration changes or by omitting a previous snapshot when current durable exhaustion is already recorded. A bounded action consumes exactly one action-specific counter increment from the durable previous checkpoint; the action must atomically CAS checkpoint `R → R+1` while creating a unique outbox reservation, and dispatch only after that committed reservation is claimed. A CAS loser cannot dispatch and a replay cannot spend the same reservation twice.
 
-Primary external review is scoped to the canonical review fingerprint, not task-head SHA. A review-neutral SHA move does not authorize a fresh Codex review or reset its budget.
+Primary external review is scoped to a trusted canonical review binding, not task-head SHA. The binding carries repository/task, base/head, tier, immutable policy ID/digest, classifier revision and risk fingerprint, and is verified/recomputed by an approved authority. A review-neutral SHA move does not authorize a fresh Codex review or reset its budget; only a trusted canonical risk change can.
 
 ## Same-head review amendment
 

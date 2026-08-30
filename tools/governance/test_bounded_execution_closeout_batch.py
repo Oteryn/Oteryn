@@ -1,12 +1,22 @@
 import copy
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from bounded_execution_guard import GuardError, decide  # noqa: E402
+from bounded_execution_guard import (  # noqa: E402
+    ExecutionContext,
+    GuardError,
+    _checkpoint_digest,
+    decide as raw_decide,
+    make_material_fact_envelope,
+    make_review_binding,
+)
+from bounded_execution_test_support import TestEvidenceAuthority, decide  # noqa: E402
+from durable_checkpoint_outbox import SqliteCheckpointOutbox  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,7 +92,7 @@ class FrozenLineageTests(unittest.TestCase):
             decide(previous, current, "observe", POLICY)
 
         current["post_freeze_material_head_changes"] = 1
-        result = decide(previous, current, "observe", POLICY)
+        result = decide(previous, current, "open_material_repair", POLICY)
         self.assertTrue(result.allowed)
 
     def test_head_move_inside_already_open_repair_does_not_need_second_increment(self):
@@ -100,7 +110,7 @@ class FrozenLineageTests(unittest.TestCase):
         )
         current = copy.deepcopy(previous)
         current["task_head_sha"] = "b" * 40
-        result = decide(previous, current, "observe", POLICY)
+        result = decide(previous, current, "mutate", POLICY)
         self.assertTrue(result.allowed)
 
 
@@ -172,12 +182,152 @@ class FreezeAdmissionTests(unittest.TestCase):
         unfrozen["post_freeze_material_head_changes"] = 1
         unfrozen["repair_generation_id"] = "d" * 64
         unfrozen["repair_base_head"] = "a" * 40
-        result = decide(admitted, unfrozen, "request_external_review", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertIn("frozen", result.reason.lower())
+        with self.assertRaises(GuardError):
+            decide(admitted, unfrozen, "request_external_review", POLICY)
 
 
 class MaterialChangeEvidenceTests(unittest.TestCase):
+    def test_frozen_snapshot_cannot_self_attest_a_new_material_fact(self):
+        previous = snapshot(candidate_frozen=True)
+        current = copy.deepcopy(previous)
+        current["material_change_reason"] = "review_finding"
+        current["material_fact_id"] = "d" * 64
+        current["material_fact_head"] = "a" * 40
+        current["material_fact_verified"] = True
+
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", POLICY)
+
+
+class TrustedAuthorityAndReservationTests(unittest.TestCase):
+    def test_standalone_consuming_action_fails_closed_with_reservation_required(self):
+        result = raw_decide(None, snapshot(candidate_frozen=False), "complete", POLICY)
+
+        self.assertFalse(result.allowed)
+        self.assertIn("reservation_required", result.reason)
+
+    def test_untrusted_material_fact_envelope_cannot_open_repair(self):
+        previous = snapshot(candidate_frozen=True)
+        previous["review_binding"] = make_review_binding(
+            POLICY,
+            repository=previous["repository"],
+            task_id=previous["task_id"],
+            base_head_sha="b" * 40,
+            head_sha=previous["task_head_sha"],
+            tier="R2",
+            classifier_revision="classifier-v1",
+            risk_fingerprint="f" * 64,
+        )
+        current = copy.deepcopy(previous)
+        current["candidate_frozen"] = False
+        current["material_change"] = True
+        current["material_change_evidence"] = "review-thread:material"
+        current["post_freeze_material_head_changes"] = 1
+        current["material_fact_envelope"] = make_material_fact_envelope(
+            POLICY,
+            repository=current["repository"],
+            task_id=current["task_id"],
+            frozen_head_sha=previous["task_head_sha"],
+            reason="review_finding",
+            source_evidence="review-thread:material",
+        )
+        current["repair_generation_id"] = current["material_fact_envelope"]["envelope_id"]
+        current["repair_base_head"] = previous["task_head_sha"]
+        with tempfile.TemporaryDirectory() as directory:
+            outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
+            outbox.seed_checkpoint(
+                previous["repository"], previous["task_id"], _checkpoint_digest(previous)
+            )
+            context = ExecutionContext(
+                TestEvidenceAuthority({previous["review_binding"]["binding_id"]}, set()),
+                outbox,
+            )
+            result = raw_decide(
+                previous,
+                current,
+                "open_material_repair",
+                POLICY,
+                context=context,
+            )
+
+        self.assertFalse(result.allowed)
+        self.assertIn("trusted_material_fact_envelope_required", result.reason)
+
+    def test_untrusted_review_binding_cannot_reset_review_budget(self):
+        previous = snapshot(external_review_invocations=1)
+        previous["review_binding"] = make_review_binding(
+            POLICY,
+            repository=previous["repository"],
+            task_id=previous["task_id"],
+            base_head_sha="b" * 40,
+            head_sha=previous["task_head_sha"],
+            tier="R2",
+            classifier_revision="classifier-v1",
+            risk_fingerprint="f" * 64,
+        )
+        current = copy.deepcopy(previous)
+        current["external_review_invocations"] = 0
+        current["review_binding"] = make_review_binding(
+            POLICY,
+            repository=current["repository"],
+            task_id=current["task_id"],
+            base_head_sha="b" * 40,
+            head_sha=current["task_head_sha"],
+            tier="R2",
+            classifier_revision="classifier-v1",
+            risk_fingerprint="e" * 64,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
+            outbox.seed_checkpoint(
+                previous["repository"], previous["task_id"], _checkpoint_digest(previous)
+            )
+            context = ExecutionContext(
+                TestEvidenceAuthority({previous["review_binding"]["binding_id"]}, set()),
+                outbox,
+            )
+            result = raw_decide(previous, current, "mutate", POLICY, context=context)
+
+        self.assertFalse(result.allowed)
+        self.assertIn("trusted_review_binding_required", result.reason)
+
+    def test_durable_outbox_allows_one_cas_winner_and_one_dispatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
+            outbox.seed_checkpoint("Oteryn/Oteryn", "OTERYN-CAS", "checkpoint-r")
+            winner = outbox.reserve(
+                repository="Oteryn/Oteryn",
+                task_id="OTERYN-CAS",
+                expected_checkpoint="checkpoint-r",
+                next_checkpoint="checkpoint-r-plus-1",
+                action="retry",
+                scope=("risk",),
+            )
+            replay = outbox.reserve(
+                repository="Oteryn/Oteryn",
+                task_id="OTERYN-CAS",
+                expected_checkpoint="checkpoint-r",
+                next_checkpoint="checkpoint-r-plus-1",
+                action="retry",
+                scope=("risk",),
+            )
+            loser = outbox.reserve(
+                repository="Oteryn/Oteryn",
+                task_id="OTERYN-CAS",
+                expected_checkpoint="checkpoint-r",
+                next_checkpoint="different-next-checkpoint",
+                action="retry",
+                scope=("risk",),
+            )
+
+            self.assertTrue(winner.committed)
+            self.assertFalse(replay.committed)
+            self.assertEqual(replay.reason, "reservation_replay")
+            self.assertFalse(loser.committed)
+            self.assertEqual(loser.reason, "checkpoint_cas_conflict")
+            self.assertTrue(outbox.claim_dispatch(winner.reservation_key))
+            self.assertFalse(outbox.claim_dispatch(winner.reservation_key))
+
     def test_frozen_candidate_rejects_self_attested_material_change(self):
         previous = snapshot(candidate_frozen=True)
         current = copy.deepcopy(previous)
@@ -220,7 +370,7 @@ class MaterialChangeEvidenceTests(unittest.TestCase):
         current["post_freeze_material_head_changes"] = 1
         current["repair_generation_id"] = "d" * 64
         current["repair_base_head"] = "a" * 40
-        result = decide(previous, current, "observe", POLICY)
+        result = decide(previous, current, "open_material_repair", POLICY)
         self.assertTrue(result.allowed)
 
     def test_unfreeze_rejects_fact_that_is_not_bound_to_frozen_head(self):
@@ -240,9 +390,9 @@ class MaterialChangeEvidenceTests(unittest.TestCase):
         current["repair_base_head"] = "a" * 40
 
         with self.assertRaises(GuardError):
-            decide(previous, current, "observe", POLICY)
+            decide(previous, current, "open_material_repair", POLICY)
 
-    def test_refreeze_requires_new_canonical_review_fingerprint(self):
+    def test_refreeze_requires_new_trusted_review_risk_binding(self):
         previous = snapshot(
             candidate_frozen=False,
             material_change=True,
@@ -261,14 +411,22 @@ class MaterialChangeEvidenceTests(unittest.TestCase):
         current["task_head_sha"] = "b" * 40
 
         with self.assertRaises(GuardError):
-            decide(previous, current, "observe", POLICY)
+            decide(previous, current, "refreeze_candidate", POLICY)
 
         current["review_fingerprint"] = "e" * 64
-        result = decide(previous, current, "observe", POLICY)
+        result = decide(previous, current, "refreeze_candidate", POLICY)
         self.assertTrue(result.allowed)
 
 
 class DoneTerminalityTests(unittest.TestCase):
+    def test_observe_cannot_claim_a_done_transition(self):
+        previous = snapshot(completion_verified=True)
+        current = copy.deepcopy(previous)
+        current["state"] = "DONE"
+
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", POLICY)
+
     def test_previous_done_cannot_transition_back_to_running(self):
         previous = snapshot(state="DONE", completion_verified=True)
         current = snapshot(

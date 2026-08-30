@@ -8,9 +8,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from bounded_execution_guard import (  # noqa: E402
     GuardError,
-    decide,
     progress_fingerprint,
 )
+from bounded_execution_test_support import decide  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -211,7 +211,7 @@ class DecisionTests(unittest.TestCase):
             same_head_gate_rechecks=1,
         )
         current = snapshot(task_head_sha="b" * 40)
-        result = decide(previous, current, "observe", POLICY)
+        result = decide(previous, current, "mutate", POLICY)
         self.assertTrue(result.allowed)
 
     def test_review_budget_cannot_reset_after_sha_only_head_progress(self):
@@ -228,7 +228,7 @@ class DecisionTests(unittest.TestCase):
         with self.assertRaises(GuardError):
             decide(previous, current, "observe", POLICY)
 
-    def test_review_budget_may_reset_after_canonical_review_fingerprint_changes(self):
+    def test_review_budget_may_reset_after_trusted_risk_binding_changes(self):
         previous = snapshot(
             external_review_invocations=1,
             review_fingerprint="f" * 64,
@@ -237,7 +237,7 @@ class DecisionTests(unittest.TestCase):
             external_review_invocations=0,
             review_fingerprint="e" * 64,
         )
-        result = decide(previous, current, "observe", POLICY)
+        result = decide(previous, current, "mutate", POLICY)
         self.assertTrue(result.allowed)
 
     def test_unverified_done_snapshot_is_invalid_for_every_action(self):

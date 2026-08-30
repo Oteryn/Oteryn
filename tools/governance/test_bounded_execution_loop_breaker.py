@@ -6,7 +6,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from bounded_execution_guard import GuardError, decide, progress_fingerprint  # noqa: E402
+from bounded_execution_guard import GuardError, progress_fingerprint  # noqa: E402
+from bounded_execution_test_support import decide  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -83,10 +84,10 @@ class PolicyContractTests(unittest.TestCase):
     def test_policy_declares_evidence_generation_and_loop_breaker(self):
         raw = policy()
         self.assertIn("evidence_generation", raw["progress_fingerprint_fields"])
-        self.assertIn("review_fingerprint", raw["progress_fingerprint_fields"])
+        self.assertIn("review_binding_scope", raw["progress_fingerprint_fields"])
         self.assertEqual(
             raw["retry_counter_scopes"]["external_review_invocations"],
-            ["review_fingerprint"],
+            ["review_binding_scope"],
         )
         loop = raw["loop_breaker"]
         self.assertEqual(loop["late_material_finding_threshold"], 2)
@@ -282,7 +283,7 @@ class LoopBreakerRegressionTests(unittest.TestCase):
         current = copy.deepcopy(previous)
         current["risk_ledger"] = clear_ledger()
         current["audited_late_material_findings"] = 2
-        result = decide(previous, current, "observe", policy())
+        result = decide(previous, current, "record_loop_breaker_audit", policy())
         self.assertTrue(result.allowed)
 
     def test_audit_cannot_self_advance_from_already_terminal_ledger(self):

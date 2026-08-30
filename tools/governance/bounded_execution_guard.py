@@ -9,7 +9,9 @@ import hashlib
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
+
+from durable_checkpoint_outbox import CheckpointOutboxAdapter
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -71,6 +73,24 @@ LOOP_BREAKER_POST_ADMISSION_ACTIONS = {
     "same_head_gate_recheck",
     "complete",
 }
+OBSERVATION_IMMUTABLE_FIELDS = (
+    "state",
+    "candidate_frozen",
+    "material_change",
+    "material_change_reason",
+    "material_change_evidence",
+    "material_fact_id",
+    "material_fact_head",
+    "material_fact_verified",
+    "material_fact_envelope",
+    "repair_generation_id",
+    "repair_base_head",
+    "review_binding",
+    "completion_verified",
+    "risk_ledger",
+    *RETRY_COUNTER_FIELDS,
+    *LOOP_BREAKER_COUNTER_FIELDS,
+)
 SUPPORTED_ACTIONS = {
     "observe",
     "retry",
@@ -82,6 +102,9 @@ SUPPORTED_ACTIONS = {
     "same_head_gate_recheck",
     "run_loop_breaker_audit",
     "enter_final_qualification",
+    "open_material_repair",
+    "refreeze_candidate",
+    "record_loop_breaker_audit",
 }
 MAX_ORGANIZATION_LOOP_BREAKER_THRESHOLD = 2
 CANONICAL_PROGRESS_FINGERPRINT_FIELDS = (
@@ -93,22 +116,37 @@ CANONICAL_PROGRESS_FINGERPRINT_FIELDS = (
     "dependency_kind",
     "gate_state",
     "review_generation",
-    "review_fingerprint",
+    "review_binding_scope",
     "evidence_generation",
     "first_material_failure",
-    "material_fact_id",
-    "material_fact_head",
+    "material_fact_envelope_id",
 )
 EXPECTED_COUNTER_SCOPES = {
     "identical_failure_cycles": ["task_head_sha", "failure_fingerprint"],
     "heavy_validation_runs": ["task_head_sha"],
-    "external_review_invocations": ["review_fingerprint"],
+    "external_review_invocations": ["review_binding_scope"],
     "same_head_gate_rechecks": ["task_head_sha", "evidence_generation"],
 }
 
 
 class GuardError(ValueError):
     """Raised when policy or snapshot input is malformed."""
+
+
+class TrustedEvidenceAuthority(Protocol):
+    """Control-plane verifier for evidence not asserted by a work snapshot."""
+
+    def verify_review_binding(self, binding: dict[str, Any]) -> bool: ...
+
+    def verify_material_fact_envelope(self, envelope: dict[str, Any]) -> bool: ...
+
+
+@dataclasses.dataclass(frozen=True)
+class ExecutionContext:
+    """Trusted dependencies required before a guard result may be executed."""
+
+    evidence_authority: TrustedEvidenceAuthority
+    checkpoint_outbox: CheckpointOutboxAdapter
 
 
 @dataclasses.dataclass(frozen=True)
@@ -119,6 +157,7 @@ class Decision:
     release_session: bool
     progress_fingerprint: str
     failure_fingerprint: str
+    reservation_key: str = ""
 
     def as_dict(self) -> dict[str, object]:
         return dataclasses.asdict(self)
@@ -129,6 +168,96 @@ def _digest(value: dict[str, Any]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def policy_digest(policy: dict[str, Any]) -> str:
+    """Return the immutable identity of the validated policy document."""
+
+    return _digest(policy)
+
+
+def _review_binding_payload(binding: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in binding.items() if key != "binding_id"}
+
+
+def _material_envelope_payload(envelope: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in envelope.items() if key != "envelope_id"}
+
+
+def make_review_binding(
+    policy: dict[str, Any],
+    *,
+    repository: str,
+    task_id: str,
+    base_head_sha: str,
+    head_sha: str,
+    tier: str,
+    classifier_revision: str,
+    risk_fingerprint: str,
+) -> dict[str, Any]:
+    """Build a canonical binding for a classifier/attestation authority to sign."""
+
+    binding = {
+        "repository": repository,
+        "task_id": task_id,
+        "base_head_sha": base_head_sha,
+        "head_sha": head_sha,
+        "tier": tier,
+        "policy_id": policy.get("policy_id"),
+        "policy_digest": policy_digest(policy),
+        "classifier_revision": classifier_revision,
+        "risk_fingerprint": risk_fingerprint,
+    }
+    return {**binding, "binding_id": _digest(binding)}
+
+
+def make_material_fact_envelope(
+    policy: dict[str, Any],
+    *,
+    repository: str,
+    task_id: str,
+    frozen_head_sha: str,
+    reason: str,
+    source_evidence: str,
+) -> dict[str, Any]:
+    """Build the canonical material-fact envelope an authority must verify."""
+
+    envelope = {
+        "repository": repository,
+        "task_id": task_id,
+        "frozen_head_sha": frozen_head_sha,
+        "policy_id": policy.get("policy_id"),
+        "policy_digest": policy_digest(policy),
+        "reason": reason,
+        "source_evidence": source_evidence,
+        "source_evidence_digest": hashlib.sha256(source_evidence.encode("utf-8")).hexdigest(),
+    }
+    return {**envelope, "envelope_id": _digest(envelope)}
+
+
+def _review_binding_scope(binding: dict[str, Any] | None) -> tuple[str, ...]:
+    if binding is None:
+        # An absent trusted binding is intentionally not a new scope.  It can
+        # never reset the review budget and cannot authorize execution.
+        return ("unbound",)
+    return (
+        binding["repository"],
+        binding["task_id"],
+        binding["tier"],
+        binding["policy_id"],
+        binding["policy_digest"],
+        binding["classifier_revision"],
+        binding["risk_fingerprint"],
+    )
+
+
+def _review_scope_digest(binding: dict[str, Any] | None) -> str:
+    return _digest({"scope": list(_review_binding_scope(binding))})
+
+
+def _material_envelope_id(snapshot: dict[str, Any]) -> str:
+    envelope = snapshot.get("material_fact_envelope")
+    return envelope["envelope_id"] if isinstance(envelope, dict) else ""
+
+
 def _non_negative_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
@@ -137,9 +266,96 @@ def _positive_int(value: object) -> bool:
     return _non_negative_int(value) and value >= 1
 
 
+def _validate_review_binding_shape(
+    binding: object,
+    snapshot: dict[str, Any],
+    policy: dict[str, Any],
+) -> None:
+    if not isinstance(binding, dict):
+        raise GuardError("snapshot.review_binding must be an object when present")
+    expected = {
+        "repository",
+        "task_id",
+        "base_head_sha",
+        "head_sha",
+        "tier",
+        "policy_id",
+        "policy_digest",
+        "classifier_revision",
+        "risk_fingerprint",
+        "binding_id",
+    }
+    if set(binding) != expected:
+        raise GuardError("review binding must contain its exact canonical coordinates")
+    if binding["repository"] != snapshot["repository"] or binding["task_id"] != snapshot["task_id"]:
+        raise GuardError("review binding must be tied to the snapshot repository and task")
+    if binding["head_sha"] != snapshot["task_head_sha"]:
+        raise GuardError("review binding must be tied to the snapshot technical head")
+    for key in ("base_head_sha", "head_sha"):
+        if not isinstance(binding[key], str) or SHA_RE.fullmatch(binding[key]) is None:
+            raise GuardError(f"review binding {key} must be a lowercase 40-hex SHA")
+    for key in ("tier", "classifier_revision"):
+        if not isinstance(binding[key], str) or not binding[key].strip():
+            raise GuardError(f"review binding {key} must be a non-empty string")
+    if binding["policy_id"] != policy["policy_id"] or binding["policy_digest"] != policy_digest(policy):
+        raise GuardError("review binding policy identity does not match the loaded policy")
+    for key in ("risk_fingerprint", "binding_id"):
+        if not isinstance(binding[key], str) or FINGERPRINT_RE.fullmatch(binding[key]) is None:
+            raise GuardError(f"review binding {key} must be a lowercase 64-hex digest")
+    if binding["binding_id"] != _digest(_review_binding_payload(binding)):
+        raise GuardError("review binding canonical digest does not match its coordinates")
+
+
+def _validate_material_envelope_shape(
+    envelope: object,
+    snapshot: dict[str, Any],
+    policy: dict[str, Any],
+) -> None:
+    if not isinstance(envelope, dict):
+        raise GuardError("snapshot.material_fact_envelope must be an object when present")
+    expected = {
+        "repository",
+        "task_id",
+        "frozen_head_sha",
+        "policy_id",
+        "policy_digest",
+        "reason",
+        "source_evidence",
+        "source_evidence_digest",
+        "envelope_id",
+    }
+    if set(envelope) != expected:
+        raise GuardError("material fact envelope must contain its exact canonical coordinates")
+    if envelope["repository"] != snapshot["repository"] or envelope["task_id"] != snapshot["task_id"]:
+        raise GuardError("material fact envelope must be tied to the snapshot repository and task")
+    if not isinstance(envelope["frozen_head_sha"], str) or SHA_RE.fullmatch(envelope["frozen_head_sha"]) is None:
+        raise GuardError("material fact envelope frozen_head_sha must be a lowercase 40-hex SHA")
+    if envelope["policy_id"] != policy["policy_id"] or envelope["policy_digest"] != policy_digest(policy):
+        raise GuardError("material fact envelope policy identity does not match the loaded policy")
+    if envelope["reason"] not in CANONICAL_MATERIAL_CHANGE_REASONS:
+        raise GuardError("material fact envelope reason is not permitted by candidate-freeze policy")
+    if not isinstance(envelope["source_evidence"], str) or not envelope["source_evidence"].strip():
+        raise GuardError("material fact envelope requires source evidence")
+    if (
+        not isinstance(envelope["source_evidence_digest"], str)
+        or FINGERPRINT_RE.fullmatch(envelope["source_evidence_digest"]) is None
+        or envelope["source_evidence_digest"]
+        != hashlib.sha256(envelope["source_evidence"].encode("utf-8")).hexdigest()
+    ):
+        raise GuardError("material fact envelope evidence digest does not match source evidence")
+    if (
+        not isinstance(envelope["envelope_id"], str)
+        or FINGERPRINT_RE.fullmatch(envelope["envelope_id"]) is None
+        or envelope["envelope_id"] != _digest(_material_envelope_payload(envelope))
+    ):
+        raise GuardError("material fact envelope canonical digest does not match its coordinates")
+
+
 def validate_policy(policy: dict[str, Any]) -> None:
     if policy.get("schema_version") != 1:
         raise GuardError("bounded execution policy schema_version must be 1")
+    if not isinstance(policy.get("policy_id"), str) or not policy["policy_id"].strip():
+        raise GuardError("bounded execution policy_id must be a non-empty immutable identifier")
     if set(policy.get("states", [])) != CANONICAL_STATES or len(policy.get("states", [])) != len(CANONICAL_STATES):
         raise GuardError("bounded execution states do not match the canonical state set")
     if set(policy.get("session_release_states", [])) != CANONICAL_RELEASE_STATES or len(policy.get("session_release_states", [])) != len(CANONICAL_RELEASE_STATES):
@@ -290,29 +506,22 @@ def validate_snapshot(snapshot: dict[str, Any], policy: dict[str, Any]) -> None:
     ):
         if not isinstance(snapshot.get(key), str):
             raise GuardError(f"snapshot.{key} must be a string")
-    if FINGERPRINT_RE.fullmatch(snapshot["review_fingerprint"]) is None:
-        raise GuardError("snapshot.review_fingerprint must be a lowercase 64-hex canonical fingerprint")
+    # ``review_fingerprint`` remains accepted only for a backwards-compatible
+    # snapshot shape.  It is never a budget scope or an authorization input;
+    # only review_binding can serve those roles.
+    if snapshot["review_fingerprint"] and FINGERPRINT_RE.fullmatch(snapshot["review_fingerprint"]) is None:
+        raise GuardError("snapshot.review_fingerprint must be empty or a lowercase 64-hex legacy digest")
     if not isinstance(snapshot.get("material_fact_verified"), bool):
         raise GuardError("snapshot.material_fact_verified must be boolean")
 
-    fact_fields = (
-        snapshot["material_change_reason"],
-        snapshot["material_fact_id"],
-        snapshot["material_fact_head"],
-        snapshot["material_fact_verified"],
-    )
-    fact_recorded = any(value not in ("", False) for value in fact_fields)
-    if fact_recorded:
-        if snapshot["material_change_reason"] not in CANONICAL_MATERIAL_CHANGE_REASONS:
-            raise GuardError("material fact reason is not permitted by candidate-freeze policy")
-        if FINGERPRINT_RE.fullmatch(snapshot["material_fact_id"]) is None:
-            raise GuardError("material_fact_id must be a lowercase 64-hex immutable identifier")
-        if SHA_RE.fullmatch(snapshot["material_fact_head"]) is None:
-            raise GuardError("material_fact_head must be a lowercase 40-hex SHA")
-        if not snapshot["material_fact_verified"]:
-            raise GuardError("material fact must be independently verified before it can open repair")
-    elif snapshot["material_change"]:
-        raise GuardError("material_change requires a verified durable material fact")
+    review_binding = snapshot.get("review_binding")
+    if review_binding is not None:
+        _validate_review_binding_shape(review_binding, snapshot, policy)
+    material_envelope = snapshot.get("material_fact_envelope")
+    if material_envelope is not None:
+        _validate_material_envelope_shape(material_envelope, snapshot, policy)
+    if snapshot["material_change"] and material_envelope is None:
+        raise GuardError("material_change requires a trusted material fact envelope")
 
     repair_recorded = bool(snapshot["repair_generation_id"])
     if repair_recorded:
@@ -320,10 +529,10 @@ def validate_snapshot(snapshot: dict[str, Any], policy: dict[str, Any]) -> None:
             raise GuardError("repair_generation_id must be a lowercase 64-hex identifier")
         if SHA_RE.fullmatch(snapshot["repair_base_head"]) is None:
             raise GuardError("repair_base_head must be a lowercase 40-hex SHA")
-        if not fact_recorded:
-            raise GuardError("repair generation requires its verified material fact")
-        if snapshot["repair_generation_id"] != snapshot["material_fact_id"]:
-            raise GuardError("repair generation must be bound to its immutable material fact")
+        if material_envelope is None:
+            raise GuardError("repair generation requires a trusted material fact envelope")
+        if snapshot["repair_generation_id"] != material_envelope["envelope_id"]:
+            raise GuardError("repair generation must be bound to its material fact envelope")
     elif snapshot["repair_base_head"]:
         raise GuardError("repair_base_head requires repair_generation_id")
     if snapshot["material_change"] and not snapshot["material_change_evidence"].strip():
@@ -345,7 +554,17 @@ def validate_snapshot(snapshot: dict[str, Any], policy: dict[str, Any]) -> None:
 def progress_fingerprint(snapshot: dict[str, Any], policy: dict[str, Any]) -> str:
     validate_policy(policy)
     validate_snapshot(snapshot, policy)
-    return _digest({field: snapshot.get(field, "") for field in policy["progress_fingerprint_fields"]})
+    material = {
+        field: (
+            _review_scope_digest(snapshot.get("review_binding"))
+            if field == "review_binding_scope"
+            else _material_envelope_id(snapshot)
+            if field == "material_fact_envelope_id"
+            else snapshot.get(field, "")
+        )
+        for field in policy["progress_fingerprint_fields"]
+    }
+    return _digest(material)
 
 
 def failure_fingerprint(snapshot: dict[str, Any]) -> str:
@@ -369,7 +588,7 @@ def _counter_scope(snapshot: dict[str, Any], field: str) -> tuple[str, ...]:
     if field == "heavy_validation_runs":
         return (snapshot["task_head_sha"],)
     if field == "external_review_invocations":
-        return (snapshot["review_fingerprint"],)
+        return _review_binding_scope(snapshot.get("review_binding"))
     if field == "same_head_gate_rechecks":
         return (snapshot["task_head_sha"], snapshot["evidence_generation"])
     raise GuardError(f"unknown retry counter field: {field}")
@@ -389,6 +608,13 @@ def _validate_history(
     action: str,
     policy: dict[str, Any],
 ) -> None:
+    if action == "observe":
+        for field in OBSERVATION_IMMUTABLE_FIELDS:
+            if current.get(field) != previous.get(field):
+                raise GuardError(
+                    f"observe cannot alter protected execution field {field}; use a reserved control-plane action"
+                )
+
     consuming_field = ACTION_COUNTER_FIELDS.get(action)
     for field in RETRY_COUNTER_FIELDS:
         same_scope = _counter_scope(previous, field) == _counter_scope(current, field)
@@ -420,25 +646,16 @@ def _validate_history(
         current["post_freeze_material_head_changes"]
         > previous["post_freeze_material_head_changes"]
     )
-    material_fact_fields = (
-        "material_change_reason",
-        "material_fact_id",
-        "material_fact_head",
-        "material_fact_verified",
-    )
     if repair_opening:
-        if not previous["material_fact_verified"]:
-            raise GuardError(
-                "frozen candidate may open repair only from a verified durable material fact"
-            )
-        if previous["material_fact_head"] != previous["task_head_sha"]:
-            raise GuardError("material fact must be bound to the prior frozen candidate head")
-        if any(current[field] != previous[field] for field in material_fact_fields):
-            raise GuardError(
-                "repair opening must consume the immutable material fact already recorded on the frozen candidate"
-            )
+        if action != "open_material_repair":
+            raise GuardError("a frozen candidate may unfreeze only through open_material_repair")
+        envelope = current.get("material_fact_envelope")
+        if not isinstance(envelope, dict):
+            raise GuardError("repair opening requires a trusted material fact envelope")
+        if envelope["frozen_head_sha"] != previous["task_head_sha"]:
+            raise GuardError("material fact envelope must be bound to the prior frozen candidate head")
         if not current["material_change"]:
-            raise GuardError("repair opening requires a material change derived from the durable fact")
+            raise GuardError("repair opening requires a material change derived from the trusted envelope")
         if (
             current["post_freeze_material_head_changes"]
             != previous["post_freeze_material_head_changes"] + 1
@@ -446,9 +663,9 @@ def _validate_history(
             raise GuardError(
                 "a technical head move from a frozen candidate must increment post_freeze_material_head_changes exactly once"
             )
-        if current["repair_generation_id"] != previous["material_fact_id"]:
+        if current["repair_generation_id"] != envelope["envelope_id"]:
             raise GuardError(
-                "repair opening must establish the durable generation identifier for its material fact"
+                "repair opening must establish the durable generation identifier for its material fact envelope"
             )
         if current["repair_base_head"] != previous["task_head_sha"]:
             raise GuardError("repair opening must retain the prior frozen head as its repair base")
@@ -462,18 +679,20 @@ def _validate_history(
         )
 
     if not previous["candidate_frozen"] and not current["candidate_frozen"] and repair_open:
-        for field in (*material_fact_fields, "repair_generation_id", "repair_base_head"):
+        for field in ("material_fact_envelope", "repair_generation_id", "repair_base_head"):
             if current[field] != previous[field]:
-                raise GuardError("an open repair generation must retain its material fact and base coordinates")
+                raise GuardError("an open repair generation must retain its trusted material fact and base coordinates")
     if not previous["candidate_frozen"] and current["candidate_frozen"] and repair_open:
-        for field in (*material_fact_fields, "repair_generation_id", "repair_base_head"):
+        if action != "refreeze_candidate":
+            raise GuardError("refreeze requires the reserved refreeze_candidate control-plane action")
+        for field in ("material_fact_envelope", "repair_generation_id", "repair_base_head"):
             if current[field] != previous[field]:
                 raise GuardError("refreeze must retain the repair generation's durable material fact")
         if current["task_head_sha"] == previous["repair_base_head"]:
             raise GuardError("refreeze requires a new technical head beyond the repair base")
-        if current["review_fingerprint"] == previous["review_fingerprint"]:
+        if _review_binding_scope(current.get("review_binding")) == _review_binding_scope(previous.get("review_binding")):
             raise GuardError(
-                "refreeze requires a changed canonical review fingerprint, not a SHA-only move"
+                "refreeze requires a changed trusted review risk binding, not a SHA-only move"
             )
 
     audit_advanced = (
@@ -528,6 +747,63 @@ def _decision(
     return Decision(allowed, state, reason, release_session, progress, failure)
 
 
+def _checkpoint_digest(snapshot: dict[str, Any]) -> str:
+    """Use the complete validated snapshot for CAS, never a caller revision."""
+
+    return _digest(snapshot)
+
+
+def _execution_prerequisite_reason(
+    context: ExecutionContext | None,
+    current: dict[str, Any],
+    action: str,
+) -> str | None:
+    if action == "observe":
+        return None
+    if context is None:
+        return "reservation_required: durable checkpoint/outbox and trusted authority are not configured"
+    binding = current.get("review_binding")
+    if not isinstance(binding, dict) or not context.evidence_authority.verify_review_binding(binding):
+        return "trusted_review_binding_required: review binding is absent, mismatched, or unverified"
+    if action == "open_material_repair":
+        envelope = current.get("material_fact_envelope")
+        if not isinstance(envelope, dict) or not context.evidence_authority.verify_material_fact_envelope(envelope):
+            return "trusted_material_fact_envelope_required: repair evidence is absent, mismatched, or unverified"
+    return None
+
+
+def _reserve_execution(
+    context: ExecutionContext,
+    previous: dict[str, Any] | None,
+    current: dict[str, Any],
+    action: str,
+    state: str,
+    reason: str,
+    release_session: bool,
+    progress: str,
+    failure: str,
+) -> Decision:
+    reservation = context.checkpoint_outbox.reserve(
+        repository=current["repository"],
+        task_id=current["task_id"],
+        expected_checkpoint=_checkpoint_digest(previous) if previous is not None else None,
+        next_checkpoint=_checkpoint_digest(current),
+        action=action,
+        scope=_review_binding_scope(current.get("review_binding")),
+    )
+    if not reservation.committed:
+        return Decision(
+            False,
+            state,
+            reservation.reason,
+            release_session,
+            progress,
+            failure,
+            reservation.reservation_key,
+        )
+    return Decision(True, state, reason, release_session, progress, failure, reservation.reservation_key)
+
+
 def _action_counter_consumption_reason(
     previous: dict[str, Any] | None,
     current: dict[str, Any],
@@ -565,6 +841,8 @@ def decide(
     current: dict[str, Any],
     requested_action: str,
     policy: dict[str, Any],
+    *,
+    context: ExecutionContext | None = None,
 ) -> Decision:
     validate_policy(policy)
     validate_snapshot(current, policy)
@@ -582,6 +860,34 @@ def decide(
     release_states = set(policy["session_release_states"])
     previous_progress = progress_fingerprint(previous, policy) if previous is not None else None
     same_progress = previous is not None and progress == previous_progress
+
+    prerequisite_reason = _execution_prerequisite_reason(context, current, requested_action)
+    if prerequisite_reason is not None:
+        state = current["state"]
+        return _decision(
+            False,
+            state,
+            prerequisite_reason,
+            state in release_states,
+            progress,
+            failure,
+        )
+
+    def allow(state: str, reason: str, release_session: bool) -> Decision:
+        if requested_action == "observe":
+            return _decision(True, state, reason, release_session, progress, failure)
+        assert context is not None
+        return _reserve_execution(
+            context,
+            previous,
+            current,
+            requested_action,
+            state,
+            reason,
+            release_session,
+            progress,
+            failure,
+        )
 
     if previous is not None and previous["state"] == "DONE":
         return _decision(
@@ -678,7 +984,7 @@ def decide(
             return _decision(False, current["state"], "LOOP_BREAKER_AUDIT must be entered explicitly before running the batched risk audit", False, progress, failure)
         if loop_current:
             return _decision(False, current["state"], "LOOP_BREAKER_AUDIT is already current for the observed generation", False, progress, failure)
-        return _decision(True, current["state"], "LOOP_BREAKER_AUDIT may run as one bounded batched risk-ledger generation", False, progress, failure)
+        return allow(current["state"], "LOOP_BREAKER_AUDIT may run as one bounded batched risk-ledger generation", False)
 
     if loop_triggered and not loop_current and requested_action in LOOP_BREAKER_FINAL_ACTIONS:
         state = "READY" if current["state"] == "RUNNING" else current["state"]
@@ -711,7 +1017,7 @@ def decide(
                 return _decision(False, "READY", "record exactly one newly consumed final qualification generation before admission", False, progress, failure)
             if consumed > limit:
                 return _decision(False, "READY", "final qualification generation budget for the current LOOP_BREAKER_AUDIT is exhausted", False, progress, failure)
-        return _decision(True, "READY", "qualification admission is within the current bounded audit generation", False, progress, failure)
+        return allow("READY", "qualification admission is within the current bounded audit generation", False)
 
     if requested_action == "complete":
         if (
@@ -733,7 +1039,7 @@ def decide(
         if not current["completion_verified"]:
             state = current["state"] if current["state"] in release_states else "READY"
             return _decision(False, state, "DONE is forbidden until completion is independently verified", state in release_states, progress, failure)
-        return _decision(True, "DONE", "completion evidence is verified", True, progress, failure)
+        return allow("DONE", "completion evidence is verified", True)
 
     forbidden_when_frozen = set(policy["candidate_freeze"]["forbidden_actions_without_material_change"])
     if current["candidate_frozen"] and requested_action in forbidden_when_frozen:
@@ -781,13 +1087,10 @@ def decide(
                 failure,
             )
 
-    return _decision(
-        True,
+    return allow(
         current["state"],
         "requested action remains within the bounded execution policy",
         current["state"] in release_states,
-        progress,
-        failure,
     )
 
 

@@ -52,7 +52,7 @@ The machine-readable policy defines the state set, freeze rules, progress-finger
 
 ### 2. Deterministic execution guard
 
-`tools/governance/bounded_execution_guard.py` is a pure deterministic helper. It consumes previous/current execution snapshots and returns an action verdict without network access.
+`tools/governance/bounded_execution_guard.py` is a deterministic helper. It consumes previous/current execution snapshots and returns an action verdict without network access. Observation of an unchanged snapshot is pure; every consuming or security-sensitive transition additionally requires injected trusted evidence and a durable checkpoint/outbox adapter.
 
 A snapshot contains only lifecycle facts required for loop detection:
 
@@ -62,7 +62,7 @@ A snapshot contains only lifecycle facts required for loop detection:
 - `candidate_frozen`;
 - `blocking_dependency`;
 - `gate_state`;
-- `review_generation`;
+- `review_generation` plus a trusted review binding (repository/task/base/head, tier, policy ID/digest, classifier revision and risk fingerprint);
 - `first_material_failure`;
 - retry counters.
 
@@ -74,7 +74,9 @@ The guard enforces:
 - same progress/failure fingerprint may be retried only within the configured identical-failure budget;
 - external dependency with unchanged task head becomes `WAITING_EXTERNAL`, not repeated active work;
 - exhausted identical local failure budget becomes `STALLED`;
-- `DONE` requires a verified completion flag supplied by the caller; the guard never infers completion from narrative.
+- `DONE` requires a verified completion flag supplied by the caller, a frozen final-qualification candidate, and a committed durable reservation; the guard never infers completion from narrative.
+
+The guard never treats snapshot fields such as a material-fact verification boolean, a revision, or a reservation key as proof. `open_material_repair` requires a trusted canonical material-fact envelope bound to the frozen head and policy/source evidence. The adapter atomically advances checkpoint `R → R+1`, creates a unique outbox reservation, and grants at most one dispatch claim. Without the injected dependencies, standalone CLI evaluation fails closed with `reservation_required`.
 
 ### 3. Candidate freeze
 
