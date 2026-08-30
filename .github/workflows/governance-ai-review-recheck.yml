@@ -4,7 +4,7 @@ on:
   pull_request_review:
     types: [submitted]
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
 permissions:
   actions: write
@@ -19,7 +19,20 @@ jobs:
   recheck:
     if: >-
       github.actor == 'chatgpt-codex-connector[bot]' &&
-      (github.event_name == 'pull_request_review' || github.event.issue.pull_request)
+      (
+        github.event_name == 'pull_request_review' ||
+        (
+          github.event.issue.pull_request &&
+          (
+            github.event.action == 'created' ||
+            (
+              github.event.action == 'edited' &&
+              contains(github.event.comment.body, '<!-- codex-pull-request-review-summary -->') &&
+              contains(github.event.comment.body, '✅ **Completed**')
+            )
+          )
+        )
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Re-run exact same-head trusted gate after reviewer evidence
