@@ -374,6 +374,37 @@ def test_current_codex_summary_rejects_ambiguous_or_top_level_p2_with_clean_reac
     _v1.core_tests.expect_fail(lambda: _verify_summary(extra_comments=[top_level_p2]))
 
 
+def test_current_codex_summary_allows_top_level_reviewer_text_without_finding() -> None:
+    note = _v1.core_tests.issue_comment(
+        12,
+        "Review completed; no actionable findings in this pass.",
+        login="chatgpt-codex-connector[bot]",
+        stamp="2026-08-20T10:01:01Z",
+    )
+    found = _verify_summary(extra_comments=[note])
+    assert found["review_source_kind"] == "issue_comment_result"
+
+
+def test_current_codex_summary_rejects_every_top_level_finding_severity() -> None:
+    finding_cases = (
+        ("[P0] Critical boundary failure", "2026-08-20T10:01:01Z"),
+        ("P1 Blocking correctness failure", "2026-08-20T10:01:01Z"),
+        ("<sub><sub>![P2 Badge](badge)</sub></sub> Follow-up required", "2026-08-20T10:01:01Z"),
+        ("- **[P3] Unknown severity must fail closed", "2026-08-20T10:00:00Z"),
+        ("* <sub>![P17 Badge](badge)</sub> Escalated unknown severity", "2026-08-20T10:01:01Z"),
+    )
+    for comment_id, (body, stamp) in enumerate(finding_cases, start=12):
+        finding = _v1.core_tests.issue_comment(
+            comment_id,
+            body,
+            login="chatgpt-codex-connector[bot]",
+            stamp=stamp,
+        )
+        _v1.core_tests.expect_fail(
+            lambda finding=finding: _verify_summary(extra_comments=[finding])
+        )
+
+
 def test_current_codex_summary_rejects_unclassified_or_escalated_review_body() -> None:
     repo, _, final = _v1.core_tests.make_repo()
     for state in ("COMMENTED", "CHANGES_REQUESTED"):

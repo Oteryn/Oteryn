@@ -41,6 +41,10 @@ _P2_FINDING_RE = re.compile(
     r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?"
     r"(?:\[P2\]|P2\b|(?:<sub>){1,2}!\[P2 Badge\])"
 )
+_FINDING_LIKE_RE = re.compile(
+    r"(?im)^\s*(?:[-*]\s*)?(?:\*\*)?"
+    r"(?:\[P[0-9]+\]|P[0-9]+\b|(?:<sub>){1,2}!\[P[0-9]+ Badge\])"
+)
 _TRACKED_P2_REPLY_RE = re.compile(r"^Tracked in #([1-9][0-9]*)\.$")
 _TRUSTED_MAINTAINER_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 _POSITIVE_DECIMAL_RE = re.compile(r"^[1-9][0-9]*$")
@@ -113,6 +117,22 @@ def _strict_graphql_database_id(raw: object) -> int | None:
     return None
 
 
+def _strict_issue_comment_order(comment: dict) -> tuple[datetime, int] | None:
+    created_at = _utc_timestamp(comment.get("created_at"))
+    comment_id = _strict_positive_int(comment.get("id"))
+    if created_at is None or comment_id is None:
+        return None
+    return created_at, comment_id
+
+
+def _request_anchor_order(anchor: dict[str, str]) -> tuple[datetime, int]:
+    request_at = _utc_timestamp(anchor.get("REQUEST_CREATED_AT"))
+    raw_id = anchor.get("REQUEST_COMMENT_ID")
+    if request_at is None or not isinstance(raw_id, str) or not _POSITIVE_DECIMAL_RE.fullmatch(raw_id):
+        raise RuntimeError("review-evidence envelope request ordering is malformed")
+    return request_at, int(raw_id)
+
+
 def _parse_completed_summary(body: str) -> tuple[datetime, str] | None:
     if body.count(_CODEX_SUMMARY_MARKER) != 1 or body.count("## Codex Review Summary") != 1:
         return None
@@ -172,7 +192,7 @@ def _eligible_summary_anchor(
 def _envelope_reviewed_heads(
     *, policy: dict, repo_root: str | Path, tier: str, fingerprint: str,
     head: str, repository: str, pr_number: int, reviews: list[dict],
-) -> tuple[str, ...]:
+) -> tuple[tuple[str, ...], tuple[datetime, int] | None]:
     """Inspect both current PR head and the sole reusable anchored generation."""
     matches = _matching_eligible_anchors(
         policy=policy, repo_root=repo_root, tier=tier, fingerprint=fingerprint,
@@ -181,7 +201,8 @@ def _envelope_reviewed_heads(
     if len(matches) > 1:
         raise RuntimeError("review-evidence envelope has ambiguous eligible immutable request anchors")
     anchored_head = matches[0][1]["REVIEWED_HEAD"] if matches else head
-    return tuple(dict.fromkeys((head, anchored_head)))
+    request_order = _request_anchor_order(matches[0][1]) if matches else None
+    return tuple(dict.fromkeys((head, anchored_head))), request_order
 
 
 def _parse_observed_duplicate_clean_echo(body: str) -> str | None:
@@ -235,8 +256,8 @@ def _same_generation_clean_echoes(
         if not (request_at < created_at <= reaction_at):
             continue
         body = str(comment.get("body") or "")
-        if _v1._core.BLOCKING_FINDING_RE.search(body):
-            raise RuntimeError("P0/P1 Codex finding exists in the same-generation clean echo")
+        if _FINDING_LIKE_RE.search(body):
+            raise RuntimeError("Codex finding exists in the same-generation clean echo")
         prefix = _parse_observed_duplicate_clean_echo(body)
         if prefix is None:
             continue
@@ -424,6 +445,7 @@ def _p2_follow_up_config(policy: dict) -> tuple[str, set[str]]:
 def _reject_unenveloped_current_head_findings(
     *, reviews: list[dict], review_comments: list[dict], policy: dict,
     comments: list[dict], reviewed_head: str, repository: str, pr_number: int,
+    request_order: tuple[datetime, int] | None = None,
 ) -> None:
     """Fail closed before legacy evidence can bypass current trusted review findings."""
     trusted_logins = {
@@ -477,18 +499,24 @@ def _reject_unenveloped_current_head_findings(
         raise RuntimeError("trusted current-generation inline finding is unclassified")
     for comment in comments:
         if (
-            str((comment.get("user") or {}).get("login", "")).casefold() in trusted_logins
-            and _v1._core._issue_comment_identity(comment, repository, pr_number)
-            and _P2_FINDING_RE.search(str(comment.get("body") or ""))
+            str((comment.get("user") or {}).get("login", "")).casefold() not in trusted_logins
+            or not _v1._core._issue_comment_identity(comment, repository, pr_number)
         ):
-            raise RuntimeError("trusted P2 finding must use the accepted summary and inline follow-up envelope")
+            continue
+        body = str(comment.get("body") or "")
+        if _P2_FINDING_RE.search(body):
+            raise RuntimeError("trusted P2 finding must use the accepted inline follow-up envelope")
+        if request_order is not None and _FINDING_LIKE_RE.search(body):
+            comment_order = _strict_issue_comment_order(comment)
+            if comment_order is None or comment_order > request_order:
+                raise RuntimeError("trusted post-request finding is outside the P2 inline envelope")
 
 
 def _accepted_p2_follow_up(
     *, comments: list[dict], reviews: list[dict], review_comments: list[dict], review_threads: object,
     tracker_issues: dict[int, dict] | None, policy: dict, trusted_logins: set[str],
     reviewed_head: str, repository: str, pr_number: int, request_at: datetime,
-    completed_at: datetime, token: str,
+    request_order: tuple[datetime, int], completed_at: datetime, token: str,
 ) -> dict | None:
     """Validate resolved exact-head P2 findings with durable same-repo issue tracking."""
     outcome, trusted_maintainer_associations = _p2_follow_up_config(policy)
@@ -581,13 +609,16 @@ def _accepted_p2_follow_up(
 
     for comment in comments:
         if (
-            str((comment.get("user") or {}).get("login", "")).casefold() in trusted_logins
-            and _v1._core._issue_comment_identity(comment, repository, pr_number)
-            and (created_at := _utc_timestamp(comment.get("created_at"))) is not None
-            and created_at > request_at
-            and _P2_FINDING_RE.search(str(comment.get("body") or ""))
+            str((comment.get("user") or {}).get("login", "")).casefold() not in trusted_logins
+            or not _v1._core._issue_comment_identity(comment, repository, pr_number)
+            or not _FINDING_LIKE_RE.search(str(comment.get("body") or ""))
         ):
-            raise RuntimeError("trusted P2 finding must be an inline root comment")
+            continue
+        comment_order = _strict_issue_comment_order(comment)
+        if comment_order is None:
+            raise RuntimeError("trusted finding issue-comment ordering is malformed")
+        if comment_order > request_order:
+            raise RuntimeError("trusted finding must be an accepted P2 inline root comment")
 
     if not p2_comments:
         return None
@@ -686,7 +717,7 @@ def _normalize_current_codex_summary(
         and str((comment.get("user") or {}).get("login", "")).casefold() in configured_logins
     ]
     if not summary_candidates:
-        reviewed_heads = _envelope_reviewed_heads(
+        reviewed_heads, request_order = _envelope_reviewed_heads(
             policy=policy, repo_root=repo_root, tier=tier, fingerprint=fingerprint,
             head=head, repository=repository, pr_number=pr_number, reviews=reviews,
         )
@@ -694,7 +725,7 @@ def _normalize_current_codex_summary(
             _reject_unenveloped_current_head_findings(
                 reviews=reviews, review_comments=review_comments, policy=policy,
                 comments=comments, reviewed_head=reviewed_head,
-                repository=repository, pr_number=pr_number,
+                repository=repository, pr_number=pr_number, request_order=request_order,
             )
         return comments, None
     if len(summary_candidates) != 1:
@@ -726,8 +757,8 @@ def _normalize_current_codex_summary(
         raise RuntimeError("trusted Codex review summary identity is invalid")
 
     summary_body = str(summary.get("body") or "")
-    if _v1._core.BLOCKING_FINDING_RE.search(summary_body):
-        raise RuntimeError("P0/P1 Codex finding exists in the review summary")
+    if _FINDING_LIKE_RE.search(summary_body):
+        raise RuntimeError("Codex finding exists in the review summary")
     parsed_summary = _parse_completed_summary(summary_body)
     if parsed_summary is None:
         raise RuntimeError("trusted Codex review summary is not the accepted completed shape")
@@ -737,9 +768,10 @@ def _normalize_current_codex_summary(
     if resolved is None or resolved != reviewed_head:
         raise RuntimeError("Codex summary reviewed-commit prefix does not match the request anchor")
 
-    request_at = _utc_timestamp(anchor.get("REQUEST_CREATED_AT"))
+    request_order = _request_anchor_order(anchor)
+    request_at = request_order[0]
     summary_updated_at = _utc_timestamp(summary.get("updated_at"))
-    if request_at is None or completed_at <= request_at:
+    if completed_at <= request_at:
         raise RuntimeError("Codex summary completion does not follow the current request")
     if summary_updated_at is None or summary_updated_at < completed_at:
         raise RuntimeError("Codex summary update timestamp precedes completion")
@@ -747,6 +779,7 @@ def _normalize_current_codex_summary(
         _reject_unenveloped_current_head_findings(
             reviews=reviews, review_comments=review_comments, policy=policy,
             comments=comments, reviewed_head=head, repository=repository, pr_number=pr_number,
+            request_order=request_order,
         )
 
     matching_reactions: list[dict] = []
@@ -771,6 +804,7 @@ def _normalize_current_codex_summary(
         repository=repository,
         pr_number=pr_number,
         request_at=request_at,
+        request_order=request_order,
         completed_at=completed_at,
         token=token,
     )
@@ -826,7 +860,7 @@ def _compat_verify_records_v3(comments: list[dict], **kwargs) -> dict:
     tracker_issues = kwargs.pop("tracker_issues", None)
     accepted_follow_up: dict | None = None
     if pr_reactions is None:
-        reviewed_heads = _envelope_reviewed_heads(
+        reviewed_heads, request_order = _envelope_reviewed_heads(
             policy=kwargs["policy"], repo_root=kwargs["repo_root"], tier=kwargs["tier"],
             fingerprint=kwargs["fingerprint"], head=kwargs["head"],
             repository=kwargs["repository"], pr_number=kwargs["pr_number"],
@@ -837,6 +871,7 @@ def _compat_verify_records_v3(comments: list[dict], **kwargs) -> dict:
                 reviews=kwargs.get("reviews") or [], review_comments=kwargs.get("review_comments") or [],
                 policy=kwargs["policy"], comments=comments, reviewed_head=reviewed_head,
                 repository=kwargs["repository"], pr_number=kwargs["pr_number"],
+                request_order=request_order,
             )
     else:
         if not isinstance(pr_reactions, list) or any(not isinstance(item, dict) for item in pr_reactions):
