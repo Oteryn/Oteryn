@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -618,6 +619,18 @@ def test_trusted_workflow_has_no_candidate_checkout_and_verifies_issued_attestat
     assert "INPUT_PR_ID: ${{ inputs.pr-id }}" in action
     assert "WORKFLOW_EXECUTION_SHA: ${{ github.sha }}" in action
     assert "WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}" in action
+
+
+def test_meta_gate_runs_trusted_attestation_regression_on_every_invocation() -> None:
+    """Removal of the attestation suite from the required meta-gate must fail closed."""
+    ci_workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    step = re.search(
+        r"(?ms)^      - name: Validate AI review risk policy\n(?P<body>.*?)(?=^      - name:|\Z)",
+        ci_workflow,
+    )
+    assert step is not None
+    assert "\n        if:" not in step.group("body")
+    assert "python3 tools/governance/test_trusted_review_attestation.py" in step.group("body")
 
 
 def main() -> int:
