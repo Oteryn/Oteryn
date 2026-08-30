@@ -280,6 +280,22 @@ def test_current_codex_summary_accepts_resolved_tracked_p2_without_reaction() ->
     assert found["follow_up_issue_numbers"] == [114]
 
 
+def test_current_codex_summary_accepts_publication_timestamp_drift_for_unedited_p2() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    inline = _p2_inline()
+    inline["updated_at"] = "2026-08-20T10:01:02Z"
+
+    found = _verify_summary(
+        reactions=[],
+        extra_reviews=[_p2_review(final, body=_codex_review_envelope(final))],
+        review_comments=[inline],
+        review_threads=[_p2_thread()],
+        tracker_issues={114: _tracker_issue()},
+    )
+    assert found["review_outcome"] == "ACCEPTED_WITH_FOLLOW_UP"
+    assert found["finding_comment_ids"] == [702]
+
+
 def test_current_codex_summary_rejects_p2_from_unrequested_reviewer() -> None:
     repo, _, final = _v1.core_tests.make_repo()
     fast_login = "codex-spark-reviewer[bot]"

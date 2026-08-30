@@ -562,7 +562,8 @@ def _accepted_p2_follow_up(
         updated_at = _utc_timestamp(comment.get("updated_at"))
         if (
             created_at is None
-            or updated_at != created_at
+            or updated_at is None
+            or updated_at < created_at
             or not (request_at < created_at <= completed_at)
         ):
             raise RuntimeError("trusted P2 inline finding metadata is malformed")
@@ -856,6 +857,14 @@ def _compat_verify_records_v3(comments: list[dict], **kwargs) -> dict:
             tracker_issues=tracker_issues,
             token=kwargs["token"],
         )
+    if accepted_follow_up is not None:
+        accepted_finding_ids = set(accepted_follow_up["finding_comment_ids"])
+        kwargs["review_comments"] = [
+            {**comment, "updated_at": comment.get("created_at")}
+            if _strict_positive_int(comment.get("id")) in accepted_finding_ids
+            else comment
+            for comment in kwargs.get("review_comments") or []
+        ]
     result = _compat_verify_records_v2(comments, **kwargs)
     if accepted_follow_up is not None:
         result = dict(result)
