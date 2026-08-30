@@ -1,5 +1,6 @@
 import sys
 import unittest
+import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -76,8 +77,8 @@ class PagingClient(GitHubClient):
         self.paths.append((path, method))
         if method != "GET":
             return None
-        marker = "page="
-        page = int(path.split(marker, 1)[1].split("&", 1)[0]) if marker in path else 1
+        query = urllib.parse.parse_qs(urllib.parse.urlsplit(path).query)
+        page = int(query.get("page", ["1"])[0])
         return {"workflow_runs": self.pages.get(page, [])}
 
 
