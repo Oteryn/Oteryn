@@ -16,6 +16,9 @@ inputs:
   pr-number:
     description: Expected pull request number; must match GitHub event context.
     required: true
+  pr-id:
+    description: Expected immutable pull request object ID; must match GitHub event context.
+    required: true
   github-token:
     description: GITHUB_TOKEN with pull-requests:read and issues:read.
     required: true
@@ -46,19 +49,21 @@ runs:
         INPUT_HEAD: ${{ inputs.head-sha }}
         INPUT_DRAFT: ${{ inputs.draft }}
         INPUT_REPOSITORY: ${{ inputs.repository }}
+        INPUT_PR_ID: ${{ inputs.pr-id }}
         INPUT_PR: ${{ inputs.pr-number }}
         EVENT_NAME: ${{ github.event_name }}
         EVENT_BASE: ${{ github.event.pull_request.base.sha }}
         EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
         EVENT_DRAFT: ${{ github.event.pull_request.draft }}
         EVENT_REPOSITORY: ${{ github.repository }}
+        EVENT_PR_ID: ${{ github.event.pull_request.id }}
         EVENT_PR: ${{ github.event.pull_request.number }}
       run: |
         set -euo pipefail
         python3 - "$GITHUB_OUTPUT" <<'PY'
         import os, re, sys
-        expected={'base':os.environ['EVENT_BASE'],'head':os.environ['EVENT_HEAD'],'draft':os.environ['EVENT_DRAFT'].lower(),'repository':os.environ['EVENT_REPOSITORY'],'pr':os.environ['EVENT_PR']}
-        actual={'base':os.environ['INPUT_BASE'],'head':os.environ['INPUT_HEAD'],'draft':os.environ['INPUT_DRAFT'].lower(),'repository':os.environ['INPUT_REPOSITORY'],'pr':os.environ['INPUT_PR']}
+        expected={'base':os.environ['EVENT_BASE'],'head':os.environ['EVENT_HEAD'],'draft':os.environ['EVENT_DRAFT'].lower(),'repository':os.environ['EVENT_REPOSITORY'],'pr_id':os.environ['EVENT_PR_ID'],'pr':os.environ['EVENT_PR']}
+        actual={'base':os.environ['INPUT_BASE'],'head':os.environ['INPUT_HEAD'],'draft':os.environ['INPUT_DRAFT'].lower(),'repository':os.environ['INPUT_REPOSITORY'],'pr_id':os.environ['INPUT_PR_ID'],'pr':os.environ['INPUT_PR']}
         if os.environ['EVENT_NAME'] != 'pull_request_target':
             raise SystemExit('AI review gate requires trusted pull_request_target context')
         if not re.fullmatch(r'[0-9a-f]{40}',expected['base']) or not re.fullmatch(r'[0-9a-f]{40}',expected['head']):
@@ -74,6 +79,7 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
         REPOSITORY: ${{ steps.bind.outputs.repository }}
         REPOSITORY_ID: ${{ github.event.repository.id }}
+        PR_ID: ${{ steps.bind.outputs.pr_id }}
         PR_NUMBER: ${{ steps.bind.outputs.pr }}
         BASE_SHA: ${{ steps.bind.outputs.base }}
         HEAD_SHA: ${{ steps.bind.outputs.head }}
@@ -82,7 +88,7 @@ runs:
         set -euo pipefail
         POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
         python3 "$POLICY_ROOT/tools/governance/trusted_review_attestation.py" preflight \
-          --repository "$REPOSITORY" --repository-id "$REPOSITORY_ID" --pr-number "$PR_NUMBER" \
+          --repository "$REPOSITORY" --repository-id "$REPOSITORY_ID" --pr-id "$PR_ID" --pr-number "$PR_NUMBER" \
           --base "$BASE_SHA" --head "$HEAD_SHA" --draft "$DRAFT" --token "$GH_TOKEN"
     - name: Fetch candidate as inert bare Git objects
       shell: bash
@@ -105,13 +111,16 @@ runs:
         GH_TOKEN: ${{ inputs.github-token }}
         REPOSITORY: ${{ steps.bind.outputs.repository }}
         REPOSITORY_ID: ${{ github.event.repository.id }}
+        PR_ID: ${{ steps.bind.outputs.pr_id }}
         PR_NUMBER: ${{ steps.bind.outputs.pr }}
         BASE_SHA: ${{ steps.bind.outputs.base }}
         HEAD_SHA: ${{ steps.bind.outputs.head }}
         DRAFT: ${{ steps.bind.outputs.draft }}
         WORKFLOW_REF: ${{ github.workflow_ref }}
         WORKFLOW_SHA: ${{ github.workflow_sha }}
+        WORKFLOW_EXECUTION_SHA: ${{ github.sha }}
         WORKFLOW_RUN_ID: ${{ github.run_id }}
+        WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
         WORKFLOW_JOB: ${{ github.job }}
         BARE_GIT_DIR: ${{ runner.temp }}/oteryn-candidate.git
         ENVELOPE_PATH: ${{ runner.temp }}/oteryn-trusted-review-envelope.json
@@ -120,10 +129,12 @@ runs:
         set -euo pipefail
         POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
         python3 "$POLICY_ROOT/tools/governance/trusted_review_attestation.py" issue \
-          --repository "$REPOSITORY" --repository-id "$REPOSITORY_ID" --pr-number "$PR_NUMBER" \
+          --repository "$REPOSITORY" --repository-id "$REPOSITORY_ID" --pr-id "$PR_ID" --pr-number "$PR_NUMBER" \
           --base "$BASE_SHA" --head "$HEAD_SHA" --draft "$DRAFT" --token "$GH_TOKEN" \
           --workflow-ref "$WORKFLOW_REF" --workflow-sha "$WORKFLOW_SHA" \
-          --workflow-run-id "$WORKFLOW_RUN_ID" --workflow-job "$WORKFLOW_JOB" \
+          --workflow-execution-sha "$WORKFLOW_EXECUTION_SHA" \
+          --workflow-run-id "$WORKFLOW_RUN_ID" --workflow-run-attempt "$WORKFLOW_RUN_ATTEMPT" \
+          --workflow-job "$WORKFLOW_JOB" \
           --bare-git-dir "$BARE_GIT_DIR" --policy-file "$POLICY_ROOT/ecosystem/ai-review-policy.json" \
           --classifier-file "$POLICY_ROOT/tools/governance/ai_review_policy.py" \
           --output "$ENVELOPE_PATH" --github-output "$GITHUB_OUTPUT_PATH"

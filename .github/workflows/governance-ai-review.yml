@@ -7,6 +7,7 @@ on:
 
 permissions:
   actions: read
+  checks: read
   contents: read
   issues: read
   pull-requests: read
@@ -48,6 +49,7 @@ jobs:
           head-sha: ${{ github.event.pull_request.head.sha }}
           draft: ${{ github.event.pull_request.draft }}
           repository: ${{ github.repository }}
+          pr-id: ${{ github.event.pull_request.id }}
           pr-number: ${{ github.event.pull_request.number }}
           github-token: ${{ github.token }}
 
@@ -65,15 +67,23 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_ID: ${{ github.event.repository.id }}
+          PR_ID: ${{ github.event.pull_request.id }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           DRAFT: ${{ github.event.pull_request.draft }}
           WORKFLOW_RUN_ID: ${{ github.run_id }}
+          WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+          WORKFLOW_EXECUTION_SHA: ${{ github.sha }}
           WORKFLOW_JOB: ${{ github.job }}
           ENVELOPE_PATH: ${{ steps.review-gate.outputs.envelope-path }}
           ENVELOPE_SHA256: ${{ steps.review-gate.outputs.envelope-sha256 }}
           ATTESTATION_RESULT: ${{ runner.temp }}/oteryn-trusted-review-attestation-verify.json
+          BARE_GIT_DIR: ${{ runner.temp }}/oteryn-candidate.git
+          POLICY_FILE: trusted/ecosystem/ai-review-policy.json
+          CLASSIFIER_FILE: trusted/tools/governance/ai_review_policy.py
         run: |
           set -euo pipefail
           test "sha256:$(sha256sum "$ENVELOPE_PATH" | awk '{print $1}')" = "$ENVELOPE_SHA256"
@@ -82,10 +92,16 @@ jobs:
             --predicate-type https://oteryn.dev/bounded-execution-evidence/v1 \
             --signer-workflow "$REPOSITORY/.github/workflows/governance-ai-review.yml" \
             --signer-digest "$BASE_SHA" \
+            --source-ref refs/heads/main \
+            --source-digest "$BASE_SHA" \
             --deny-self-hosted-runners \
             --format json > "$ATTESTATION_RESULT"
           python3 trusted/tools/governance/trusted_review_attestation.py verify \
-            --repository "$REPOSITORY" --repository-id "$REPOSITORY_ID" --pr-number "$PR_NUMBER" \
+            --repository "$REPOSITORY" --repository-id "$REPOSITORY_ID" --pr-id "$PR_ID" --pr-number "$PR_NUMBER" \
             --base "$BASE_SHA" --head "$HEAD_SHA" --draft "$DRAFT" --token "$GH_TOKEN" \
-            --workflow-run-id "$WORKFLOW_RUN_ID" --workflow-job "$WORKFLOW_JOB" \
+            --workflow-ref "$WORKFLOW_REF" --workflow-sha "$WORKFLOW_SHA" \
+            --workflow-execution-sha "$WORKFLOW_EXECUTION_SHA" \
+            --workflow-run-id "$WORKFLOW_RUN_ID" --workflow-run-attempt "$WORKFLOW_RUN_ATTEMPT" \
+            --workflow-job "$WORKFLOW_JOB" --bare-git-dir "$BARE_GIT_DIR" \
+            --policy-file "$POLICY_FILE" --classifier-file "$CLASSIFIER_FILE" \
             --envelope "$ENVELOPE_PATH" --attestation-result "$ATTESTATION_RESULT"
