@@ -38,11 +38,11 @@ def _validate(snapshot: dict[str, Any]) -> None:
         missing = sorted(REQUIRED - set(snapshot))
         extra = sorted(set(snapshot) - REQUIRED)
         raise ValueError(f"snapshot fields mismatch: missing={missing} extra={extra}")
-    if snapshot["schema_version"] != 1:
+    if type(snapshot["schema_version"]) is not int or snapshot["schema_version"] != 1:
         raise ValueError("unsupported schema_version")
     if not isinstance(snapshot["repository"], str) or snapshot["repository"].count("/") != 1:
         raise ValueError("repository must use owner/name")
-    if not isinstance(snapshot["pr_number"], int) or snapshot["pr_number"] < 1:
+    if type(snapshot["pr_number"]) is not int or snapshot["pr_number"] < 1:
         raise ValueError("pr_number must be positive")
     task_head = snapshot["task_head_sha"]
     if not isinstance(task_head, str) or not SHA_RE.fullmatch(task_head):
