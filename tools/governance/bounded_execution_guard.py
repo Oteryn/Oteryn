@@ -50,6 +50,13 @@ LOOP_BREAKER_FINAL_ACTIONS = {
     "enter_final_qualification",
     "complete",
 }
+LOOP_BREAKER_POST_ADMISSION_ACTIONS = {
+    "request_external_review",
+    "run_heavy_validation",
+    "same_head_gate_recheck",
+    "complete",
+}
+MAX_ORGANIZATION_LOOP_BREAKER_THRESHOLD = 2
 EXPECTED_COUNTER_SCOPES = {
     "identical_failure_cycles": ["task_head_sha", "failure_fingerprint"],
     "heavy_validation_runs": ["task_head_sha"],
@@ -150,6 +157,14 @@ def validate_policy(policy: dict[str, Any]) -> None:
     ):
         if not _positive_integer(loop.get(key)):
             raise GuardError(f"loop_breaker.{key} must be a positive integer")
+    for key in (
+        "late_material_finding_threshold",
+        "post_freeze_material_head_change_threshold",
+    ):
+        if loop[key] > MAX_ORGANIZATION_LOOP_BREAKER_THRESHOLD:
+            raise GuardError(
+                f"loop_breaker.{key} may be stricter but cannot exceed the organization threshold of {MAX_ORGANIZATION_LOOP_BREAKER_THRESHOLD}"
+            )
     if loop["final_qualification_generations_per_audit"] != 1:
         raise GuardError("loop breaker permits exactly one final qualification generation per audit")
     severities = loop.get("material_finding_severities")
@@ -390,6 +405,10 @@ def _validate_monotonic_history(
             raise GuardError(
                 "audited loop-breaker counters may advance only in LOOP_BREAKER_AUDIT"
             )
+        if _ledger_terminal(previous, policy):
+            raise GuardError(
+                "a renewed LOOP_BREAKER_AUDIT must reopen at least one risk class before advancing audited counters"
+            )
         if not _ledger_terminal(current, policy):
             raise GuardError(
                 "audited loop-breaker counters require a terminal risk ledger"
@@ -591,6 +610,23 @@ def decide(
             reason=(
                 "LOOP_BREAKER_AUDIT_REQUIRED: late findings/head movement exceeded the bounded closeout threshold; "
                 "complete one batched risk-ledger audit before another final qualification generation"
+            ),
+            release_session=False,
+            progress=progress,
+            failure=failure,
+        )
+
+    if (
+        loop_breaker_triggered
+        and loop_breaker_current
+        and requested_action in LOOP_BREAKER_POST_ADMISSION_ACTIONS
+        and current["final_qualification_runs_since_audit"] != 1
+    ):
+        return _decision(
+            allowed=False,
+            state="READY" if current["state"] == "RUNNING" else current["state"],
+            reason=(
+                "final qualification admission is required: record exactly one consumed qualification generation before final checks/review/completion"
             ),
             release_session=False,
             progress=progress,
