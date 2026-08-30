@@ -58,15 +58,20 @@ jobs:
               Path('docs/ci/CI_CONTRACT.md'),
               Path('docs/testing/ECOSYSTEM_TEST_STRATEGY.md'),
               Path('docs/release/RELEASE_COORDINATION.md'),
+              Path('docs/agents/EXECUTION_STATE_CONTRACT.json'),
               Path('ecosystem/repositories.json'),
               Path('ecosystem/governance-desired-state.json'),
               Path('ecosystem/compatibility.schema.json'),
               Path('ecosystem/agent-execution-routing-policy.json'),
+              Path('tools/agents/execution_guard.py'),
+              Path('tools/agents/execution_state.py'),
               Path('tools/governance/audit_github_readonly.py'),
               Path('tools/governance/audit_github_readonly_core.py'),
               Path('tools/governance/test_audit_github_readonly.py'),
               Path('tools/governance/test_audit_github_readonly_terminal.py'),
               Path('tools/governance/agent_execution_routing.py'),
+              Path('tools/governance/remote_desktop_call_gate.py'),
+              Path('tools/governance/provider_policy_adoption.py'),
               Path('tools/governance/test_agent_execution_routing.py'),
               Path('tools/governance/test_remote_desktop_action_gate.py'),
           ]
@@ -208,6 +213,15 @@ jobs:
               raise SystemExit('R2 must require the deep reviewer class')
           print('AI review policy contract PASS')
           PY
+
+      - name: Validate bounded autonomous execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest tools.agents.test_execution_guard -v
+          python3 -m unittest tools.agents.test_execution_contract -v
+          python3 -m unittest tools.agents.test_execution_state -v
+          python3 -m unittest tools.governance.test_ai_review_recheck_workflow -v
 
       - name: Emit exact pull-request AI review classification
         if: ${{ github.event_name == 'pull_request' }}
