@@ -354,10 +354,13 @@ Test these exact structurally valid pairings before trusted-authority checks:
 Create the trusted context outside the snapshot fixture:
 
 ```python
-trusted_task = TrustedTaskIdentity(
+lineage_key = StableTaskLineageKey(
     repository="Oteryn/Oteryn",
     task_id="Oteryn/Oteryn#108",
     checkpoint_lineage_token="checkpoint-lineage:Oteryn/Oteryn#108",
+)
+trusted_task = TrustedTaskIdentity(
+    lineage_key=lineage_key,
     task_branch="governance/example",
     pr_applicable=True,
     pr_id="110",
@@ -428,7 +431,7 @@ unless the trusted canonical bounded lifecycle independently reports a valid ter
 
 - [ ] **Step 7: Add trusted retry-preservation tests**
 
-Construct a fake `CheckpointLineageAuthority` whose authoritative latest predecessor for the independently supplied `TrustedTaskIdentity` contains a bounded generation and non-zero canonical retry/evidence counters. Call:
+Construct a fake `CheckpointLineageAuthority` whose authoritative latest predecessor for `trusted_task.lineage_key` contains a bounded generation and non-zero canonical retry/evidence counters. Call:
 
 ```python
 validate_continuation_snapshot(
@@ -446,7 +449,7 @@ validate_continuation_snapshot(
 
 First prove `resume_read` cannot substitute or rewrite predecessor retry/generation evidence: a caller snapshot that lowers self-declared counters, names an older predecessor, supplies a fabricated predecessor digest, or changes any snapshot repository/task/lineage/branch/PR/head/next-action coordinate must fail historical authentication before it can affect trusted state.
 
-Exercise **both checkpoint-write boundaries** explicitly. First, when `latest_predecessor(trusted_task)` returns `None`, prove that `proves_no_predecessor(trusted_task)` alone is insufficient: the fake bounded authority must expose already-consumed generation/retry/evidence state and `matches_current_retry_and_evidence_state(...)` must reject a first continuation checkpoint that lowers, resets or omits any applicable canonical value; unknown/unavailable current bounded state also fails closed. A truly first continuation checkpoint is accepted only when both no-predecessor proof and current bounded-state match succeed.
+Exercise **both checkpoint-write boundaries** explicitly. First, when `latest_predecessor(trusted_task.lineage_key)` returns `None`, prove that `proves_no_predecessor(trusted_task.lineage_key)` alone is insufficient: the fake bounded authority must expose already-consumed generation/retry/evidence state and `matches_current_retry_and_evidence_state(...)` must reject a first continuation checkpoint that lowers, resets or omits any applicable canonical value; unknown/unavailable current bounded state also fails closed. A truly first continuation checkpoint is accepted only when both no-predecessor proof and current bounded-state match succeed.
 
 Then exercise the **successor write** boundary. After a valid resume, build `successor_snapshot` for fresh trusted state and call `validate_continuation_snapshot(..., validation_mode="checkpoint_write")` while `lineage_authority.latest_predecessor(trusted_task.lineage_key)` returns the authenticated historical checkpoint. The fake `BoundedLifecycleAuthority.preserves_retry_and_evidence_continuity(...)` must reject every reduced, reset or omitted applicable bounded generation/retry/evidence value relative to that authoritative predecessor, and must allow only transitions the canonical `#69/#71` authority declares valid. Test unavailable/ambiguous predecessor and unavailable continuity proof as fail-closed. The continuation validator delegates canonical counter scopes and legal reset semantics to bounded authority; it never redefines them.
 
