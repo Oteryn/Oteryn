@@ -130,6 +130,14 @@ class DecisionTests(unittest.TestCase):
                 with self.assertRaisesRegex(GuardError, "forbidden action"):
                     decide(None, snapshot(), "observe", weakened)
 
+    def test_policy_requires_unique_external_dependency_kind(self):
+        for kinds in (["local"], ["external", "external"]):
+            with self.subTest(kinds=kinds):
+                weakened = copy.deepcopy(POLICY)
+                weakened["dependency_kinds"] = kinds
+                with self.assertRaisesRegex(GuardError, "dependency_kinds"):
+                    decide(None, snapshot(), "observe", weakened)
+
     def test_frozen_candidate_denies_retrigger_without_material_change(self):
         current = snapshot(candidate_frozen=True, state="READY")
         result = decide(None, current, "retrigger", POLICY)

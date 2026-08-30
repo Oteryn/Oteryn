@@ -328,6 +328,59 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             self.assertTrue(outbox.claim_dispatch(winner.reservation_key))
             self.assertFalse(outbox.claim_dispatch(winner.reservation_key))
 
+    def test_durable_outbox_persists_recoverable_snapshot_for_takeover(self):
+        previous = snapshot(
+            state="READY",
+            phase="implementation",
+            candidate_frozen=False,
+        )
+        first = copy.deepcopy(previous)
+        first["gate_state"] = "running"
+        second = copy.deepcopy(first)
+        second["state"] = "WAITING_EXTERNAL"
+        second["blocking_dependency"] = "provider-result:pending"
+        second["dependency_kind"] = "external"
+
+        with tempfile.TemporaryDirectory() as directory:
+            outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
+            outbox.seed_checkpoint(
+                previous["repository"],
+                previous["task_id"],
+                _checkpoint_digest(previous),
+                snapshot=previous,
+            )
+            seeded = outbox.load_checkpoint(previous["repository"], previous["task_id"])
+            self.assertEqual(seeded.checkpoint, _checkpoint_digest(previous))
+            self.assertEqual(seeded.snapshot, previous)
+
+            reserved = outbox.reserve(
+                repository=previous["repository"],
+                task_id=previous["task_id"],
+                expected_checkpoint=_checkpoint_digest(previous),
+                next_checkpoint=_checkpoint_digest(first),
+                next_snapshot=first,
+                action="retry",
+                scope=(),
+            )
+            self.assertTrue(reserved.committed)
+            after_reserve = outbox.load_checkpoint(previous["repository"], previous["task_id"])
+            self.assertEqual(after_reserve.checkpoint, _checkpoint_digest(first))
+            self.assertEqual(after_reserve.snapshot, first)
+
+            transitioned = outbox.transition(
+                repository=previous["repository"],
+                task_id=previous["task_id"],
+                expected_checkpoint=_checkpoint_digest(first),
+                next_checkpoint=_checkpoint_digest(second),
+                next_snapshot=second,
+                reason="external dependency is pending",
+                scope=(),
+            )
+            self.assertTrue(transitioned.committed)
+            after_transition = outbox.load_checkpoint(previous["repository"], previous["task_id"])
+            self.assertEqual(after_transition.checkpoint, _checkpoint_digest(second))
+            self.assertEqual(after_transition.snapshot, second)
+
     def test_frozen_candidate_rejects_self_attested_material_change(self):
         previous = snapshot(candidate_frozen=True)
         current = copy.deepcopy(previous)

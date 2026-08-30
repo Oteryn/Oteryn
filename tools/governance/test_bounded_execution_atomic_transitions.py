@@ -236,6 +236,34 @@ class AtomicTransitionRegressionTests(unittest.TestCase):
         expected["state"] = "WAITING_EXTERNAL"
         self.assertEqual(outbox.next_checkpoint, _checkpoint_digest(expected))
 
+    def test_unbound_external_dependency_persists_waiting_without_review_authority(self):
+        for action, expected_allowed in (("observe", True), ("mutate", False)):
+            with self.subTest(action=action):
+                current = snapshot(
+                    state="READY",
+                    phase="implementation",
+                    candidate_frozen=False,
+                    blocking_dependency="provider-result:pending",
+                    dependency_kind="external",
+                )
+                outbox = RecordingOutbox()
+
+                result = raw_decide(
+                    None,
+                    current,
+                    action,
+                    POLICY,
+                    context=ExecutionContext(AllowEvidenceAuthority(), outbox),
+                )
+
+                self.assertEqual(result.allowed, expected_allowed)
+                self.assertEqual(result.state, "WAITING_EXTERNAL")
+                self.assertTrue(result.release_session)
+                expected = copy.deepcopy(current)
+                expected["state"] = "WAITING_EXTERNAL"
+                self.assertEqual(outbox.next_checkpoint, _checkpoint_digest(expected))
+                self.assertIsNone(outbox.action)
+
     def test_completion_requires_prior_durable_frozen_final_candidate(self):
         previous = with_binding(
             snapshot(
