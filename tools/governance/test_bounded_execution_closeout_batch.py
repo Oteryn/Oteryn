@@ -11,6 +11,7 @@ from bounded_execution_guard import (  # noqa: E402
     ExecutionContext,
     GuardError,
     _checkpoint_digest,
+    _dispatch_scope,
     decide as raw_decide,
     make_material_fact_envelope,
     make_review_binding,
@@ -115,6 +116,22 @@ class FrozenLineageTests(unittest.TestCase):
 
 
 class FreezeAdmissionTests(unittest.TestCase):
+    def test_final_candidate_actions_require_prior_durable_freeze(self):
+        previous = snapshot(candidate_frozen=False, phase="implementation")
+        for action, counter in (
+            ("request_external_review", "external_review_invocations"),
+            ("run_heavy_validation", "heavy_validation_runs"),
+            ("same_head_gate_recheck", "same_head_gate_rechecks"),
+        ):
+            with self.subTest(action=action):
+                current = copy.deepcopy(previous)
+                current["candidate_frozen"] = True
+                current["phase"] = "final_qualification"
+                current[counter] = 1
+                result = decide(previous, current, action, POLICY)
+                self.assertFalse(result.allowed)
+                self.assertIn("previous durable checkpoint", result.reason)
+
     def test_pre_threshold_final_qualification_requires_frozen_candidate(self):
         current = snapshot(candidate_frozen=False)
         result = decide(None, current, "enter_final_qualification", POLICY)
@@ -216,6 +233,56 @@ class MaterialChangeEvidenceTests(unittest.TestCase):
 
 
 class TrustedAuthorityAndReservationTests(unittest.TestCase):
+    def test_loop_breaker_audit_dispatch_scope_includes_exact_head(self):
+        head_a = snapshot(
+            phase="LOOP_BREAKER_AUDIT", late_material_findings=2,
+            audited_late_material_findings=0,
+        )
+        head_b = copy.deepcopy(head_a)
+        head_b["task_head_sha"] = "b" * 40
+        self.assertNotEqual(
+            _dispatch_scope(head_a, "run_loop_breaker_audit"),
+            _dispatch_scope(head_b, "run_loop_breaker_audit"),
+        )
+
+    def test_dispatch_crash_before_start_is_recoverable_but_after_start_is_in_doubt(self):
+        repository = "Oteryn/Oteryn"
+        task_id = "OTERYN-DISPATCH-START-BOUNDARY"
+        initial = {"revision": 0}
+        reserved = {"revision": 1}
+        with tempfile.TemporaryDirectory() as directory:
+            outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
+            outbox.seed_checkpoint(
+                repository, task_id, _checkpoint_digest(initial), snapshot=initial
+            )
+            reservation = outbox.reserve(
+                repository=repository, task_id=task_id,
+                expected_checkpoint=_checkpoint_digest(initial),
+                next_checkpoint=_checkpoint_digest(reserved), next_snapshot=reserved,
+                action="mutate", scope=("material-generation-1",),
+            )
+            first = outbox.claim_pending_dispatch(repository, task_id)
+            self.assertIsNotNone(first)
+
+            # A claim lost before the durable start boundary can be recovered.
+            self.assertTrue(outbox.requeue_unacknowledged_dispatch(
+                reservation.reservation_key, first.dispatch_generation
+            ))
+            second = outbox.claim_pending_dispatch(repository, task_id)
+            self.assertIsNotNone(second)
+            self.assertTrue(outbox.begin_dispatch(
+                reservation.reservation_key, second.dispatch_generation
+            ))
+
+            # Once execution may have begun, recovery must fail closed.
+            self.assertFalse(outbox.requeue_unacknowledged_dispatch(
+                reservation.reservation_key, second.dispatch_generation
+            ))
+            self.assertIsNone(outbox.claim_pending_dispatch(repository, task_id))
+            inflight = outbox.load_inflight_dispatch(repository, task_id)
+            self.assertIsNotNone(inflight)
+            self.assertTrue(inflight.dispatch_started)
+
     def test_standalone_consuming_action_fails_closed_with_reservation_required(self):
         result = raw_decide(None, snapshot(candidate_frozen=False), "complete", POLICY)
 
