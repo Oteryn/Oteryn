@@ -8,6 +8,8 @@ This module adds exact argument binding immediately before the connector call.
 from __future__ import annotations
 
 import importlib.util
+import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -26,8 +28,12 @@ def _mapping(value: object) -> dict[str, Any]:
 
 
 def _is_json_value(value: object) -> bool:
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None or isinstance(value, (str, bool)):
         return True
+    if type(value) is int:
+        return True
+    if type(value) is float:
+        return math.isfinite(value)
     if isinstance(value, list):
         return all(_is_json_value(member) for member in value)
     if isinstance(value, dict):
@@ -61,6 +67,17 @@ def _call_gate_config(policy: dict[str, object]) -> tuple[set[str], list[str]]:
 
 def _normalize_arguments(arguments: dict[str, Any], nonsemantic: set[str]) -> dict[str, Any]:
     return {key: value for key, value in arguments.items() if key not in nonsemantic}
+
+
+def _canonical_arguments(arguments: dict[str, Any], nonsemantic: set[str]) -> str:
+    """Return a deterministic, JSON-type-sensitive representation for exact binding."""
+    return json.dumps(
+        _normalize_arguments(arguments, nonsemantic),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    )
 
 
 def validate_remote_desktop_call(
@@ -105,8 +122,9 @@ def validate_remote_desktop_call(
     if not isinstance(declarations, list) or not declarations:
         return ["remote desktop call requires exact argument declaration"]
 
-    normalized_actual = _normalize_arguments(tool_arguments, nonsemantic)
-    normalized_seen: list[tuple[str, dict[str, Any]]] = []
+    canonical_actual = _canonical_arguments(tool_arguments, nonsemantic)
+    canonical_seen: set[tuple[str, str]] = set()
+    matched = False
     for declaration in declarations:
         if not isinstance(declaration, dict) or set(declaration) != {"tool", "arguments"}:
             return ["requested_remote_desktop_calls contains an invalid declaration"]
@@ -119,12 +137,14 @@ def validate_remote_desktop_call(
             or not _is_json_value(declared_arguments)
         ):
             return ["requested_remote_desktop_calls contains an invalid declaration"]
-        normalized_declared = _normalize_arguments(declared_arguments, nonsemantic)
-        key = (declared_tool, normalized_declared)
-        if any(previous_tool == declared_tool and previous_args == normalized_declared for previous_tool, previous_args in normalized_seen):
+        canonical_declared = _canonical_arguments(declared_arguments, nonsemantic)
+        key = (declared_tool, canonical_declared)
+        if key in canonical_seen:
             return ["requested_remote_desktop_calls contains a duplicate declaration"]
-        normalized_seen.append(key)
-        if declared_tool == remote_tool and normalized_declared == normalized_actual:
-            return []
+        canonical_seen.add(key)
+        if declared_tool == remote_tool and canonical_declared == canonical_actual:
+            matched = True
 
+    if matched:
+        return []
     return ["remote desktop call arguments do not match routing packet"]
