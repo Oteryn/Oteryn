@@ -79,10 +79,11 @@ Create/extend META machine and human governance so there is one authoritative co
   - P1 remaining blocking;
   - provider config being unable to override META reuse semantics;
   - a missing/duplicate commit-to-PR mapping, queue entry or attestation artifact failing closed;
-  - a candidate workflow attempting to reproduce the required result name remaining non-authoritative.
+  - a candidate workflow attempting to reproduce the required result name remaining non-authoritative;
   - `Hpr -> C` admission rejecting a stale, mismatched or ambiguous PR/check-suite binding;
   - a PR-stage success being unable to satisfy an exact-`I` merge-group requirement;
-  - a malicious local helper shadowing a trusted helper path failing closed.
+  - a malicious local helper shadowing a trusted helper path failing closed;
+  - every legacy required status context having an explicit protected replacement mapping before it may become non-required.
 - [ ] Run the focused tests and prove RED for intended missing semantics.
 - [ ] Implement the minimum canonical policy/validator changes.
 - [ ] Prove GREEN plus existing META governance tests.
@@ -95,7 +96,7 @@ Create/extend META machine and human governance so there is one authoritative co
 
 All Phase-2 implementation must satisfy the binding amendment. In particular, do not infer speculative group cardinality from `maximumEntriesToMerge`; historical review evidence must come from an exact terminal-success issuer generation; durable envelope artifacts are emitted only after issuer self-verification; trusted bridge/provider-contract changes use versioned protected activation; and #114 must be complete before provider consumption.
 
-- [ ] Inventory every required `main` check and current workflow/ruleset authority in META; explicitly classify target-local `merge_group` workflows as non-authoritative.
+- [ ] Inventory every required `main` check and current workflow/ruleset authority in META; explicitly classify target-local `merge_group` workflows as non-authoritative and classify every required legacy context as `merge_group-capable` or `PR-only/incompatible`.
 - [ ] Implement one META-owned organization-ruleset workflow, stored and protected on META `main`, with disjoint fail-closed `pull_request` and `merge_group: checks_requested` jobs; select it later by source repository/workflow path, not by result name.
 - [ ] In the `pull_request` job, bind GitHub's PR merge-ref/check-suite head `Hpr` to server-current candidate `C`, require exactly one trusted PR #111 envelope, and verify `Q`, `R`, exact tier/fingerprint and canonical `R -> C` qualification. Use read-only permissions: no secrets, OIDC, attestation writes, checks/status writes or candidate execution. Run any candidate test only in a separate unprivileged job. Do not introduce `pull_request_target` as this admission leg.
 - [ ] Resolve workflow helpers/actions in a separate trusted path from exact protected META `T`, never from candidate/default-workspace `./...`; pin every external action by full SHA and prove a malicious local-helper shadow cannot alter either event leg.
@@ -107,10 +108,10 @@ All Phase-2 implementation must satisfy the binding amendment. In particular, do
 - [ ] Run canonical reuse validation for `R -> C` plus the supported method-aware integration topology, trusted-base lineage and exact integration tier/fingerprint equality. Run provider aggregate tests against exact `I` in a separate credential-free, unprivileged job.
 - [ ] In a fresh mediator job that never executes candidate code or consumes candidate artifacts/caches, re-fetch the test job/check conclusion and exact head from the Actions API; emit and immediately verify an integration envelope binding repository/PR/queue identities, `T/Q/M/B/C/R/I`, tier/fingerprint, evidence and run/job/check-suite identities. Assert the ruleset workflow's own check suite has `head_sha == I`; rely on that GitHub-published required workflow result, not a manually named candidate status.
 - [ ] Give candidate workflows and the integration test job read-only/no-secret permissions and no `checks`, `statuses`, OIDC or attestation writes. Give only the isolated mediator job `actions/checks/contents/issues/pull-requests: read` plus `id-token`, `attestations` and `artifact-metadata: write` for its own envelope; no contents/checks/statuses write and no shared caches/artifacts from candidate execution. Do not use event filters, whole-workflow skips or `cancel-in-progress` to couple or suppress the two proof stages.
-- [ ] Add deterministic fixtures for the supported squash topology plus zero/multiple/foreign/stale mappings; wrong base/head; unsupported predecessor/prefix/extra-member shapes; non-reproducible integration result; merge-method mismatch/ambiguity; stale/duplicate/missing artifact; invalid signer/source; valid attestation from a failed issuer generation; fingerprint drift; wrong check-suite head; stale/mismatched `Hpr -> C`; PR-stage/merge-group result confusion; and malicious local-helper shadowing.
+- [ ] Add deterministic fixtures for the supported squash topology plus zero/multiple/foreign/stale mappings; wrong base/head; unsupported predecessor/prefix/extra-member shapes; non-reproducible integration result; merge-method mismatch/ambiguity; stale/duplicate/missing artifact; invalid signer/source; valid attestation from a failed issuer generation; fingerprint drift; wrong check-suite head; stale/mismatched `Hpr -> C`; PR-stage/merge-group result confusion; malicious local-helper shadowing; and incomplete/ambiguous replacement coverage for legacy required contexts.
 - [ ] Prove existing PR flow remains green, merge the complete bridge/capability code, then read the exact files and SHA back from protected `main`.
 
-Do not change queue, ruleset enforcement or strict freshness in this phase. **No live `merge_group` canary is required to exit Phase 2.** A live canary belongs to Phase 3, after the capable code is already protected and Merge Queue is enabled while strict freshness remains active.
+Do not change queue, ruleset enforcement or strict freshness in this phase. **No live `merge_group` canary is required to exit Phase 2.** A live canary belongs to Phase 3, after the capable code is already protected and while strict freshness remains active.
 
 ---
 
@@ -118,18 +119,21 @@ Do not change queue, ruleset enforcement or strict freshness in this phase. **No
 
 Only after Phase 2 is proven:
 
-- [ ] Re-read the dual-event workflow and verifier from protected `main`; record source workflow SHA/path, current ruleset JSON and `strict freshness = true` as the rollback baseline.
-- [ ] In Evaluate mode, save and read back the required-workflow configuration and verify protected source-repository/path access before enabling enforcement. If Team cross-repository required-workflow semantics fail, record the exact capability fallback and retain strict freshness.
-- [ ] Configure squash and the intended initial queue limits/topology, activate the protected-source required workflow, and enable/require Merge Queue on `main` while strict freshness remains enabled.
-- [ ] Read back that Merge Queue and the required source workflow are active and strict freshness is still enabled.
+- [ ] Re-read the dual-event workflow and verifier from protected `main`; record source workflow SHA/path, current ruleset JSON, exact legacy required-context set and `strict freshness = true` as the rollback baseline.
+- [ ] In Evaluate mode, save and read back the protected-source required-workflow configuration and verify source-repository/path access. If Team cross-repository required-workflow semantics fail, record the exact capability fallback and retain strict freshness.
+- [ ] Activate/require the protected dual-event workflow **while strict freshness and every existing legacy required context remain active**. Prove its `pull_request` admission leg succeeds and positively read back the combined protected state.
+- [ ] For each legacy required context, prove its deterministic/security coverage is preserved by the protected dual-event workflow or protected META/provider aggregate contract. Any missing coverage blocks cutover.
+- [ ] Make every legacy context that cannot succeed on `merge_group` non-required while the protected dual-event workflow remains required and strict freshness remains enabled. META examples include current `meta-gate` / `ai-review-gate`; provider examples include current `game-gate`, `platform-gate`, and `atlas-gate` / `provenance-gate` unless a refreshed live implementation proves that exact context is deliberately `merge_group`-capable and remains part of the supported integration contract.
+- [ ] Positively read back the exact **pre-canary** protection state: protected dual-event workflow required, strict freshness `true`, no incompatible PR-only legacy context still required, and merge method/thread/CODEOWNERS/force-push/deletion protections unchanged.
+- [ ] Configure squash and the intended initial queue limits/topology, enable/require Merge Queue while strict freshness remains enabled, and positively read back queue-required + bridge-required + strict-freshness-active state before enqueue.
 - [ ] Enqueue one fresh or reopened actual canary; prove PR-stage ineligible-before/eligible-after admission and a same-head late-review rerun without a commit, then prove the actual event/server queue topology, exact successful historical issuer/artifact evidence, supported method-aware integration-tree reproduction, aggregate tests and the distinct required workflow result on exact synthetic `I`.
 - [ ] Verify the canary merge and protected-main SHA/readback.
-- [ ] Disable strict `Require branches to be up to date before merging` only after that terminal success, then read back queue-required, bridge-required and strict-freshness-disabled state together.
-- [ ] Verify agents can leave a reviewed candidate unchanged while unrelated `main` advances and still integrate through the queue when fingerprint reuse remains valid; retain strict freshness throughout the canary until its protected-main readback is complete.
+- [ ] Disable strict `Require branches to be up to date before merging` only after that terminal success, then read back queue-required, bridge-required, incompatible-legacy-contexts-nonrequired and strict-freshness-disabled state together.
+- [ ] Verify agents can leave a reviewed candidate unchanged while unrelated `main` advances and still integrate through the queue when fingerprint reuse remains valid.
 
-**Rollback before strict-disable:** if enqueue, queue topology/API mapping, issuer/artifact validation, required exact-`I` result, canary merge or pre-disable readback fails, the latest positive readback still proves `strict freshness = true`; only in that state remove/restore the queue/ruleset change to the captured pre-cutover state and positively read back `strict freshness = true` again.
+**Rollback before strict-disable:** if required-context replacement, enqueue, queue topology/API mapping, issuer/artifact validation, required exact-`I` result, canary merge or pre-disable readback fails, retain/restore the captured legacy required-context set while strict freshness remains positively `true`, and positively read back that fallback before further mutation. Never remove the protected dual-event workflow first if doing so would create a protection gap.
 
-**Recovery after strict-disable request:** once any request to disable strict freshness has been sent, or when the final combined readback is failed, missing or ambiguous, do not assume strict remains enabled. First explicitly re-enable strict freshness and require a positive `strict freshness = true` readback. Only after that proof may the queue or required-workflow rule be removed/restored. If strict cannot be positively confirmed, stop in emergency `BLOCKED`, leave the queue and required-workflow rule in place, and escalate; never leave an unprotected gap.
+**Recovery after strict-disable request:** once any request to disable strict freshness has been sent, or when the final combined readback is failed, missing or ambiguous, do not assume strict remains enabled. First explicitly re-enable strict freshness and require a positive `strict freshness = true` readback. Only after that proof may the queue/required-workflow/legacy-context configuration be restored to the captured safe baseline. If strict cannot be positively confirmed, stop in emergency `BLOCKED`, preserve the strongest remaining queue/workflow protection, and escalate; never leave an unprotected gap.
 
 ---
 
@@ -142,13 +146,14 @@ For each authorized provider among Game, Platform and Atlas, create a separately
 ### Required provider work
 
 - [ ] Complete Issue #114's reusable caller-token permission contract and executed regression before any provider consumes the META gate/action.
-- [ ] Add the provider's protected-base test contract/configuration consumed by the META ruleset workflow; target-local `game-gate`, `platform-gate` or `atlas-gate`/`provenance-gate` may run on `merge_group` for diagnostics but is not the required authority.
+- [ ] Add the provider's protected-base test contract/configuration consumed by the META ruleset workflow; target-local `game-gate`, `platform-gate` or `atlas-gate`/`provenance-gate` may continue for diagnostics but is not the required integration authority unless refreshed protected code proves that exact context intentionally supports `merge_group` and is part of the supported final requirement set.
 - [ ] Make trusted bridge event parsing and provider selection work for the repository without reading authority from `I`.
 - [ ] Ensure integration candidate exact SHA is what required deterministic jobs actually test.
 - [ ] Bind external review evidence to canonical META fingerprint semantics, not local `head_change_invalidates_prior_qualification` shortcuts.
 - [ ] Remove/supersede reusable prompt/task wording that says every material SHA movement automatically requires new external review when canonical reuse conditions hold.
 - [ ] Preserve repository-specific tests, CODEOWNERS, thread resolution and risk escalations.
 - [ ] Add deterministic provider governance regressions that reject reintroduction of exact-SHA-only review invalidation.
+- [ ] Produce an explicit coverage map from each provider's current required aggregate/status contexts to the new protected provider aggregate contract before Phase 5 may make a legacy context non-required.
 
 Provider code/runtime is out of scope unless the existing aggregate workflow itself lives with tooling needed to run its tests.
 
@@ -166,13 +171,16 @@ After the first provider passes end-to-end, Platform and Atlas may proceed indep
 
 For each authorized provider, serialized per repository:
 
-- [ ] Merge and read back the provider bridge contract/configuration from protected `main`; record ruleset JSON and active strict freshness.
-- [ ] Configure squash and the intended canary queue topology, require the protected META ruleset workflow, and enable/require Merge Queue while strict freshness stays active.
-- [ ] Enqueue one canary and prove actual live queue topology + exact-`I` trusted bridge success, merge and protected-main readback.
-- [ ] Disable strict up-to-date-before-merge only after the canary is terminally successful, then read back the complete final state.
+- [ ] Merge and read back the provider bridge contract/configuration from protected `main`; capture ruleset JSON, exact legacy required-context set and active strict freshness.
+- [ ] Activate/require the protected META dual-event workflow while strict freshness and existing provider legacy required contexts remain active; prove/read back its provider PR-admission result.
+- [ ] Verify the explicit coverage map, then make every provider legacy required context that cannot succeed on `merge_group` non-required while the protected META workflow remains required and strict freshness remains `true`.
+- [ ] Positively read back the pre-canary state: protected META workflow required, strict freshness `true`, no incompatible provider legacy required context remains, and all other protections unchanged.
+- [ ] Configure squash/intended queue topology and enable/require Merge Queue while strict freshness stays active; positively read back queue + protected workflow + strict freshness before enqueue.
+- [ ] Enqueue one canary and prove actual live queue topology, exact successful historical issuer/artifact evidence, provider aggregate coverage and exact-`I` trusted bridge success; then verify merge and protected-main readback.
+- [ ] Disable strict up-to-date-before-merge only after the canary is terminally successful, then read back queue-required, bridge-required, incompatible-legacy-contexts-nonrequired and strict-freshness-disabled state.
 - [ ] Verify no direct merge path bypasses the queue except explicit documented emergency policy.
 
-If a provider canary fails before any strict-disable request, restore/remove its queue/ruleset change only while the latest positive readback proves `strict freshness = true`, then positively verify the fallback. After any strict-disable request, or on a failed, missing or ambiguous final readback, first explicitly re-enable strict and obtain positive `strict freshness = true`; only then restore/remove queue or required-workflow rules. If that proof cannot be obtained, stop in emergency `BLOCKED` and leave queue plus required-workflow rules in place. Do not perform all settings changes across all repositories simultaneously. One proven canary precedes broad rollout.
+If provider required-context replacement or canary fails before any strict-disable request, restore/retain the captured legacy required-context set while the latest positive readback proves `strict freshness = true`, then positively verify the safe fallback. After any strict-disable request, or on a failed, missing or ambiguous final readback, first explicitly re-enable strict and obtain positive `strict freshness = true`; only then restore/remove queue or required-workflow rules or restore legacy context requirements. If that proof cannot be obtained, stop in emergency `BLOCKED` and preserve the strongest remaining queue/workflow protection. Do not perform all settings changes across all repositories simultaneously. One proven canary precedes broad rollout.
 
 ---
 
@@ -200,6 +208,7 @@ It should fail/report on at least:
 - strict branch freshness re-enabled without a declared fallback state;
 - trusted ruleset workflow or protected-base provider contract missing `merge_group` support;
 - required check names diverging from provider config;
+- a PR-only/non-`merge_group`-capable legacy context remaining required after queue cutover;
 - local policy reintroducing exact-SHA-only external-review invalidation;
 - no-op/retrigger allowance returning;
 - P2 becoming an automatic blocking severity;
@@ -218,7 +227,7 @@ For each repository prove these scenarios:
 
 ### Scenario A — unchanged main
 
-Candidate CI -> required external review and successful PR #111 issuer/artifact -> queue -> trusted server-bound queue topology -> exact-`I` aggregate CI/fingerprint qualification -> squash merge -> protected-main readback.
+Candidate CI -> required external review and successful PR #111 issuer/artifact -> protected PR-admission -> legacy-required-context replacement readback -> queue -> trusted server-bound queue topology -> exact-`I` aggregate CI/fingerprint qualification -> squash merge -> protected-main readback.
 
 ### Scenario B — unrelated main advance after review
 
@@ -242,7 +251,7 @@ Stable unchanged candidate waits -> same-head re-evaluation/recheck -> no no-op 
 
 ### Scenario G — dual-event separation
 
-Fresh or reopened canary is PR-stage ineligible before trusted review and eligible after it; the same head reruns admission without a commit. Its later `merge_group` run uses a distinct exact `I`, and neither stage can satisfy the other. Evaluate-mode configuration save/readback/source access succeeds, strict freshness remains active through the canary, and a malicious candidate local-helper shadow fixture fails closed. If Team cross-repository required-workflow semantics are unavailable, record the capability fallback and retain strict freshness.
+Fresh or reopened canary is PR-stage ineligible before trusted review and eligible after it; the same head reruns admission without a commit. Before enqueue, incompatible legacy required contexts are replaced and the pre-canary readback proves protected workflow required + strict freshness active. Its later `merge_group` run uses a distinct exact `I`, and neither stage can satisfy the other. Evaluate-mode configuration save/readback/source access succeeds, strict freshness remains active through the canary, and a malicious candidate local-helper shadow fixture fails closed. If Team cross-repository required-workflow semantics are unavailable, record the capability fallback and retain strict freshness.
 
 ### Scenario H — queue topology and issuer failure
 
@@ -256,6 +265,7 @@ The live canary proves exactly the queue topology supported by protected code fr
 - [ ] Confirm the trusted ruleset workflow and protected-base provider contracts support `merge_group` from protected `main`.
 - [ ] Confirm the same protected workflow file supplies both disjoint event jobs: `pull_request` binds `Hpr -> C` and verifies `Q`/`R`/tier/fingerprint/`R -> C`, while `merge_group` alone emits the exact-`I` integration qualification.
 - [ ] Confirm the organization ruleset requires the protected META source workflow, its check suite targets exact `I`, and candidate-local same-name checks are non-authoritative.
+- [ ] Confirm no incompatible PR-only legacy context remains required on a queue-enabled protected branch; any retained legacy workflow is diagnostic or deliberately proven `merge_group`-capable.
 - [ ] Confirm queue is required and strict freshness is no longer the normal integration mechanism.
 - [ ] Confirm canonical review fingerprint/reuse policy is the only authority for external-review invalidation.
 - [ ] Confirm bounded-autonomous anti-loop policy is canonical and provider-adopted.
@@ -265,4 +275,4 @@ The live canary proves exactly the queue topology supported by protected code fr
 
 ## Definition of done
 
-The rollout is terminal only when an agent can encounter an unrelated `main` advance after a valid review and correctly do **nothing to the PR branch**, reuse the external review through canonical fingerprint proof, allow Merge Queue to construct/test the latest-main integration candidate, and merge only after the exact merge-group checks pass.
+The rollout is terminal only when an agent can encounter an unrelated `main` advance after a valid review and correctly do **nothing to the PR branch**, reuse the external review through canonical fingerprint proof, allow Merge Queue to construct/test the latest-main integration candidate, and merge only after the exact merge-group checks pass without any incompatible PR-only legacy requirement blocking the synthetic head.
