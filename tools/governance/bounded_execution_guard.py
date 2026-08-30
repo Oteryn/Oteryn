@@ -813,6 +813,48 @@ def _reserve_execution(
     return Decision(True, state, reason, release_session, progress, failure, reservation.reservation_key)
 
 
+def _transition_state(
+    context: ExecutionContext,
+    previous: dict[str, Any] | None,
+    current: dict[str, Any],
+    state: str,
+    reason: str,
+    *,
+    allowed: bool,
+    release_session: bool,
+    progress: str,
+    failure: str,
+) -> Decision:
+    next_snapshot = current if state == current["state"] else {**current, "state": state}
+    transition = context.checkpoint_outbox.transition(
+        repository=current["repository"],
+        task_id=current["task_id"],
+        expected_checkpoint=_checkpoint_digest(previous) if previous is not None else None,
+        next_checkpoint=_checkpoint_digest(next_snapshot),
+        reason=reason,
+        scope=_review_binding_scope(current.get("review_binding")),
+    )
+    if not transition.committed:
+        return Decision(
+            False,
+            current["state"],
+            transition.reason,
+            False,
+            progress,
+            failure,
+            transition.reservation_key,
+        )
+    return Decision(
+        allowed,
+        state,
+        reason,
+        release_session,
+        progress,
+        failure,
+        transition.reservation_key,
+    )
+
+
 def _action_counter_consumption_reason(
     previous: dict[str, Any] | None,
     current: dict[str, Any],
@@ -942,16 +984,16 @@ def decide(
                     progress,
                     failure,
                 )
-            return _reserve_execution(
+            return _transition_state(
                 context,
                 previous,
                 current,
-                "observe",
                 "WAITING_EXTERNAL",
                 "external dependency is pending",
-                True,
-                progress,
-                failure,
+                allowed=True,
+                release_session=True,
+                progress=progress,
+                failure=failure,
             )
         if requested_action != "complete":
             return _decision(False, "WAITING_EXTERNAL", "external dependency is pending; operational work is forbidden", True, progress, failure)
@@ -1142,14 +1184,21 @@ def decide(
         ) or (requested_action != "retry" and counter_value > budget)
         if exhausted:
             state, release = _counter_denial_state(requested_action, current)
-            return _decision(
-                False,
-                state,
-                f"{requested_action} counter budget is exhausted for its durable generation",
-                release,
-                progress,
-                failure,
-            )
+            reason = f"{requested_action} counter budget is exhausted for its durable generation"
+            if requested_action in {"request_external_review", "same_head_gate_recheck"}:
+                assert context is not None
+                return _transition_state(
+                    context,
+                    previous,
+                    current,
+                    state,
+                    reason,
+                    allowed=False,
+                    release_session=release,
+                    progress=progress,
+                    failure=failure,
+                )
+            return _decision(False, state, reason, release, progress, failure)
 
     if requested_action in {"request_external_review", "same_head_gate_recheck"}:
         return allow(

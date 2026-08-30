@@ -41,6 +41,17 @@ class CheckpointOutboxAdapter(Protocol):
         scope: tuple[str, ...],
     ) -> Reservation: ...
 
+    def transition(
+        self,
+        *,
+        repository: str,
+        task_id: str,
+        expected_checkpoint: str | None,
+        next_checkpoint: str,
+        reason: str,
+        scope: tuple[str, ...],
+    ) -> Reservation: ...
+
     def claim_dispatch(self, reservation_key: str) -> bool: ...
 
 
@@ -186,6 +197,58 @@ class SqliteCheckpointOutbox:
             )
             connection.execute("COMMIT")
         return Reservation(True, key, "reservation_committed")
+
+    def transition(
+        self,
+        *,
+        repository: str,
+        task_id: str,
+        expected_checkpoint: str | None,
+        next_checkpoint: str,
+        reason: str,
+        scope: tuple[str, ...],
+    ) -> Reservation:
+        """Atomically persist a checkpoint transition without creating dispatch work."""
+
+        key = _reservation_key(
+            repository,
+            task_id,
+            expected_checkpoint,
+            next_checkpoint,
+            f"transition:{reason}",
+            scope,
+        )
+        with closing(self._connect()) as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT checkpoint FROM bounded_execution_checkpoint WHERE repository = ? AND task_id = ?",
+                (repository, task_id),
+            ).fetchone()
+            actual = row[0] if row is not None else None
+            if actual != expected_checkpoint:
+                connection.execute("ROLLBACK")
+                return Reservation(False, key, "checkpoint_cas_conflict")
+
+            if row is None:
+                connection.execute(
+                    "INSERT INTO bounded_execution_checkpoint(repository, task_id, checkpoint) VALUES (?, ?, ?)",
+                    (repository, task_id, next_checkpoint),
+                )
+            else:
+                updated = connection.execute(
+                    """
+                    UPDATE bounded_execution_checkpoint
+                    SET checkpoint = ?
+                    WHERE repository = ? AND task_id = ? AND checkpoint = ?
+                    """,
+                    (next_checkpoint, repository, task_id, expected_checkpoint),
+                )
+                if updated.rowcount != 1:
+                    connection.execute("ROLLBACK")
+                    return Reservation(False, key, "checkpoint_cas_conflict")
+
+            connection.execute("COMMIT")
+        return Reservation(True, key, "transition_committed")
 
     def claim_dispatch(self, reservation_key: str) -> bool:
         """Grant exactly one dispatcher the committed reservation."""
