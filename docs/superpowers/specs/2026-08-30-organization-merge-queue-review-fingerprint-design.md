@@ -62,14 +62,22 @@ Required repository checks remain exact-integration-head requirements. A prior P
 
 Required coverage must include both:
 
-- `pull_request` for candidate qualification; and
-- the protected-source ruleset workflow on `merge_group` for integration qualification.
+- the protected-source ruleset workflow's `pull_request` admission leg for candidate qualification; and
+- its distinct `merge_group` integration leg for exact-`I` qualification.
 
-The final required result reported to the Merge Queue must prove the exact merge-group SHA it evaluated. Configure the bridge with the ruleset's **Require workflows to pass before merging** rule, identified by source repository and workflow path, not as a loose required-status name that a candidate workflow could reproduce.
+The one protected META organization-ruleset workflow file supports both events with disjoint, fail-closed jobs. The final required result reported to the Merge Queue must prove the exact merge-group SHA it evaluated. Configure the bridge with the ruleset's **Require workflows to pass before merging** rule, identified by source repository and workflow path, not as a loose required-status name that a candidate workflow could reproduce.
 
-### Trusted merge-group qualification bridge
+### Protected dual-event qualification workflow
 
-The integration authority is a META-owned organization-ruleset workflow triggered directly by `merge_group: checks_requested`. Its workflow and verifier are loaded from protected META `main` (the trusted source SHA `T`) and protected by the same R2/CODEOWNERS rules as the existing AI-review gate. Target-repository `merge_group` workflows execute from the synthetic tree and are candidate-controlled; they may provide non-authoritative diagnostics, but their conclusion alone cannot qualify the integration head.
+The single integration authority is a META-owned organization-ruleset workflow whose protected file handles both `pull_request` and `merge_group: checks_requested`. Its workflow and verifier are loaded from protected META `main` (the trusted source SHA `T`) and protected by the same R2/CODEOWNERS rules as the existing AI-review gate. Event-specific jobs must be disjoint and fail closed: a successful PR-stage result is admission evidence only and must never satisfy, be renamed into, or be accepted as the distinct merge-group result. `pull_request_target` remains the server-derived trusted historical path used to locate an issued envelope; it is not the new PR admission leg.
+
+The `pull_request` leg is the pre-queue admission proof. It binds GitHub's PR merge-ref/check-suite head `Hpr` to the server-current candidate `C`, resolves the one same-repository Ready PR, and verifies exactly one trusted PR #111-format envelope. That envelope must bind the protected issuance source `Q` and reviewed head `R`; the admission job verifies exact tier and `review_fingerprint` equality plus the canonical `R -> C` qualification. It uses read-only permissions and never receives secrets, OIDC, attestation writes, checks/status writes, or a candidate-controlled helper. Candidate contents are inert to this job; if candidate tests are required, they run only in a separate unprivileged job.
+
+The trusted path resolves every helper and action from exact protected META `T`, not from the candidate/default workspace: it must never execute `./...` from a candidate checkout, and every external action is pinned by full SHA. Do not rely on event filters, whole-workflow skips, `cancel-in-progress`, no-op commits, or candidate-controlled helpers to create or preserve either proof.
+
+### Trusted merge-group integration leg
+
+The `merge_group` leg is the distinct exact-`I` integration authority. Target-repository `merge_group` workflows execute from the synthetic tree and are candidate-controlled; they may provide non-authoritative diagnostics, but their conclusion alone cannot qualify the integration head.
 
 The bridge uses these exact identities:
 
@@ -196,7 +204,7 @@ Prefer a META-owned versioned machine policy/reusable action plus thin provider 
 
 For every active provider repository:
 
-1. candidate CI supports `pull_request`, while the protected META ruleset workflow is the required `merge_group` authority;
+1. the one protected META ruleset workflow has a disjoint `pull_request` admission leg that binds `Hpr -> C`, verifies the unique trusted PR #111 envelope (`Q`, `R`, exact tier/fingerprint and `R -> C`), and has a separately required `merge_group` exact-`I` integration leg;
 2. bridge event parsing does not assume `github.event.pull_request` exists and uses the REST commit association plus GraphQL queue entry to resolve exactly one PR;
 3. candidate, reviewed, base and integration SHA identities are validated fail-closed, including merge-method-aware ancestry and reproducible single-PR `B + C` integration proof;
 4. the bridge consumes and verifies the canonical META attestation/evidence and fingerprint rather than local exact-SHA-only logic;
@@ -205,6 +213,7 @@ For every active provider repository:
 7. strict up-to-date-before-merge is disabled only after the live canary merge and protected-main readback succeed;
 8. no prompt/task may instruct an agent to merge-up solely because `main` moved when Merge Queue can perform final integration;
 9. no prompt/task may require fresh external review solely because a SHA changed if canonical fingerprint reuse succeeds.
+10. trusted helpers/actions resolve from exact protected META `T`, never a candidate/default `./...` path; candidate contents stay inert outside separate unprivileged tests.
 
 ## Rollout order
 
@@ -213,7 +222,7 @@ Use staged migration, never a flag-day weakening of protection:
 1. refresh and terminalize/supersede the bounded-autonomous META work without duplicating it;
 2. publish canonical META merge-integration semantics and deterministic tests;
 3. merge and read back the protected META ruleset workflow, attestation bridge and deterministic event/API fixtures while strict freshness remains active;
-4. enable/require META Merge Queue with one-PR groups while strict freshness remains active, enqueue a live canary, verify exact-`I` bridge success and protected-main readback, and only then switch off strict freshness;
+4. enable/require META Merge Queue with one-PR groups while strict freshness remains active, enqueue a fresh or reopened live canary, verify PR-stage ineligible-before/eligible-after admission plus a same-head late-review rerun without a commit, then verify the distinct exact-`I` bridge success and protected-main readback before switching off strict freshness;
 5. repeat provider adoption only in Game, Platform and Atlas repositories whose exact current-task mutation authorization is recorded, allowing independent provider work where paths and settings are disjoint; keep every other provider read-only and hand it off;
 6. add an organization drift audit comparing expected policy with live repository settings/workflow capabilities;
 7. remove/supersede stale local exact-head-only review language and close provider adoption Issues.
@@ -252,6 +261,7 @@ These observations are not future authority. Every execution agent must refresh 
 The programme is complete only when:
 
 - all four active Oteryn repositories use the same canonical META candidate/integration/review semantics;
+- one protected META workflow file has disjoint fail-closed `pull_request` and `merge_group` jobs: the former binds `Hpr -> C` and verifies the unique `Q`/`R` envelope and `R -> C` qualification, while the latter alone qualifies exact `I`;
 - Merge Queue is required for protected `main` where supported;
 - a protected-source META ruleset workflow maps each single-PR group without ambiguity, verifies attested review/fingerprint/ancestry and publishes the required result on the exact integration SHA;
 - required aggregate tests pass inside that trusted workflow on merge-group candidates;
@@ -261,5 +271,6 @@ The programme is complete only when:
 - P0/P1 block and P2 follow-up behavior is deterministic;
 - no-op/retrigger loops are deterministically prohibited;
 - live configuration drift is detectable;
-- canary PRs prove the end-to-end flow before old protections are removed.
+- canary PRs prove the end-to-end flow before old protections are removed, including Evaluate-mode save/readback/source access, a fresh or reopened canary, PR-stage ineligible-before/eligible-after evidence, a same-head late-review rerun without a commit, a distinct exact-`I` merge-group run, a malicious local-helper shadow fixture, and strict freshness retained throughout the canary;
+- if Team cross-repository required-workflow semantics fail, the rollout records that exact capability fallback and retains strict freshness rather than weakening authority.
 - every provider branch/PR/settings mutation is preceded by recorded current-task owner authorization for that exact repository and scope; an unauthorized provider remains a read-only handoff and cannot be represented as rollout-complete.

@@ -24,7 +24,9 @@
 - Do require fresh external review after a risk-bearing fingerprint change.
 - P0/P1 block. P2 is follow-up unless the finding is escalated to P1 because it proves a merge-blocking invariant violation.
 - Provider repositories may be stricter on tests/risk classification but may not fork review-reuse or integration semantics.
-- A target-local `merge_group` workflow is candidate-controlled and cannot be required integration authority. Require the protected META organization-ruleset workflow by source repository/path; never accept a same-name status as an equivalent.
+- The one protected META organization-ruleset workflow must support disjoint, fail-closed `pull_request` admission and `merge_group` integration jobs. A target-local `merge_group` workflow is candidate-controlled and cannot be required integration authority; require the protected META workflow by source repository/path, never a same-name status.
+- The PR admission job binds the GitHub PR merge-ref/check-suite head `Hpr` to server-current candidate `C`, verifies the unique trusted PR #111 envelope (`Q`, `R`, exact tier/fingerprint and `R -> C`), and never receives secrets, OIDC, attestation writes or checks/status writes. Candidate contents are inert; candidate tests, if needed, are separate unprivileged jobs. A PR-stage result can never satisfy the distinct exact-`I` merge-group stage.
+- Resolve trusted helpers/actions only from exact protected META `T` in a separate trusted path; never use `./...` from a candidate/default workspace, and pin every external action by full SHA. Do not rely on event filters, whole-workflow skips, `cancel-in-progress`, no-op commits or candidate-controlled helpers.
 - Before any branch, PR or settings mutation in Game, Platform or Atlas, record explicit current-task owner authorization for the exact repository and mutation scope. Target-repository lists, META authority, Issues/PRs and tool/admin capability do not grant that authority.
 - Prefer proportional parallelism: META policy work and each provider rollout may be separate lanes when their owned paths/settings are disjoint; ruleset cutovers for a repository are serialized with that repository's gate rollout.
 
@@ -53,6 +55,7 @@ Create/extend META machine and human governance so there is one authoritative co
 - `reviewed_head_sha`;
 - `review_fingerprint`;
 - `integration_head_sha` / merge-group identity;
+- `Hpr`, the GitHub PR merge-ref/check-suite head used only for PR admission;
 - protected source-workflow SHA and ruleset workflow identity;
 - durable discovery and verification of the PR #111-format review envelope/attestation;
 - fingerprint reuse/invalidation;
@@ -74,6 +77,9 @@ Create/extend META machine and human governance so there is one authoritative co
   - provider config being unable to override META reuse semantics;
   - a missing/duplicate commit-to-PR mapping, queue entry or attestation artifact failing closed;
   - a candidate workflow attempting to reproduce the required result name remaining non-authoritative.
+  - `Hpr -> C` admission rejecting a stale, mismatched or ambiguous PR/check-suite binding;
+  - a PR-stage success being unable to satisfy an exact-`I` merge-group requirement;
+  - a malicious local helper shadowing a trusted helper path failing closed.
 - [ ] Run the focused tests and prove RED for intended missing semantics.
 - [ ] Implement the minimum canonical policy/validator changes.
 - [ ] Prove GREEN plus existing META governance tests.
@@ -82,10 +88,12 @@ Create/extend META machine and human governance so there is one authoritative co
 
 ---
 
-## Phase 2 — Publish the trusted merge-group bridge
+## Phase 2 — Publish the protected dual-event workflow
 
 - [ ] Inventory every required `main` check and current workflow/ruleset authority in META; explicitly classify target-local `merge_group` workflows as non-authoritative.
-- [ ] Implement a META-owned organization-ruleset workflow with `merge_group: checks_requested`, stored and protected on META `main`; select it later by source repository/workflow path, not by result name.
+- [ ] Implement one META-owned organization-ruleset workflow, stored and protected on META `main`, with disjoint fail-closed `pull_request` and `merge_group: checks_requested` jobs; select it later by source repository/workflow path, not by result name.
+- [ ] In the `pull_request` job, bind GitHub's PR merge-ref/check-suite head `Hpr` to server-current candidate `C`, require exactly one trusted PR #111 envelope, and verify `Q`, `R`, exact tier/fingerprint and canonical `R -> C` qualification. Use read-only permissions: no secrets, OIDC, attestation writes, checks/status writes or candidate execution. Run any candidate test only in a separate unprivileged job. Do not introduce `pull_request_target` as this admission leg.
+- [ ] Resolve workflow helpers/actions in a separate trusted path from exact protected META `T`, never from candidate/default-workspace `./...`; pin every external action by full SHA and prove a malicious local-helper shadow cannot alter either event leg.
 - [ ] Extend the PR #111 trusted review gate, if necessary, to upload the canonical envelope as an immutable artifact and expose its server-verifiable run/attempt, artifact digest and envelope digest. Preserve the existing predicate, signer/source SHA, issuer and live-coordinate verification contract.
 - [ ] In protected code define `T` (current bridge source), `Q` (protected source recorded by the candidate review envelope), `B` (merge-group base), `I` (integration), `P` (unique PR), `C` (queued candidate), `R` (reviewed head) and `M` (live configured merge method, required here to equal `squash`).
 - [ ] Implement fail-closed mapping: assert exact `merge_group` event/repository/ref/SHA facts; fetch the bridge's run/job/check suite; paginate `GET /repos/{owner}/{repo}/commits/{I}/pulls` and require exactly one same-repository open Ready PR; cross-check the PR and active GraphQL `mergeQueueEntry`, including `baseCommit == B`, `headCommit == C`, live `M` and `maximumEntriesToMerge == 1`.
@@ -93,8 +101,8 @@ Create/extend META machine and human governance so there is one authoritative co
 - [ ] Locate exactly one non-superseded trusted review-envelope artifact from the server-derived `pull_request_target` run for `P/C`; verify artifact/envelope digests, canonical JSON, repository/PR IDs, evidence source and GitHub attestation constrained to the PR #111 predicate plus the envelope's signer/ref/digest `Q`, then prove `Q` was a protected trusted source allowed at issuance.
 - [ ] Run canonical reuse validation for `R -> C` plus method-aware `B + C => I`, trusted-base lineage and exact `B..I` tier/fingerprint equality. Run provider aggregate tests against exact `I` in a separate credential-free, unprivileged job.
 - [ ] In a fresh mediator job that never executes candidate code or consumes candidate artifacts/caches, re-fetch the test job/check conclusion and exact head from the Actions API; emit and immediately verify an integration envelope binding repository/PR IDs, `T/Q/M/B/C/R/I`, tier/fingerprint, evidence and run/job/check-suite identities. Assert the ruleset workflow's own check suite has `head_sha == I`; rely on that GitHub-published required workflow result, not a manually named candidate status.
-- [ ] Give candidate workflows and the integration test job read-only/no-secret permissions and no `checks`, `statuses`, OIDC or attestation writes. Give only the isolated mediator job `actions/checks/contents/issues/pull-requests: read` plus `id-token`, `attestations` and `artifact-metadata: write` for its own envelope; no contents/checks/statuses write and no shared caches/artifacts from candidate execution.
-- [ ] Add deterministic fixtures for valid single-PR squash mapping where `B` but not `C` is an ancestor of `I`; zero/multiple PRs; cross-repository identity; stale/dequeued entry; wrong base/head; extra merge-group member; non-reproducible `B + C` result; merge-method mismatch/ambiguity; stale/duplicate/missing artifact; invalid signer/source; fingerprint drift; and wrong check-suite head. Keep `merge`/`rebase` unsupported until their distinct topology/replay fixtures are versioned.
+- [ ] Give candidate workflows and the integration test job read-only/no-secret permissions and no `checks`, `statuses`, OIDC or attestation writes. Give only the isolated mediator job `actions/checks/contents/issues/pull-requests: read` plus `id-token`, `attestations` and `artifact-metadata: write` for its own envelope; no contents/checks/statuses write and no shared caches/artifacts from candidate execution. Do not use event filters, whole-workflow skips or `cancel-in-progress` to couple or suppress the two proof stages.
+- [ ] Add deterministic fixtures for valid single-PR squash mapping where `B` but not `C` is an ancestor of `I`; zero/multiple PRs; cross-repository identity; stale/dequeued entry; wrong base/head; extra merge-group member; non-reproducible `B + C` result; merge-method mismatch/ambiguity; stale/duplicate/missing artifact; invalid signer/source; fingerprint drift; wrong check-suite head; stale/mismatched `Hpr -> C`; PR-stage/merge-group result confusion; and malicious local-helper shadowing. Keep `merge`/`rebase` unsupported until their distinct topology/replay fixtures are versioned.
 - [ ] Prove existing PR flow remains green, merge the complete bridge/capability code, then read the exact files and SHA back from protected `main`.
 
 Do not change queue, ruleset enforcement or strict freshness in this phase. A live `merge_group` canary belongs to Phase 3, after the capable code is already protected.
@@ -105,13 +113,14 @@ Do not change queue, ruleset enforcement or strict freshness in this phase. A li
 
 Only after Phase 2 is proven:
 
-- [ ] Re-read the bridge and verifier from protected `main`; record source workflow SHA/path, current ruleset JSON and `strict freshness = true` as the rollback baseline.
+- [ ] Re-read the dual-event workflow and verifier from protected `main`; record source workflow SHA/path, current ruleset JSON and `strict freshness = true` as the rollback baseline.
+- [ ] In Evaluate mode, save and read back the required-workflow configuration and verify protected source-repository/path access before enabling enforcement. If Team cross-repository required-workflow semantics fail, record the exact capability fallback and retain strict freshness.
 - [ ] Configure squash and exactly one PR per merge group, activate the protected-source required workflow, and enable/require Merge Queue on `main` while strict freshness remains enabled.
 - [ ] Read back that Merge Queue and the required source workflow are active and strict freshness is still enabled.
-- [ ] Enqueue one actual canary; require unique `P/C` mapping, trusted review attestation/fingerprint qualification, aggregate tests and the required ruleset workflow result on its exact synthetic `I`.
+- [ ] Enqueue one fresh or reopened actual canary; prove PR-stage ineligible-before/eligible-after admission, a same-head late-review rerun without a commit, then unique `P/C` mapping, trusted review attestation/fingerprint qualification, aggregate tests and the distinct required workflow result on its exact synthetic `I`.
 - [ ] Verify the canary merge and protected-main SHA/readback.
 - [ ] Disable strict `Require branches to be up to date before merging` only after that terminal success, then read back queue-required, bridge-required and strict-freshness-disabled state together.
-- [ ] Verify agents can leave a reviewed candidate unchanged while unrelated `main` advances and still integrate through the queue when fingerprint reuse remains valid.
+- [ ] Verify agents can leave a reviewed candidate unchanged while unrelated `main` advances and still integrate through the queue when fingerprint reuse remains valid; retain strict freshness throughout the canary until its protected-main readback is complete.
 
 **Rollback before strict-disable:** if enqueue, API mapping, attestation, required exact-`I` result, canary merge or pre-disable readback fails, the latest positive readback still proves `strict freshness = true`; only in that state remove/restore the queue/ruleset change to the captured pre-cutover state and positively read back `strict freshness = true` again.
 
@@ -225,12 +234,17 @@ P2 that does not violate a merge-blocking invariant -> durable follow-up Issue/e
 
 Stable unchanged candidate waits -> same-head re-evaluation/recheck -> no no-op commit -> qualification continues.
 
+### Scenario G — dual-event separation
+
+Fresh or reopened canary is PR-stage ineligible before trusted review and eligible after it; the same head reruns admission without a commit. Its later `merge_group` run uses a distinct exact `I`, and neither stage can satisfy the other. Evaluate-mode configuration save/readback/source access succeeds, strict freshness remains active through the canary, and a malicious candidate local-helper shadow fixture fails closed. If Team cross-repository required-workflow semantics are unavailable, record the capability fallback and retain strict freshness.
+
 ---
 
 ## Phase 9 — Closeout
 
 - [ ] Read back protected `main` and live settings in all four repositories.
 - [ ] Confirm the trusted ruleset workflow and protected-base provider contracts support `merge_group` from protected `main`.
+- [ ] Confirm the same protected workflow file supplies both disjoint event jobs: `pull_request` binds `Hpr -> C` and verifies `Q`/`R`/tier/fingerprint/`R -> C`, while `merge_group` alone emits the exact-`I` integration qualification.
 - [ ] Confirm the organization ruleset requires the protected META source workflow, its check suite targets exact `I`, and candidate-local same-name checks are non-authoritative.
 - [ ] Confirm queue is required and strict freshness is no longer the normal integration mechanism.
 - [ ] Confirm canonical review fingerprint/reuse policy is the only authority for external-review invalidation.
