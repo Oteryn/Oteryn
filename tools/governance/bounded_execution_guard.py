@@ -235,6 +235,8 @@ def make_material_fact_envelope(
 
 def _review_binding_scope(binding: dict[str, Any] | None) -> tuple[str, ...]:
     if binding is None:
+        # An absent trusted binding is intentionally not a new scope.  It can
+        # never reset the review budget and cannot authorize execution.
         return ("unbound",)
     return (
         binding["repository"],
@@ -358,9 +360,11 @@ def validate_policy(policy: dict[str, Any]) -> None:
         raise GuardError("bounded execution states do not match the canonical state set")
     if set(policy.get("session_release_states", [])) != CANONICAL_RELEASE_STATES or len(policy.get("session_release_states", [])) != len(CANONICAL_RELEASE_STATES):
         raise GuardError("session_release_states do not match the canonical release-state set")
+
     fields = policy.get("progress_fingerprint_fields")
     if fields != list(CANONICAL_PROGRESS_FINGERPRINT_FIELDS):
         raise GuardError("progress_fingerprint_fields must match the canonical material field set")
+
     budgets = policy.get("retry_budgets")
     expected_budgets = {
         "identical_failure_cycles",
@@ -374,6 +378,7 @@ def validate_policy(policy: dict[str, Any]) -> None:
         raise GuardError("all retry budgets must be non-negative integers")
     if policy.get("retry_counter_scopes") != EXPECTED_COUNTER_SCOPES:
         raise GuardError("retry_counter_scopes do not match the canonical generation scopes")
+
     freeze = policy.get("candidate_freeze")
     forbidden = freeze.get("forbidden_actions_without_material_change") if isinstance(freeze, dict) else None
     if not isinstance(forbidden, list) or not forbidden or not all(isinstance(x, str) and x for x in forbidden):
@@ -385,6 +390,7 @@ def validate_policy(policy: dict[str, Any]) -> None:
         or len(material_reasons) != len(CANONICAL_MATERIAL_CHANGE_REASONS)
     ):
         raise GuardError("candidate_freeze material change reasons are not canonical")
+
     loop = policy.get("loop_breaker")
     if not isinstance(loop, dict):
         raise GuardError("loop_breaker policy is required")
@@ -410,6 +416,7 @@ def validate_policy(policy: dict[str, Any]) -> None:
         raise GuardError("loop breaker ledger statuses are invalid")
     if set(loop.get("ledger_terminal_statuses", [])) != CANONICAL_LEDGER_TERMINAL_STATUSES:
         raise GuardError("loop breaker terminal ledger statuses are invalid")
+
     dependency_kinds = policy.get("dependency_kinds")
     if not isinstance(dependency_kinds, list) or not dependency_kinds or not all(isinstance(x, str) and x for x in dependency_kinds):
         raise GuardError("dependency_kinds must be a non-empty string list")
@@ -499,10 +506,14 @@ def validate_snapshot(snapshot: dict[str, Any], policy: dict[str, Any]) -> None:
     ):
         if not isinstance(snapshot.get(key), str):
             raise GuardError(f"snapshot.{key} must be a string")
+    # ``review_fingerprint`` remains accepted only for a backwards-compatible
+    # snapshot shape.  It is never a budget scope or an authorization input;
+    # only review_binding can serve those roles.
     if snapshot["review_fingerprint"] and FINGERPRINT_RE.fullmatch(snapshot["review_fingerprint"]) is None:
         raise GuardError("snapshot.review_fingerprint must be empty or a lowercase 64-hex legacy digest")
     if not isinstance(snapshot.get("material_fact_verified"), bool):
         raise GuardError("snapshot.material_fact_verified must be boolean")
+
     review_binding = snapshot.get("review_binding")
     if review_binding is not None:
         _validate_review_binding_shape(review_binding, snapshot, policy)
@@ -511,6 +522,7 @@ def validate_snapshot(snapshot: dict[str, Any], policy: dict[str, Any]) -> None:
         _validate_material_envelope_shape(material_envelope, snapshot, policy)
     if snapshot["material_change"] and material_envelope is None:
         raise GuardError("material_change requires a trusted material fact envelope")
+
     repair_recorded = bool(snapshot["repair_generation_id"])
     if repair_recorded:
         if FINGERPRINT_RE.fullmatch(snapshot["repair_generation_id"]) is None:
@@ -602,6 +614,7 @@ def _validate_history(
                 raise GuardError(
                     f"observe cannot alter protected execution field {field}; use a reserved control-plane action"
                 )
+
     consuming_field = ACTION_COUNTER_FIELDS.get(action)
     for field in RETRY_COUNTER_FIELDS:
         same_scope = _counter_scope(previous, field) == _counter_scope(current, field)
@@ -616,6 +629,7 @@ def _validate_history(
             raise GuardError(
                 f"snapshot.{field} must reset to zero when its durable generation scope changes"
             )
+
     for field in (
         "late_material_findings",
         "post_freeze_material_head_changes",
@@ -624,6 +638,7 @@ def _validate_history(
     ):
         if current[field] < previous[field]:
             raise GuardError(f"snapshot.{field} cannot decrease")
+
     head_changed = current["task_head_sha"] != previous["task_head_sha"]
     repair_opening = previous["candidate_frozen"] and not current["candidate_frozen"]
     repair_open = bool(previous["repair_generation_id"])
@@ -662,6 +677,7 @@ def _validate_history(
         raise GuardError(
             "post_freeze_material_head_changes may increase only when a frozen candidate opens a durable repair generation"
         )
+
     if not previous["candidate_frozen"] and not current["candidate_frozen"] and repair_open:
         for field in ("material_fact_envelope", "repair_generation_id", "repair_base_head"):
             if current[field] != previous[field]:
@@ -678,6 +694,7 @@ def _validate_history(
             raise GuardError(
                 "refreeze requires a changed trusted review risk binding, not a SHA-only move"
             )
+
     audit_advanced = (
         current["audited_late_material_findings"] > previous["audited_late_material_findings"]
         or current["audited_post_freeze_material_head_changes"] > previous["audited_post_freeze_material_head_changes"]
@@ -700,6 +717,7 @@ def _validate_history(
             raise GuardError("a completed LOOP_BREAKER_AUDIT must cover the whole observed generation")
         if current["final_qualification_runs_since_audit"] != 0:
             raise GuardError("a renewed LOOP_BREAKER_AUDIT must reset final qualification generation consumption to zero")
+
     previous_audit = (
         previous["audited_late_material_findings"],
         previous["audited_post_freeze_material_head_changes"],
@@ -798,6 +816,7 @@ def _action_counter_consumption_reason(
     if field is None:
         return None
     if action == "retry" and not current["first_material_failure"] and current[field] == 0:
+        # This is the initial attempt before any material failure; it is not a retry.
         return None
     if previous is None:
         return f"{action} requires a durable previous snapshot before reserving its counter"
@@ -832,16 +851,19 @@ def decide(
     validate_snapshot(current, policy)
     if requested_action not in SUPPORTED_ACTIONS:
         raise GuardError(f"unsupported requested action: {requested_action!r}")
+
     if previous is not None:
         validate_snapshot(previous, policy)
         if previous["repository"] != current["repository"] or previous["task_id"] != current["task_id"]:
             raise GuardError("previous/current snapshots must describe the same task")
         _validate_history(previous, current, requested_action, policy)
+
     progress = progress_fingerprint(current, policy)
     failure = failure_fingerprint(current)
     release_states = set(policy["session_release_states"])
     previous_progress = progress_fingerprint(previous, policy) if previous is not None else None
     same_progress = previous is not None and progress == previous_progress
+
     prerequisite_reason = _execution_prerequisite_reason(context, current, requested_action)
     if prerequisite_reason is not None:
         state = current["state"]
@@ -853,6 +875,7 @@ def decide(
             progress,
             failure,
         )
+
     def allow(state: str, reason: str, release_session: bool) -> Decision:
         if requested_action == "observe":
             return _decision(True, state, reason, release_session, progress, failure)
@@ -868,6 +891,7 @@ def decide(
             progress,
             failure,
         )
+
     if previous is not None and previous["state"] == "DONE":
         return _decision(
             requested_action == "observe",
@@ -877,8 +901,10 @@ def decide(
             progress,
             failure,
         )
+
     if current["state"] == "DONE" and requested_action not in {"observe", "complete"}:
         return _decision(False, "DONE", "DONE is terminal; operational/retrigger actions are forbidden", True, progress, failure)
+
     if current["state"] == "WAITING_EXTERNAL":
         return _decision(
             requested_action == "observe",
@@ -888,11 +914,13 @@ def decide(
             progress,
             failure,
         )
+
     if current["dependency_kind"] == "external" and current["blocking_dependency"] and current["state"] != "WAITING_EXTERNAL":
         if requested_action == "observe":
             return _decision(True, "WAITING_EXTERNAL", "external dependency is pending", True, progress, failure)
         if requested_action != "complete":
             return _decision(False, "WAITING_EXTERNAL", "external dependency is pending; operational work is forbidden", True, progress, failure)
+
     if previous is not None and previous["state"] in {"BLOCKED", "STALLED"} and same_progress and requested_action != "complete":
         return _decision(
             requested_action == "observe",
@@ -902,6 +930,7 @@ def decide(
             progress,
             failure,
         )
+
     if current["state"] in {"BLOCKED", "STALLED"} and requested_action not in {"observe", "complete"}:
         return _decision(
             False,
@@ -911,6 +940,7 @@ def decide(
             progress,
             failure,
         )
+
     final_candidate_actions = {
         "enter_final_qualification",
         "request_external_review",
@@ -931,8 +961,10 @@ def decide(
             progress,
             failure,
         )
+
     loop_triggered = _loop_triggered(current, policy)
     loop_current = _loop_audit_current(current, policy)
+
     if (
         loop_triggered
         and current["final_qualification_runs_since_audit"] > 0
@@ -947,6 +979,7 @@ def decide(
             progress,
             failure,
         )
+
     if requested_action == "run_loop_breaker_audit":
         if not loop_triggered:
             return _decision(False, current["state"], "LOOP_BREAKER_AUDIT is not required before a configured threshold is reached", current["state"] in release_states, progress, failure)
@@ -955,6 +988,7 @@ def decide(
         if loop_current:
             return _decision(False, current["state"], "LOOP_BREAKER_AUDIT is already current for the observed generation", False, progress, failure)
         return allow(current["state"], "LOOP_BREAKER_AUDIT may run as one bounded batched risk-ledger generation", False)
+
     if loop_triggered and not loop_current and requested_action in LOOP_BREAKER_FINAL_ACTIONS:
         state = "READY" if current["state"] == "RUNNING" else current["state"]
         return _decision(
@@ -965,6 +999,7 @@ def decide(
             progress,
             failure,
         )
+
     if (
         loop_triggered
         and loop_current
@@ -973,6 +1008,7 @@ def decide(
     ):
         state = "READY" if current["state"] == "RUNNING" else current["state"]
         return _decision(False, state, "final qualification admission is required before final checks/review/completion", False, progress, failure)
+
     if requested_action == "enter_final_qualification":
         if loop_triggered:
             if previous is None:
@@ -985,6 +1021,7 @@ def decide(
             if consumed > limit:
                 return _decision(False, "READY", "final qualification generation budget for the current LOOP_BREAKER_AUDIT is exhausted", False, progress, failure)
         return allow("READY", "qualification admission is within the current bounded audit generation", False)
+
     if requested_action == "complete":
         if (
             not current["candidate_frozen"]
@@ -1006,6 +1043,7 @@ def decide(
             state = current["state"] if current["state"] in release_states else "READY"
             return _decision(False, state, "DONE is forbidden until completion is independently verified", state in release_states, progress, failure)
         return allow("DONE", "completion evidence is verified", True)
+
     forbidden_when_frozen = set(policy["candidate_freeze"]["forbidden_actions_without_material_change"])
     if current["candidate_frozen"] and requested_action in forbidden_when_frozen:
         if current["state"] in release_states:
@@ -1024,6 +1062,7 @@ def decide(
             progress,
             failure,
         )
+
     counter_field = ACTION_COUNTER_FIELDS.get(requested_action)
     if counter_field is not None:
         consumption_reason = _action_counter_consumption_reason(
@@ -1032,6 +1071,7 @@ def decide(
         if consumption_reason is not None:
             state, release = _counter_denial_state(requested_action, current)
             return _decision(False, state, consumption_reason, release, progress, failure)
+
         budget = policy["retry_budgets"][ACTION_COUNTER_BUDGETS[requested_action]]
         counter_value = current[counter_field]
         exhausted = (
@@ -1049,12 +1089,14 @@ def decide(
                 progress,
                 failure,
             )
+
     if requested_action in {"request_external_review", "same_head_gate_recheck"}:
         return allow(
             "WAITING_EXTERNAL",
             "external evidence is pending after the bounded asynchronous action",
             True,
         )
+
     return allow(
         current["state"],
         "requested action remains within the bounded execution policy",
@@ -1076,6 +1118,7 @@ def main() -> int:
     parser.add_argument("--previous")
     parser.add_argument("--action", required=True)
     args = parser.parse_args()
+
     policy = _load_json(args.policy)
     current = _load_json(args.current)
     previous = _load_json(args.previous) if args.previous else None
