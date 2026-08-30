@@ -244,6 +244,8 @@ A checkpoint that records `rotate_resumable` must identify one of `scheduled_tas
 
 For `release_waiting`, every worker-capable automatic mechanism (`scheduled_task`, `work_event_trigger`, or `work_persistent`) likewise requires a non-empty concrete locator that identifies the configured continuation. `github_native` requires a concrete workflow/queue/control-plane locator plus proof that no later agent worker action remains anywhere in the task.
 
+Truthfulness has two different verification boundaries. **Before release/checkpoint**, an automatic continuation mechanism must be live and bound to the trusted task plus the checkpoint's current `next_action`. **At resumption**, the control plane authenticates the actual trigger/completion event against that immutable historical mechanism, locator, task identity and historical action before reconciling its result to fresh GitHub/task state. A one-shot scheduled/Work/GitHub-native mechanism may legitimately be completed or consumed after firing and therefore need not remain live or bind to the freshly advanced action. If the resumed worker claims another future automatic continuation, the successor checkpoint must freshly verify that new claim as live and bound to the successor action.
+
 `release_waiting + github_native` is invalid whenever any later agent worker action remains in the task after the GitHub-native event. In that case the checkpoint must identify a worker-launching/preserving continuation mechanism instead, or use `stop_reinvoke_required` if none exists.
 
 If no worker-launching/preserving automatic mechanism exists when replacement worker action will be required, use `stop_reinvoke_required`. Never imply that regular Chat or GitHub-native control-plane progress will silently create a new foreground worker turn after the current response ends.
@@ -369,7 +371,7 @@ The META implementation should provide a versioned machine policy and validator 
 5. `release_waiting + github_native` is allowed only when no later agent worker action remains anywhere in the task after GitHub-native progression;
 6. `release_waiting` paired with `scheduled_task`, `work_event_trigger`, or `work_persistent` requires a non-empty concrete locator; `github_native` also requires a concrete control-plane locator;
 7. `owner_reinvoke` cannot be presented as automatic continuation;
-8. continuation does not reset canonical retry/no-progress counters;
+8. continuation does not reset canonical retry/no-progress counters: every successor checkpoint write resolves the latest trusted predecessor and delegates retry/evidence continuity validation to the canonical bounded-execution authority;
 9. frozen candidates cannot use checkpoint/retrigger commits as a continuation mechanism;
 10. Work selection requires a capability reason rather than effort alone;
 11. provider mapping may be stricter but cannot weaken organization task-lifetime truthfulness or bounded-execution safety;
