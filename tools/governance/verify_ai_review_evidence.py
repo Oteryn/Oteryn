@@ -26,6 +26,9 @@ _OBSERVED_CLEAN_FLAIRS = {
     "Another round soon, please!",
     "Keep it up!",
 }
+_OBSERVED_DUPLICATE_ECHO_FIRST_LINES = {
+    f"{_CLEAN_PREFIX} Delightful!",
+}
 _CODEX_SUMMARY_MARKER = "<!-- codex-pull-request-review-summary -->"
 _CODEX_SUMMARY_APP = "chatgpt-codex-connector"
 _CODEX_SUMMARY_ROW = re.compile(
@@ -164,7 +167,7 @@ def _same_generation_clean_echoes(
             continue
         body = str(comment.get("body") or "")
         first_line = body.strip().splitlines()[0] if body.strip() else ""
-        if first_line != _CLEAN_PREFIX and not first_line.startswith(f"{_CLEAN_PREFIX} "):
+        if first_line not in _OBSERVED_DUPLICATE_ECHO_FIRST_LINES:
             continue
         if _v1._core.BLOCKING_FINDING_RE.search(body):
             raise RuntimeError("P0/P1 Codex finding exists in the same-generation clean echo")
