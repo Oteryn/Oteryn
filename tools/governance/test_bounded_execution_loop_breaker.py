@@ -34,6 +34,12 @@ def clear_ledger():
     }
 
 
+def pending_ledger(risk_class="identity_binding"):
+    ledger = clear_ledger()
+    ledger[risk_class] = {"status": "PENDING", "reason": ""}
+    return ledger
+
+
 def snapshot(**overrides):
     value = {
         "repository": "Oteryn/Oteryn",
@@ -74,6 +80,17 @@ class PolicyContractTests(unittest.TestCase):
         self.assertEqual(loop["post_freeze_material_head_change_threshold"], 2)
         self.assertEqual(tuple(loop["risk_classes"]), RISK_CLASSES)
         self.assertEqual(loop["final_qualification_generations_per_audit"], 1)
+
+    def test_provider_cannot_weaken_organization_loop_breaker_thresholds(self):
+        for key in (
+            "late_material_finding_threshold",
+            "post_freeze_material_head_change_threshold",
+        ):
+            with self.subTest(key=key):
+                weakened = policy()
+                weakened["loop_breaker"][key] = 3
+                with self.assertRaises(GuardError):
+                    decide(None, snapshot(), "observe", weakened)
 
     def test_material_evidence_generation_changes_progress_fingerprint(self):
         first = snapshot(evidence_generation="evidence-1")
@@ -222,27 +239,39 @@ class LoopBreakerRegressionTests(unittest.TestCase):
             decide(None, current, "observe", policy())
 
     def test_incomplete_risk_ledger_cannot_mark_audit_current(self):
-        ledger = clear_ledger()
-        ledger["authority_relay"] = {"status": "PENDING", "reason": ""}
         current = snapshot(
             late_material_findings=2,
             audited_late_material_findings=2,
-            risk_ledger=ledger,
+            risk_ledger=pending_ledger("authority_relay"),
         )
         result = decide(None, current, "request_external_review", policy())
         self.assertFalse(result.allowed)
         self.assertIn("loop_breaker", result.reason.lower())
 
-    def test_loop_breaker_audit_may_advance_audited_counters_with_terminal_ledger(self):
+    def test_loop_breaker_audit_may_advance_audited_counters_after_reopened_ledger(self):
         previous = snapshot(
             phase="LOOP_BREAKER_AUDIT",
             late_material_findings=2,
             audited_late_material_findings=0,
+            risk_ledger=pending_ledger(),
         )
         current = copy.deepcopy(previous)
+        current["risk_ledger"] = clear_ledger()
         current["audited_late_material_findings"] = 2
         result = decide(previous, current, "observe", policy())
         self.assertTrue(result.allowed)
+
+    def test_audit_cannot_self_advance_from_already_terminal_ledger(self):
+        previous = snapshot(
+            phase="LOOP_BREAKER_AUDIT",
+            late_material_findings=2,
+            audited_late_material_findings=0,
+            risk_ledger=clear_ledger(),
+        )
+        current = copy.deepcopy(previous)
+        current["audited_late_material_findings"] = 2
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", policy())
 
     def test_final_qualification_admission_must_consume_the_single_generation(self):
         current = snapshot(
@@ -266,6 +295,41 @@ class LoopBreakerRegressionTests(unittest.TestCase):
         result = decide(admitted, duplicate, "enter_final_qualification", policy())
         self.assertFalse(result.allowed)
         self.assertIn("qualification", result.reason.lower())
+
+    def test_final_actions_require_consumed_qualification_generation_after_audit(self):
+        for action in (
+            "request_external_review",
+            "run_heavy_validation",
+            "same_head_gate_recheck",
+            "complete",
+        ):
+            with self.subTest(action=action):
+                current = snapshot(
+                    late_material_findings=2,
+                    audited_late_material_findings=2,
+                    final_qualification_runs_since_audit=0,
+                    completion_verified=True,
+                )
+                result = decide(None, current, action, policy())
+                self.assertFalse(result.allowed)
+                self.assertIn("qualification", result.reason.lower())
+
+    def test_final_actions_are_admitted_after_single_generation_is_consumed(self):
+        for action in (
+            "request_external_review",
+            "run_heavy_validation",
+            "same_head_gate_recheck",
+            "complete",
+        ):
+            with self.subTest(action=action):
+                current = snapshot(
+                    late_material_findings=2,
+                    audited_late_material_findings=2,
+                    final_qualification_runs_since_audit=1,
+                    completion_verified=True,
+                )
+                result = decide(None, current, action, policy())
+                self.assertTrue(result.allowed)
 
     def test_new_late_finding_after_audit_reopens_loop_breaker(self):
         current = snapshot(
