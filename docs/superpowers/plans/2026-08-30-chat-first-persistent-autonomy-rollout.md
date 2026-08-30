@@ -21,7 +21,9 @@
 - Automatic continuation may be claimed only when a real configured mechanism and concrete locator exist and the locator is verified live at release/checkpoint and again at resumption.
 - `rotate_resumable` is valid only with a worker-launching/preserving mechanism: `scheduled_task`, `work_event_trigger` or `work_persistent`; `same_session`, `github_native`, `owner_reinvoke` and `none_terminal` must fail closed for that disposition.
 - Worker/session, command, wait or context exhaustion alone must not terminate the owner-visible task.
-- Continuation must never reset canonical bounded-execution retry/evidence counters; continuity is checked against a trusted durable predecessor, never against caller-supplied self-history alone.
+- Continuation must never reset canonical bounded-execution retry/evidence counters; the validator resolves the latest durable predecessor inside the trusted control-plane boundary and never accepts caller-selected predecessor history as authority.
+- `release_waiting + github_native` requires authoritative remaining-work proof that no later agent-worker action exists anywhere in the remaining task, not a checkpoint-provided boolean.
+- Work/Codex selection requires a capability reason plus current verified availability and authorization; an unavailable/unauthorized surface must fail closed as `BLOCKED_CAPABILITY_UNAVAILABLE`.
 - Frozen candidates must not receive empty/no-op/checkpoint/retrigger commits.
 - META write authority does not extend to Game, Platform or Atlas. Provider Issue/PR/design references do not confer write authority. Before any provider mutation in Tasks 5-7, the owner must explicitly authorize writes to that exact provider repository for the current task; absent authorization, only read-only preflight/reconciliation analysis is allowed.
 - No product runtime, deployment, production, credential, secret or live-data mutation is part of this rollout.
@@ -88,8 +90,8 @@ No Git commit is created for control-plane-only comments.
 - Create: `tools/governance/test_agent_continuation_policy.py`
 
 **Interfaces:**
-- Consumes: canonical bounded policy identity from the eventual protected-main `#69/#71` merge; current `ecosystem/agent-execution-routing-policy.json` from protected `main`; trusted durable predecessor state from the authoritative control plane; live resume-mechanism verification.
-- Produces: `load_policy(path) -> dict`, `validate_policy(policy) -> None`, `validate_continuation_snapshot(policy, snapshot, trusted_previous=None, mechanism_verifier=None) -> None`, `select_execution_surface(policy, facts) -> str`; typed `ExecutionSurfaceUnavailable` for no safe execution surface.
+- Consumes: canonical bounded policy identity from the eventual protected-main `#69/#71` merge; current `ecosystem/agent-execution-routing-policy.json` from protected `main`; authoritative checkpoint-lineage lookup; authoritative remaining-work lookup; live resume-mechanism verification; current execution-surface capability/authorization facts.
+- Produces: `load_policy(path) -> dict`, `validate_policy(policy) -> None`, `validate_continuation_snapshot(policy, snapshot, *, lineage_authority, mechanism_verifier, remaining_work_authority) -> None`, `select_execution_surface(policy, facts) -> str`; typed `ExecutionSurfaceUnavailable` for no safe execution surface.
 
 - [ ] **Step 1: Write failing policy-schema tests**
 
@@ -163,8 +165,31 @@ In `tools/governance/agent_continuation_policy.py`, implement:
 ```python
 class ExecutionSurfaceUnavailable(RuntimeError): ...
 
+class CheckpointLineageAuthority(Protocol):
+    def latest_predecessor(
+        self,
+        repository: str,
+        task_id: str,
+        lineage_token: str,
+    ) -> dict | None: ...
+
+    def proves_no_predecessor(
+        self,
+        repository: str,
+        task_id: str,
+        lineage_token: str,
+    ) -> bool: ...
+
 class ResumeMechanismVerifier(Protocol):
     def is_live(self, mechanism: str, locator: str) -> bool: ...
+
+class RemainingWorkAuthority(Protocol):
+    def all_remaining_work_can_complete_without_agent_worker(
+        self,
+        repository: str,
+        task_id: str,
+        lineage_token: str,
+    ) -> bool: ...
 
 def load_policy(path: Path) -> dict: ...
 def validate_policy(policy: dict) -> None: ...
@@ -172,13 +197,16 @@ def validate_continuation_snapshot(
     policy: dict,
     snapshot: dict,
     *,
-    trusted_previous: dict | None = None,
-    mechanism_verifier: ResumeMechanismVerifier | None = None,
+    lineage_authority: CheckpointLineageAuthority,
+    mechanism_verifier: ResumeMechanismVerifier,
+    remaining_work_authority: RemainingWorkAuthority,
 ) -> None: ...
 def select_execution_surface(policy: dict, facts: dict) -> str: ...
 ```
 
-Reject unknown schema versions, missing authority references, duplicate vocabulary values, unknown dispositions/mechanisms/surfaces, invalid disposition/mechanism pairings, missing mandatory checkpoint semantics, malformed exact-head identities, empty/multiple `next_action` values and malformed booleans/integers where the schema expects another type. `trusted_previous` must come from an authoritative durable control-plane lookup keyed by repository/task/checkpoint lineage; never accept a self-declared previous snapshot embedded only in the new snapshot as continuity proof. For automatic waiting/rotation mechanisms, require `mechanism_verifier` and fail closed when the locator is absent, deleted, disabled, paused, fabricated, inaccessible, or otherwise not verifiably live.
+Reject unknown schema versions, missing authority references, duplicate vocabulary values, unknown dispositions/mechanisms/surfaces, invalid disposition/mechanism pairings, missing mandatory checkpoint semantics, malformed exact-head identities, empty/multiple `next_action` values and malformed booleans/integers where the schema expects another type.
+
+The validator MUST resolve the latest predecessor itself by calling `lineage_authority.latest_predecessor(repository, task_id, checkpoint_lineage_token)`. A raw prior snapshot, caller-selected predecessor SHA/digest, caller-provided `None`, or self-declared prior counters are never authoritative inputs. When the adapter returns no predecessor, the validator may treat the snapshot as first-generation only if `lineage_authority.proves_no_predecessor(...)` independently returns true; lookup failure, stale lineage, ambiguous lineage, or unverifiable absence fails closed. For automatic waiting/rotation mechanisms, require `mechanism_verifier` and fail closed when the locator is absent, deleted, disabled, paused, fabricated, inaccessible, or otherwise not verifiably live. For `release_waiting + github_native`, ignore/reject any caller-supplied completion boolean and require `remaining_work_authority.all_remaining_work_can_complete_without_agent_worker(...)` to prove the whole remaining task can reach a canonical terminal state without any later agent worker.
 
 - [ ] **Step 5: Add fail-closed disposition/resume compatibility and checkpoint-minimum tests**
 
@@ -222,7 +250,7 @@ Test these exact structurally valid pairings:
 
 For every automatic mechanism above, validity requires a trusted verifier returning live/active for the exact locator at checkpoint/release. Add parameterized negative cases where the locator is syntactically non-empty but the verifier reports deleted, disabled, paused, unknown, inaccessible or mismatched identity. Add a positive verifier fixture for each automatic mechanism. Repeat the live verification at resumption before allowing a replacement worker to rely on it; if verification fails at either boundary, degrade to `stop_reinvoke_required`/`owner_reinvoke` and require truthful owner notification rather than preserving an automatic-resume claim.
 
-For `release_waiting + github_native`, additionally require `all_remaining_task_work_can_complete_without_agent_worker=true`; if any later worker action is required and no worker-launching mechanism exists, fail closed to `stop_reinvoke_required` rather than claiming automatic worker continuation. For `release_waiting` paired with `scheduled_task`, `work_event_trigger`, or `work_persistent`, require the same concrete-locator and live-verification invariant as `rotate_resumable` so a purported waiting continuation can always be re-established and audited.
+For `release_waiting + github_native`, the snapshot MUST NOT be trusted to assert that no future worker is needed. Add a fake `RemainingWorkAuthority` and require its whole-task proof to return true; if it returns false, unknown, stale, or unavailable, fail closed to `stop_reinvoke_required` rather than claiming automatic worker continuation. For `release_waiting` paired with `scheduled_task`, `work_event_trigger`, or `work_persistent`, require the same concrete-locator and live-verification invariant as `rotate_resumable` so a purported waiting continuation can always be re-established and audited.
 
 Build one valid baseline snapshot containing at least these always-required checkpoint fields:
 
@@ -230,6 +258,7 @@ Build one valid baseline snapshot containing at least these always-required chec
 {
     "repository": "Oteryn/Oteryn",
     "task_id": "Oteryn/Oteryn#108",
+    "checkpoint_lineage_token": "checkpoint-lineage:Oteryn/Oteryn#108",
     "task_branch": "governance/example",
     "task_head_sha": "0123456789abcdef0123456789abcdef01234567",
     "pr_applicable": True,
@@ -247,7 +276,7 @@ Build one valid baseline snapshot containing at least these always-required chec
 }
 ```
 
-Parameterize deletion of every always-required field, including `pr_applicable`, and assert `validate_continuation_snapshot(...)` rejects the snapshot. Require `pr_applicable` to be a real boolean in every snapshot. When `pr_applicable=true`, require a non-empty canonical `pr_id`; when `pr_applicable=false`, `pr_id` is not required and must not be fabricated. Also reject an invalid/non-40-hex `task_head_sha`, empty or non-string `next_action`, multiple next actions encoded as a list, non-list `completed_material_work`/`validation_evidence_refs`/`blockers`, and a missing/empty `pr_id` when `pr_applicable=true`. Conditionally required evidence such as first material failure, rejected hypotheses, bounded retry/evidence-generation state and context-pressure classification must be required when the corresponding condition/fact says that semantic applies; the validator must not require fabricated values when it does not apply.
+Parameterize deletion of every always-required field, including `checkpoint_lineage_token` and `pr_applicable`, and assert `validate_continuation_snapshot(...)` rejects the snapshot. Require `checkpoint_lineage_token` to be non-empty and bound by the authoritative adapter to the exact repository/task lineage. Require `pr_applicable` to be a real boolean in every snapshot. When `pr_applicable=true`, require a non-empty canonical `pr_id`; when `pr_applicable=false`, `pr_id` is not required and must not be fabricated. Also reject an invalid/non-40-hex `task_head_sha`, empty or non-string `next_action`, multiple next actions encoded as a list, non-list `completed_material_work`/`validation_evidence_refs`/`blockers`, and a missing/empty `pr_id` when `pr_applicable=true`. Conditionally required evidence such as first material failure, rejected hypotheses, bounded retry/evidence-generation state and context-pressure classification must be required when the corresponding condition/fact says that semantic applies; the validator must not require fabricated values when it does not apply.
 
 - [ ] **Step 6: Add task-lifetime separation tests**
 
@@ -266,18 +295,19 @@ unless the snapshot also carries an independently valid canonical bounded-lifecy
 
 - [ ] **Step 7: Add trusted retry-preservation tests**
 
-Construct an authoritative `trusted_previous` checkpoint returned by a fake durable control-plane adapter, with a bounded generation and non-zero canonical retry/evidence counters. Call:
+Construct a fake `CheckpointLineageAuthority` whose authoritative latest predecessor contains a bounded generation and non-zero canonical retry/evidence counters. Call:
 
 ```python
 validate_continuation_snapshot(
     policy,
     resumed_snapshot,
-    trusted_previous=trusted_previous,
+    lineage_authority=lineage_authority,
     mechanism_verifier=verifier,
+    remaining_work_authority=remaining_work_authority,
 )
 ```
 
-Prove that worker rotation, execution-surface change or resume firing cannot reduce/reset the trusted bounded generation or any canonical counters. Test lowering both the current counter and any self-declared `previous_retry_counters`; test omitting self-declared previous fields entirely; both must still fail because continuity is anchored to `trusted_previous`. If trusted history exists but cannot be loaded/verified, fail closed rather than treating the resumed snapshot as first-generation. A genuinely new task with no authoritative predecessor may use `trusted_previous=None` only when the control plane independently proves no predecessor exists. The continuation validator compares preserved values but must not reinterpret the canonical bounded counter scopes.
+Prove that worker rotation, execution-surface change or resume firing cannot reduce/reset the predecessor generation or any canonical counters resolved internally from the lineage authority. Test a caller snapshot that lowers both current and self-declared previous counters, omits self-declared previous fields entirely, names an older predecessor, supplies a fabricated predecessor digest, or uses a stale lineage token; none may change which predecessor the validator obtains from the authority. If the authority says a predecessor exists but it cannot be loaded/verified, fail closed rather than treating the resumed snapshot as first-generation. A genuinely new task may have no predecessor only when `proves_no_predecessor(...)` independently succeeds. The continuation validator compares preserved values but must not reinterpret the canonical bounded counter scopes.
 
 - [ ] **Step 8: Add executor-selection tests**
 
@@ -289,6 +319,10 @@ assert select_execution_surface(policy, {
     "chat_tools_sufficient": True,
     "heavy_deterministic_compute": False,
     "persistent_capability_required": False,
+    "work_available": False,
+    "work_authorized": False,
+    "codex_available": False,
+    "codex_authorized": False,
 }) == "chat"
 
 assert select_execution_surface(policy, {
@@ -297,6 +331,10 @@ assert select_execution_surface(policy, {
     "heavy_deterministic_compute": True,
     "repository_runner_available": True,
     "persistent_capability_required": False,
+    "work_available": False,
+    "work_authorized": False,
+    "codex_available": False,
+    "codex_authorized": False,
 }) == "github_native"
 
 assert select_execution_surface(policy, {
@@ -304,10 +342,15 @@ assert select_execution_surface(policy, {
     "chat_tools_sufficient": False,
     "persistent_capability_required": True,
     "required_capability": "event_triggered_connected_app",
+    "work_available": True,
+    "work_authorized": True,
+    "work_capability_reason": "event_triggered_connected_app",
+    "codex_available": False,
+    "codex_authorized": False,
 }) == "work"
 ```
 
-Also reject a Work/Codex selection whose only reason is `effort=high`. Add a fail-closed exhaustion case:
+Also reject a Work/Codex selection whose only reason is `effort=high`. Add fail-closed cases for both ordinary exhaustion and persistent-capability exhaustion:
 
 ```python
 with self.assertRaisesRegex(ExecutionSurfaceUnavailable, "BLOCKED_CAPABILITY_UNAVAILABLE"):
@@ -317,12 +360,29 @@ with self.assertRaisesRegex(ExecutionSurfaceUnavailable, "BLOCKED_CAPABILITY_UNA
         "heavy_deterministic_compute": True,
         "repository_runner_available": False,
         "persistent_capability_required": False,
+        "work_available": False,
+        "work_authorized": False,
+        "codex_available": False,
+        "codex_authorized": False,
         "codex_capability_reason": None,
         "work_capability_reason": None,
     })
+
+with self.assertRaisesRegex(ExecutionSurfaceUnavailable, "BLOCKED_CAPABILITY_UNAVAILABLE"):
+    select_execution_surface(policy, {
+        "effort": "low",
+        "chat_tools_sufficient": False,
+        "persistent_capability_required": True,
+        "required_capability": "event_triggered_connected_app",
+        "work_available": False,
+        "work_authorized": False,
+        "work_capability_reason": "event_triggered_connected_app",
+        "codex_available": False,
+        "codex_authorized": False,
+    })
 ```
 
-The selector must not invent Work/Codex availability or silently choose an unusable surface. The typed blocker is a task/control-plane fact to persist and route; it is not permission to mark the task `DONE`.
+Add equivalent negative coverage for `work_available=true/work_authorized=false`, `codex_available=false`, and `codex_available=true/codex_authorized=false` whenever the corresponding surface would otherwise be selected. Availability/authorization facts must come from current capability discovery/control-plane evidence, not from effort or the requested capability string. The selector must not invent Work/Codex availability or silently choose an unusable surface. The typed blocker is a task/control-plane fact to persist and route; it is not permission to mark the task `DONE`.
 
 - [ ] **Step 9: Run focused GREEN validation**
 
@@ -367,7 +427,9 @@ tool timeout != task timeout
 context rotation != task timeout
 automatic continuation requires a real configured mechanism
 automatic resume locator must be live-verified at release and resumption
-retry continuity requires trusted durable predecessor state
+retry continuity resolves the latest durable predecessor inside the trusted control-plane boundary
+GitHub-only release requires authoritative proof that no later agent-worker action remains
+Work/Codex selection requires verified availability and authorization
 rotate_resumable requires a worker-launching/preserving mechanism
 no safe execution surface => BLOCKED_CAPABILITY_UNAVAILABLE
 provider write authority must be explicitly authorized for the current task
@@ -389,9 +451,10 @@ Create `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` usin
 
 - six coordinates;
 - worker dispositions;
-- executor-selection order and the typed fail-closed no-surface result;
+- executor-selection order, verified Work/Codex capability availability/authorization, and the typed fail-closed no-surface result;
 - truthful resume mechanisms, live locator verification at release and resumption, and the fail-closed disposition/mechanism compatibility matrix;
-- checkpoint semantic minimum and trusted predecessor binding for canonical bounded counters/generations;
+- checkpoint semantic minimum and internal authoritative predecessor-lineage resolution for canonical bounded counters/generations;
+- authoritative whole-task remaining-work proof before `release_waiting + github_native`;
 - context compaction/rotation;
 - user-notification semantics;
 - provider write-authority boundary: META coordination/design/provider Issue references never authorize provider mutation; explicit current-task owner authorization for the exact provider is required;
@@ -402,7 +465,7 @@ Create `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` usin
 Add a narrow paragraph to `AGENTS.md` after the bounded execution reference:
 
 ```text
-For long-lived task continuation, agents MUST also follow docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md and ecosystem/agent-continuation-policy.json. Task lifetime, worker/session lifetime, command timeout, external waiting, retry/no-progress and context pressure are separate coordinates. Chat is the default execution surface when current tools are sufficient; Work/Codex requires a capability reason. Automatic resume may be claimed only when a real configured continuation mechanism exists and its locator is live-verified. Cross-repository provider writes remain separately authorized per the existing META authority boundary.
+For long-lived task continuation, agents MUST also follow docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md and ecosystem/agent-continuation-policy.json. Task lifetime, worker/session lifetime, command timeout, external waiting, retry/no-progress and context pressure are separate coordinates. Chat is the default execution surface when current tools are sufficient; Work/Codex requires a capability reason plus current verified availability/authorization. Automatic resume may be claimed only when a real configured continuation mechanism exists and its locator is live-verified. Cross-repository provider writes remain separately authorized per the existing META authority boundary.
 ```
 
 Do not alter the current effort-aware routing or Remote Desktop policy in this task.
@@ -570,7 +633,7 @@ Preserve all existing numeric limits unless a separate owner-approved Platform t
 
 - [ ] **Step 6: Update checkpoint/resume implementation**
 
-Make `checkpoint.py` and `resume.py` validate truthful resume disposition without changing existing liveness/security behavior. `rotate_resumable` must fail closed unless its mechanism is exactly `scheduled_task`, `work_event_trigger` or `work_persistent` with the required concrete locator; `same_session` and `github_native` must not qualify rotation. Automatic `release_waiting` mechanisms must also carry a concrete locator verified live at release and again at resumption. `owner_reinvoke` must not render as automatic continuation. Bounded retry/generation continuity must be compared with Platform's trusted prior checkpoint/control-plane state, not caller-supplied self-history.
+Make `checkpoint.py` and `resume.py` validate truthful resume disposition without changing existing liveness/security behavior. `rotate_resumable` must fail closed unless its mechanism is exactly `scheduled_task`, `work_event_trigger` or `work_persistent` with the required concrete locator; `same_session` and `github_native` must not qualify rotation. Automatic `release_waiting` mechanisms must also carry a concrete locator verified live at release and again at resumption. `owner_reinvoke` must not render as automatic continuation. Bounded retry/generation continuity must be resolved from Platform's authoritative latest checkpoint/control-plane lineage inside the trusted resume boundary, never from caller-supplied predecessor state. Platform must likewise derive any GitHub-only no-later-worker decision from its authoritative task/next-action state rather than trusting a checkpoint boolean.
 
 - [ ] **Step 7: Update Control Room only if needed**
 
