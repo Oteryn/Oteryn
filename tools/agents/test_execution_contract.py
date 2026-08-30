@@ -1,3 +1,4 @@
+import json
 import unittest
 from pathlib import Path
 
@@ -5,22 +6,39 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ExecutionContractTests(unittest.TestCase):
-    def test_bounded_contract_requires_wait_and_stall_states(self):
-        text = (
-            ROOT / "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md"
-        ).read_text(encoding="utf-8")
+    def test_bounded_contract_is_canonical_meta_authority(self):
+        policy_path = ROOT / "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md"
+        machine_path = ROOT / "ecosystem/bounded-autonomous-execution-policy.json"
+
+        self.assertTrue(
+            machine_path.exists(),
+            "bounded lifecycle authority is not canonical yet: merge/reconcile META #71 first",
+        )
+        text = policy_path.read_text(encoding="utf-8")
+        machine = json.loads(machine_path.read_text(encoding="utf-8"))
+
         for marker in [
+            "Lifecycle authority: `Oteryn/Oteryn#69`",
+            "Machine-readable authority: `ecosystem/bounded-autonomous-execution-policy.json`",
             "WAITING_EXTERNAL",
             "STALLED",
             "candidate_frozen",
             "progress_fingerprint",
             "failure_fingerprint",
             "no-op/retrigger",
-            "release the active session",
+            "MaterialFactEnvelope",
+            "reservation_required",
+            "LOOP_BREAKER_AUDIT",
+            "Canonical risk ledger",
+            "same_head_gate_rechecks",
+            "external_review_invocations",
         ]:
             self.assertIn(marker, text)
-        self.assertIn("EXECUTION_STATE_CONTRACT.json", text)
-        self.assertIn("new or materially updated substantial task", text)
+
+        self.assertEqual(machine.get("policy_id"), "oteryn-bounded-autonomous-execution-v1")
+        self.assertIn("same_head_gate_rechecks", machine.get("retry_budgets", {}))
+        self.assertIn("external_review_invocations", machine.get("retry_budgets", {}))
+        self.assertIn("evidence_generation", machine.get("progress_fingerprint_fields", []))
 
     def test_meta_gate_executes_bounded_execution_regressions(self):
         text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
