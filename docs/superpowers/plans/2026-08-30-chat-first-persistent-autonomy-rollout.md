@@ -92,7 +92,7 @@ No Git commit is created for control-plane-only comments.
 
 **Interfaces:**
 - Consumes: canonical bounded policy identity from the eventual protected-main `#69/#71` merge; current `ecosystem/agent-execution-routing-policy.json` from protected `main`; independently trusted task identity; authoritative checkpoint-lineage lookup; authoritative bounded-lifecycle state; authoritative remaining-work lookup; live/bound resume-mechanism verification; current execution-surface capability/authorization facts.
-- Produces: `load_policy(path) -> dict`, `validate_policy(policy) -> None`, `validate_continuation_snapshot(policy, snapshot, *, trusted_task, lineage_authority, bounded_lifecycle_authority, mechanism_verifier, remaining_work_authority) -> None`, `select_execution_surface(policy, facts) -> str`; typed `ExecutionSurfaceUnavailable` for no safe execution surface.
+- Produces: `load_policy(path) -> dict`, `validate_policy(policy) -> None`, `validate_continuation_snapshot(policy, snapshot, *, trusted_task, lineage_authority, transition_authority, bounded_lifecycle_authority, mechanism_verifier, remaining_work_authority, validation_mode) -> None`, `select_execution_surface(policy, facts) -> str`; typed `ExecutionSurfaceUnavailable` for no safe execution surface.
 
 - [ ] **Step 1: Write failing policy-schema tests**
 
@@ -197,6 +197,7 @@ class CheckpointTransitionAuthority(Protocol):
         self,
         historical_checkpoint: dict,
         current_trusted_task: TrustedTaskIdentity,
+        current_bounded_lifecycle_state: str,
     ) -> bool: ...
 
 class BoundedLifecycleAuthority(Protocol):
@@ -257,20 +258,20 @@ snapshot["task_head_sha"] == trusted_task.task_head_sha
 snapshot["next_action"] == trusted_task.expected_next_action
 ```
 
-For `validation_mode="resume_read"`, **do not rewrite or directly compare historical mutable coordinates to fresh GitHub state**. Instead:
+For `validation_mode="resume_read"`, **do not rewrite or directly compare historical mutable coordinates or lifecycle/disposition to fresh control-plane state**. Instead:
 
 1. resolve `historical = lineage_authority.latest_predecessor(trusted_task)` from the durable lineage using only the stable trusted task identity;
 2. require the supplied checkpoint to be that exact authenticated historical record (same durable checkpoint digest and stable identity); a caller-selected older checkpoint, edited branch/PR/head/action, fabricated digest, or rewritten copy fails closed;
-3. preserve `historical["task_branch"]`, `pr_applicable`, `pr_id`, `task_head_sha`, and `next_action` as historical evidence;
-4. resolve a **fresh** `trusted_task` from GitHub/control-plane state;
-5. if the historical mutable coordinates differ from fresh trusted coordinates, require `transition_authority.is_authorized_transition(historical, trusted_task)` to prove the exact branch/PR/head/next-action transition from authoritative GitHub/control-plane evidence;
-6. after successful reconciliation, all **new** checkout/action/PR authority comes from `trusted_task`, never from rewritten snapshot fields.
+3. preserve `historical["task_branch"]`, `pr_applicable`, `pr_id`, `task_head_sha`, `next_action`, `bounded_lifecycle_state`, `worker_disposition`, `resume_mechanism`, and `resume_locator` as historical evidence;
+4. resolve a **fresh** `trusted_task` from GitHub/control-plane state and independently resolve `fresh_lifecycle = bounded_lifecycle_authority.canonical_state(trusted_task)`;
+5. if any historical mutable execution coordinate differs from fresh trusted coordinates, or `historical["bounded_lifecycle_state"] != fresh_lifecycle`, require `transition_authority.is_authorized_transition(historical, trusted_task, fresh_lifecycle)` to prove the exact history-to-fresh branch/PR/head/next-action/lifecycle transition from authoritative evidence;
+6. after successful reconciliation, all **new** checkout/action/PR/lifecycle authority comes from the fresh trusted authorities, never from rewritten snapshot fields. Historical disposition/resume fields remain evidence of why the prior worker released; they are not required to equal the disposition that a resumed worker will write next.
 
-An unchanged resume may pass when the authenticated historical mutable coordinates already equal the fresh trusted context. A legitimate GitHub head/action advance may pass only through the transition authority. False/unknown/stale/ambiguous transition proof fails closed. This preserves immutable checkpoint history while allowing authorized live-state progress.
+An unchanged resume may pass when the authenticated historical mutable coordinates and lifecycle already equal the fresh trusted context. A legitimate GitHub head/action/lifecycle advance may pass only through the transition authority. False/unknown/stale/ambiguous transition proof fails closed. This preserves immutable checkpoint history while allowing authorized live-state progress such as `WAITING_EXTERNAL -> READY` or `WAITING_EXTERNAL -> DONE`.
 
 When no predecessor exists, `checkpoint_write` may treat the snapshot as first-generation only if `lineage_authority.proves_no_predecessor(trusted_task)` independently returns true. `resume_read` with no authenticated predecessor always fails closed. Lookup failure, stale lineage, ambiguous lineage, unverifiable absence, and unknown `validation_mode` all fail closed.
 
-The snapshot's `bounded_lifecycle_state` is evidence only: it MUST equal `bounded_lifecycle_authority.canonical_state(trusted_task)`. `worker_disposition="terminal"` and `resume_mechanism="none_terminal"` are valid only when `bounded_lifecycle_authority.is_terminal(trusted_task)` is true. Conversely, when the trusted bounded lifecycle is terminal, any nonterminal worker disposition/resume pairing is rejected. The continuation layer does not decide which bounded states are terminal; that remains entirely delegated to `#69/#71`.
+For `checkpoint_write`, the snapshot's `bounded_lifecycle_state` is current-state evidence and MUST equal `bounded_lifecycle_authority.canonical_state(trusted_task)`. `worker_disposition="terminal"` and `resume_mechanism="none_terminal"` are valid only when `bounded_lifecycle_authority.is_terminal(trusted_task)` is true; conversely a currently terminal trusted lifecycle rejects any nonterminal disposition/resume pairing. For `resume_read`, do **not** apply current terminality rules directly to the historical disposition: authenticate the historical lifecycle/disposition first, reconcile any lifecycle advance through `CheckpointTransitionAuthority`, and evaluate current terminality only against the fresh canonical lifecycle. A historical `release_waiting` checkpoint may therefore reconcile to fresh terminal `DONE` without being rewritten; any subsequent checkpoint write must use the fresh terminal disposition. The continuation layer does not decide which bounded states are terminal; that remains entirely delegated to `#69/#71`.
 
 For automatic waiting/rotation mechanisms during `checkpoint_write`, require `snapshot["next_action"] == trusted_task.expected_next_action` and then `mechanism_verifier.is_live_and_bound(mechanism, locator, trusted_task, trusted_task.expected_next_action)`. During `resume_read`, first authenticate the historical checkpoint and reconcile any live-state transition as above; then re-check the mechanism against the **fresh** `trusted_task` and `trusted_task.expected_next_action`. Fail closed when the locator is absent, deleted, disabled, paused, fabricated, inaccessible, belongs to another task/lineage, or is bound to a stale/different action. For `release_waiting + github_native`, ignore/reject any caller-supplied completion boolean and require `remaining_work_authority.all_remaining_work_can_complete_without_agent_worker(trusted_task)` against the fresh trusted state to prove the whole remaining task can reach a canonical terminal state without any later agent worker.
 
@@ -370,7 +371,7 @@ trusted canonical terminal + terminal/none_terminal => allowed
 trusted canonical terminal + any nonterminal disposition => reject
 ```
 
-Also reject a snapshot whose `bounded_lifecycle_state` differs from the authority's canonical state even if its worker disposition would otherwise be valid. Do not hard-code which state names are terminal in the continuation layer; the fake authority controls `is_terminal` in these tests.
+For `checkpoint_write`, reject a snapshot whose `bounded_lifecycle_state` differs from the authority's canonical state even if its worker disposition would otherwise be valid. For `resume_read`, add historical `WAITING_EXTERNAL + release_waiting` fixtures with fresh canonical `READY` and fresh canonical terminal `DONE`: both must preserve the old lifecycle/disposition unchanged as authenticated history and pass only when `CheckpointTransitionAuthority` proves the exact lifecycle transition. Reject false/unknown/stale transition proof; prove that the fresh terminal case is not rejected merely because the historical disposition was nonterminal. Do not hard-code which state names are terminal in the continuation layer; the fake authority controls `is_terminal` in these tests.
 
 - [ ] **Step 6: Add task-lifetime separation tests**
 
@@ -397,9 +398,11 @@ validate_continuation_snapshot(
     resumed_snapshot,
     trusted_task=trusted_task,
     lineage_authority=lineage_authority,
+    transition_authority=transition_authority,
     bounded_lifecycle_authority=bounded_lifecycle_authority,
     mechanism_verifier=verifier,
     remaining_work_authority=remaining_work_authority,
+    validation_mode="resume_read",
 )
 ```
 
