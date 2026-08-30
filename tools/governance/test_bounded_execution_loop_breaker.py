@@ -315,6 +315,11 @@ class LoopBreakerRegressionTests(unittest.TestCase):
                 self.assertIn("qualification", result.reason.lower())
 
     def test_final_actions_are_admitted_after_single_generation_is_consumed(self):
+        counter_by_action = {
+            "request_external_review": "external_review_invocations",
+            "run_heavy_validation": "heavy_validation_runs",
+            "same_head_gate_recheck": "same_head_gate_rechecks",
+        }
         for action in (
             "request_external_review",
             "run_heavy_validation",
@@ -322,13 +327,16 @@ class LoopBreakerRegressionTests(unittest.TestCase):
             "complete",
         ):
             with self.subTest(action=action):
-                current = snapshot(
+                previous = snapshot(
                     late_material_findings=2,
                     audited_late_material_findings=2,
                     final_qualification_runs_since_audit=1,
                     completion_verified=True,
                 )
-                result = decide(None, current, action, policy())
+                current = copy.deepcopy(previous)
+                if action in counter_by_action:
+                    current[counter_by_action[action]] = 1
+                result = decide(previous, current, action, policy())
                 self.assertTrue(result.allowed)
 
     def test_new_late_finding_after_audit_reopens_loop_breaker(self):
