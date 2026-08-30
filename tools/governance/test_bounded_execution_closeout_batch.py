@@ -43,6 +43,7 @@ def snapshot(**overrides):
         "same_head_gate_rechecks": 0,
         "completion_verified": False,
         "material_change": False,
+        "material_change_reason": "",
         "late_material_findings": 0,
         "post_freeze_material_head_changes": 0,
         "audited_late_material_findings": 0,
@@ -60,6 +61,8 @@ class FrozenLineageTests(unittest.TestCase):
         current = copy.deepcopy(previous)
         current["candidate_frozen"] = False
         current["material_change"] = True
+        current["material_change_reason"] = "review_finding"
+        current["late_material_findings"] = 1
         with self.assertRaises(GuardError):
             decide(previous, current, "observe", POLICY)
 
@@ -71,6 +74,8 @@ class FrozenLineageTests(unittest.TestCase):
         previous = snapshot(
             candidate_frozen=False,
             material_change=True,
+            material_change_reason="review_finding",
+            late_material_findings=1,
             post_freeze_material_head_changes=1,
         )
         current = copy.deepcopy(previous)
@@ -117,10 +122,77 @@ class FreezeAdmissionTests(unittest.TestCase):
         unfrozen = copy.deepcopy(admitted)
         unfrozen["candidate_frozen"] = False
         unfrozen["material_change"] = True
+        unfrozen["material_change_reason"] = "review_finding"
+        unfrozen["late_material_findings"] = 3
         unfrozen["post_freeze_material_head_changes"] = 1
         result = decide(admitted, unfrozen, "request_external_review", POLICY)
         self.assertFalse(result.allowed)
         self.assertIn("frozen", result.reason.lower())
+
+
+class MaterialChangeEvidenceTests(unittest.TestCase):
+    def test_frozen_mutation_rejects_material_change_without_durable_evidence(self):
+        previous = snapshot(candidate_frozen=True)
+        current = copy.deepcopy(previous)
+        current["material_change"] = True
+        current["material_change_reason"] = "review_finding"
+        result = decide(previous, current, "mutate", POLICY)
+        self.assertFalse(result.allowed)
+        self.assertIn("material", result.reason.lower())
+
+    def test_frozen_mutation_rejects_unrecognized_material_change_reason(self):
+        previous = snapshot(candidate_frozen=True)
+        current = copy.deepcopy(previous)
+        current["material_change"] = True
+        current["material_change_reason"] = "because_i_said_so"
+        current["evidence_generation"] = "evidence-2"
+        result = decide(previous, current, "mutate", POLICY)
+        self.assertFalse(result.allowed)
+        self.assertIn("reason", result.reason.lower())
+
+    def test_review_finding_reason_is_bound_to_late_finding_increment(self):
+        previous = snapshot(candidate_frozen=True)
+        current = copy.deepcopy(previous)
+        current["material_change"] = True
+        current["material_change_reason"] = "review_finding"
+        current["late_material_findings"] = 1
+        result = decide(previous, current, "mutate", POLICY)
+        self.assertTrue(result.allowed)
+
+    def test_frozen_retrigger_is_forbidden_even_with_material_change_evidence(self):
+        previous = snapshot(candidate_frozen=True)
+        current = copy.deepcopy(previous)
+        current["material_change"] = True
+        current["material_change_reason"] = "review_finding"
+        current["late_material_findings"] = 1
+        result = decide(previous, current, "retrigger", POLICY)
+        self.assertFalse(result.allowed)
+        self.assertIn("retrigger", result.reason.lower())
+
+
+class DoneTerminalityTests(unittest.TestCase):
+    def test_previous_done_cannot_transition_back_to_running(self):
+        previous = snapshot(state="DONE", completion_verified=True)
+        current = snapshot(
+            state="RUNNING",
+            candidate_frozen=False,
+            completion_verified=False,
+        )
+        with self.assertRaises(GuardError):
+            decide(previous, current, "mutate", POLICY)
+
+    def test_previous_done_allows_observation_only(self):
+        previous = snapshot(state="DONE", completion_verified=True)
+        current = copy.deepcopy(previous)
+        observed = decide(previous, current, "observe", POLICY)
+        self.assertTrue(observed.allowed)
+        self.assertEqual(observed.state, "DONE")
+        self.assertTrue(observed.release_session)
+
+        completed = decide(previous, current, "complete", POLICY)
+        self.assertFalse(completed.allowed)
+        self.assertEqual(completed.state, "DONE")
+        self.assertTrue(completed.release_session)
 
 
 class ActionCounterConsumptionTests(unittest.TestCase):
