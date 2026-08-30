@@ -18,6 +18,7 @@ def _load(path: Path, name: str):
 
 rdc = _load(ROOT / "tools/governance/test_remote_desktop_action_gate.py", "rdc_fixtures")
 execution_guard = _load(ROOT / "tools/agents/execution_guard.py", "execution_guard_review_fixes")
+execution_state = _load(ROOT / "tools/agents/execution_state.py", "execution_state_review_fixes")
 
 
 def _healthy_snapshot() -> dict[str, object]:
@@ -41,6 +42,22 @@ def _healthy_snapshot() -> dict[str, object]:
         "terminal_verified": False,
         "blocked": False,
         "noop_retrigger_intent": False,
+    }
+
+
+def _valid_checkpoint() -> dict[str, object]:
+    return {
+        "status": "RUNNING",
+        "task_head_sha": "a" * 40,
+        "candidate_frozen": False,
+        "candidate_head_sha": "",
+        "progress_fingerprint": "b" * 64,
+        "failure_fingerprint": "",
+        "identical_cycle_count": 0,
+        "retry_count": 0,
+        "retry_limit": 1,
+        "waiting_for": "",
+        "last_material_progress_at": "2026-08-30T18:00:00+00:00",
     }
 
 
@@ -108,6 +125,18 @@ def test_call_gate_preserves_json_boolean_vs_integer_types() -> None:
     assert errors == ["remote desktop call arguments do not match routing packet"]
 
 
+def test_execution_identity_integers_reject_json_booleans() -> None:
+    for key in ("schema_version", "pr_number"):
+        snapshot = _healthy_snapshot()
+        snapshot[key] = True
+        try:
+            execution_guard.evaluate_snapshot(snapshot)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"{key}=true must fail closed")
+
+
 def test_retry_counters_reject_json_booleans() -> None:
     for key in ("identical_cycle_count", "retry_count", "retry_limit"):
         snapshot = _healthy_snapshot()
@@ -124,6 +153,20 @@ def test_zero_retry_budget_does_not_stall_failure_free_initial_work() -> None:
     result = execution_guard.evaluate_snapshot(_healthy_snapshot())
     assert result["decision"] == "CONTINUE"
     assert result["next_state"] == "RUNNING"
+
+
+def test_zero_retry_budget_recorded_failure_cannot_remain_running() -> None:
+    checkpoint = _valid_checkpoint()
+    checkpoint.update(
+        {
+            "failure_fingerprint": "c" * 64,
+            "retry_count": 0,
+            "retry_limit": 0,
+            "identical_cycle_count": 0,
+        }
+    )
+    errors = execution_state.validate_checkpoint(checkpoint, require_bounded_fields=True)
+    assert "retry budget exhausted; status must be STALLED or WAITING_EXTERNAL" in errors
 
 
 def test_same_head_recheck_listens_for_final_codex_summary_edit() -> None:
