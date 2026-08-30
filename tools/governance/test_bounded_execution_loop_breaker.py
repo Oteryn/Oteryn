@@ -24,21 +24,7 @@ RISK_CLASSES = (
 
 
 def policy():
-    value = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
-    value["progress_fingerprint_fields"] = list(value["progress_fingerprint_fields"])
-    if "evidence_generation" not in value["progress_fingerprint_fields"]:
-        value["progress_fingerprint_fields"].append("evidence_generation")
-    value.setdefault(
-        "loop_breaker",
-        {
-            "late_material_finding_threshold": 2,
-            "post_freeze_material_head_change_threshold": 2,
-            "risk_classes": list(RISK_CLASSES),
-            "ledger_terminal_statuses": ["AUDITED_PASS", "NOT_APPLICABLE"],
-            "final_qualification_generations_per_audit": 1,
-        },
-    )
-    return value
+    return json.loads(POLICY_PATH.read_text(encoding="utf-8"))
 
 
 def clear_ledger():
@@ -81,7 +67,7 @@ def snapshot(**overrides):
 
 class PolicyContractTests(unittest.TestCase):
     def test_policy_declares_evidence_generation_and_loop_breaker(self):
-        raw = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+        raw = policy()
         self.assertIn("evidence_generation", raw["progress_fingerprint_fields"])
         loop = raw["loop_breaker"]
         self.assertEqual(loop["late_material_finding_threshold"], 2)
@@ -132,15 +118,31 @@ class RetryScopeRegressionTests(unittest.TestCase):
         with self.assertRaises(GuardError):
             decide(None, current, "observe", policy())
 
-    def test_initial_attempt_is_not_blocked_without_a_failure(self):
+    def test_zero_retry_budget_still_allows_initial_attempt_before_failure(self):
+        zero = policy()
+        zero["retry_budgets"]["identical_failure_cycles"] = 0
         current = snapshot(
             state="RUNNING",
             candidate_frozen=False,
-            identical_failure_cycles=2,
+            identical_failure_cycles=0,
             first_material_failure="",
         )
-        result = decide(None, current, "retry", policy())
+        result = decide(None, current, "retry", zero)
         self.assertTrue(result.allowed)
+
+    def test_zero_retry_budget_blocks_retry_after_first_material_failure(self):
+        zero = policy()
+        zero["retry_budgets"]["identical_failure_cycles"] = 0
+        current = snapshot(
+            state="RUNNING",
+            candidate_frozen=False,
+            gate_state="failure",
+            identical_failure_cycles=0,
+            first_material_failure="deterministic failure",
+        )
+        result = decide(None, current, "retry", zero)
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "STALLED")
 
 
 class LoopBreakerRegressionTests(unittest.TestCase):
@@ -153,6 +155,18 @@ class LoopBreakerRegressionTests(unittest.TestCase):
         result = decide(None, current, "retrigger", policy())
         self.assertFalse(result.allowed)
         self.assertEqual(result.state, "DONE")
+
+    def test_risk_ledger_is_not_required_before_loop_breaker_threshold(self):
+        current = snapshot(state="RUNNING", candidate_frozen=False)
+        current.pop("risk_ledger")
+        result = decide(None, current, "observe", policy())
+        self.assertTrue(result.allowed)
+
+    def test_risk_ledger_is_required_once_loop_breaker_threshold_is_reached(self):
+        current = snapshot(late_material_findings=2)
+        current.pop("risk_ledger")
+        with self.assertRaises(GuardError):
+            decide(None, current, "observe", policy())
 
     def test_second_late_finding_blocks_final_review_until_fresh_audit(self):
         current = snapshot(
@@ -172,13 +186,38 @@ class LoopBreakerRegressionTests(unittest.TestCase):
         self.assertFalse(result.allowed)
         self.assertIn("loop_breaker", result.reason.lower())
 
+    def test_post_freeze_head_move_must_increment_head_change_counter(self):
+        previous = snapshot(
+            task_head_sha="a" * 40,
+            candidate_frozen=True,
+            post_freeze_material_head_changes=0,
+        )
+        current = snapshot(
+            task_head_sha="b" * 40,
+            candidate_frozen=False,
+            material_change=True,
+            post_freeze_material_head_changes=0,
+        )
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", policy())
+
+    def test_audited_counters_cannot_advance_outside_loop_breaker_phase(self):
+        previous = snapshot(
+            late_material_findings=2,
+            audited_late_material_findings=0,
+        )
+        current = copy.deepcopy(previous)
+        current["audited_late_material_findings"] = 2
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", policy())
+
     def test_not_applicable_risk_class_requires_reason(self):
         ledger = clear_ledger()
         ledger["transaction_persistence"] = {
             "status": "NOT_APPLICABLE",
             "reason": "",
         }
-        current = snapshot(risk_ledger=ledger)
+        current = snapshot(late_material_findings=2, risk_ledger=ledger)
         with self.assertRaises(GuardError):
             decide(None, current, "observe", policy())
 
@@ -194,7 +233,18 @@ class LoopBreakerRegressionTests(unittest.TestCase):
         self.assertFalse(result.allowed)
         self.assertIn("loop_breaker", result.reason.lower())
 
-    def test_clear_audit_allows_exactly_one_new_final_qualification_generation(self):
+    def test_loop_breaker_audit_may_advance_audited_counters_with_terminal_ledger(self):
+        previous = snapshot(
+            phase="LOOP_BREAKER_AUDIT",
+            late_material_findings=2,
+            audited_late_material_findings=0,
+        )
+        current = copy.deepcopy(previous)
+        current["audited_late_material_findings"] = 2
+        result = decide(previous, current, "observe", policy())
+        self.assertTrue(result.allowed)
+
+    def test_final_qualification_admission_must_consume_the_single_generation(self):
         current = snapshot(
             late_material_findings=2,
             audited_late_material_findings=2,
@@ -203,11 +253,17 @@ class LoopBreakerRegressionTests(unittest.TestCase):
             final_qualification_runs_since_audit=0,
         )
         result = decide(None, current, "enter_final_qualification", policy())
+        self.assertFalse(result.allowed)
+        self.assertIn("record", result.reason.lower())
+
+        admitted = copy.deepcopy(current)
+        admitted["final_qualification_runs_since_audit"] = 1
+        result = decide(current, admitted, "enter_final_qualification", policy())
         self.assertTrue(result.allowed)
 
-        consumed = copy.deepcopy(current)
-        consumed["final_qualification_runs_since_audit"] = 1
-        result = decide(current, consumed, "enter_final_qualification", policy())
+        duplicate = copy.deepcopy(admitted)
+        duplicate["final_qualification_runs_since_audit"] = 2
+        result = decide(admitted, duplicate, "enter_final_qualification", policy())
         self.assertFalse(result.allowed)
         self.assertIn("qualification", result.reason.lower())
 
