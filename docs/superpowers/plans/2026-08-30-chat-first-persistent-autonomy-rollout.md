@@ -154,6 +154,12 @@ The machine policy must contain:
   "execution_surfaces": ["chat", "github_native", "work", "codex"],
   "automatic_resume_requires_live_verification": true,
   "automatic_resume_requires_task_binding": true,
+  "capability_surface_compatibility": {
+    "event_triggered_connected_app": ["work"],
+    "cloud_browser": ["work"],
+    "persistent_background_execution": ["work"],
+    "software_development_repo_loop": ["codex"]
+  },
   "no_execution_surface_result": "BLOCKED_CAPABILITY_UNAVAILABLE"
 }
 ```
@@ -175,6 +181,11 @@ class TrustedTaskIdentity:
     repository: str
     task_id: str
     checkpoint_lineage_token: str
+    task_branch: str
+    pr_applicable: bool
+    pr_id: str | None
+    task_head_sha: str
+    expected_next_action: str
 
 class CheckpointLineageAuthority(Protocol):
     def latest_predecessor(self, trusted_task: TrustedTaskIdentity) -> dict | None: ...
@@ -216,19 +227,26 @@ def select_execution_surface(policy: dict, facts: dict) -> str: ...
 
 Reject unknown schema versions, missing authority references, duplicate vocabulary values, unknown dispositions/mechanisms/surfaces, invalid disposition/mechanism pairings, missing mandatory checkpoint semantics, malformed exact-head identities, empty/multiple `next_action` values and malformed booleans/integers where the schema expects another type.
 
-Before any lineage, resume or lifecycle decision, require exact equality:
+Before any lineage, resume or lifecycle decision, require the checkpoint to match the independently authenticated task context:
 
 ```python
 snapshot["repository"] == trusted_task.repository
 snapshot["task_id"] == trusted_task.task_id
 snapshot["checkpoint_lineage_token"] == trusted_task.checkpoint_lineage_token
+snapshot["task_branch"] == trusted_task.task_branch
+snapshot["pr_applicable"] == trusted_task.pr_applicable
+snapshot.get("pr_id") == trusted_task.pr_id
+snapshot["task_head_sha"] == trusted_task.task_head_sha
+snapshot["next_action"] == trusted_task.expected_next_action
 ```
 
-`trusted_task` MUST be supplied by an independently authenticated control-plane/task context and MUST NOT be constructed from snapshot fields inside `validate_continuation_snapshot`. The validator resolves the latest predecessor only with `lineage_authority.latest_predecessor(trusted_task)`. A raw prior snapshot, caller-selected predecessor SHA/digest, caller-provided `None`, or self-declared prior counters are never authoritative inputs. When the adapter returns no predecessor, the validator may treat the snapshot as first-generation only if `lineage_authority.proves_no_predecessor(trusted_task)` independently returns true; lookup failure, stale lineage, ambiguous lineage, or unverifiable absence fails closed.
+`trusted_task` MUST be supplied by an independently authenticated control-plane/task context and MUST NOT be constructed from snapshot fields inside `validate_continuation_snapshot`. At checkpoint creation it represents the authoritative current repository/task/branch/PR/exact-head/next-action coordinates. At resumption, resolve a **fresh** trusted context from GitHub/control-plane state before validation. A legitimate branch/head advance is accepted only after that authoritative state is reconciled into the fresh context; the stale checkpoint head or PR coordinates are historical evidence and never current checkout authority. Unexpected branch, PR, head or next-action drift fails closed.
+
+The validator resolves the latest predecessor only with `lineage_authority.latest_predecessor(trusted_task)`. A raw prior snapshot, caller-selected predecessor SHA/digest, caller-provided `None`, or self-declared prior counters are never authoritative inputs. When the adapter returns no predecessor, the validator may treat the snapshot as first-generation only if `lineage_authority.proves_no_predecessor(trusted_task)` independently returns true; lookup failure, stale lineage, ambiguous lineage, or unverifiable absence fails closed.
 
 The snapshot's `bounded_lifecycle_state` is evidence only: it MUST equal `bounded_lifecycle_authority.canonical_state(trusted_task)`. `worker_disposition="terminal"` and `resume_mechanism="none_terminal"` are valid only when `bounded_lifecycle_authority.is_terminal(trusted_task)` is true. Conversely, when the trusted bounded lifecycle is terminal, any nonterminal worker disposition/resume pairing is rejected. The continuation layer does not decide which bounded states are terminal; that remains entirely delegated to `#69/#71`.
 
-For automatic waiting/rotation mechanisms, require `mechanism_verifier.is_live_and_bound(mechanism, locator, trusted_task, snapshot["next_action"])`; fail closed when the locator is absent, deleted, disabled, paused, fabricated, inaccessible, belongs to another task/lineage, or is bound to a different next action. Repeat the same check at resumption. For `release_waiting + github_native`, ignore/reject any caller-supplied completion boolean and require `remaining_work_authority.all_remaining_work_can_complete_without_agent_worker(trusted_task)` to prove the whole remaining task can reach a canonical terminal state without any later agent worker.
+For automatic waiting/rotation mechanisms, require `mechanism_verifier.is_live_and_bound(mechanism, locator, trusted_task, trusted_task.expected_next_action)` after first proving `snapshot["next_action"] == trusted_task.expected_next_action`; fail closed when the locator is absent, deleted, disabled, paused, fabricated, inaccessible, belongs to another task/lineage, or is bound to a different next action. Repeat the same check at resumption. For `release_waiting + github_native`, ignore/reject any caller-supplied completion boolean and require `remaining_work_authority.all_remaining_work_can_complete_without_agent_worker(trusted_task)` to prove the whole remaining task can reach a canonical terminal state without any later agent worker.
 
 - [ ] **Step 5: Add fail-closed disposition/resume compatibility and checkpoint-minimum tests**
 
@@ -270,7 +288,22 @@ Test these exact structurally valid pairings before trusted-authority checks:
 {"worker_disposition": "terminal", "resume_mechanism": "none_terminal", "resume_locator": None}
 ```
 
-Create `TrustedTaskIdentity("Oteryn/Oteryn", "Oteryn/Oteryn#108", "checkpoint-lineage:Oteryn/Oteryn#108")` outside the snapshot fixture. Add negative tests where the snapshot changes only repository, task ID, or lineage token while the trusted identity remains unchanged; all must fail before lineage lookup. Add a fake lineage authority containing an unrelated checkpoint-free task and prove that changing all three snapshot identity fields together still cannot make `proves_no_predecessor` authorize it.
+Create the trusted context outside the snapshot fixture:
+
+```python
+trusted_task = TrustedTaskIdentity(
+    repository="Oteryn/Oteryn",
+    task_id="Oteryn/Oteryn#108",
+    checkpoint_lineage_token="checkpoint-lineage:Oteryn/Oteryn#108",
+    task_branch="governance/example",
+    pr_applicable=True,
+    pr_id="110",
+    task_head_sha="0123456789abcdef0123456789abcdef01234567",
+    expected_next_action="run exact-head qualification",
+)
+```
+
+Add negative tests where the snapshot changes repository, task ID, lineage token, task branch, PR applicability/ID, exact head, or `next_action` while the trusted context remains unchanged; all must fail before lineage/resume dispatch. Add a fake lineage authority containing an unrelated checkpoint-free task and prove that changing all snapshot identity fields together still cannot make `proves_no_predecessor` authorize it. Add a resumption test where GitHub legitimately advances the head: the old checkpoint remains historical evidence, a fresh trusted context is resolved from authoritative live state, and the replacement worker may use the new head only after the transition is explicitly reconciled; a snapshot-selected new head without that proof fails closed.
 
 For every automatic mechanism, validity requires `is_live_and_bound(...)` to return true for the exact trusted task and `next_action`. Add parameterized negative cases where the locator is syntactically non-empty but the verifier reports deleted, disabled, paused, unknown, inaccessible, mismatched task/lineage, or mismatched next action. Explicitly prove that a live scheduled/Work task belonging to `OTHER-TASK` does not satisfy a checkpoint for `Oteryn/Oteryn#108`, and that the same locator bound to `next_action="other action"` fails. Repeat verification at resumption; if verification fails at either boundary, degrade to `stop_reinvoke_required`/`owner_reinvoke` and require truthful owner notification rather than preserving an automatic-resume claim.
 
@@ -344,7 +377,7 @@ validate_continuation_snapshot(
 )
 ```
 
-Prove that worker rotation, execution-surface change or resume firing cannot reduce/reset the predecessor generation or any canonical counters resolved internally from the lineage authority. Test a caller snapshot that lowers both current and self-declared previous counters, omits self-declared previous fields entirely, names an older predecessor, supplies a fabricated predecessor digest, or changes its own task identity/lineage token; none may change which predecessor the validator obtains for `trusted_task`. If the authority says a predecessor exists but it cannot be loaded/verified, fail closed rather than treating the resumed snapshot as first-generation. A genuinely new task may have no predecessor only when `proves_no_predecessor(trusted_task)` independently succeeds. The continuation validator compares preserved values but must not reinterpret the canonical bounded counter scopes.
+Prove that worker rotation, execution-surface change or resume firing cannot reduce/reset the predecessor generation or any canonical counters resolved internally from the lineage authority. Test a caller snapshot that lowers both current and self-declared previous counters, omits self-declared previous fields entirely, names an older predecessor, supplies a fabricated predecessor digest, or changes any snapshot repository/task/lineage/branch/PR/head/next-action coordinate; none may change which predecessor or trusted current task context the validator obtains for `trusted_task`. If the authority says a predecessor exists but it cannot be loaded/verified, fail closed rather than treating the resumed snapshot as first-generation. A genuinely new task may have no predecessor only when `proves_no_predecessor(trusted_task)` independently succeeds. The continuation validator compares preserved values but must not reinterpret the canonical bounded counter scopes.
 
 - [ ] **Step 8: Add executor-selection tests**
 
@@ -387,7 +420,37 @@ assert select_execution_surface(policy, {
 }) == "work"
 ```
 
-Also reject a Work/Codex selection whose only reason is `effort=high`. Add fail-closed cases for ordinary exhaustion and persistent-capability exhaustion. Add equivalent negative coverage for `work_available=true/work_authorized=false`, `codex_available=false`, and `codex_available=true/codex_authorized=false` whenever the corresponding surface would otherwise be selected. Availability/authorization facts must come from current capability discovery/control-plane evidence, not from effort or the requested capability string. The selector must not invent Work/Codex availability or silently choose an unusable surface. The typed blocker is a task/control-plane fact to persist and route; it is not permission to mark the task `DONE`.
+Also reject a Work/Codex selection whose only reason is `effort=high`. Add fail-closed cases for ordinary exhaustion and persistent-capability exhaustion. The machine policy's `capability_surface_compatibility` mapping is authoritative for capability-specific escalation: a surface is eligible only when the requested capability maps to it **and** current availability/authorization evidence is true. Availability/authorization alone never substitutes for capability support.
+
+Add exact cases including:
+
+```python
+# Event-triggered connected-app work is Work-only; available Codex cannot substitute.
+with self.assertRaisesRegex(ExecutionSurfaceUnavailable, "BLOCKED_CAPABILITY_UNAVAILABLE"):
+    select_execution_surface(policy, {
+        "chat_tools_sufficient": False,
+        "persistent_capability_required": True,
+        "required_capability": "event_triggered_connected_app",
+        "work_available": False,
+        "work_authorized": False,
+        "codex_available": True,
+        "codex_authorized": True,
+        "codex_capability_reason": "software_development_repo_loop",
+    })
+
+assert select_execution_surface(policy, {
+    "chat_tools_sufficient": False,
+    "persistent_capability_required": True,
+    "required_capability": "software_development_repo_loop",
+    "work_available": False,
+    "work_authorized": False,
+    "codex_available": True,
+    "codex_authorized": True,
+    "codex_capability_reason": "software_development_repo_loop",
+}) == "codex"
+```
+
+Add equivalent negative coverage for `work_available=true/work_authorized=false`, `codex_available=false`, `codex_available=true/codex_authorized=false`, a capability mapped only to another surface, and an unknown/unmapped required capability. Capability support plus availability/authorization facts must come from current product/control-plane evidence, not from effort or a self-declared capability reason. The selector must not invent Work/Codex support or silently choose an unusable surface. The typed blocker is a task/control-plane fact to persist and route; it is not permission to mark the task `DONE`.
 
 - [ ] **Step 9: Run focused GREEN validation**
 
