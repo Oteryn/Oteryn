@@ -122,6 +122,14 @@ class DecisionTests(unittest.TestCase):
                 self.assertNotEqual(result.state, "DONE")
                 self.assertIn("frozen", result.reason.lower())
 
+    def test_policy_cannot_omit_canonical_frozen_actions(self):
+        for omitted_action in ("mutate", "retrigger"):
+            with self.subTest(omitted_action=omitted_action):
+                weakened = copy.deepcopy(POLICY)
+                weakened["candidate_freeze"]["forbidden_actions_without_material_change"].remove(omitted_action)
+                with self.assertRaisesRegex(GuardError, "forbidden action"):
+                    decide(None, snapshot(), "observe", weakened)
+
     def test_frozen_candidate_denies_retrigger_without_material_change(self):
         current = snapshot(candidate_frozen=True, state="READY")
         result = decide(None, current, "retrigger", POLICY)

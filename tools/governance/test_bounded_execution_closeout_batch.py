@@ -392,6 +392,25 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
         with self.assertRaises(GuardError):
             decide(previous, current, "open_material_repair", POLICY)
 
+    def test_refreeze_action_must_commit_frozen_transition(self):
+        previous = snapshot(
+            candidate_frozen=False,
+            material_change=True,
+            material_change_reason="review_finding",
+            material_change_evidence="review-thread:3889619678",
+            material_fact_id="d" * 64,
+            material_fact_head="a" * 40,
+            material_fact_verified=True,
+            repair_generation_id="d" * 64,
+            repair_base_head="a" * 40,
+            post_freeze_material_head_changes=1,
+            review_fingerprint="f" * 64,
+        )
+        current = copy.deepcopy(previous)
+
+        with self.assertRaisesRegex(GuardError, "refreeze"):
+            decide(previous, current, "refreeze_candidate", POLICY)
+
     def test_refreeze_requires_new_trusted_review_risk_binding(self):
         previous = snapshot(
             candidate_frozen=False,
