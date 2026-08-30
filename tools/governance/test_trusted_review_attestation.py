@@ -2,11 +2,16 @@
 """Regression tests for trusted-base review-attestation issuance."""
 from __future__ import annotations
 
+import base64
 from copy import deepcopy
 import hashlib
 import json
+import os
 import re
+import subprocess
 import sys
+import tempfile
+import textwrap
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -695,6 +700,181 @@ def test_action_passes_runtime_github_output_to_the_issuer() -> None:
     assert '--github-output "$GITHUB_OUTPUT"' in issue_step.group("body")
     assert "GITHUB_OUTPUT_PATH:" not in issue_step.group("body")
     assert "${{ github.output }}" not in issue_step.group("body")
+
+
+def _candidate_fetch_run() -> str:
+    action = (Path(__file__).resolve().parents[2] / ".github/actions/ai-review-gate/action.yml").read_text(encoding="utf-8")
+    step = re.search(
+        r"(?ms)^    - name: Fetch candidate as inert bare Git objects\n(?P<body>.*?)(?=^    - (?:id:|name:)|\Z)",
+        action,
+    )
+    assert step is not None
+    run = re.search(r"(?ms)^      run: \|\n(?P<script>(?:        .*\n?)*)\Z", step.group("body"))
+    assert run is not None
+    return textwrap.dedent(run.group("script"))
+
+
+def _run_candidate_fetch_with_fake_git(
+    *, fail_fetch: bool = False, reject_config_env: bool = False, require_auth: bool = True,
+) -> tuple[subprocess.CompletedProcess[str], str, str, list[str], str, bool]:
+    """Execute the actual action shell body against fake Git without recording a secret."""
+    secret = "token-for-inert-fetch-test"
+    derived = base64.b64encode(f"x-access-token:{secret}".encode("utf-8")).decode("ascii")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        argv_log = root / "git-argv.log"
+        event_log = root / "git-events.log"
+        lfs_log = root / "git-lfs.log"
+        fake_git = bin_dir / "git"
+        fake_git.write_text(
+            """#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' '---' >> "$FAKE_GIT_ARGV_LOG"
+printf '%s\\n' "$@" >> "$FAKE_GIT_ARGV_LOG"
+is_fetch=0
+has_config_env=0
+for arg in "$@"; do
+  [[ "$arg" == fetch ]] && is_fetch=1
+  [[ "$arg" == lfs ]] && touch "$FAKE_GIT_LFS_LOG"
+  [[ "$arg" == --config-env=http.https://github.com/.extraheader=OTERYN_GIT_AUTH_HEADER ]] && has_config_env=1
+done
+if [[ "$is_fetch" -eq 1 ]]; then
+  if [[ "${FAKE_GIT_REQUIRE_AUTH:-0}" -eq 1 ]]; then
+    [[ -n "${OTERYN_GIT_AUTH_HEADER:-}" ]] || exit 41
+    [[ "$has_config_env" -eq 1 ]] || exit 42
+    [[ "${GIT_TERMINAL_PROMPT:-}" == 0 ]] || exit 43
+    [[ "${GIT_CONFIG_NOSYSTEM:-}" == 1 ]] || exit 44
+    [[ "${GIT_CONFIG_GLOBAL:-}" == /dev/null ]] || exit 45
+    [[ "${GIT_LFS_SKIP_SMUDGE:-}" == 1 ]] || exit 46
+  fi
+  printf '%s\\n' 'fetch:auth-present' >> "$FAKE_GIT_EVENT_LOG"
+  [[ "${FAKE_GIT_REJECT_CONFIG_ENV:-0}" -eq 1 && "$has_config_env" -eq 1 ]] && exit 77
+  [[ "${FAKE_GIT_FAIL_FETCH:-0}" -eq 1 ]] && exit 78
+else
+  [[ -z "${OTERYN_GIT_AUTH_HEADER:-}" ]] || exit 79
+  printf '%s\\n' 'nonfetch:auth-absent' >> "$FAKE_GIT_EVENT_LOG"
+fi
+if [[ "${1:-}" == init && "${2:-}" == --bare ]]; then
+  mkdir -p "$3"
+fi
+""",
+            encoding="utf-8",
+        )
+        fake_git.chmod(0o755)
+        fake_lfs = bin_dir / "git-lfs"
+        fake_lfs.write_text('#!/usr/bin/env bash\ntouch "$FAKE_GIT_LFS_LOG"\nexit 99\n', encoding="utf-8")
+        fake_lfs.chmod(0o755)
+        env = dict(os.environ)
+        env.update({
+            "PATH": f"{bin_dir}:{env['PATH']}",
+            "GH_TOKEN": secret,
+            "REPOSITORY": REPOSITORY,
+            "BASE_SHA": BASE,
+            "HEAD_SHA": HEAD,
+            "RUNNER_TEMP": str(root),
+            "FAKE_GIT_ARGV_LOG": str(argv_log),
+            "FAKE_GIT_EVENT_LOG": str(event_log),
+            "FAKE_GIT_LFS_LOG": str(lfs_log),
+            "FAKE_GIT_FAIL_FETCH": "1" if fail_fetch else "0",
+            "FAKE_GIT_REJECT_CONFIG_ENV": "1" if reject_config_env else "0",
+            "FAKE_GIT_REQUIRE_AUTH": "1" if require_auth else "0",
+        })
+        completed = subprocess.run(
+            ["bash", "-c", _candidate_fetch_run()], cwd=root, env=env,
+            text=True, capture_output=True, check=False,
+        )
+        contents = [path.read_text(encoding="utf-8") for path in root.rglob("*") if path.is_file()]
+        return (
+            completed, argv_log.read_text(encoding="utf-8"), event_log.read_text(encoding="utf-8"),
+            contents, derived, lfs_log.exists(),
+        )
+
+
+def test_candidate_fetch_uses_ephemeral_git_config_without_secret_argv_or_persistence() -> None:
+    """A fetch must send Basic auth only through config-env and leave no token material behind."""
+    completed, argv, events, contents, derived, lfs_invoked = _run_candidate_fetch_with_fake_git()
+    assert completed.returncode == 0, completed.stderr
+    action = (Path(__file__).resolve().parents[2] / ".github/actions/ai-review-gate/action.yml").read_text(encoding="utf-8")
+    assert re.search(
+        r"(?ms)^    - name: Fetch candidate as inert bare Git objects\n.*?^        GH_TOKEN: \$\{\{ inputs\.github-token \}\}",
+        action,
+    )
+    assert "--config-env=http.https://github.com/.extraheader=OTERYN_GIT_AUTH_HEADER" in argv
+    assert "credential.helper=" in argv
+    assert "http.sslVerify=true" in argv
+    assert "http.followRedirects=false" in argv
+    assert "protocol.allow=never" in argv
+    assert "protocol.https.allow=always" in argv
+    assert "--no-recurse-submodules" in argv
+    assert f"https://github.com/{REPOSITORY}.git" in argv
+    assert f"http://github.com/{REPOSITORY}.git" not in argv
+    assert "fetch:auth-present" in events
+    assert events.count("nonfetch:auth-absent") >= 3
+    assert "token-for-inert-fetch-test" not in argv
+    assert derived not in argv
+    assert f"Authorization: Basic {derived}" not in argv
+    assert all("token-for-inert-fetch-test" not in value for value in contents)
+    assert all(derived not in value for value in contents)
+    assert all(f"Authorization: Basic {derived}" not in value for value in contents)
+    assert not lfs_invoked
+
+
+def test_candidate_fetch_fails_closed_when_config_env_is_unsupported() -> None:
+    """Git implementations that reject config-env must not fall back to a helper or URL token."""
+    completed, argv, events, contents, derived, _lfs_invoked = _run_candidate_fetch_with_fake_git(
+        reject_config_env=True, require_auth=False,
+    )
+    assert completed.returncode != 0
+    assert "--config-env=http.https://github.com/.extraheader=OTERYN_GIT_AUTH_HEADER" in argv
+    assert "fetch:auth-present" in events
+    assert all("token-for-inert-fetch-test" not in value for value in contents)
+    assert all(derived not in value for value in contents)
+
+
+def test_candidate_fetch_failure_leaves_no_secret_material_and_has_exit_cleanup() -> None:
+    """Both fetch failure and shell exit keep the token/header out of persistent state."""
+    completed, argv, events, contents, derived, _lfs_invoked = _run_candidate_fetch_with_fake_git(fail_fetch=True)
+    assert completed.returncode != 0
+    assert "fetch:auth-present" in events
+    assert "token-for-inert-fetch-test" not in argv
+    assert derived not in argv
+    assert all("token-for-inert-fetch-test" not in value for value in contents)
+    assert all(derived not in value for value in contents)
+    fetch = _candidate_fetch_run()
+    assert "set +x" in fetch
+    assert "cleanup() {" in fetch
+    assert "unset GH_TOKEN OTERYN_GIT_AUTH_HEADER auth_b64" in fetch
+    assert "trap cleanup EXIT" in fetch
+    assert "unset OTERYN_GIT_AUTH_HEADER" in fetch
+
+
+def test_ai_review_gate_job_identity_is_static_and_rejects_renamed_or_matrix_rest_jobs() -> None:
+    """The job name passed as github.job has one static REST identity; P2 defer never widens it."""
+    workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/governance-ai-review.yml").read_text(encoding="utf-8")
+    action = (Path(__file__).resolve().parents[2] / ".github/actions/ai-review-gate/action.yml").read_text(encoding="utf-8")
+    assert workflow.count("\n  ai-review-gate:\n") == 1
+    job = re.search(r"(?ms)^  ai-review-gate:\n(?P<body>.*?)(?=^  [a-zA-Z][^\n]*:\n|\Z)", workflow)
+    assert job is not None
+    assert re.search(r"^    name: ai-review-gate$", job.group("body"), flags=re.MULTILINE)
+    assert "strategy:" not in job.group("body")
+    assert "matrix" not in job.group("body")
+    assert "WORKFLOW_JOB: ${{ github.job }}" in action
+    for name in ("renamed-ai-review-gate", "ai-review-gate (ubuntu-latest)", "${{ matrix.job }}"):
+        jobs = workflow_jobs()
+        jobs[0]["name"] = name
+        try:
+            issuer.validate_run_job_facts(
+                workflow_run(), jobs, expected_repository=REPOSITORY, expected_repository_id=REPOSITORY_ID,
+                expected_run_id=RUN_ID, expected_run_attempt=RUN_ATTEMPT, expected_base=BASE,
+                expected_head=HEAD, expected_pr_id=PR_ID, expected_pr_number=17,
+                expected_default_branch="main", expected_job_name="ai-review-gate",
+            )
+        except issuer.IssuanceError:
+            pass
+        else:
+            raise AssertionError(f"non-static REST job name {name!r} was accepted")
 
 
 def test_meta_gate_runs_trusted_attestation_regression_on_every_invocation() -> None:

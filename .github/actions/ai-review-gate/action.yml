@@ -93,15 +93,37 @@ runs:
     - name: Fetch candidate as inert bare Git objects
       shell: bash
       env:
+        GH_TOKEN: ${{ inputs.github-token }}
         REPOSITORY: ${{ steps.bind.outputs.repository }}
         BASE_SHA: ${{ steps.bind.outputs.base }}
         HEAD_SHA: ${{ steps.bind.outputs.head }}
       run: |
         set -euo pipefail
+        set +x
+        export GIT_TERMINAL_PROMPT=0
+        export GIT_CONFIG_NOSYSTEM=1
+        export GIT_CONFIG_GLOBAL=/dev/null
+        export GIT_LFS_SKIP_SMUDGE=1
+        unset GIT_SSL_NO_VERIFY
+        cleanup() {
+          unset GH_TOKEN OTERYN_GIT_AUTH_HEADER auth_b64
+        }
+        trap cleanup EXIT
         BARE_GIT_DIR="$RUNNER_TEMP/oteryn-candidate.git"
         git init --bare "$BARE_GIT_DIR"
-        git -C "$BARE_GIT_DIR" -c protocol.file.allow=never fetch --no-tags --quiet \
+        auth_b64="$(printf '%s' "x-access-token:${GH_TOKEN}" | base64 | tr -d '\n')"
+        export OTERYN_GIT_AUTH_HEADER="Authorization: Basic ${auth_b64}"
+        unset auth_b64
+        git -C "$BARE_GIT_DIR" \
+          -c credential.helper= \
+          -c http.sslVerify=true \
+          -c http.followRedirects=false \
+          -c protocol.allow=never \
+          -c protocol.https.allow=always \
+          --config-env=http.https://github.com/.extraheader=OTERYN_GIT_AUTH_HEADER \
+          fetch --no-tags --quiet --no-recurse-submodules \
           "https://github.com/${REPOSITORY}.git" "$BASE_SHA" "$HEAD_SHA"
+        unset OTERYN_GIT_AUTH_HEADER
         git -C "$BARE_GIT_DIR" cat-file -e "${BASE_SHA}^{commit}"
         git -C "$BARE_GIT_DIR" cat-file -e "${HEAD_SHA}^{commit}"
     - id: issue
