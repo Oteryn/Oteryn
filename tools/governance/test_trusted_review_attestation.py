@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import trusted_review_attestation as issuer  # noqa: E402
+import test_verify_ai_review_evidence as p2_evidence  # noqa: E402
 
 
 REPOSITORY = "Oteryn/Oteryn"
@@ -149,6 +150,144 @@ def pull_request() -> dict:
     }
 
 
+def issuer_coordinates() -> dict:
+    return {
+        "workflow_ref": "Oteryn/Oteryn/.github/workflows/governance-ai-review.yml@refs/heads/main",
+        "workflow_sha": "f" * 40,
+        "workflow_execution_sha": "f" * 40,
+        "workflow_run_id": 100,
+        "workflow_run_attempt": 2,
+        "workflow_job_id": 101,
+        "check_run_id": 102,
+        "check_suite_id": 103,
+    }
+
+
+def verified_source() -> dict:
+    return {
+        "kind": "issue_comment_result", "object_id": 201, "reviewed_head": HEAD,
+        "actor_login": "reviewer[bot]", "actor_id": 202,
+        "app_slug": "chatgpt-codex-connector", "app_id": None, "body_sha256": "1" * 64,
+    }
+
+
+def follow_up_coordinates() -> dict:
+    return {
+        "review_outcome": "ACCEPTED_WITH_FOLLOW_UP",
+        "p2_review_id": 701,
+        "finding_comment_ids": [702],
+        "review_thread_ids": ["thread-702"],
+        "follow_up_issue_numbers": [114],
+    }
+
+
+def ready_facts() -> dict:
+    return issuer.validate_pr_facts(
+        repository(), pull_request(), expected_repository=REPOSITORY,
+        expected_repository_id=REPOSITORY_ID, expected_pr_id=PR_ID, expected_pr_number=17,
+        expected_base=BASE, expected_head=HEAD,
+    )
+
+
+def make_follow_up_envelope(**overrides: object) -> dict:
+    values: dict[str, object] = {
+        "facts": ready_facts(),
+        "classification": {
+            "tier": "R2", "review_fingerprint": "c" * 64,
+            "reviewer_class": "deep",
+        },
+        "policy_id": "oteryn-ai-review-risk-v1",
+        "policy_sha256": "d" * 64,
+        "classifier_revision": "sha256:" + "e" * 64,
+        "issuer": issuer_coordinates(),
+        "evidence_status": "verified",
+        "evidence_sources": [verified_source()],
+        "issued_at": "2026-08-30T09:30:00Z",
+        **follow_up_coordinates(),
+    }
+    values.update(overrides)
+    return issuer.make_envelope(**values)
+
+
+def expect_issuance_failure(fn, message: str) -> None:
+    try:
+        fn()
+    except issuer.IssuanceError:
+        return
+    raise AssertionError(message)
+
+
+def expect_review_failure(fn, message: str) -> None:
+    try:
+        fn()
+    except RuntimeError:
+        return
+    raise AssertionError(message)
+
+
+def run_valid_p2_review_verifier(*, review_thread: dict | None = None,
+                                  tracker_issue: dict | None = None) -> tuple[dict, list[tuple[str, int, str]]]:
+    repo, _, final = p2_evidence._v1.core_tests.make_repo()
+    current = p2_evidence._v1.core_tests.issue_comment(
+        10, p2_evidence._v1.core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
+    )
+    summary = p2_evidence._summary_comment(final[:10])
+    selected_thread = p2_evidence._p2_thread() if review_thread is None else review_thread
+    selected_issue = p2_evidence._tracker_issue() if tracker_issue is None else tracker_issue
+    reviews = [
+        p2_evidence._v1.core_tests.request_anchor(current, final),
+        p2_evidence._p2_review(final, body=p2_evidence._codex_review_envelope(final)),
+    ]
+    review_comments = [p2_evidence._p2_inline()]
+    core = issuer.review_evidence._core
+    originals = (
+        core.fetch_comments,
+        core.fetch_reviews,
+        core.fetch_review_comments,
+        issuer.review_evidence.fetch_pr_reactions,
+        issuer.review_evidence.fetch_review_threads,
+        issuer.review_evidence.fetch_review_source,
+        issuer.review_evidence.fetch_json,
+        issuer.review_evidence._v1.fetch_json,
+        issuer.review_evidence._v1._core.fetch_json,
+    )
+    thread_calls: list[tuple[str, int, str]] = []
+    try:
+        core.fetch_comments = lambda *_args: [current, summary]
+        core.fetch_reviews = lambda *_args: reviews
+        core.fetch_review_comments = lambda *_args: review_comments
+        issuer.review_evidence.fetch_pr_reactions = lambda *_args: []
+
+        def fetch_threads(repository: str, pr_number: int, token: str) -> list[dict]:
+            thread_calls.append((repository, pr_number, token))
+            return [selected_thread]
+
+        issuer.review_evidence.fetch_review_threads = fetch_threads
+        issuer.review_evidence.fetch_review_source = lambda *_args: ("issue_comment_result", summary)
+        issuer.review_evidence.fetch_json = lambda *_args: selected_issue
+        issuer.review_evidence._v1.fetch_json = issuer.review_evidence.fetch_json
+        issuer.review_evidence._v1._core.fetch_json = issuer.review_evidence.fetch_json
+        result = issuer._run_review_verifier(
+            repository="Oteryn/Test", pr_number=7, base=BASE, head=final, bare_git_dir=repo,
+            policy=p2_evidence._policy(),
+            classification={"tier": "R2", "review_fingerprint": "f" * 64}, token="test",
+        )
+    finally:
+        (
+            core.fetch_comments,
+            core.fetch_reviews,
+            core.fetch_review_comments,
+            issuer.review_evidence.fetch_pr_reactions,
+            issuer.review_evidence.fetch_review_threads,
+            issuer.review_evidence.fetch_review_source,
+            issuer.review_evidence.fetch_json,
+            issuer.review_evidence._v1.fetch_json,
+            issuer.review_evidence._v1._core.fetch_json,
+        ) = originals
+    assert result is not None
+    return result, thread_calls
+
+
 def test_canonical_envelope_bytes_have_recomputable_subject_identity() -> None:
     facts = issuer.validate_pr_facts(
         repository(), pull_request(), expected_repository=REPOSITORY,
@@ -180,6 +319,11 @@ def test_canonical_envelope_bytes_have_recomputable_subject_identity() -> None:
             "reviewed_head": HEAD, "actor_login": "reviewer[bot]", "actor_id": 202,
             "app_slug": "chatgpt-codex-connector", "app_id": None, "body_sha256": "1" * 64,
         }],
+        review_outcome="PASS",
+        p2_review_id=None,
+        finding_comment_ids=None,
+        review_thread_ids=None,
+        follow_up_issue_numbers=None,
         issued_at="2026-08-30T09:30:00Z",
     )
     payload = issuer.canonical_json_bytes(envelope)
@@ -193,6 +337,156 @@ def test_canonical_envelope_bytes_have_recomputable_subject_identity() -> None:
         "tier": "R2", "fingerprint": "c" * 64, "reviewer_class": "deep",
         "evidence_status": "verified",
     }
+    assert envelope["review_outcome"] == "PASS"
+
+
+def test_canonical_envelope_binds_follow_up_outcome_and_exact_coordinates() -> None:
+    envelope = make_follow_up_envelope()
+    payload = issuer.canonical_json_bytes(envelope)
+    assert payload == issuer.canonical_json_bytes(json.loads(payload))
+    assert envelope["review_outcome"] == "ACCEPTED_WITH_FOLLOW_UP"
+    assert envelope["p2_review_id"] == 701
+    assert envelope["finding_comment_ids"] == [702]
+    assert envelope["review_thread_ids"] == ["thread-702"]
+    assert envelope["follow_up_issue_numbers"] == [114]
+
+
+def test_follow_up_envelope_rejects_missing_coordinate() -> None:
+    for coordinate in (
+        "p2_review_id", "finding_comment_ids", "review_thread_ids", "follow_up_issue_numbers",
+    ):
+        expect_issuance_failure(
+            lambda coordinate=coordinate: make_follow_up_envelope(**{coordinate: None}),
+            f"follow-up envelope accepted missing {coordinate}",
+        )
+
+
+def test_follow_up_envelope_rejects_duplicate_coordinates() -> None:
+    for coordinate, duplicate in (
+        ("finding_comment_ids", [702, 702]),
+        ("review_thread_ids", ["thread-702", "thread-702"]),
+        ("follow_up_issue_numbers", [114, 114]),
+    ):
+        expect_issuance_failure(
+            lambda coordinate=coordinate, duplicate=duplicate: make_follow_up_envelope(
+                **{coordinate: duplicate}
+            ),
+            f"follow-up envelope accepted duplicate {coordinate}",
+        )
+
+
+def test_semantic_claims_reject_follow_up_outcome_or_coordinate_tamper() -> None:
+    expected = {
+        "policy": {"id": "oteryn-ai-review-risk-v1", "sha256": "d" * 64},
+        "classifier": {"revision": "sha256:" + "e" * 64},
+        "review": {
+            "tier": "R2", "fingerprint": "c" * 64, "reviewer_class": "deep",
+            "evidence_status": "verified",
+        },
+        "review_evidence": [verified_source()],
+        **follow_up_coordinates(),
+    }
+    issuer.validate_semantic_claims(expected, expected)
+    for coordinate, replacement in (
+        ("review_outcome", "PASS"),
+        ("p2_review_id", 999),
+        ("finding_comment_ids", [999]),
+        ("review_thread_ids", ["thread-999"]),
+        ("follow_up_issue_numbers", [999]),
+    ):
+        candidate = deepcopy(expected)
+        candidate[coordinate] = replacement
+        expect_issuance_failure(
+            lambda candidate=candidate: issuer.validate_semantic_claims(candidate, expected),
+            f"semantic claims accepted tampered {coordinate}",
+        )
+
+
+def test_recompute_semantic_claims_preserves_follow_up_outcome_and_coordinates() -> None:
+    root = Path(__file__).resolve().parents[2]
+    review_match = {
+        "reviewed_head": HEAD,
+        "review_source_url": "ignored",
+        "review_source_kind": "ignored",
+        "review_source_commit_id": HEAD,
+        **follow_up_coordinates(),
+    }
+    originals = (
+        issuer.risk_policy.load_policy,
+        issuer.risk_policy.evaluate,
+        issuer._run_review_verifier,
+        issuer._material_sources,
+    )
+    try:
+        issuer.risk_policy.load_policy = lambda _path: {"policy_id": "oteryn-ai-review-risk-v1"}
+        issuer.risk_policy.evaluate = lambda *_args: {
+            "tier": "R2", "review_fingerprint": "c" * 64, "reviewer_class": "deep",
+        }
+        issuer._run_review_verifier = lambda **_kwargs: review_match
+        issuer._material_sources = lambda *_args, **_kwargs: [verified_source()]
+        recomputed = issuer.recompute_semantic_claims(
+            facts=ready_facts(), repository=REPOSITORY, pr_number=17, base=BASE, head=HEAD,
+            bare_git_dir=root, policy_path=root / "ecosystem/ai-review-policy.json",
+            classifier_path=root / "tools/governance/ai_review_policy.py", token="test",
+        )
+    finally:
+        (
+            issuer.risk_policy.load_policy,
+            issuer.risk_policy.evaluate,
+            issuer._run_review_verifier,
+            issuer._material_sources,
+        ) = originals
+    assert recomputed["review_outcome"] == "ACCEPTED_WITH_FOLLOW_UP"
+    assert recomputed["p2_review_id"] == 701
+    assert recomputed["finding_comment_ids"] == [702]
+    assert recomputed["review_thread_ids"] == ["thread-702"]
+    assert recomputed["follow_up_issue_numbers"] == [114]
+
+
+def test_run_review_verifier_fetches_lazy_threads_for_valid_p2_follow_up() -> None:
+    match, thread_calls = run_valid_p2_review_verifier()
+    assert thread_calls == [("Oteryn/Test", 7, "test")]
+    assert match["review_outcome"] == "ACCEPTED_WITH_FOLLOW_UP"
+    assert match["p2_review_id"] == 701
+    assert match["finding_comment_ids"] == [702]
+    assert match["review_thread_ids"] == ["thread-702"]
+    assert match["follow_up_issue_numbers"] == [114]
+
+
+def test_run_review_verifier_rejects_unresolved_p2_follow_up() -> None:
+    expect_review_failure(
+        lambda: run_valid_p2_review_verifier(review_thread=p2_evidence._p2_thread(resolved=False)),
+        "review verifier accepted an unresolved P2 follow-up",
+    )
+
+
+def test_run_review_verifier_rejects_closed_p2_follow_up_issue() -> None:
+    closed_issue = p2_evidence._tracker_issue()
+    closed_issue["state"] = "closed"
+    expect_review_failure(
+        lambda: run_valid_p2_review_verifier(tracker_issue=closed_issue),
+        "review verifier accepted a closed P2 follow-up issue",
+    )
+
+
+def test_run_review_verifier_rejects_cross_repository_p2_follow_up_issue() -> None:
+    foreign_issue = p2_evidence._tracker_issue()
+    foreign_issue["repository_url"] = "https://api.github.com/repos/Oteryn/Other"
+    expect_review_failure(
+        lambda: run_valid_p2_review_verifier(tracker_issue=foreign_issue),
+        "review verifier accepted a cross-repository P2 follow-up issue",
+    )
+
+
+def test_run_review_verifier_rejects_duplicate_p2_follow_up_disposition() -> None:
+    duplicate_thread = p2_evidence._p2_thread()
+    duplicate_reply = deepcopy(duplicate_thread["comments"]["nodes"][1])
+    duplicate_reply["fullDatabaseId"] = "704"
+    duplicate_thread["comments"]["nodes"].append(duplicate_reply)
+    expect_review_failure(
+        lambda: run_valid_p2_review_verifier(review_thread=duplicate_thread),
+        "review verifier accepted duplicate P2 follow-up dispositions",
+    )
 
 
 def test_draft_risk_review_is_explicitly_deferred_and_source_free() -> None:
@@ -224,6 +518,11 @@ def test_draft_risk_review_is_explicitly_deferred_and_source_free() -> None:
         },
         evidence_status="deferred",
         evidence_sources=[],
+        review_outcome=None,
+        p2_review_id=None,
+        finding_comment_ids=None,
+        review_thread_ids=None,
+        follow_up_issue_numbers=None,
         issued_at="2026-08-30T09:30:00Z",
     )
     assert envelope["review"]["evidence_status"] == "deferred"
@@ -250,6 +549,11 @@ def test_draft_risk_review_is_explicitly_deferred_and_source_free() -> None:
             },
             evidence_status="verified",
             evidence_sources=[],
+            review_outcome=None,
+            p2_review_id=None,
+            finding_comment_ids=None,
+            review_thread_ids=None,
+            follow_up_issue_numbers=None,
             issued_at="2026-08-30T09:30:00Z",
         )
     except issuer.IssuanceError:
@@ -555,6 +859,7 @@ def test_recomputed_semantic_claims_reject_every_single_claim_tamper() -> None:
             "evidence_status": "verified",
         },
         "review_evidence": [source],
+        "review_outcome": "PASS",
     }
     issuer.validate_semantic_claims(expected, expected)
     tampered_claims = {
@@ -628,6 +933,7 @@ def test_semantic_recompute_accepts_policy_authorized_clean_merge_up_source() ->
         ) = originals
     assert recomputed["review_evidence"] == [source]
     assert recomputed["review_evidence"][0]["reviewed_head"] == BASE
+    assert recomputed["review_outcome"] == "PASS"
     assert BASE != HEAD
 
 
@@ -637,10 +943,10 @@ def test_semantic_claims_fail_closed_on_r0_draft_and_ready_source_cardinality() 
         "actor_login": "reviewer[bot]", "actor_id": 202,
         "app_slug": "chatgpt-codex-connector", "app_id": None, "body_sha256": "1" * 64,
     }
-    for review, expected_sources, tampered_sources in (
-        ({"tier": "R0", "fingerprint": "c" * 64, "reviewer_class": None, "evidence_status": "not_required"}, [], [source]),
-        ({"tier": "R1", "fingerprint": "c" * 64, "reviewer_class": "fast", "evidence_status": "deferred"}, [], [source]),
-        ({"tier": "R2", "fingerprint": "c" * 64, "reviewer_class": "deep", "evidence_status": "verified"}, [source], []),
+    for review, expected_sources, tampered_sources, outcome in (
+        ({"tier": "R0", "fingerprint": "c" * 64, "reviewer_class": None, "evidence_status": "not_required"}, [], [source], None),
+        ({"tier": "R1", "fingerprint": "c" * 64, "reviewer_class": "fast", "evidence_status": "deferred"}, [], [source], None),
+        ({"tier": "R2", "fingerprint": "c" * 64, "reviewer_class": "deep", "evidence_status": "verified"}, [source], [], "PASS"),
     ):
         expected = {
             "policy": {"id": "oteryn-ai-review-risk-v1", "sha256": "d" * 64},
@@ -648,6 +954,8 @@ def test_semantic_claims_fail_closed_on_r0_draft_and_ready_source_cardinality() 
             "review": review,
             "review_evidence": expected_sources,
         }
+        if outcome is not None:
+            expected["review_outcome"] = outcome
         candidate = deepcopy(expected)
         candidate["review_evidence"] = tampered_sources
         try:

@@ -212,7 +212,7 @@ def _parse_observed_duplicate_clean_echo(body: str) -> str | None:
     if len(lines) != 11 or not lines[0].startswith(f"{_CLEAN_PREFIX} "):
         return None
     flair = lines[0][len(_CLEAN_PREFIX) + 1:]
-    if flair not in {"Delightful!", ":tada:"}:
+    if flair not in (_OBSERVED_CLEAN_FLAIRS | {"Delightful!", ":tada:"}):
         return None
     reviewed = _REVIEWED_COMMIT_LINE.fullmatch(lines[1])
     if reviewed is None:

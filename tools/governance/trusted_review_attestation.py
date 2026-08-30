@@ -37,6 +37,11 @@ WORKFLOW_PATH = ".github/workflows/governance-ai-review.yml"
 WORKFLOW_BRANCH_REF = "refs/heads/main"
 GITHUB_ACTIONS_APP_ID = 15368
 GITHUB_ACTIONS_APP_SLUG = "github-actions"
+PASS_REVIEW_OUTCOME = "PASS"
+FOLLOW_UP_REVIEW_OUTCOME = "ACCEPTED_WITH_FOLLOW_UP"
+FOLLOW_UP_COORDINATE_KEYS = (
+    "p2_review_id", "finding_comment_ids", "review_thread_ids", "follow_up_issue_numbers",
+)
 
 
 class IssuanceError(RuntimeError):
@@ -261,10 +266,79 @@ def validate_check_chain(
     _validate_actions_app(check_suite.get("app"), "check-suite application")
 
 
+def _require_sorted_unique_positive_integers(value: object, label: str) -> list[int]:
+    if not isinstance(value, list) or not value:
+        raise IssuanceError(f"{label} must be a non-empty list")
+    normalized = [_require_positive_int(item, label) for item in value]
+    if normalized != sorted(set(normalized)):
+        raise IssuanceError(f"{label} must be sorted and unique")
+    return normalized
+
+
+def _require_sorted_unique_strings(value: object, label: str) -> list[str]:
+    if not isinstance(value, list) or not value or any(not isinstance(item, str) or not item for item in value):
+        raise IssuanceError(f"{label} must be a non-empty list of strings")
+    if value != sorted(set(value)):
+        raise IssuanceError(f"{label} must be sorted and unique")
+    return value
+
+
+def _review_disposition(
+    *, evidence_status: object, review_outcome: object, p2_review_id: object,
+    finding_comment_ids: object, review_thread_ids: object, follow_up_issue_numbers: object,
+) -> dict[str, Any]:
+    follow_up_values = (
+        p2_review_id, finding_comment_ids, review_thread_ids, follow_up_issue_numbers,
+    )
+    if evidence_status != "verified":
+        if review_outcome is not None or any(value is not None for value in follow_up_values):
+            raise IssuanceError("unverified review disposition must be absent")
+        return {}
+    if review_outcome == PASS_REVIEW_OUTCOME:
+        if any(value is not None for value in follow_up_values):
+            raise IssuanceError("PASS review outcome must not contain P2 follow-up coordinates")
+        return {"review_outcome": PASS_REVIEW_OUTCOME}
+    if review_outcome != FOLLOW_UP_REVIEW_OUTCOME:
+        raise IssuanceError("verified review outcome is missing or unsupported")
+    p2_id = _require_positive_int(p2_review_id, "P2 review id")
+    finding_ids = _require_sorted_unique_positive_integers(
+        finding_comment_ids, "P2 finding comment ids",
+    )
+    thread_ids = _require_sorted_unique_strings(review_thread_ids, "P2 review thread ids")
+    issue_numbers = _require_sorted_unique_positive_integers(
+        follow_up_issue_numbers, "P2 follow-up issue numbers",
+    )
+    if len(finding_ids) != len(thread_ids):
+        raise IssuanceError("P2 finding and review-thread coordinates differ in cardinality")
+    return {
+        "review_outcome": FOLLOW_UP_REVIEW_OUTCOME,
+        "p2_review_id": p2_id,
+        "finding_comment_ids": finding_ids,
+        "review_thread_ids": thread_ids,
+        "follow_up_issue_numbers": issue_numbers,
+    }
+
+
+def _review_disposition_from_match(match: object) -> dict[str, Any]:
+    if not isinstance(match, dict):
+        raise IssuanceError("review verifier result is malformed")
+    outcome = match.get("review_outcome", PASS_REVIEW_OUTCOME)
+    return _review_disposition(
+        evidence_status="verified",
+        review_outcome=outcome,
+        p2_review_id=match.get("p2_review_id"),
+        finding_comment_ids=match.get("finding_comment_ids"),
+        review_thread_ids=match.get("review_thread_ids"),
+        follow_up_issue_numbers=match.get("follow_up_issue_numbers"),
+    )
+
+
 def make_envelope(
     *, facts: dict[str, Any], classification: dict[str, Any], policy_id: str, policy_sha256: str,
     classifier_revision: str, issuer: dict[str, Any], evidence_sources: list[dict[str, Any]],
-    evidence_status: str, issued_at: str,
+    evidence_status: str, review_outcome: str | None, p2_review_id: int | None,
+    finding_comment_ids: list[int] | None, review_thread_ids: list[str] | None,
+    follow_up_issue_numbers: list[int] | None, issued_at: str,
 ) -> dict[str, Any]:
     tier = classification.get("tier")
     fingerprint = classification.get("review_fingerprint")
@@ -306,7 +380,12 @@ def make_envelope(
         _validate_evidence_source(evidence_sources[0])
     elif evidence_sources:
         raise IssuanceError("deferred or unnecessary review evidence must be source-free")
-    return {
+    disposition = _review_disposition(
+        evidence_status=evidence_status, review_outcome=review_outcome, p2_review_id=p2_review_id,
+        finding_comment_ids=finding_comment_ids, review_thread_ids=review_thread_ids,
+        follow_up_issue_numbers=follow_up_issue_numbers,
+    )
+    envelope = {
         "schema_version": 1,
         "predicate_type": PREDICATE_TYPE,
         "repository": facts["repository"],
@@ -323,6 +402,8 @@ def make_envelope(
         "review_evidence": evidence_sources,
         "issued_at": issued_at,
     }
+    envelope.update(disposition)
+    return envelope
 
 
 def _validate_evidence_source(source: dict[str, Any]) -> None:
@@ -571,6 +652,7 @@ def _run_review_verifier(
         reviews=core.fetch_reviews(repository, pr_number, token),
         review_comments=core.fetch_review_comments(repository, pr_number, token),
         pr_reactions=review_evidence.fetch_pr_reactions(repository, pr_number, token),
+        review_threads=lambda: review_evidence.fetch_review_threads(repository, pr_number, token),
     )
 
 
@@ -598,9 +680,11 @@ def recompute_semantic_claims(
     if tier == "R0":
         evidence_status = "not_required"
         evidence_sources: list[dict[str, Any]] = []
+        disposition: dict[str, Any] = {}
     elif draft:
         evidence_status = "deferred"
         evidence_sources = []
+        disposition = {}
     else:
         evidence_status = "verified"
         review_match = _run_review_verifier(
@@ -612,7 +696,8 @@ def recompute_semantic_claims(
         evidence_sources = _material_sources(
             review_match, repository=repository, pr_number=pr_number, token=token,
         )
-    return {
+        disposition = _review_disposition_from_match(review_match)
+    claims = {
         "policy": {
             "id": policy.get("policy_id"),
             "sha256": hashlib.sha256(policy_bytes).hexdigest(),
@@ -626,12 +711,32 @@ def recompute_semantic_claims(
         },
         "review_evidence": evidence_sources,
     }
+    claims.update(disposition)
+    return claims
 
 
 def validate_semantic_claims(attested: object, expected: dict[str, Any]) -> None:
     """Do not trust a self-authored predicate when trusted recomputation disagrees."""
     value = _require_object(attested, "attested semantic claims")
-    required = {"policy", "classifier", "review", "review_evidence"}
+    expected_review = _require_object(expected.get("review"), "expected semantic review")
+    expected_disposition = _review_disposition(
+        evidence_status=expected_review.get("evidence_status"),
+        review_outcome=expected.get("review_outcome"),
+        p2_review_id=expected.get("p2_review_id"),
+        finding_comment_ids=expected.get("finding_comment_ids"),
+        review_thread_ids=expected.get("review_thread_ids"),
+        follow_up_issue_numbers=expected.get("follow_up_issue_numbers"),
+    )
+    value_review = _require_object(value.get("review"), "attested semantic review")
+    value_disposition = _review_disposition(
+        evidence_status=value_review.get("evidence_status"),
+        review_outcome=value.get("review_outcome"),
+        p2_review_id=value.get("p2_review_id"),
+        finding_comment_ids=value.get("finding_comment_ids"),
+        review_thread_ids=value.get("review_thread_ids"),
+        follow_up_issue_numbers=value.get("follow_up_issue_numbers"),
+    )
+    required = {"policy", "classifier", "review", "review_evidence", *expected_disposition}
     if set(value) != required or set(expected) != required:
         raise IssuanceError("semantic claim shape is malformed")
     for key in ("policy", "classifier", "review"):
@@ -639,6 +744,8 @@ def validate_semantic_claims(attested: object, expected: dict[str, Any]) -> None
             raise IssuanceError(f"attested {key} differs from trusted recomputation")
     if value.get("review_evidence") != expected["review_evidence"]:
         raise IssuanceError("attested review evidence differs from trusted recomputation")
+    if value_disposition != expected_disposition:
+        raise IssuanceError("attested review outcome differs from trusted recomputation")
 
 
 def _read_run_facts(
@@ -730,6 +837,11 @@ def _issue(args: argparse.Namespace) -> int:
         issuer=issuer,
         evidence_status=semantic_claims["review"]["evidence_status"],
         evidence_sources=semantic_claims["review_evidence"],
+        review_outcome=semantic_claims.get("review_outcome"),
+        p2_review_id=semantic_claims.get("p2_review_id"),
+        finding_comment_ids=semantic_claims.get("finding_comment_ids"),
+        review_thread_ids=semantic_claims.get("review_thread_ids"),
+        follow_up_issue_numbers=semantic_claims.get("follow_up_issue_numbers"),
         issued_at=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     )
     payload = canonical_json_bytes(envelope)
@@ -814,12 +926,13 @@ def _verify(args: argparse.Namespace) -> int:
         bare_git_dir=Path(args.bare_git_dir), policy_path=Path(args.policy_file),
         classifier_path=Path(args.classifier_file), token=args.token,
     )
-    validate_semantic_claims({
-        "policy": envelope.get("policy"),
-        "classifier": envelope.get("classifier"),
-        "review": envelope.get("review"),
-        "review_evidence": envelope.get("review_evidence"),
-    }, expected_semantics)
+    semantic_keys = (
+        "policy", "classifier", "review", "review_evidence", "review_outcome",
+        *FOLLOW_UP_COORDINATE_KEYS,
+    )
+    validate_semantic_claims(
+        {key: envelope[key] for key in semantic_keys if key in envelope}, expected_semantics,
+    )
     return 0
 
 
