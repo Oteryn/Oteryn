@@ -113,7 +113,9 @@ Only after Phase 2 is proven:
 - [ ] Disable strict `Require branches to be up to date before merging` only after that terminal success, then read back queue-required, bridge-required and strict-freshness-disabled state together.
 - [ ] Verify agents can leave a reviewed candidate unchanged while unrelated `main` advances and still integrate through the queue when fingerprint reuse remains valid.
 
-**Rollback:** if enqueue, API mapping, attestation, required exact-`I` result, merge or readback fails, remove/restore the queue/ruleset change to the captured pre-cutover state while strict freshness is still enabled, then read back `strict freshness = true`. Do not disable strict freshness during failed-canary cleanup and never leave an unprotected gap.
+**Rollback before strict-disable:** if enqueue, API mapping, attestation, required exact-`I` result, canary merge or pre-disable readback fails, the latest positive readback still proves `strict freshness = true`; only in that state remove/restore the queue/ruleset change to the captured pre-cutover state and positively read back `strict freshness = true` again.
+
+**Recovery after strict-disable request:** once any request to disable strict freshness has been sent, or when the final combined readback is failed, missing or ambiguous, do not assume strict remains enabled. First explicitly re-enable strict freshness and require a positive `strict freshness = true` readback. Only after that proof may the queue or required-workflow rule be removed/restored. If strict cannot be positively confirmed, stop in emergency `BLOCKED`, leave the queue and required-workflow rule in place, and escalate; never leave an unprotected gap.
 
 ---
 
@@ -155,7 +157,7 @@ For each authorized provider, serialized per repository:
 - [ ] Disable strict up-to-date-before-merge only after the canary is terminally successful, then read back the complete final state.
 - [ ] Verify no direct merge path bypasses the queue except explicit documented emergency policy.
 
-If any provider canary fails, restore/remove its queue/ruleset change while its strict freshness is still active and verify the fallback. Do not perform all settings changes across all repositories simultaneously. One proven canary precedes broad rollout.
+If a provider canary fails before any strict-disable request, restore/remove its queue/ruleset change only while the latest positive readback proves `strict freshness = true`, then positively verify the fallback. After any strict-disable request, or on a failed, missing or ambiguous final readback, first explicitly re-enable strict and obtain positive `strict freshness = true`; only then restore/remove queue or required-workflow rules. If that proof cannot be obtained, stop in emergency `BLOCKED` and leave queue plus required-workflow rules in place. Do not perform all settings changes across all repositories simultaneously. One proven canary precedes broad rollout.
 
 ---
 

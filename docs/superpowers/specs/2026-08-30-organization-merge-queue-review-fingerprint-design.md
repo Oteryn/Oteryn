@@ -223,7 +223,8 @@ Use staged migration, never a flag-day weakening of protection:
 - If queue evidence is merely delayed, enter `WAITING_EXTERNAL`; do not commit to retrigger.
 - If an unrelated base advance preserves the fingerprint, reuse review and let the queue rebuild the integration candidate.
 - If a trusted-base change touches a reviewed risk-bearing path and changes fingerprint, require fresh review.
-- If the canary, trusted bridge, API mapping or readback fails, remove/roll back the queue-required rule to its captured pre-cutover state while strict freshness is still active; verify that fallback state before further work. Never remove strict freshness as part of a failed canary cleanup.
+- Before any request to disable strict freshness, a canary, trusted bridge, API mapping, merge or readback failure may remove/roll back the queue-required rule only while the latest positive settings readback still proves `strict freshness = true`; verify that fallback state before further work.
+- After any request to disable strict freshness has been sent, or if the final settings readback is failed, missing or ambiguous, never assume strict freshness remains active. First explicitly re-enable strict freshness and obtain a positive readback of `strict freshness = true`; only then remove/roll back the queue or required-workflow rule. If that positive readback cannot be obtained, stop in emergency `BLOCKED`, preserve the queue and required-workflow rule, and escalate without further cutover cleanup. Never create an unprotected gap.
 - If Merge Queue, organization ruleset workflows or protected source-workflow access is unavailable for a repository/account capability reason, record the exact capability gap. Do not silently weaken integration safety; use the existing strict-up-to-date model only as an explicit temporary fallback until the capability exists.
 
 ## Current observed basis — locators only

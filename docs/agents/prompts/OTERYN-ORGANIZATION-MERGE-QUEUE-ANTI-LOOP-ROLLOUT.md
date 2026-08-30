@@ -180,7 +180,9 @@ For META first, then a provider canary, then remaining providers:
 7. only then disable strict `Require branches to be up to date before merging` and read back the complete final state;
 8. verify no ordinary direct merge path bypasses queue policy.
 
-If the canary or any readback fails, remove/restore the queue/ruleset change to the captured state while strict freshness is still active, and verify `strict freshness = true`. Never create a window where neither strict freshness nor proven queue integration protects `main`.
+If the canary, bridge or pre-disable readback fails before any strict-disable request, remove/restore the queue/ruleset change only while the latest positive settings readback proves `strict freshness = true`, then positively read back that fallback again.
+
+Once any strict-disable request has been sent, or if the final combined settings readback fails, is missing or is ambiguous, do not assume strict freshness survived. First explicitly re-enable strict freshness and require a positive `strict freshness = true` readback; only then remove/restore the queue or required-workflow rule. If strict cannot be positively confirmed, stop in emergency `BLOCKED`, leave the queue and required-workflow rule in place, and escalate without further cutover cleanup. Never create a window where neither strict freshness nor proven queue integration protects `main`.
 
 ### Phase E — provider semantic cleanup
 
@@ -235,6 +237,7 @@ Do not:
 - use Remote Desktop as a routine fallback for GitHub/settings/review work;
 - fabricate Merge Queue capability, ruleset state or review evidence;
 - disable strict branch freshness before a live exact-`I` bridge canary has merged and protected-main readback succeeds;
+- remove queue or required-workflow protection after a strict-disable request unless strict freshness has first been explicitly re-enabled and positively read back as `true`;
 - create no-op/retrigger commits.
 
 If a repository/account cannot use Merge Queue, keep or restore strict freshness as an explicitly recorded fallback and report the smallest missing capability. Do not call that fallback the target architecture.
