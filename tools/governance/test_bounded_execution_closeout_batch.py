@@ -519,6 +519,9 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             )
             self.assertFalse(blocked_dispatched.committed)
             self.assertEqual(blocked_dispatched.reason, "dispatch_in_flight")
+            self.assertTrue(takeover.begin_dispatch(
+                first_reservation.reservation_key, pending.dispatch_generation
+            ))
             self.assertTrue(takeover.acknowledge_dispatch(first_reservation.reservation_key))
 
             second_reservation = takeover.reserve(
@@ -528,7 +531,11 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
                 action="run_heavy_validation", scope=("validation-generation-2",),
             )
             self.assertTrue(second_reservation.committed)
-            self.assertIsNotNone(takeover.claim_pending_dispatch(repository, task_id))
+            second_pending = takeover.claim_pending_dispatch(repository, task_id)
+            self.assertIsNotNone(second_pending)
+            self.assertTrue(takeover.begin_dispatch(
+                second_reservation.reservation_key, second_pending.dispatch_generation
+            ))
             self.assertTrue(takeover.acknowledge_dispatch(second_reservation.reservation_key))
             self.assertIsNone(takeover.claim_pending_dispatch(repository, task_id))
 
@@ -570,6 +577,11 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             self.assertFalse(
                 takeover.acknowledge_dispatch(
                     reservation.reservation_key, first_generation
+                )
+            )
+            self.assertTrue(
+                takeover.begin_dispatch(
+                    reservation.reservation_key, second_claim.dispatch_generation
                 )
             )
             self.assertTrue(
@@ -620,7 +632,11 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             context = ExecutionContext(authority, outbox)
             result = raw_decide(previous, first, "run_loop_breaker_audit", POLICY, context=context)
             self.assertTrue(result.allowed)
-            self.assertIsNotNone(outbox.claim_pending_dispatch(previous["repository"], previous["task_id"]))
+            claimed = outbox.claim_pending_dispatch(previous["repository"], previous["task_id"])
+            self.assertIsNotNone(claimed)
+            self.assertTrue(outbox.begin_dispatch(
+                result.reservation_key, claimed.dispatch_generation
+            ))
             self.assertTrue(outbox.acknowledge_dispatch(result.reservation_key))
             second = copy.deepcopy(first)
             second["material_fact_id"] = "d" * 64

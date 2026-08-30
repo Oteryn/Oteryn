@@ -137,6 +137,7 @@ def decide_with_acknowledged_audit(previous: dict[str, Any], current: dict[str, 
         )
         assert reservation.committed
         assert outbox.claim_dispatch(reservation.reservation_key)
+        assert outbox.begin_dispatch(reservation.reservation_key, 1)
         assert outbox.acknowledge_dispatch(reservation.reservation_key)
         authority = TestEvidenceAuthority({binding["binding_id"]}, set())
         return guard_decide(prepared_previous, prepared_current, "record_loop_breaker_audit", policy, context=ExecutionContext(authority, outbox))

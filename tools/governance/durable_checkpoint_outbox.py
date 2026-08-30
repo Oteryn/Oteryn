@@ -779,6 +779,7 @@ class SqliteCheckpointOutbox:
                 WHERE reservation_key = ?
                   AND dispatch_generation = ?
                   AND status = 'dispatched'
+                  AND dispatch_started = 1
                   AND COALESCE(acknowledged, 0) = 0
                   AND COALESCE(invalidated, 0) = 0
                 """,
@@ -798,6 +799,7 @@ class SqliteCheckpointOutbox:
                 SELECT 1 FROM bounded_execution_outbox
                 WHERE repository = ? AND task_id = ? AND action = ? AND scope_json = ?
                   AND status = 'dispatched' AND acknowledged = 1
+                  AND dispatch_started = 1
                   AND invalidated = 0 AND dispatch_generation > 0
                 LIMIT 1
                 """,
