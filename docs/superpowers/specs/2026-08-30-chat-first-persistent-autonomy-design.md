@@ -233,7 +233,7 @@ Disposition/mechanism compatibility is fail-closed:
 | Worker disposition | Allowed resume mechanism(s) | Meaning |
 | --- | --- | --- |
 | `continue_current` | `same_session` | The current worker continues now; no rotation is claimed. |
-| `release_waiting` | `github_native`, `scheduled_task`, `work_event_trigger`, `work_persistent` | The active mutating worker is released while an external/control-plane or worker-capable mechanism remains active. `github_native` alone may be used only when control-plane progression can complete the current phase without requiring an automatically launched replacement worker. |
+| `release_waiting` | `github_native`, `scheduled_task`, `work_event_trigger`, `work_persistent` | The active mutating worker is released while an external/control-plane or worker-capable mechanism remains active. `github_native` alone is valid only when repository-native progression can complete **all remaining task work through a canonical terminal state** without any later agent worker action. If any later worker action may be required, `github_native` alone is invalid; use a worker-launching/preserving mechanism or `stop_reinvoke_required`. |
 | `rotate_resumable` | `scheduled_task`, `work_event_trigger`, `work_persistent` | A replacement/persistent worker execution is actually configured; a concrete locator is mandatory. |
 | `stop_reinvoke_required` | `owner_reinvoke` | No automatic worker continuation exists; owner re-invocation is required and must be reported truthfully. |
 | `terminal` | `none_terminal` | The canonical task lifecycle is terminal. |
@@ -241,6 +241,8 @@ Disposition/mechanism compatibility is fail-closed:
 `rotate_resumable` is invalid with `same_session` because no rotation occurs, and invalid with `github_native` because repository-native control-plane progress alone does not launch a replacement agent worker. It is also invalid with `owner_reinvoke` or `none_terminal`.
 
 A checkpoint that records `rotate_resumable` must identify one of `scheduled_task`, `work_event_trigger` or `work_persistent` and include the concrete task/workflow/trigger locator required to re-establish it.
+
+`release_waiting + github_native` is likewise invalid whenever any later agent worker action remains in the task after the GitHub-native event. In that case the checkpoint must identify a worker-launching/preserving continuation mechanism instead, or use `stop_reinvoke_required` if none exists.
 
 If no worker-launching/preserving automatic mechanism exists when replacement worker action will be required, use `stop_reinvoke_required`. Never imply that regular Chat or GitHub-native control-plane progress will silently create a new foreground worker turn after the current response ends.
 
@@ -312,7 +314,7 @@ The continuation layer consumes `#102/#103` rather than duplicating it.
 
 When Merge Queue is canonical for a repository:
 
-- the worker may release while GitHub owns the merge-group integration attempt;
+- the active mutating worker may release while GitHub owns the merge-group integration attempt only when either no later agent worker action remains anywhere in the task, or a worker-launching/preserving continuation mechanism is separately configured and represented by the checkpoint; GitHub-native queue progression alone must not strand post-merge readback/closeout work;
 - queue rebuilds after trusted-main movement are GitHub-native continuation, not a reason to mutate the PR branch;
 - external review reuse/invalidation remains a review-fingerprint decision, not a continuation-layer decision;
 - a changed risk-bearing fingerprint still requires the review behavior defined by the canonical review policy.
@@ -362,13 +364,14 @@ The META implementation should provide a versioned machine policy and validator 
 2. a worker/session timeout, command timeout or context rotation alone cannot produce task `DONE`;
 3. worker disposition and resume mechanism obey the fail-closed compatibility matrix;
 4. `rotate_resumable` is allowed only with `scheduled_task`, `work_event_trigger` or `work_persistent` plus a concrete locator; `same_session` and `github_native` cannot qualify it;
-5. `owner_reinvoke` cannot be presented as automatic continuation;
-6. continuation does not reset canonical retry/no-progress counters;
-7. frozen candidates cannot use checkpoint/retrigger commits as a continuation mechanism;
-8. Work selection requires a capability reason rather than effort alone;
-9. provider mapping may be stricter but cannot weaken organization task-lifetime truthfulness or bounded-execution safety;
-10. provider write adoption cannot be inferred from META policy/Issue/PR references and must be separately authorized for the current task;
-11. the continuation contract does not redefine bounded lifecycle states or Merge Queue/review-fingerprint semantics.
+5. `release_waiting + github_native` is allowed only when no later agent worker action remains anywhere in the task after GitHub-native progression;
+6. `owner_reinvoke` cannot be presented as automatic continuation;
+7. continuation does not reset canonical retry/no-progress counters;
+8. frozen candidates cannot use checkpoint/retrigger commits as a continuation mechanism;
+9. Work selection requires a capability reason rather than effort alone;
+10. provider mapping may be stricter but cannot weaken organization task-lifetime truthfulness or bounded-execution safety;
+11. provider write adoption cannot be inferred from META policy/Issue/PR references and must be separately authorized for the current task;
+12. the continuation contract does not redefine bounded lifecycle states or Merge Queue/review-fingerprint semantics.
 
 After provider adoption, organization live-state drift audit should check the protected-main provider contracts for stale incompatible wording and the expected META policy reference/version without attempting to parse arbitrary prose as the primary authority.
 
@@ -413,7 +416,7 @@ This programme is complete when all of the following are true:
 - `#107` does not establish a competing bounded lifecycle;
 - `#102/#103` remains the sole merge-integration/review-fingerprint authority;
 - META has one thin, versioned continuation contract covering task/session/tool/wait/retry/context separation and execution-surface/resume semantics;
-- deterministic tests reject false automatic-resume claims, including `rotate_resumable` paired with `same_session` or `github_native`, and local-limit-as-task-limit behavior;
+- deterministic tests reject false automatic-resume claims, including `rotate_resumable` paired with `same_session` or `github_native`, `release_waiting + github_native` when later worker action remains, and local-limit-as-task-limit behavior;
 - Game and Atlas consume the META minimum without product/runtime changes and only under explicit current-task provider write authorization;
 - Platform maps the minimum into its existing Control Room/checkpoint system without a second orchestration schema and only under explicit current-task provider write authorization;
 - provider-specific foreground/command budgets remain worker/invocation limits rather than whole-task lifetime limits;
