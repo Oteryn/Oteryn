@@ -472,6 +472,70 @@ def test_pull_request_target_run_job_and_check_chain_bind_candidate_head() -> No
         raise AssertionError("ambiguous job identity was accepted")
 
 
+def test_read_run_facts_extracts_bounded_actions_jobs_envelope_and_rejects_count_ambiguity() -> None:
+    """A GitHub Actions jobs envelope is authoritative only when its bounded count agrees."""
+    root_url = f"https://api.github.com/repos/{REPOSITORY}/actions/runs/{RUN_ID}"
+    jobs_url = f"{root_url}/jobs?per_page=100&page=1"
+    responses = {
+        root_url: workflow_run(),
+        jobs_url: {"total_count": 1, "jobs": workflow_jobs()},
+        f"https://api.github.com/repos/{REPOSITORY}/check-runs/{CHECK_RUN_ID}": check_run(),
+        f"https://api.github.com/repos/{REPOSITORY}/check-suites/{CHECK_SUITE_ID}": check_suite(),
+    }
+
+    class Response:
+        def __init__(self, value: object) -> None:
+            self.value = value
+
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def read(self, *_args: object) -> str:
+            return json.dumps(self.value)
+
+    original_urlopen = issuer.urllib.request.urlopen
+    calls: list[str] = []
+
+    def urlopen(request: object, *, timeout: int) -> Response:
+        url = request.full_url
+        calls.append(url)
+        return Response(responses[url])
+
+    try:
+        issuer.urllib.request.urlopen = urlopen
+        facts = issuer._read_run_facts(
+            repository=REPOSITORY, repository_id=REPOSITORY_ID, pr_id=PR_ID, pr_number=17,
+            base=BASE, head=HEAD, default_branch="main", workflow_run_id=RUN_ID,
+            workflow_run_attempt=RUN_ATTEMPT, workflow_job="ai-review-gate", token="test",
+        )
+        assert facts == {
+            "workflow_run_id": RUN_ID, "workflow_run_attempt": RUN_ATTEMPT,
+            "workflow_job_id": JOB_ID, "check_run_id": CHECK_RUN_ID,
+            "check_suite_id": CHECK_SUITE_ID,
+        }
+        assert calls == [
+            root_url, jobs_url,
+            f"https://api.github.com/repos/{REPOSITORY}/check-runs/{CHECK_RUN_ID}",
+            f"https://api.github.com/repos/{REPOSITORY}/check-suites/{CHECK_SUITE_ID}",
+        ]
+        responses[jobs_url] = {"total_count": 2, "jobs": workflow_jobs()}
+        try:
+            issuer._read_run_facts(
+                repository=REPOSITORY, repository_id=REPOSITORY_ID, pr_id=PR_ID, pr_number=17,
+                base=BASE, head=HEAD, default_branch="main", workflow_run_id=RUN_ID,
+                workflow_run_attempt=RUN_ATTEMPT, workflow_job="ai-review-gate", token="test",
+            )
+        except issuer.IssuanceError:
+            pass
+        else:
+            raise AssertionError("jobs envelope with an ambiguous total_count was accepted")
+    finally:
+        issuer.urllib.request.urlopen = original_urlopen
+
+
 def test_recomputed_semantic_claims_reject_every_single_claim_tamper() -> None:
     source = {
         "kind": "pull_request_review", "object_id": 201, "reviewed_head": BASE,
@@ -619,6 +683,18 @@ def test_trusted_workflow_has_no_candidate_checkout_and_verifies_issued_attestat
     assert "INPUT_PR_ID: ${{ inputs.pr-id }}" in action
     assert "WORKFLOW_EXECUTION_SHA: ${{ github.sha }}" in action
     assert "WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}" in action
+
+
+def test_action_passes_runtime_github_output_to_the_issuer() -> None:
+    """The issuer must receive the runner output file, not an unavailable expression context."""
+    action = (Path(__file__).resolve().parents[2] / ".github/actions/ai-review-gate/action.yml").read_text(encoding="utf-8")
+    issue_step = re.search(
+        r"(?ms)^    - id: issue\n(?P<body>.*?)(?=^    - id:|\Z)", action,
+    )
+    assert issue_step is not None
+    assert '--github-output "$GITHUB_OUTPUT"' in issue_step.group("body")
+    assert "GITHUB_OUTPUT_PATH:" not in issue_step.group("body")
+    assert "${{ github.output }}" not in issue_step.group("body")
 
 
 def test_meta_gate_runs_trusted_attestation_regression_on_every_invocation() -> None:

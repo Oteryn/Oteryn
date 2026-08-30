@@ -438,7 +438,9 @@ def _api_json(url: str, token: str) -> dict[str, Any]:
     return _require_object(value, "GitHub API response")
 
 
-def _api_pages(url: str, token: str) -> list[dict[str, Any]]:
+def _api_pages(url: str, token: str, *, list_key: str | None = None) -> list[dict[str, Any]]:
+    if list_key is not None and (not isinstance(list_key, str) or not list_key):
+        raise IssuanceError("GitHub paginated list key is malformed")
     result: list[dict[str, Any]] = []
     for page in range(1, MAX_PAGES + 1):
         separator = "&" if "?" in url else "?"
@@ -456,10 +458,25 @@ def _api_pages(url: str, token: str) -> list[dict[str, Any]]:
                 batch = json.load(response)
         except Exception as exc:
             raise IssuanceError(f"GitHub API paginated read failed for {url}") from exc
-        if not isinstance(batch, list) or any(not isinstance(item, dict) for item in batch):
+        total_count: int | None = None
+        if list_key is not None:
+            envelope = _require_object(batch, "GitHub paginated response")
+            total_count = envelope.get("total_count")
+            if isinstance(total_count, bool) or not isinstance(total_count, int) or total_count < 0:
+                raise IssuanceError("GitHub paginated response total_count is malformed")
+            batch = envelope.get(list_key)
+        if (
+            not isinstance(batch, list)
+            or len(batch) > 100
+            or any(not isinstance(item, dict) for item in batch)
+        ):
             raise IssuanceError("GitHub paginated response is malformed")
         result.extend(batch)
+        if total_count is not None and len(result) > total_count:
+            raise IssuanceError("GitHub paginated response exceeds its declared total_count")
         if len(batch) < 100:
+            if total_count is not None and len(result) != total_count:
+                raise IssuanceError("GitHub paginated response total_count is incomplete or ambiguous")
             return result
     raise IssuanceError("GitHub pagination exceeded the bounded trust limit")
 
@@ -632,7 +649,11 @@ def _read_run_facts(
     run = _api_json(f"https://api.github.com/repos/{repository}/actions/runs/{workflow_run_id}", token)
     run_facts = validate_run_job_facts(
         run,
-        _api_pages(f"https://api.github.com/repos/{repository}/actions/runs/{workflow_run_id}/jobs", token),
+        _api_pages(
+            f"https://api.github.com/repos/{repository}/actions/runs/{workflow_run_id}/jobs",
+            token,
+            list_key="jobs",
+        ),
         expected_repository=repository, expected_repository_id=repository_id,
         expected_run_id=workflow_run_id, expected_run_attempt=workflow_run_attempt,
         expected_base=base, expected_head=head, expected_pr_id=pr_id, expected_pr_number=pr_number,

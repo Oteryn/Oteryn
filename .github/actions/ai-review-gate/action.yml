@@ -124,7 +124,6 @@ runs:
         WORKFLOW_JOB: ${{ github.job }}
         BARE_GIT_DIR: ${{ runner.temp }}/oteryn-candidate.git
         ENVELOPE_PATH: ${{ runner.temp }}/oteryn-trusted-review-envelope.json
-        GITHUB_OUTPUT_PATH: ${{ github.output }}
       run: |
         set -euo pipefail
         POLICY_ROOT="$(cd "$GITHUB_ACTION_PATH/../../.." && pwd)"
@@ -137,7 +136,7 @@ runs:
           --workflow-job "$WORKFLOW_JOB" \
           --bare-git-dir "$BARE_GIT_DIR" --policy-file "$POLICY_ROOT/ecosystem/ai-review-policy.json" \
           --classifier-file "$POLICY_ROOT/tools/governance/ai_review_policy.py" \
-          --output "$ENVELOPE_PATH" --github-output "$GITHUB_OUTPUT_PATH"
+          --output "$ENVELOPE_PATH" --github-output "$GITHUB_OUTPUT"
     - id: classify
       name: Publish trusted classification outputs
       shell: bash
