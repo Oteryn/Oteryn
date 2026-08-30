@@ -46,6 +46,7 @@ _FINDING_LIKE_RE = re.compile(
     r"(?:\[P[0-9]+\]|P[0-9]+\b|(?:<sub>){1,2}!\[P[0-9]+ Badge\])"
 )
 _TRACKED_P2_REPLY_RE = re.compile(r"^Tracked in #([1-9][0-9]*)\.$")
+_P2_DISPOSITION_LIKE_RE = re.compile(r"^\s*tracked\s+in\b", re.IGNORECASE)
 _TRUSTED_MAINTAINER_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
 _POSITIVE_DECIMAL_RE = re.compile(r"^[1-9][0-9]*$")
 
@@ -208,14 +209,17 @@ def _envelope_reviewed_heads(
 def _parse_observed_duplicate_clean_echo(body: str) -> str | None:
     """Return the reviewed prefix only for the complete observed Codex echo envelope."""
     lines = [line.strip() for line in (body or "").splitlines() if line.strip()]
-    if len(lines) != 11 or lines[0] != f"{_CLEAN_PREFIX} Delightful!":
+    if len(lines) != 11 or not lines[0].startswith(f"{_CLEAN_PREFIX} "):
+        return None
+    flair = lines[0][len(_CLEAN_PREFIX) + 1:]
+    if flair not in {"Delightful!", ":tada:"}:
         return None
     reviewed = _REVIEWED_COMMIT_LINE.fullmatch(lines[1])
     if reviewed is None:
         return None
     prefix = reviewed.group(1)
     expected = [
-        f"{_CLEAN_PREFIX} Delightful!",
+        f"{_CLEAN_PREFIX} {flair}",
         f"**Reviewed commit:** `{prefix}`",
         "<details> <summary>ℹ️ About Codex in GitHub</summary>",
         "<br/>",
@@ -662,16 +666,21 @@ def _accepted_p2_follow_up(
         for node in nodes:
             if node is root:
                 continue
-            association = str(node.get("authorAssociation") or "")
-            if association not in trusted_maintainer_associations:
+            body = str(node.get("body") or "")
+            if _FINDING_LIKE_RE.search(body):
+                raise RuntimeError("P2 review thread contains an intermediate finding")
+            tracker = _TRACKED_P2_REPLY_RE.fullmatch(body)
+            if tracker is None:
+                if _P2_DISPOSITION_LIKE_RE.search(body):
+                    raise RuntimeError("P2 follow-up disposition is malformed")
                 continue
+            association = str(node.get("authorAssociation") or "")
             reply_at = _utc_timestamp(node.get("createdAt"))
-            tracker = _TRACKED_P2_REPLY_RE.fullmatch(str(node.get("body") or ""))
             if (
-                node.get("lastEditedAt") is not None
+                association not in trusted_maintainer_associations
+                or node.get("lastEditedAt") is not None
                 or reply_at is None
                 or reply_at <= root_at
-                or tracker is None
                 or not str((node.get("author") or {}).get("login", "")).strip()
             ):
                 raise RuntimeError("P2 follow-up disposition is malformed or edited")

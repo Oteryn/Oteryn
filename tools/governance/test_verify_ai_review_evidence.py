@@ -34,6 +34,7 @@ def test_every_unobserved_clean_flair_fails_closed() -> None:
         "Blocking regression detected.",
         "Wonderful future diff.",
         "Ship it but P1 remains.",
+        ":tada:",
     ):
         repo, _, final = _v1.core_tests.make_repo()
         current = _v1.core_tests.issue_comment(
@@ -280,6 +281,30 @@ def test_current_codex_summary_accepts_resolved_tracked_p2_without_reaction() ->
     assert found["follow_up_issue_numbers"] == [114]
 
 
+def test_current_codex_summary_ignores_inert_p2_repair_reply_before_exact_tracker() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    thread = _p2_thread()
+    thread["comments"]["nodes"].insert(1, {
+        "fullDatabaseId": "704",
+        "body": "I will repair the documentation in the next change.",
+        "author": {"login": "blakinio"},
+        "authorAssociation": "MEMBER",
+        "createdAt": "2026-08-20T10:01:00.500Z",
+        "lastEditedAt": "2026-08-20T10:01:00.750Z",
+    })
+
+    found = _verify_summary(
+        reactions=[],
+        extra_reviews=[_p2_review(final, body=_codex_review_envelope(final))],
+        review_comments=[_p2_inline()],
+        review_threads=[thread],
+        tracker_issues={114: _tracker_issue()},
+    )
+
+    assert found["review_outcome"] == "ACCEPTED_WITH_FOLLOW_UP"
+    assert found["follow_up_issue_numbers"] == [114]
+
+
 def test_current_codex_summary_accepts_publication_timestamp_drift_for_unedited_p2() -> None:
     repo, _, final = _v1.core_tests.make_repo()
     inline = _p2_inline()
@@ -508,11 +533,71 @@ def test_current_codex_summary_rejects_edited_or_untrusted_p2_disposition() -> N
     for thread in (
         _p2_thread(disposition_edited=True),
         _p2_thread(disposition_association="CONTRIBUTOR"),
+        _p2_thread(disposition_login=""),
     ):
         _v1.core_tests.expect_fail(lambda: _verify_summary(
             reactions=[], extra_reviews=[_p2_review(final)], review_comments=[_p2_inline()],
             review_threads=[thread], tracker_issues={114: _tracker_issue()},
         ))
+
+
+def test_current_codex_summary_rejects_evidence_shaped_or_duplicate_p2_replies() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    malformed_trackers = (
+        "Tracked in #0.",
+        "Tracked in #114. Follow-up details.",
+        " Tracked in #114.",
+        "Tracked in #114. ",
+        "Tracked in #114.\n",
+        "[P0] Critical reply",
+        "[P1] Blocking reply",
+        "P3 Unknown-severity reply",
+    )
+    for tracker in malformed_trackers:
+        _v1.core_tests.expect_fail(lambda tracker=tracker: _verify_summary(
+            reactions=[],
+            extra_reviews=[_p2_review(final)],
+            review_comments=[_p2_inline()],
+            review_threads=[_p2_thread(tracker=tracker)],
+            tracker_issues={114: _tracker_issue()},
+        ))
+
+    misordered = _p2_thread()
+    misordered["comments"]["nodes"][1]["createdAt"] = "2026-08-20T10:01:00Z"
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        reactions=[],
+        extra_reviews=[_p2_review(final)],
+        review_comments=[_p2_inline()],
+        review_threads=[misordered],
+        tracker_issues={114: _tracker_issue()},
+    ))
+
+    edited_root = _p2_thread()
+    edited_root["comments"]["nodes"][0]["lastEditedAt"] = "2026-08-20T10:01:02Z"
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        reactions=[],
+        extra_reviews=[_p2_review(final)],
+        review_comments=[_p2_inline()],
+        review_threads=[edited_root],
+        tracker_issues={114: _tracker_issue()},
+    ))
+
+    duplicate = _p2_thread()
+    duplicate["comments"]["nodes"].append({
+        "fullDatabaseId": "704",
+        "body": "Tracked in #115.",
+        "author": {"login": "blakinio"},
+        "authorAssociation": "MEMBER",
+        "createdAt": "2026-08-20T10:01:02Z",
+        "lastEditedAt": None,
+    })
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        reactions=[],
+        extra_reviews=[_p2_review(final)],
+        review_comments=[_p2_inline()],
+        review_threads=[duplicate],
+        tracker_issues={114: _tracker_issue(), 115: _tracker_issue(115)},
+    ))
 
 
 def test_current_codex_summary_rejects_bad_p2_tracker_identity_or_state() -> None:
@@ -866,6 +951,13 @@ def test_current_codex_summary_reuses_review_after_clean_merge_up_with_duplicate
     assert found["review_source_kind"] == "issue_comment_result"
 
 
+def test_current_codex_summary_reuses_review_after_clean_merge_up_with_tada_duplicate_echo() -> None:
+    found = _verify_summary_merge_reuse_with_echoes(
+        echo_first_line="Codex Review: Didn't find any major issues. :tada:"
+    )
+    assert found["review_source_kind"] == "issue_comment_result"
+
+
 def test_current_codex_summary_reuse_rejects_descendant_p2() -> None:
     _v1.core_tests.expect_fail(
         lambda: _verify_summary_merge_reuse_with_echoes(descendant_p2=True)
@@ -909,6 +1001,93 @@ def test_current_codex_summary_rejects_multiple_same_generation_clean_echoes() -
     _v1.core_tests.expect_fail(
         lambda: _verify_summary_merge_reuse_with_echoes(echo_count=2)
     )
+
+
+def test_current_codex_summary_does_not_suppress_invalid_tada_clean_echoes() -> None:
+    first_line = "Codex Review: Didn't find any major issues. :tada:"
+    cases = (
+        {"echo_prefix": "f" * 10},
+        {"echo_stamp": "2026-08-20T10:01:02Z"},
+        {"echo_extra": "\nExtra prose."},
+        {"echo_extra": "\n[P1] Security boundary bypass"},
+        {"echo_count": 2},
+    )
+    for case in cases:
+        _v1.core_tests.expect_fail(
+            lambda case=case: _verify_summary_merge_reuse_with_echoes(
+                echo_first_line=first_line, **case
+            )
+        )
+
+
+def test_tada_echo_requires_every_duplicate_identity_and_envelope_invariant() -> None:
+    repo, reviewed, _ = _v1.core_tests.make_repo()
+    summary = _summary_comment(reviewed[:10])
+    request_at = _v1.m._utc_timestamp("2026-08-20T10:00:00Z")
+    reaction_at = _v1.m._utc_timestamp("2026-08-20T10:01:01Z")
+    assert request_at is not None and reaction_at is not None
+
+    def observed_echo(*, prefix: str = reviewed[:10], stamp: str = "2026-08-20T10:00:59Z") -> dict:
+        echo = _v1.core_tests.codex_result(
+            12,
+            prefix,
+            stamp=stamp,
+            text=_observed_duplicate_echo_body(
+                prefix,
+                first_line="Codex Review: Didn't find any major issues. :tada:",
+            ),
+        )
+        echo["performed_via_github_app"] = {"slug": "chatgpt-codex-connector"}
+        return echo
+
+    def echoes(comments: list[dict]) -> list[dict]:
+        return _v1.m._same_generation_clean_echoes(
+            comments,
+            summary=summary,
+            trusted_logins={"chatgpt-codex-connector[bot]"},
+            repo_root=repo,
+            reviewed_head=reviewed,
+            request_at=request_at,
+            reaction_at=reaction_at,
+            repository="Oteryn/Test",
+            pr_number=7,
+        )
+
+    valid = observed_echo()
+    assert echoes([summary, valid]) == [valid]
+
+    wrong_login = observed_echo()
+    wrong_login["user"]["login"] = "other-bot"
+    wrong_app = observed_echo()
+    wrong_app["performed_via_github_app"] = {"slug": "other-app"}
+    wrong_pr = observed_echo()
+    wrong_pr["issue_url"] = "https://api.github.com/repos/Oteryn/Test/issues/8"
+    wrong_pr["html_url"] = "https://github.com/Oteryn/Test/pull/8#issuecomment-12"
+    edited = observed_echo()
+    edited["updated_at"] = "2026-08-20T10:01:00Z"
+    wrong_head = observed_echo(prefix="f" * 10)
+    outside_window = observed_echo(stamp="2026-08-20T10:01:02Z")
+    extra_prose = observed_echo()
+    extra_prose["body"] += "\nExtra prose."
+    for invalid in (
+        wrong_login,
+        wrong_app,
+        wrong_pr,
+        edited,
+        wrong_head,
+        outside_window,
+        extra_prose,
+    ):
+        assert echoes([summary, invalid]) == []
+
+    finding_content = observed_echo()
+    finding_content["body"] += "\n[P1] Security boundary bypass"
+    _v1.core_tests.expect_fail(lambda: echoes([summary, finding_content]))
+
+    second = observed_echo()
+    second["id"] = 13
+    second["html_url"] = "https://github.com/Oteryn/Test/pull/7#issuecomment-13"
+    _v1.core_tests.expect_fail(lambda: echoes([summary, valid, second]))
 
 
 def main() -> int:
