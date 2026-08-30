@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 2595)
-Total output lines: 268
-
 import copy
 import json
 import sys
@@ -117,7 +114,64 @@ class DecisionTests(unittest.TestCase):
             gate_state="failure",
             first_material_failure="review evidence not ready",
         )
-        current = copy.dee…595 tokens truncated…snapshot(
+        current = copy.deepcopy(previous)
+        current["updated_at"] = "2026-08-25T14:05:00Z"
+        result = decide(previous, current, "observe", POLICY)
+        self.assertTrue(result.allowed)
+        self.assertEqual(result.state, "WAITING_EXTERNAL")
+        self.assertTrue(result.release_session)
+
+    def test_external_dependency_denies_operational_actions_until_fact_changes(self):
+        current = snapshot(
+            state="WAITING_EXTERNAL",
+            blocking_dependency="external_review",
+            dependency_kind="external",
+            gate_state="failure",
+            first_material_failure="review evidence not ready",
+        )
+        for action in (
+            "mutate",
+            "retry",
+            "retrigger",
+            "run_heavy_validation",
+            "request_external_review",
+            "same_head_gate_recheck",
+        ):
+            with self.subTest(action=action):
+                result = decide(current, copy.deepcopy(current), action, POLICY)
+                self.assertFalse(result.allowed)
+                self.assertEqual(result.state, "WAITING_EXTERNAL")
+                self.assertTrue(result.release_session)
+
+    def test_second_identical_local_failure_stalls_instead_of_retrying_again(self):
+        previous = snapshot(
+            gate_state="failure",
+            first_material_failure="same deterministic failure",
+            identical_failure_cycles=1,
+        )
+        current = copy.deepcopy(previous)
+        current["identical_failure_cycles"] = 2
+        result = decide(previous, current, "retry", POLICY)
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "STALLED")
+        self.assertTrue(result.release_session)
+
+    def test_retry_counters_cannot_regress_without_material_progress(self):
+        counter_names = (
+            "identical_failure_cycles",
+            "heavy_validation_runs",
+            "external_review_invocations",
+            "same_head_gate_rechecks",
+        )
+        for counter in counter_names:
+            with self.subTest(counter=counter):
+                previous = snapshot(**{counter: 1})
+                current = snapshot(**{counter: 0})
+                with self.assertRaises(GuardError):
+                    decide(previous, current, "observe", POLICY)
+
+    def test_head_scoped_counters_may_restart_after_material_head_progress(self):
+        previous = snapshot(
             task_head_sha="a" * 40,
             identical_failure_cycles=2,
             heavy_validation_runs=2,

@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 3903)
-Total output lines: 395
-
 import copy
 import json
 import sys
@@ -114,7 +111,186 @@ class FreezeAdmissionTests(unittest.TestCase):
         self.assertFalse(result.allowed)
         self.assertIn("frozen", result.reason.lower())
 
- …1903 tokens truncated…       self.assertEqual(completed.state, "DONE")
+    def test_every_final_qualification_action_requires_frozen_candidate(self):
+        previous = snapshot(candidate_frozen=False, completion_verified=True)
+        for action in (
+            "request_external_review",
+            "run_heavy_validation",
+            "same_head_gate_recheck",
+            "complete",
+        ):
+            with self.subTest(action=action):
+                current = copy.deepcopy(previous)
+                counter = {
+                    "request_external_review": "external_review_invocations",
+                    "run_heavy_validation": "heavy_validation_runs",
+                    "same_head_gate_recheck": "same_head_gate_rechecks",
+                }.get(action)
+                if counter is not None:
+                    current[counter] = 1
+                result = decide(previous, current, action, POLICY)
+                self.assertFalse(result.allowed)
+                self.assertIn("frozen", result.reason.lower())
+
+    def test_loop_breaker_qualification_requires_frozen_candidate(self):
+        previous = snapshot(
+            late_material_findings=2,
+            audited_late_material_findings=2,
+            candidate_frozen=False,
+            final_qualification_runs_since_audit=0,
+        )
+        current = copy.deepcopy(previous)
+        current["final_qualification_runs_since_audit"] = 1
+        result = decide(previous, current, "enter_final_qualification", POLICY)
+        self.assertFalse(result.allowed)
+        self.assertIn("frozen", result.reason.lower())
+
+    def test_post_admission_final_review_requires_candidate_to_remain_frozen(self):
+        previous = snapshot(
+            phase="LOOP_BREAKER_AUDIT",
+            late_material_findings=2,
+            audited_late_material_findings=2,
+            candidate_frozen=True,
+            material_change_reason="review_finding",
+            material_fact_id="d" * 64,
+            material_fact_head="a" * 40,
+            material_fact_verified=True,
+            final_qualification_runs_since_audit=0,
+        )
+        admitted = copy.deepcopy(previous)
+        admitted["phase"] = "final_qualification"
+        admitted["final_qualification_runs_since_audit"] = 1
+        self.assertTrue(
+            decide(previous, admitted, "enter_final_qualification", POLICY).allowed
+        )
+
+        unfrozen = copy.deepcopy(admitted)
+        unfrozen["candidate_frozen"] = False
+        unfrozen["material_change"] = True
+        unfrozen["material_change_evidence"] = "review-thread:3888776294"
+        unfrozen["evidence_generation"] = "evidence-2"
+        unfrozen["post_freeze_material_head_changes"] = 1
+        unfrozen["repair_generation_id"] = "d" * 64
+        unfrozen["repair_base_head"] = "a" * 40
+        result = decide(admitted, unfrozen, "request_external_review", POLICY)
+        self.assertFalse(result.allowed)
+        self.assertIn("frozen", result.reason.lower())
+
+
+class MaterialChangeEvidenceTests(unittest.TestCase):
+    def test_frozen_candidate_rejects_self_attested_material_change(self):
+        previous = snapshot(candidate_frozen=True)
+        current = copy.deepcopy(previous)
+        current["material_change"] = True
+        current["material_change_reason"] = "review_finding"
+        current["material_change_evidence"] = "review-thread:3888786165"
+        current["material_fact_id"] = "d" * 64
+        current["material_fact_head"] = "a" * 40
+        current["material_fact_verified"] = True
+        current["repair_generation_id"] = "d" * 64
+        current["repair_base_head"] = "a" * 40
+
+        result = decide(previous, current, "mutate", POLICY)
+
+        self.assertFalse(result.allowed)
+        self.assertIn("unfreeze", result.reason.lower())
+
+    def test_unfreeze_requires_permitted_reason_and_durable_evidence(self):
+        previous = snapshot(candidate_frozen=True)
+        current = copy.deepcopy(previous)
+        current["candidate_frozen"] = False
+        current["material_change"] = True
+        current["post_freeze_material_head_changes"] = 1
+
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", POLICY)
+
+        previous = snapshot(
+            candidate_frozen=True,
+            material_change_reason="review_finding",
+            material_fact_id="d" * 64,
+            material_fact_head="a" * 40,
+            material_fact_verified=True,
+        )
+        current = copy.deepcopy(previous)
+        current["candidate_frozen"] = False
+        current["material_change"] = True
+        current["material_change_evidence"] = "review-thread:3888786165"
+        current["evidence_generation"] = "evidence-2"
+        current["post_freeze_material_head_changes"] = 1
+        current["repair_generation_id"] = "d" * 64
+        current["repair_base_head"] = "a" * 40
+        result = decide(previous, current, "observe", POLICY)
+        self.assertTrue(result.allowed)
+
+    def test_unfreeze_rejects_fact_that_is_not_bound_to_frozen_head(self):
+        previous = snapshot(
+            candidate_frozen=True,
+            material_change_reason="review_finding",
+            material_fact_id="d" * 64,
+            material_fact_head="b" * 40,
+            material_fact_verified=True,
+        )
+        current = copy.deepcopy(previous)
+        current["candidate_frozen"] = False
+        current["material_change"] = True
+        current["material_change_evidence"] = "review-thread:3888786165"
+        current["post_freeze_material_head_changes"] = 1
+        current["repair_generation_id"] = "d" * 64
+        current["repair_base_head"] = "a" * 40
+
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", POLICY)
+
+    def test_refreeze_requires_new_canonical_review_fingerprint(self):
+        previous = snapshot(
+            candidate_frozen=False,
+            material_change=True,
+            material_change_reason="review_finding",
+            material_change_evidence="review-thread:3888786165",
+            material_fact_id="d" * 64,
+            material_fact_head="a" * 40,
+            material_fact_verified=True,
+            repair_generation_id="d" * 64,
+            repair_base_head="a" * 40,
+            post_freeze_material_head_changes=1,
+            review_fingerprint="f" * 64,
+        )
+        current = copy.deepcopy(previous)
+        current["candidate_frozen"] = True
+        current["task_head_sha"] = "b" * 40
+
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", POLICY)
+
+        current["review_fingerprint"] = "e" * 64
+        result = decide(previous, current, "observe", POLICY)
+        self.assertTrue(result.allowed)
+
+
+class DoneTerminalityTests(unittest.TestCase):
+    def test_previous_done_cannot_transition_back_to_running(self):
+        previous = snapshot(state="DONE", completion_verified=True)
+        current = snapshot(
+            state="RUNNING",
+            completion_verified=False,
+        )
+        result = decide(previous, current, "mutate", POLICY)
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "DONE")
+        self.assertTrue(result.release_session)
+
+    def test_previous_done_allows_observation_only(self):
+        previous = snapshot(state="DONE", completion_verified=True)
+        current = copy.deepcopy(previous)
+        observed = decide(previous, current, "observe", POLICY)
+        self.assertTrue(observed.allowed)
+        self.assertEqual(observed.state, "DONE")
+        self.assertTrue(observed.release_session)
+
+        completed = decide(previous, current, "complete", POLICY)
+        self.assertFalse(completed.allowed)
+        self.assertEqual(completed.state, "DONE")
         self.assertTrue(completed.release_session)
 
 

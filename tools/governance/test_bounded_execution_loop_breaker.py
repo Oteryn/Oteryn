@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 3678)
-Total output lines: 378
-
 import copy
 import json
 import sys
@@ -119,7 +116,171 @@ class PolicyContractTests(unittest.TestCase):
 
 class RetryScopeRegressionTests(unittest.TestCase):
     def test_exhausted_retry_without_previous_stays_stalled(self):
-        current = snapsho…1678 tokens truncated…edger()
+        current = snapshot(
+            state="RUNNING",
+            candidate_frozen=False,
+            gate_state="failure",
+            first_material_failure="same deterministic failure",
+            identical_failure_cycles=2,
+        )
+        result = decide(None, current, "retry", policy())
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "STALLED")
+
+    def test_external_review_counter_cannot_reset_on_unrelated_phase_change(self):
+        previous = snapshot(phase="repair", external_review_invocations=1)
+        current = copy.deepcopy(previous)
+        current["phase"] = "validate"
+        current["external_review_invocations"] = 0
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", policy())
+
+    def test_same_head_recheck_counter_cannot_reset_on_gate_change_same_evidence(self):
+        previous = snapshot(gate_state="failure", same_head_gate_rechecks=1)
+        current = copy.deepcopy(previous)
+        current["gate_state"] = "pending"
+        current["same_head_gate_rechecks"] = 0
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", policy())
+
+    def test_boolean_retry_counter_is_rejected(self):
+        current = snapshot(identical_failure_cycles=True)
+        with self.assertRaises(GuardError):
+            decide(None, current, "observe", policy())
+
+    def test_zero_retry_budget_still_allows_initial_attempt_before_failure(self):
+        zero = policy()
+        zero["retry_budgets"]["identical_failure_cycles"] = 0
+        current = snapshot(
+            state="RUNNING",
+            candidate_frozen=False,
+            identical_failure_cycles=0,
+            first_material_failure="",
+        )
+        result = decide(None, current, "retry", zero)
+        self.assertTrue(result.allowed)
+
+    def test_zero_retry_budget_blocks_retry_after_first_material_failure(self):
+        zero = policy()
+        zero["retry_budgets"]["identical_failure_cycles"] = 0
+        current = snapshot(
+            state="RUNNING",
+            candidate_frozen=False,
+            gate_state="failure",
+            identical_failure_cycles=0,
+            first_material_failure="deterministic failure",
+        )
+        result = decide(None, current, "retry", zero)
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "STALLED")
+
+
+class LoopBreakerRegressionTests(unittest.TestCase):
+    def test_done_retrigger_is_denied(self):
+        current = snapshot(
+            state="DONE",
+            completion_verified=True,
+            candidate_frozen=False,
+        )
+        result = decide(None, current, "retrigger", policy())
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "DONE")
+
+    def test_risk_ledger_is_not_required_before_loop_breaker_threshold(self):
+        current = snapshot(state="RUNNING", candidate_frozen=False)
+        current.pop("risk_ledger")
+        result = decide(None, current, "observe", policy())
+        self.assertTrue(result.allowed)
+
+    def test_risk_ledger_is_required_once_loop_breaker_threshold_is_reached(self):
+        current = snapshot(late_material_findings=2)
+        current.pop("risk_ledger")
+        with self.assertRaises(GuardError):
+            decide(None, current, "observe", policy())
+
+    def test_second_late_finding_blocks_final_review_until_fresh_audit(self):
+        current = snapshot(
+            late_material_findings=2,
+            audited_late_material_findings=0,
+        )
+        result = decide(None, current, "request_external_review", policy())
+        self.assertFalse(result.allowed)
+        self.assertIn("loop_breaker", result.reason.lower())
+
+    def test_second_post_freeze_head_change_blocks_heavy_final_validation(self):
+        current = snapshot(
+            post_freeze_material_head_changes=2,
+            audited_post_freeze_material_head_changes=0,
+        )
+        result = decide(None, current, "run_heavy_validation", policy())
+        self.assertFalse(result.allowed)
+        self.assertIn("loop_breaker", result.reason.lower())
+
+    def test_post_freeze_head_move_must_increment_head_change_counter(self):
+        previous = snapshot(
+            task_head_sha="a" * 40,
+            candidate_frozen=True,
+            post_freeze_material_head_changes=0,
+            material_change_reason="review_finding",
+            material_fact_id="d" * 64,
+            material_fact_head="a" * 40,
+            material_fact_verified=True,
+        )
+        current = snapshot(
+            task_head_sha="b" * 40,
+            candidate_frozen=False,
+            material_change=True,
+            material_change_reason="review_finding",
+            material_change_evidence="review-thread:3854512392",
+            material_fact_id="d" * 64,
+            material_fact_head="a" * 40,
+            material_fact_verified=True,
+            repair_generation_id="d" * 64,
+            repair_base_head="a" * 40,
+            post_freeze_material_head_changes=0,
+        )
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", policy())
+
+    def test_audited_counters_cannot_advance_outside_loop_breaker_phase(self):
+        previous = snapshot(
+            late_material_findings=2,
+            audited_late_material_findings=0,
+        )
+        current = copy.deepcopy(previous)
+        current["audited_late_material_findings"] = 2
+        with self.assertRaises(GuardError):
+            decide(previous, current, "observe", policy())
+
+    def test_not_applicable_risk_class_requires_reason(self):
+        ledger = clear_ledger()
+        ledger["transaction_persistence"] = {
+            "status": "NOT_APPLICABLE",
+            "reason": "",
+        }
+        current = snapshot(late_material_findings=2, risk_ledger=ledger)
+        with self.assertRaises(GuardError):
+            decide(None, current, "observe", policy())
+
+    def test_incomplete_risk_ledger_cannot_mark_audit_current(self):
+        current = snapshot(
+            late_material_findings=2,
+            audited_late_material_findings=2,
+            risk_ledger=pending_ledger("authority_relay"),
+        )
+        result = decide(None, current, "request_external_review", policy())
+        self.assertFalse(result.allowed)
+        self.assertIn("loop_breaker", result.reason.lower())
+
+    def test_loop_breaker_audit_may_advance_audited_counters_after_reopened_ledger(self):
+        previous = snapshot(
+            phase="LOOP_BREAKER_AUDIT",
+            late_material_findings=2,
+            audited_late_material_findings=0,
+            risk_ledger=pending_ledger(),
+        )
+        current = copy.deepcopy(previous)
+        current["risk_ledger"] = clear_ledger()
         current["audited_late_material_findings"] = 2
         result = decide(previous, current, "observe", policy())
         self.assertTrue(result.allowed)
