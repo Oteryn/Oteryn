@@ -207,7 +207,8 @@ def _verify_summary(*, summary_prefix: str | None = None,
                     review_comments: list[dict] | None = None,
                     extra_comments: list[dict] | None = None,
                     review_threads: list[dict] | None = None,
-                    tracker_issues: dict[int, dict] | None = None) -> dict:
+                    tracker_issues: dict[int, dict] | None = None,
+                    policy: dict | None = None) -> dict:
     repo, _, final = _v1.core_tests.make_repo()
     current = _v1.core_tests.issue_comment(
         10,
@@ -233,7 +234,7 @@ def _verify_summary(*, summary_prefix: str | None = None,
         kwargs["tracker_issues"] = tracker_issues
     return _v1.m.verify_records(
         [current, summary, *(extra_comments or [])],
-        policy=_policy(),
+        policy=_policy() if policy is None else policy,
         repo_root=repo,
         tier="R2",
         fingerprint=_v1.core_tests.ISSUE_FP,
@@ -277,6 +278,29 @@ def test_current_codex_summary_accepts_resolved_tracked_p2_without_reaction() ->
     assert found["review_source_kind"] == "issue_comment_result"
     assert found["review_outcome"] == "ACCEPTED_WITH_FOLLOW_UP"
     assert found["follow_up_issue_numbers"] == [114]
+
+
+def test_current_codex_summary_rejects_p2_from_unrequested_reviewer() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    fast_login = "codex-spark-reviewer[bot]"
+    policy = _policy()
+    policy["reviewer_source_logins"] = {
+        "codex": ["chatgpt-codex-connector[bot]"],
+        "codex_spark": [fast_login],
+    }
+    thread = _p2_thread()
+    thread["comments"]["nodes"][0]["author"]["login"] = fast_login
+
+    _v1.core_tests.expect_fail(lambda: _verify_summary(
+        reactions=[],
+        extra_reviews=[_p2_review(
+            final, login=fast_login, body=_codex_review_envelope(final),
+        )],
+        review_comments=[_p2_inline(login=fast_login)],
+        review_threads=[thread],
+        tracker_issues={114: _tracker_issue()},
+        policy=policy,
+    ))
 
 
 def test_current_codex_summary_accepts_64_bit_graphql_comment_identity() -> None:

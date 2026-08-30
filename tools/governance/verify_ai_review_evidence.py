@@ -762,15 +762,10 @@ def _normalize_current_codex_summary(
             matching_reactions.append(reaction)
     if len(matching_reactions) > 1:
         raise RuntimeError("current Codex summary has ambiguous trusted post-completion PR reactions")
-    p2_trusted_logins = {
-        str(login).casefold()
-        for values in policy.get("reviewer_source_logins", {}).values()
-        for login in values
-    }
     p2_follow_up = _accepted_p2_follow_up(
         comments=comments, reviews=reviews, review_comments=review_comments, review_threads=review_threads,
         tracker_issues=tracker_issues, policy=policy,
-        trusted_logins=p2_trusted_logins,
+        trusted_logins=trusted_logins,
         reviewed_head=reviewed_head,
         repository=repository,
         pr_number=pr_number,
