@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement a thin organization continuation layer that keeps owner-visible tasks durable across worker/session/tool/context boundaries while preserving `#69/#71` bounded-execution authority, `#102/#103` merge-integration authority, and provider-owned orchestration.
+**Goal:** Implement a thin organization continuation layer that keeps owner-visible tasks durable across worker/session/tool/context boundaries while preserving `#69/#71` bounded-execution authority, `#102/#103` merge-integration authority, provider-owned orchestration and explicit provider write-authority boundaries.
 
-**Architecture:** META will publish one versioned continuation policy plus deterministic validation for task/session/tool/wait/retry/context separation, executor selection, truthful resume mechanisms and checkpoint semantics. Game and Atlas will adopt the minimum by reference; Platform will map it into its existing Control Room/checkpoint model rather than creating a second schema.
+**Architecture:** META will publish one versioned continuation policy plus deterministic validation for task/session/tool/wait/retry/context separation, executor selection, truthful resume mechanisms and checkpoint semantics. Game and Atlas may adopt the minimum by reference only after explicit current-task owner authorization for that provider; Platform may map it into its existing Control Room/checkpoint model under the same authorization rule rather than creating a second schema.
 
 **Tech Stack:** Markdown governance contracts, JSON machine policy, Python deterministic validators/tests, GitHub Actions, provider root agent instructions and existing Platform agent tooling.
 
@@ -19,9 +19,11 @@
 - Do not create a second Platform Control Room/checkpoint schema; broader Platform schema-first migration remains owned by `Oteryn/Oteryn-Platform#1009`.
 - Effort and execution surface are independent; `high` effort alone must never require Work/Codex.
 - Automatic continuation may be claimed only when a real configured mechanism and concrete locator exist.
+- `rotate_resumable` is valid only with a worker-launching/preserving mechanism: `scheduled_task`, `work_event_trigger` or `work_persistent`; `same_session`, `github_native`, `owner_reinvoke` and `none_terminal` must fail closed for that disposition.
 - Worker/session, command, wait or context exhaustion alone must not terminate the owner-visible task.
 - Continuation must never reset canonical bounded-execution retry/evidence counters.
 - Frozen candidates must not receive empty/no-op/checkpoint/retrigger commits.
+- META write authority does not extend to Game, Platform or Atlas. Provider Issue/PR/design references do not confer write authority. Before any provider mutation in Tasks 5-7, the owner must explicitly authorize writes to that exact provider repository for the current task; absent authorization, only read-only preflight/reconciliation analysis is allowed.
 - No product runtime, deployment, production, credential, secret or live-data mutation is part of this rollout.
 - GitHub live state must be refreshed before every task; historical Issue/PR/SHA references in this plan are locators only.
 
@@ -39,7 +41,7 @@
 
 - [ ] **Step 1: Refresh the four authority lifecycles**
 
-Read current protected META `main`, Issues `#69`, `#104`, `#108`, `#102`, PRs `#71`, `#107`, `#109`, `#103`, their exact heads, draft/readiness state, review threads and required checks.
+Read current protected META `main`, Issues `#69`, `#104`, `#108`, `#102`, PRs `#71`, `#107`, `#110`, `#103`, their exact heads, draft/readiness state, review threads and required checks. Treat closed PR `#109` as transport-only predecessor provenance for `#110`.
 
 Expected: no hidden successor Issue/PR has taken ownership of the same semantics.
 
@@ -52,7 +54,7 @@ OWNER-APPROVED AUTHORITY SPLIT — 2026-08-30
 - #69/#71: sole bounded autonomous lifecycle / retries / freeze / LOOP_BREAKER_AUDIT
 - #104/#107: effort-aware routing, Remote Desktop exact-call binding, provider execution-policy drift only
 - #102/#103: candidate/integration head, review fingerprint, Merge Queue only
-- #108/#109: task-vs-worker/tool/wait/retry/context continuation, executor selection, checkpoint/resume/user-notification semantics only
+- #108/#110: task-vs-worker/tool/wait/retry/context continuation, executor selection, checkpoint/resume/user-notification semantics only
 No lineage may silently absorb another authority surface.
 ```
 
@@ -150,7 +152,7 @@ The machine policy must contain:
 }
 ```
 
-Add machine-readable invariants for the tests below; do not copy bounded retry numbers or bounded lifecycle state definitions into this file.
+Add machine-readable disposition/mechanism compatibility and the invariants for the tests below; do not copy bounded retry numbers or bounded lifecycle state definitions into this file.
 
 - [ ] **Step 4: Implement fail-closed policy loading and validation**
 
@@ -163,24 +165,36 @@ def validate_continuation_snapshot(policy: dict, snapshot: dict) -> None: ...
 def select_execution_surface(policy: dict, facts: dict) -> str: ...
 ```
 
-Reject unknown schema versions, missing authority references, duplicate vocabulary values, unknown dispositions/mechanisms/surfaces and malformed booleans/integers where the schema expects another type.
+Reject unknown schema versions, missing authority references, duplicate vocabulary values, unknown dispositions/mechanisms/surfaces, invalid disposition/mechanism pairings and malformed booleans/integers where the schema expects another type.
 
-- [ ] **Step 5: Add false-auto-resume tests**
+- [ ] **Step 5: Add fail-closed disposition/resume compatibility tests**
 
 Test these exact failures:
 
 ```python
-# rotate_resumable requires an automatic mechanism plus non-empty locator
+# rotate_resumable requires a worker-launching/preserving automatic mechanism plus non-empty locator
 {"worker_disposition": "rotate_resumable", "resume_mechanism": "owner_reinvoke", "resume_locator": None}
-
-# owner_reinvoke must be explicit stop, not resumable rotation
 {"worker_disposition": "rotate_resumable", "resume_mechanism": "owner_reinvoke", "resume_locator": "owner"}
+{"worker_disposition": "rotate_resumable", "resume_mechanism": "same_session", "resume_locator": "current"}
+{"worker_disposition": "rotate_resumable", "resume_mechanism": "github_native", "resume_locator": "workflow:ci"}
 
 # terminal task cannot advertise scheduled continuation
 {"worker_disposition": "terminal", "resume_mechanism": "scheduled_task", "resume_locator": "task-1"}
 ```
 
-Expected: all fail closed.
+Test these exact valid pairings:
+
+```python
+{"worker_disposition": "continue_current", "resume_mechanism": "same_session", "resume_locator": None}
+{"worker_disposition": "release_waiting", "resume_mechanism": "github_native", "resume_locator": "merge-queue:pr-123"}
+{"worker_disposition": "rotate_resumable", "resume_mechanism": "scheduled_task", "resume_locator": "scheduled-task:abc"}
+{"worker_disposition": "rotate_resumable", "resume_mechanism": "work_event_trigger", "resume_locator": "work-trigger:def"}
+{"worker_disposition": "rotate_resumable", "resume_mechanism": "work_persistent", "resume_locator": "work-task:ghi"}
+{"worker_disposition": "stop_reinvoke_required", "resume_mechanism": "owner_reinvoke", "resume_locator": None}
+{"worker_disposition": "terminal", "resume_mechanism": "none_terminal", "resume_locator": None}
+```
+
+For `release_waiting + github_native`, additionally require a fact such as `phase_can_complete_without_replacement_worker=true`; if later worker action is required and no worker-launching mechanism exists, fail closed to `stop_reinvoke_required` rather than claiming automatic worker continuation.
 
 - [ ] **Step 6: Add task-lifetime separation tests**
 
@@ -273,9 +287,11 @@ worker/session timeout != task timeout
 tool timeout != task timeout
 context rotation != task timeout
 automatic continuation requires a real configured mechanism
+rotate_resumable requires a worker-launching/preserving mechanism
+provider write authority must be explicitly authorized for the current task
 ```
 
-Also require explicit references to `Oteryn/Oteryn#69` and `Oteryn/Oteryn#102`.
+Also require explicit references to `Oteryn/Oteryn#69` and `Oteryn/Oteryn#102`, plus a disposition/mechanism compatibility table equivalent to the approved spec.
 
 - [ ] **Step 2: Run tests and prove RED**
 
@@ -292,10 +308,11 @@ Create `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` usin
 - six coordinates;
 - worker dispositions;
 - executor-selection order;
-- truthful resume mechanisms;
+- truthful resume mechanisms and the fail-closed disposition/mechanism compatibility matrix;
 - checkpoint semantic minimum;
 - context compaction/rotation;
 - user-notification semantics;
+- provider write-authority boundary: META coordination/design/provider Issue references never authorize provider mutation; explicit current-task owner authorization for the exact provider is required;
 - provider override rule: stricter local safety is allowed, but a local worker/invocation budget cannot silently become whole-task termination.
 
 - [ ] **Step 4: Bind the contract from root META instructions**
@@ -303,7 +320,7 @@ Create `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` usin
 Add a narrow paragraph to `AGENTS.md` after the bounded execution reference:
 
 ```text
-For long-lived task continuation, agents MUST also follow docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md and ecosystem/agent-continuation-policy.json. Task lifetime, worker/session lifetime, command timeout, external waiting, retry/no-progress and context pressure are separate coordinates. Chat is the default execution surface when current tools are sufficient; Work/Codex requires a capability reason. Automatic resume may be claimed only when a real configured continuation mechanism exists.
+For long-lived task continuation, agents MUST also follow docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md and ecosystem/agent-continuation-policy.json. Task lifetime, worker/session lifetime, command timeout, external waiting, retry/no-progress and context pressure are separate coordinates. Chat is the default execution surface when current tools are sufficient; Work/Codex requires a capability reason. Automatic resume may be claimed only when a real configured continuation mechanism exists. Cross-repository provider writes remain separately authorized per the existing META authority boundary.
 ```
 
 Do not alter the current effort-aware routing or Remote Desktop policy in this task.
@@ -343,9 +360,9 @@ git commit -m "docs(governance): publish persistent continuation contract"
 - Consumes: exact META candidate from Tasks 2/3.
 - Produces: protected-main canonical continuation policy and exact merge/readback identity.
 
-- [ ] **Step 1: Open or update the dedicated `#108` implementation PR**
+- [ ] **Step 1: Open the dedicated `#108` implementation PR after the design packet is terminal**
 
-Do not reuse another lifecycle's writable branch. If PR `#109` has already merged as the design packet, create a fresh implementation branch from current protected `main`; if repository policy explicitly converts `#109` into the implementation vehicle without overlapping writers, record that decision first.
+Do not reuse another lifecycle's writable branch. PR `#110` is the design/plan vehicle (with `#109` only its closed transport predecessor); after it is terminally merged/closed according to live policy and Task 1 prerequisites are satisfied, create a fresh implementation branch from current protected `main`. Do not silently convert the reviewed design branch into a canonical implementation writer.
 
 - [ ] **Step 2: Inspect the exact full diff**
 
@@ -371,28 +388,30 @@ Confirm the merged contract/policy/tests exist at the resulting exact `main` SHA
 
 ### Task 5: Reconcile and adopt Game continuation semantics
 
-**Prerequisite:** Task 4 protected-main readback PASS.
+**Prerequisite:** Task 4 protected-main readback PASS. Read-only Game preflight is permitted from the META task, but **no Game mutation may begin until the owner explicitly authorizes writes to `Oteryn/Oteryn-Game` for the current adoption task**. Issue `Oteryn/Oteryn-Game#148`, existing PRs, META design text and tool access do not satisfy this authorization gate.
 
 **Files:**
-- Modify: `Oteryn/Oteryn-Game:AGENTS.md`
+- Modify only after authorization: `Oteryn/Oteryn-Game:AGENTS.md`
 - Reconcile existing provider PR/Issue lineage: `Oteryn/Oteryn-Game#148`, existing stale/superseded bounded-execution PRs such as `#150` if still open.
 - Test: repository-selected Agent governance / policy validation on the exact final head.
 
 **Interfaces:**
-- Consumes: exact merged META continuation policy/version and exact merged bounded-execution authority.
+- Consumes: exact merged META continuation policy/version, exact merged bounded-execution authority, and explicit current-task Game write authorization.
 - Produces: Game root policy that adopts both by reference and no longer contains stale `parallel-first`, superseded `#72/#73`, or session-limit-as-task-limit semantics.
 
-- [ ] **Step 1: Refresh Game live state and root ownership**
+- [ ] **Step 1: Refresh Game live state and verify the authorization gate**
 
-Verify current `main`, root `AGENTS.md`, Issue `#148`, stale provider PRs, current execution-policy adoption and any newer root-policy owner.
+Verify current `main`, root `AGENTS.md`, Issue `#148`, stale provider PRs, current execution-policy adoption and any newer root-policy owner. Separately verify explicit owner authorization naming `Oteryn/Oteryn-Game` for this current adoption task before creating/updating branches, files, commits, PRs or other provider state.
+
+Expected if authorization is absent: record `OWNER_PERMISSION_REQUIRED` for provider mutation, preserve read-only findings, perform no Game write and do not infer authority from `#148` or META.
 
 - [ ] **Step 2: Do not merge historical `#72/#73` provider lineage as-is**
 
-If PR `#150` or a successor still depends on `#73`, reconcile/close/supersede it through the provider lifecycle rather than layering another root writer on top.
+If PR `#150` or a successor still depends on `#73`, reconcile/close/supersede it through the provider lifecycle only after the provider write-authorization gate is satisfied; otherwise leave provider state read-only and record the required action.
 
 - [ ] **Step 3: Write the minimal root adoption**
 
-Root instructions must state:
+After authorization, root instructions must state:
 
 ```text
 - adopt canonical META bounded execution by current protected-main reference;
@@ -415,43 +434,49 @@ Use current Game protected merge authority and record exact resulting `main` SHA
 
 ### Task 6: Map continuation into Platform Control Room without a second schema
 
-**Prerequisite:** Task 4 protected-main readback PASS and live ownership reconciliation with Platform `#1009/#1266` plus any current root-policy PR such as `#1270`.
+**Prerequisite:** Task 4 protected-main readback PASS and live ownership reconciliation with Platform `#1009/#1266` plus any current root-policy PR such as `#1270`. Read-only Platform preflight is permitted from the META task, but **no Platform mutation may begin until the owner explicitly authorizes writes to `Oteryn/Oteryn-Platform` for the current adoption task**. Provider Issues/PRs and META references do not satisfy this gate.
 
 **Files:**
-- Modify: `Oteryn/Oteryn-Platform:docs/agents/EXECUTION_PROTOCOL.md`
-- Modify: `Oteryn/Oteryn-Platform:docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md`
-- Modify: `Oteryn/Oteryn-Platform:docs/agents/GOVERNANCE_CONTRACT.json`
-- Modify: `Oteryn/Oteryn-Platform:tools/agents/checkpoint.py`
-- Modify: `Oteryn/Oteryn-Platform:tools/agents/resume.py`
-- Modify only if required for rendering/classification: `Oteryn/Oteryn-Platform:tools/agents/control_room.py`
+- Modify only after authorization: `Oteryn/Oteryn-Platform:docs/agents/EXECUTION_PROTOCOL.md`
+- Modify only after authorization: `Oteryn/Oteryn-Platform:docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md`
+- Modify only after authorization: `Oteryn/Oteryn-Platform:docs/agents/GOVERNANCE_CONTRACT.json`
+- Modify only after authorization: `Oteryn/Oteryn-Platform:tools/agents/checkpoint.py`
+- Modify only after authorization: `Oteryn/Oteryn-Platform:tools/agents/resume.py`
+- Modify only if required for rendering/classification and authorized: `Oteryn/Oteryn-Platform:tools/agents/control_room.py`
 - Test: current checkpoint/resume/control-room policy suites discovered from protected `main`.
 
 **Interfaces:**
-- Consumes: META continuation semantic minimum.
+- Consumes: META continuation semantic minimum and explicit current-task Platform write authorization.
 - Produces: additive Platform mapping; no new Platform orchestration schema.
 
-- [ ] **Step 1: Write failing checkpoint/resume tests**
+- [ ] **Step 1: Refresh Platform live state and verify the authorization gate**
 
-Require additive continuation fields or derived values that represent:
+Verify current `main`, the live `#1009/#1266` ownership surfaces, active root-policy PRs and exact checkpoint/resume schema owner. Separately verify explicit owner authorization naming `Oteryn/Oteryn-Platform` for this current adoption task before any provider mutation.
+
+Expected if authorization is absent: record `OWNER_PERMISSION_REQUIRED`, preserve read-only reconciliation findings and perform no Platform write.
+
+- [ ] **Step 2: Write failing checkpoint/resume tests**
+
+After authorization, require additive continuation fields or derived values that represent:
 
 ```yaml
 worker_disposition: continue_current | release_waiting | rotate_resumable | stop_reinvoke_required | terminal
 resume_mechanism: same_session | github_native | scheduled_task | work_event_trigger | work_persistent | owner_reinvoke | none_terminal
-resume_locator: <non-empty only when an automatic mechanism requires it>
+resume_locator: <required for worker-launching/preserving automatic rotation; otherwise per compatibility matrix>
 context_pressure: <existing Platform classification>
 ```
 
-Do not change the existing canonical task-status vocabulary merely to mirror META names.
+Do not change the existing canonical task-status vocabulary merely to mirror META names. Require the same fail-closed compatibility matrix as META, including rejection of `rotate_resumable + same_session` and `rotate_resumable + github_native`.
 
-- [ ] **Step 2: Prove RED**
+- [ ] **Step 3: Prove RED**
 
 Run the exact existing Platform checkpoint/resume tests plus the new cases. Expected new cases fail before implementation.
 
-- [ ] **Step 3: Add additive contract semantics**
+- [ ] **Step 4: Add additive contract semantics**
 
 Extend `GOVERNANCE_CONTRACT.json` only in a backward-compatible way if the fields can be additive. If the live `#1009` schema-first owner has already moved these values to a different canonical machine surface, update that surface instead and do not duplicate it.
 
-- [ ] **Step 4: Map Platform foreground budgets correctly**
+- [ ] **Step 5: Map Platform foreground budgets correctly**
 
 Update `ANTI_STALL_AND_EXECUTION_BUDGET.md` to say explicitly:
 
@@ -461,19 +486,19 @@ normal/large foreground runtime, command timeout, terminal-CI wait and context-r
 
 Preserve all existing numeric limits unless a separate owner-approved Platform task changes them.
 
-- [ ] **Step 5: Update checkpoint/resume implementation**
+- [ ] **Step 6: Update checkpoint/resume implementation**
 
-Make `checkpoint.py` and `resume.py` validate truthful resume disposition without changing existing liveness/security behavior. `rotate_resumable` must fail closed without a supported mechanism/locator; `owner_reinvoke` must not render as automatic continuation.
+Make `checkpoint.py` and `resume.py` validate truthful resume disposition without changing existing liveness/security behavior. `rotate_resumable` must fail closed unless its mechanism is exactly `scheduled_task`, `work_event_trigger` or `work_persistent` with the required concrete locator; `same_session` and `github_native` must not qualify rotation. `owner_reinvoke` must not render as automatic continuation.
 
-- [ ] **Step 6: Update Control Room only if needed**
+- [ ] **Step 7: Update Control Room only if needed**
 
 If `control_room.py` already exposes enough checkpoint information, do not modify it. If it needs a small additive display field, add only worker disposition/resume mechanism; do not add a second scheduler.
 
-- [ ] **Step 7: Run Platform governance validation**
+- [ ] **Step 8: Run Platform governance validation**
 
 Run the live exact-head Agent Governance / CI and the focused checkpoint/resume/control-room tests. Runtime/browser E2E is `NOT_APPLICABLE` only if the live classifier and repository rules agree.
 
-- [ ] **Step 8: Merge and verify Platform protected main**
+- [ ] **Step 9: Merge and verify Platform protected main**
 
 Record exact merged `main` and verify `platform-gate` plus required governance checks.
 
@@ -481,28 +506,30 @@ Record exact merged `main` and verify `platform-gate` plus required governance c
 
 ### Task 7: Reconcile and adopt Atlas continuation semantics
 
-**Prerequisite:** Task 4 protected-main readback PASS.
+**Prerequisite:** Task 4 protected-main readback PASS. Read-only Atlas preflight is permitted from the META task, but **no Atlas mutation may begin until the owner explicitly authorizes writes to `Oteryn/Oteryn-Atlas` for the current adoption task**. Issue `Oteryn/Oteryn-Atlas#176`, existing PRs, META design text and tool access do not satisfy this authorization gate.
 
 **Files:**
-- Modify: `Oteryn/Oteryn-Atlas:AGENTS.md`
+- Modify only after authorization: `Oteryn/Oteryn-Atlas:AGENTS.md`
 - Reconcile existing provider lineage: `Oteryn/Oteryn-Atlas#176` and stale/superseded provider PRs such as `#182` if still open.
 - Test: live Atlas governance/merge gates selected for the exact final diff.
 
 **Interfaces:**
-- Consumes: exact protected META continuation and bounded-execution authorities.
+- Consumes: exact protected META continuation and bounded-execution authorities, plus explicit current-task Atlas write authorization.
 - Produces: Atlas root adoption without weakening exact-head/provenance/E2E/specialist execution rules.
 
-- [ ] **Step 1: Refresh Atlas root ownership and live gate classification**
+- [ ] **Step 1: Refresh Atlas root ownership, gate classification and authorization**
 
-Check current `main`, root `AGENTS.md`, Issue `#176`, stale provider PRs and active Atlas verification-policy owners.
+Check current `main`, root `AGENTS.md`, Issue `#176`, stale provider PRs and active Atlas verification-policy owners. Separately verify explicit owner authorization naming `Oteryn/Oteryn-Atlas` for this current adoption task before any provider mutation.
+
+Expected if authorization is absent: record `OWNER_PERMISSION_REQUIRED`, preserve read-only findings and perform no Atlas write.
 
 - [ ] **Step 2: Remove superseded lineage dependence**
 
-Do not terminally merge an existing provider PR whose dependency still says `#72/#73` is canonical. Reconcile or supersede it first.
+After authorization, do not terminally merge an existing provider PR whose dependency still says `#72/#73` is canonical. Reconcile or supersede it first.
 
 - [ ] **Step 3: Add the minimal root adoption**
 
-State that worker/session/tool/context boundaries do not themselves terminate Atlas tasks, Chat-first selection applies when current tools suffice, automatic continuation must be real, and all Atlas verification/provenance rules remain controlling.
+After authorization, state that worker/session/tool/context boundaries do not themselves terminate Atlas tasks, Chat-first selection applies when current tools suffice, automatic continuation must be real, and all Atlas verification/provenance rules remain controlling.
 
 - [ ] **Step 4: Run the live exact-head Atlas gate**
 
@@ -536,8 +563,11 @@ Add provider fixtures that fail for:
 - stale parallel-first / serial-exception requirement where current META is effort-aware;
 - provider statement that a local foreground/session/command/context limit terminates the whole task;
 - provider statement that owner_reinvoke is automatic continuation;
+- provider statement that same_session or github_native alone qualifies rotate_resumable;
 - provider missing the protected META continuation policy reference/version after adoption.
 ```
+
+Do not attempt to persist ephemeral per-task provider write authorization in desired-state policy; authorization must instead be verified at the provider mutation boundary by the executing task.
 
 - [ ] **Step 2: Prove RED**
 

@@ -1,8 +1,8 @@
 # Chat-first Persistent Autonomy Design
 
-**Status:** owner-approved design for `Oteryn/Oteryn#108`; implementation is not canonical until the applicable META and provider changes merge to protected `main`.
+**Status:** owner-approved design for `Oteryn/Oteryn#108`; implementation is not canonical until the applicable META and separately authorized provider changes merge to protected `main`.
 
-**Delivery PR:** `Oteryn/Oteryn#109`
+**Delivery PR:** `Oteryn/Oteryn#110` (supersedes closed unmerged transport PR `#109` with the same original candidate lineage)
 
 **Approved:** 2026-08-30
 
@@ -44,6 +44,7 @@ The following ownership split was verified from GitHub live state before this de
 - Platform adoption is tracked by `Oteryn/Oteryn-Platform#1266`; Platform already owns a mature Control Room, checkpoint, session-rotation and anti-stall model.
 - Platform `#1009` owns schema-first governance refactoring. `#108` must not create a competing Platform schema or orchestration database.
 - Atlas adoption is tracked by `Oteryn/Oteryn-Atlas#176` and must follow the eventual canonical META execution contract.
+- META coordination, this design, and provider Issue/PR references do **not** confer product-repository write authority. Game, Platform and Atlas remain read-only from a META task until the owner explicitly authorizes writes to that exact provider repository for the current task. Provider adoption must fail closed before mutation when that authorization is absent.
 
 ## Problem statement
 
@@ -71,7 +72,7 @@ The design must ensure that:
 - Work/Codex is selected only when its unique persistent, cloud-browser, event-triggered or software-development capabilities materially justify shared agentic usage;
 - durable GitHub/repository state is sufficient for a later worker to resume without reconstructing the full prior chat;
 - automatic continuation is claimed only when a real configured continuation mechanism exists;
-- provider repositories can adopt the organization minimum without losing stronger local controls.
+- provider repositories can adopt the organization minimum without losing stronger local controls and only under explicit current-task write authorization for that provider.
 
 ## Non-goals
 
@@ -82,6 +83,7 @@ This design does not:
 - establish a universal Chat, Work or Codex wall-clock timeout;
 - make Work mandatory for high-effort tasks;
 - create a second Platform Control Room, checkpoint schema or schema-first governance project;
+- grant or infer cross-repository provider write authority;
 - authorize production, deployment, secret, credential, data or live-system mutation;
 - claim that repository policy can override a hard product/tool limit.
 
@@ -112,7 +114,7 @@ The continuation layer uses worker disposition as an orthogonal attribute, not a
 
 - `continue_current` — useful authorized work remains and the current worker can safely continue;
 - `release_waiting` — the task is `WAITING_EXTERNAL`, `BLOCKED`, `STALLED` or otherwise has no justified active mutating worker;
-- `rotate_resumable` — a new worker/session should resume the same task from durable state and a real automatic resume mechanism exists;
+- `rotate_resumable` — a new worker/session should resume the same task from durable state and a real worker-launching/preserving automatic resume mechanism exists;
 - `stop_reinvoke_required` — the current execution cannot continue automatically; durable state is complete and owner re-invocation is required;
 - `terminal` — the canonical task lifecycle is terminal.
 
@@ -218,17 +220,29 @@ A worker may claim automatic continuation only when a real mechanism is configur
 
 The organization recognizes these continuation mechanism classes:
 
-- `same_session` — the current worker continues immediately;
-- `github_native` — GitHub Actions, Merge Queue or another repository-native event progresses the control plane without an active worker;
-- `scheduled_task` — an enabled ChatGPT scheduled/monitoring task will perform the configured later check/action;
-- `work_event_trigger` — an enabled Work event-triggered task will respond to a supported connected-app event;
-- `work_persistent` — an active Work cloud task or other supported persistent Work execution continues independently;
+- `same_session` — the current worker continues immediately; it does not launch or preserve a replacement worker;
+- `github_native` — GitHub Actions, Merge Queue or another repository-native event progresses the control plane without an active worker; it does not by itself launch a replacement agent worker;
+- `scheduled_task` — an enabled ChatGPT scheduled/monitoring task will perform the configured later check/action and therefore can launch a later worker execution;
+- `work_event_trigger` — an enabled Work event-triggered task will respond to a supported connected-app event and therefore can launch a later worker execution;
+- `work_persistent` — an active Work cloud task or other supported persistent Work execution continues independently and preserves worker execution;
 - `owner_reinvoke` — no automatic mechanism exists; a future owner invocation is required;
 - `none_terminal` — the canonical task lifecycle is terminal.
 
-A checkpoint that records `rotate_resumable` must identify one of the real automatic mechanisms above other than `owner_reinvoke`/`none_terminal` and include the concrete task/workflow/trigger locator required to re-establish it.
+Disposition/mechanism compatibility is fail-closed:
 
-If no such mechanism exists, use `stop_reinvoke_required`. Never imply that regular Chat will silently create a new foreground turn after the current response ends.
+| Worker disposition | Allowed resume mechanism(s) | Meaning |
+| --- | --- | --- |
+| `continue_current` | `same_session` | The current worker continues now; no rotation is claimed. |
+| `release_waiting` | `github_native`, `scheduled_task`, `work_event_trigger`, `work_persistent` | The active mutating worker is released while an external/control-plane or worker-capable mechanism remains active. `github_native` alone may be used only when control-plane progression can complete the current phase without requiring an automatically launched replacement worker. |
+| `rotate_resumable` | `scheduled_task`, `work_event_trigger`, `work_persistent` | A replacement/persistent worker execution is actually configured; a concrete locator is mandatory. |
+| `stop_reinvoke_required` | `owner_reinvoke` | No automatic worker continuation exists; owner re-invocation is required and must be reported truthfully. |
+| `terminal` | `none_terminal` | The canonical task lifecycle is terminal. |
+
+`rotate_resumable` is invalid with `same_session` because no rotation occurs, and invalid with `github_native` because repository-native control-plane progress alone does not launch a replacement agent worker. It is also invalid with `owner_reinvoke` or `none_terminal`.
+
+A checkpoint that records `rotate_resumable` must identify one of `scheduled_task`, `work_event_trigger` or `work_persistent` and include the concrete task/workflow/trigger locator required to re-establish it.
+
+If no worker-launching/preserving automatic mechanism exists when replacement worker action will be required, use `stop_reinvoke_required`. Never imply that regular Chat or GitHub-native control-plane progress will silently create a new foreground worker turn after the current response ends.
 
 ## Durable checkpoint semantic minimum
 
@@ -287,7 +301,7 @@ Do not interrupt solely because of:
 Notify the owner when:
 
 - the task is verified `DONE`;
-- a concrete owner decision or permission is required;
+- a concrete owner decision or permission is required, including missing cross-repository write authorization before a provider mutation;
 - a safety/protected/irreversible approval is required;
 - terminal `STALLED` is reached after bounded recovery;
 - execution is stopping and no real automatic continuation mechanism exists, so `owner_reinvoke` is required.
@@ -307,17 +321,21 @@ When Merge Queue is not yet canonical, the existing repository integration polic
 
 ## Provider adoption model
 
+Provider adoption is a separate write-authority boundary. Protected META policy being canonical is necessary but never sufficient authorization to mutate a product repository. Before any provider write, the executing task must hold explicit owner authorization naming that provider repository for the current task. Provider Issues, PRs, dependency links, manifests or META coordination text are evidence/routing only and cannot confer that authority.
+
 ### META
 
 META owns the organization continuation semantics and deterministic validator. The new contract references canonical bounded-execution and merge-integration authorities rather than copying them.
 
 ### Game
 
-Game adopts the organization continuation minimum by reference in its root/agent-governance surfaces after the canonical META dependencies are protected-main verified. The adoption must remove stale claims that a worker/session stop automatically terminates the task and must preserve Game-specific review/merge/security rules.
+After canonical META dependencies are protected-main verified **and** the owner explicitly authorizes `Oteryn/Oteryn-Game` writes for the current adoption task, Game may adopt the organization continuation minimum by reference in its root/agent-governance surfaces. The adoption must remove stale claims that a worker/session stop automatically terminates the task and must preserve Game-specific review/merge/security rules.
 
-Existing provider PRs that depend on the superseded `#72/#73` lineage must be reconciled rather than independently merged.
+Existing provider PRs that depend on the superseded `#72/#73` lineage must be reconciled rather than independently merged. Without current-task Game write authorization, only read-only preflight/reconciliation analysis is permitted.
 
 ### Platform
+
+After canonical META dependencies are protected-main verified **and** the owner explicitly authorizes `Oteryn/Oteryn-Platform` writes for the current adoption task, Platform maps the organization minimum into its existing model. Without that authorization, only read-only preflight/reconciliation analysis is permitted.
 
 Platform keeps its existing `EXECUTION_PROTOCOL.md`, `ANTI_STALL_AND_EXECUTION_BUDGET.md`, `PROJECT_LANES.json`, `GOVERNANCE_CONTRACT.json` and Control Room.
 
@@ -334,7 +352,7 @@ Broader schema-first restructuring remains owned by Platform `#1009`.
 
 ### Atlas
 
-Atlas adopts the organization continuation minimum through its provider-owned governance/test-execution surfaces after canonical META dependencies are protected-main verified. The adoption must not weaken Atlas exact-head, provenance, hosted-E2E or specialist-capability gates.
+After canonical META dependencies are protected-main verified **and** the owner explicitly authorizes `Oteryn/Oteryn-Atlas` writes for the current adoption task, Atlas may adopt the organization continuation minimum through its provider-owned governance/test-execution surfaces. Without that authorization, only read-only preflight/reconciliation analysis is permitted. The adoption must not weaken Atlas exact-head, provenance, hosted-E2E or specialist-capability gates.
 
 ## Deterministic validation and drift strategy
 
@@ -342,13 +360,15 @@ The META implementation should provide a versioned machine policy and validator 
 
 1. task lifetime is distinct from worker/session, command, wait, retry and context coordinates;
 2. a worker/session timeout, command timeout or context rotation alone cannot produce task `DONE`;
-3. `rotate_resumable` requires a real automatic resume mechanism and concrete locator;
-4. `owner_reinvoke` cannot be presented as automatic continuation;
-5. continuation does not reset canonical retry/no-progress counters;
-6. frozen candidates cannot use checkpoint/retrigger commits as a continuation mechanism;
-7. Work selection requires a capability reason rather than effort alone;
-8. provider mapping may be stricter but cannot weaken organization task-lifetime truthfulness or bounded-execution safety;
-9. the continuation contract does not redefine bounded lifecycle states or Merge Queue/review-fingerprint semantics.
+3. worker disposition and resume mechanism obey the fail-closed compatibility matrix;
+4. `rotate_resumable` is allowed only with `scheduled_task`, `work_event_trigger` or `work_persistent` plus a concrete locator; `same_session` and `github_native` cannot qualify it;
+5. `owner_reinvoke` cannot be presented as automatic continuation;
+6. continuation does not reset canonical retry/no-progress counters;
+7. frozen candidates cannot use checkpoint/retrigger commits as a continuation mechanism;
+8. Work selection requires a capability reason rather than effort alone;
+9. provider mapping may be stricter but cannot weaken organization task-lifetime truthfulness or bounded-execution safety;
+10. provider write adoption cannot be inferred from META policy/Issue/PR references and must be separately authorized for the current task;
+11. the continuation contract does not redefine bounded lifecycle states or Merge Queue/review-fingerprint semantics.
 
 After provider adoption, organization live-state drift audit should check the protected-main provider contracts for stale incompatible wording and the expected META policy reference/version without attempting to parse arbitrary prose as the primary authority.
 
@@ -381,7 +401,7 @@ No universal public wall-clock maximum such as `Chat = N minutes` or `Work = N h
 3. Complete and protected-main verify canonical bounded-execution authority before provider continuation adoption treats those semantics as stable.
 4. Implement the thin META continuation contract and deterministic tests without importing Merge Queue or provider-specific orchestration.
 5. Reconcile `#102/#103` integration semantics by reference; do not make `#108` a merge authority.
-6. Adopt the continuation minimum in Game, Platform and Atlas through provider-owned branches/PRs, with Platform mapping into its existing Control Room/checkpoint model.
+6. For each provider independently, obtain explicit owner authorization naming that provider repository for the current adoption task; only then adopt the continuation minimum through the provider-owned branch/PR. Platform maps into its existing Control Room/checkpoint model.
 7. Add provider/live-state drift validation after protected provider adoption exists.
 8. Close `#108` only after protected-main META/provider readback proves the organization contract is consistently adopted or the Issue's final scope is explicitly reduced by owner decision.
 
@@ -393,11 +413,11 @@ This programme is complete when all of the following are true:
 - `#107` does not establish a competing bounded lifecycle;
 - `#102/#103` remains the sole merge-integration/review-fingerprint authority;
 - META has one thin, versioned continuation contract covering task/session/tool/wait/retry/context separation and execution-surface/resume semantics;
-- deterministic tests reject false automatic-resume claims and local-limit-as-task-limit behavior;
-- Game and Atlas consume the META minimum without product/runtime changes;
-- Platform maps the minimum into its existing Control Room/checkpoint system without a second orchestration schema;
+- deterministic tests reject false automatic-resume claims, including `rotate_resumable` paired with `same_session` or `github_native`, and local-limit-as-task-limit behavior;
+- Game and Atlas consume the META minimum without product/runtime changes and only under explicit current-task provider write authorization;
+- Platform maps the minimum into its existing Control Room/checkpoint system without a second orchestration schema and only under explicit current-task provider write authorization;
 - provider-specific foreground/command budgets remain worker/invocation limits rather than whole-task lifetime limits;
 - Work/Codex is selected by capability need, not effort label alone;
 - no-op/retrigger commits remain forbidden;
-- user notification is limited to terminal completion, real decision/approval blockers, terminal stall, or truthful re-invocation requirement;
+- user notification is limited to terminal completion, real decision/approval blockers (including missing provider write authority), terminal stall, or truthful re-invocation requirement;
 - protected-main readback and applicable deterministic/provider gates confirm the final state.
