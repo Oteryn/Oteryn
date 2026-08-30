@@ -1,9 +1,9 @@
 """Durable compare-and-swap checkpoints and idempotent dispatch reservations.
 
 The bounded-execution guard deliberately does not treat fields supplied in an
-execution snapshot as a transaction proof.  A caller that wants to execute a
+execution snapshot as a transaction proof. A caller that wants to execute a
 consuming or security-sensitive action must supply an adapter backed by a
-durable store.  This module provides the small protocol the guard needs and a
+durable store. This module provides the small protocol the guard needs and a
 SQLite reference implementation suitable for a control-plane service.
 """
 
@@ -15,7 +15,7 @@ import json
 import sqlite3
 from contextlib import closing
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 
 @dataclasses.dataclass(frozen=True)
@@ -27,8 +27,16 @@ class Reservation:
     reason: str
 
 
+@dataclasses.dataclass(frozen=True)
+class CheckpointRecord:
+    """Recoverable durable checkpoint returned to a takeover worker."""
+
+    checkpoint: str
+    snapshot: dict[str, Any]
+
+
 class CheckpointOutboxAdapter(Protocol):
-    """Atomically advance a checkpoint and create one dispatch reservation."""
+    """Atomically advance recoverable checkpoints and dispatch reservations."""
 
     def reserve(
         self,
@@ -37,6 +45,7 @@ class CheckpointOutboxAdapter(Protocol):
         task_id: str,
         expected_checkpoint: str | None,
         next_checkpoint: str,
+        next_snapshot: dict[str, Any],
         action: str,
         scope: tuple[str, ...],
     ) -> Reservation: ...
@@ -48,11 +57,31 @@ class CheckpointOutboxAdapter(Protocol):
         task_id: str,
         expected_checkpoint: str | None,
         next_checkpoint: str,
+        next_snapshot: dict[str, Any],
         reason: str,
         scope: tuple[str, ...],
     ) -> Reservation: ...
 
+    def load_checkpoint(self, repository: str, task_id: str) -> CheckpointRecord | None: ...
+
     def claim_dispatch(self, reservation_key: str) -> bool: ...
+
+
+def _canonical_snapshot(snapshot: dict[str, Any]) -> str:
+    if not isinstance(snapshot, dict):
+        raise ValueError("checkpoint snapshot must be an object")
+    return json.dumps(snapshot, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def _snapshot_digest(snapshot_json: str) -> str:
+    return hashlib.sha256(snapshot_json.encode("utf-8")).hexdigest()
+
+
+def _validated_snapshot_payload(snapshot: dict[str, Any], expected_digest: str) -> str:
+    payload = _canonical_snapshot(snapshot)
+    if _snapshot_digest(payload) != expected_digest:
+        raise ValueError("checkpoint digest does not match canonical snapshot")
+    return payload
 
 
 def _reservation_key(
@@ -78,10 +107,9 @@ def _reservation_key(
 class SqliteCheckpointOutbox:
     """SQLite durable adapter with atomic CAS and a unique dispatch outbox.
 
-    A control plane seeds a trusted checkpoint before operating an existing
-    task.  A first checkpoint (``expected_checkpoint is None``) is also
-    supported for a new task.  Replays return the same deterministic key but
-    never grant another dispatch claim.
+    Every committed checkpoint stores both its canonical digest and serialized
+    snapshot. A takeover can therefore reconstruct the exact durable state.
+    Legacy digest-only rows fail closed through ``load_checkpoint``.
     """
 
     def __init__(self, path: str | Path):
@@ -101,10 +129,21 @@ class SqliteCheckpointOutbox:
                     repository TEXT NOT NULL,
                     task_id TEXT NOT NULL,
                     checkpoint TEXT NOT NULL,
+                    snapshot_json TEXT,
                     PRIMARY KEY (repository, task_id)
                 )
                 """
             )
+            columns = {
+                row[1]
+                for row in connection.execute(
+                    "PRAGMA table_info(bounded_execution_checkpoint)"
+                ).fetchall()
+            }
+            if "snapshot_json" not in columns:
+                connection.execute(
+                    "ALTER TABLE bounded_execution_checkpoint ADD COLUMN snapshot_json TEXT"
+                )
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS bounded_execution_outbox (
@@ -117,21 +156,76 @@ class SqliteCheckpointOutbox:
                 """
             )
 
-    def seed_checkpoint(self, repository: str, task_id: str, checkpoint: str) -> None:
-        """Install a control-plane checkpoint for a task before its first CAS.
+    def seed_checkpoint(
+        self,
+        repository: str,
+        task_id: str,
+        checkpoint: str,
+        *,
+        snapshot: dict[str, Any],
+    ) -> None:
+        """Install one recoverable trusted checkpoint; replacement is forbidden."""
 
-        The operation intentionally refuses replacement: reseeding would erase
-        the very CAS lineage this adapter protects.
-        """
-
+        snapshot_json = _validated_snapshot_payload(snapshot, checkpoint)
         with closing(self._connect()) as connection:
             try:
                 connection.execute(
-                    "INSERT INTO bounded_execution_checkpoint(repository, task_id, checkpoint) VALUES (?, ?, ?)",
-                    (repository, task_id, checkpoint),
+                    """
+                    INSERT INTO bounded_execution_checkpoint(
+                        repository, task_id, checkpoint, snapshot_json
+                    ) VALUES (?, ?, ?, ?)
+                    """,
+                    (repository, task_id, checkpoint, snapshot_json),
                 )
             except sqlite3.IntegrityError as error:
                 raise ValueError("checkpoint already exists; reseeding is forbidden") from error
+
+    def _advance_checkpoint(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        repository: str,
+        task_id: str,
+        expected_checkpoint: str | None,
+        next_checkpoint: str,
+        snapshot_json: str,
+    ) -> bool:
+        row = connection.execute(
+            """
+            SELECT checkpoint
+            FROM bounded_execution_checkpoint
+            WHERE repository = ? AND task_id = ?
+            """,
+            (repository, task_id),
+        ).fetchone()
+        actual = row[0] if row is not None else None
+        if actual != expected_checkpoint:
+            return False
+        if row is None:
+            connection.execute(
+                """
+                INSERT INTO bounded_execution_checkpoint(
+                    repository, task_id, checkpoint, snapshot_json
+                ) VALUES (?, ?, ?, ?)
+                """,
+                (repository, task_id, next_checkpoint, snapshot_json),
+            )
+            return True
+        updated = connection.execute(
+            """
+            UPDATE bounded_execution_checkpoint
+            SET checkpoint = ?, snapshot_json = ?
+            WHERE repository = ? AND task_id = ? AND checkpoint = ?
+            """,
+            (
+                next_checkpoint,
+                snapshot_json,
+                repository,
+                task_id,
+                expected_checkpoint,
+            ),
+        )
+        return updated.rowcount == 1
 
     def reserve(
         self,
@@ -140,9 +234,11 @@ class SqliteCheckpointOutbox:
         task_id: str,
         expected_checkpoint: str | None,
         next_checkpoint: str,
+        next_snapshot: dict[str, Any],
         action: str,
         scope: tuple[str, ...],
     ) -> Reservation:
+        snapshot_json = _validated_snapshot_payload(next_snapshot, next_checkpoint)
         key = _reservation_key(
             repository,
             task_id,
@@ -160,38 +256,21 @@ class SqliteCheckpointOutbox:
             if replay is not None:
                 connection.execute("ROLLBACK")
                 return Reservation(False, key, "reservation_replay")
-
-            row = connection.execute(
-                "SELECT checkpoint FROM bounded_execution_checkpoint WHERE repository = ? AND task_id = ?",
-                (repository, task_id),
-            ).fetchone()
-            actual = row[0] if row is not None else None
-            if actual != expected_checkpoint:
+            if not self._advance_checkpoint(
+                connection,
+                repository=repository,
+                task_id=task_id,
+                expected_checkpoint=expected_checkpoint,
+                next_checkpoint=next_checkpoint,
+                snapshot_json=snapshot_json,
+            ):
                 connection.execute("ROLLBACK")
                 return Reservation(False, key, "checkpoint_cas_conflict")
-
-            if row is None:
-                connection.execute(
-                    "INSERT INTO bounded_execution_checkpoint(repository, task_id, checkpoint) VALUES (?, ?, ?)",
-                    (repository, task_id, next_checkpoint),
-                )
-            else:
-                updated = connection.execute(
-                    """
-                    UPDATE bounded_execution_checkpoint
-                    SET checkpoint = ?
-                    WHERE repository = ? AND task_id = ? AND checkpoint = ?
-                    """,
-                    (next_checkpoint, repository, task_id, expected_checkpoint),
-                )
-                if updated.rowcount != 1:
-                    connection.execute("ROLLBACK")
-                    return Reservation(False, key, "checkpoint_cas_conflict")
-
             connection.execute(
                 """
-                INSERT INTO bounded_execution_outbox(reservation_key, repository, task_id, action, status)
-                VALUES (?, ?, ?, ?, 'committed')
+                INSERT INTO bounded_execution_outbox(
+                    reservation_key, repository, task_id, action, status
+                ) VALUES (?, ?, ?, ?, 'committed')
                 """,
                 (key, repository, task_id, action),
             )
@@ -205,11 +284,13 @@ class SqliteCheckpointOutbox:
         task_id: str,
         expected_checkpoint: str | None,
         next_checkpoint: str,
+        next_snapshot: dict[str, Any],
         reason: str,
         scope: tuple[str, ...],
     ) -> Reservation:
-        """Atomically persist a checkpoint transition without creating dispatch work."""
+        """Atomically persist a recoverable checkpoint without dispatch work."""
 
+        snapshot_json = _validated_snapshot_payload(next_snapshot, next_checkpoint)
         key = _reservation_key(
             repository,
             task_id,
@@ -220,35 +301,46 @@ class SqliteCheckpointOutbox:
         )
         with closing(self._connect()) as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
-                "SELECT checkpoint FROM bounded_execution_checkpoint WHERE repository = ? AND task_id = ?",
-                (repository, task_id),
-            ).fetchone()
-            actual = row[0] if row is not None else None
-            if actual != expected_checkpoint:
+            if not self._advance_checkpoint(
+                connection,
+                repository=repository,
+                task_id=task_id,
+                expected_checkpoint=expected_checkpoint,
+                next_checkpoint=next_checkpoint,
+                snapshot_json=snapshot_json,
+            ):
                 connection.execute("ROLLBACK")
                 return Reservation(False, key, "checkpoint_cas_conflict")
-
-            if row is None:
-                connection.execute(
-                    "INSERT INTO bounded_execution_checkpoint(repository, task_id, checkpoint) VALUES (?, ?, ?)",
-                    (repository, task_id, next_checkpoint),
-                )
-            else:
-                updated = connection.execute(
-                    """
-                    UPDATE bounded_execution_checkpoint
-                    SET checkpoint = ?
-                    WHERE repository = ? AND task_id = ? AND checkpoint = ?
-                    """,
-                    (next_checkpoint, repository, task_id, expected_checkpoint),
-                )
-                if updated.rowcount != 1:
-                    connection.execute("ROLLBACK")
-                    return Reservation(False, key, "checkpoint_cas_conflict")
-
             connection.execute("COMMIT")
         return Reservation(True, key, "transition_committed")
+
+    def load_checkpoint(self, repository: str, task_id: str) -> CheckpointRecord | None:
+        """Return the exact durable checkpoint, failing closed on corrupt legacy state."""
+
+        with closing(self._connect()) as connection:
+            row = connection.execute(
+                """
+                SELECT checkpoint, snapshot_json
+                FROM bounded_execution_checkpoint
+                WHERE repository = ? AND task_id = ?
+                """,
+                (repository, task_id),
+            ).fetchone()
+        if row is None:
+            return None
+        checkpoint, snapshot_json = row
+        if not isinstance(snapshot_json, str) or not snapshot_json:
+            raise ValueError("recoverable checkpoint snapshot is unavailable")
+        try:
+            snapshot = json.loads(snapshot_json)
+        except json.JSONDecodeError as error:
+            raise ValueError("recoverable checkpoint snapshot is malformed") from error
+        if not isinstance(snapshot, dict):
+            raise ValueError("recoverable checkpoint snapshot must be an object")
+        canonical = _canonical_snapshot(snapshot)
+        if _snapshot_digest(canonical) != checkpoint:
+            raise ValueError("recoverable checkpoint snapshot digest mismatch")
+        return CheckpointRecord(checkpoint=checkpoint, snapshot=snapshot)
 
     def claim_dispatch(self, reservation_key: str) -> bool:
         """Grant exactly one dispatcher the committed reservation."""

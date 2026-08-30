@@ -429,6 +429,10 @@ def validate_policy(policy: dict[str, Any]) -> None:
     dependency_kinds = policy.get("dependency_kinds")
     if not isinstance(dependency_kinds, list) or not dependency_kinds or not all(isinstance(x, str) and x for x in dependency_kinds):
         raise GuardError("dependency_kinds must be a non-empty string list")
+    if len(set(dependency_kinds)) != len(dependency_kinds):
+        raise GuardError("dependency_kinds must be unique")
+    if "external" not in dependency_kinds:
+        raise GuardError("dependency_kinds must retain canonical external support")
 
 
 def _loop_triggered(snapshot: dict[str, Any], policy: dict[str, Any]) -> bool:
@@ -778,6 +782,10 @@ def _execution_prerequisite_reason(
 ) -> str | None:
     if action == "observe":
         return None
+    # An already-observed external dependency is non-dispatch control-plane work:
+    # let the external-wait branch persist WAITING_EXTERNAL even without review authority.
+    if current["dependency_kind"] == "external" and current["blocking_dependency"] and action != "complete":
+        return None
     if context is None:
         return "reservation_required: durable checkpoint/outbox and trusted authority are not configured"
     binding = current.get("review_binding")
@@ -807,6 +815,7 @@ def _reserve_execution(
         task_id=current["task_id"],
         expected_checkpoint=_checkpoint_digest(previous) if previous is not None else None,
         next_checkpoint=_checkpoint_digest(next_snapshot),
+        next_snapshot=next_snapshot,
         action=action,
         scope=_review_binding_scope(current.get("review_binding")),
     )
@@ -841,6 +850,7 @@ def _transition_state(
         task_id=current["task_id"],
         expected_checkpoint=_checkpoint_digest(previous) if previous is not None else None,
         next_checkpoint=_checkpoint_digest(next_snapshot),
+        next_snapshot=next_snapshot,
         reason=reason,
         scope=_review_binding_scope(current.get("review_binding")),
     )
@@ -980,16 +990,6 @@ def decide(
                     False,
                     current["state"],
                     "reservation_required: external waiting must be durably reserved before ownership is released",
-                    False,
-                    progress,
-                    failure,
-                )
-            binding = current.get("review_binding")
-            if not isinstance(binding, dict) or not context.evidence_authority.verify_review_binding(binding):
-                return _decision(
-                    False,
-                    current["state"],
-                    "trusted_review_binding_required: external waiting transition is unverified",
                     False,
                     progress,
                     failure,

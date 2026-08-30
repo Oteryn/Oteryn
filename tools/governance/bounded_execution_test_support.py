@@ -99,6 +99,7 @@ def decide(previous: dict[str, Any] | None, current: dict[str, Any], action: str
                 prepared_previous["repository"],
                 prepared_previous["task_id"],
                 _checkpoint_digest(prepared_previous),
+                snapshot=prepared_previous,
             )
         return guard_decide(
             prepared_previous,

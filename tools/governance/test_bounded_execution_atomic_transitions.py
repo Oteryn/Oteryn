@@ -104,10 +104,12 @@ class RecordingOutbox:
         task_id,
         expected_checkpoint,
         next_checkpoint,
+        next_snapshot,
         action,
         scope,
     ):
         self.next_checkpoint = next_checkpoint
+        self.next_snapshot = copy.deepcopy(next_snapshot)
         self.action = action
         return Reservation(True, "atomic-transition-test", "reservation_committed")
 
@@ -118,10 +120,12 @@ class RecordingOutbox:
         task_id,
         expected_checkpoint,
         next_checkpoint,
+        next_snapshot,
         reason,
         scope,
     ):
         self.next_checkpoint = next_checkpoint
+        self.next_snapshot = copy.deepcopy(next_snapshot)
         self.action = None
         return Reservation(True, "atomic-transition-test", "transition_committed")
 

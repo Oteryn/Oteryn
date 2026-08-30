@@ -236,7 +236,7 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
             outbox.seed_checkpoint(
-                previous["repository"], previous["task_id"], _checkpoint_digest(previous)
+                previous["repository"], previous["task_id"], _checkpoint_digest(previous), snapshot=previous
             )
             context = ExecutionContext(
                 TestEvidenceAuthority({previous["review_binding"]["binding_id"]}, set()),
@@ -280,7 +280,7 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
             outbox.seed_checkpoint(
-                previous["repository"], previous["task_id"], _checkpoint_digest(previous)
+                previous["repository"], previous["task_id"], _checkpoint_digest(previous), snapshot=previous
             )
             context = ExecutionContext(
                 TestEvidenceAuthority({previous["review_binding"]["binding_id"]}, set()),
@@ -294,28 +294,39 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
     def test_durable_outbox_allows_one_cas_winner_and_one_dispatch(self):
         with tempfile.TemporaryDirectory() as directory:
             outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
-            outbox.seed_checkpoint("Oteryn/Oteryn", "OTERYN-CAS", "checkpoint-r")
+            snapshot_r = {"revision": "r"}
+            snapshot_r1 = {"revision": "r+1"}
+            snapshot_other = {"revision": "other"}
+            checkpoint_r = _checkpoint_digest(snapshot_r)
+            checkpoint_r1 = _checkpoint_digest(snapshot_r1)
+            checkpoint_other = _checkpoint_digest(snapshot_other)
+            outbox.seed_checkpoint(
+                "Oteryn/Oteryn", "OTERYN-CAS", checkpoint_r, snapshot=snapshot_r
+            )
             winner = outbox.reserve(
                 repository="Oteryn/Oteryn",
                 task_id="OTERYN-CAS",
-                expected_checkpoint="checkpoint-r",
-                next_checkpoint="checkpoint-r-plus-1",
+                expected_checkpoint=checkpoint_r,
+                next_checkpoint=checkpoint_r1,
+                next_snapshot=snapshot_r1,
                 action="retry",
                 scope=("risk",),
             )
             replay = outbox.reserve(
                 repository="Oteryn/Oteryn",
                 task_id="OTERYN-CAS",
-                expected_checkpoint="checkpoint-r",
-                next_checkpoint="checkpoint-r-plus-1",
+                expected_checkpoint=checkpoint_r,
+                next_checkpoint=checkpoint_r1,
+                next_snapshot=snapshot_r1,
                 action="retry",
                 scope=("risk",),
             )
             loser = outbox.reserve(
                 repository="Oteryn/Oteryn",
                 task_id="OTERYN-CAS",
-                expected_checkpoint="checkpoint-r",
-                next_checkpoint="different-next-checkpoint",
+                expected_checkpoint=checkpoint_r,
+                next_checkpoint=checkpoint_other,
+                next_snapshot=snapshot_other,
                 action="retry",
                 scope=("risk",),
             )
@@ -325,6 +336,10 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             self.assertEqual(replay.reason, "reservation_replay")
             self.assertFalse(loser.committed)
             self.assertEqual(loser.reason, "checkpoint_cas_conflict")
+            loaded = outbox.load_checkpoint("Oteryn/Oteryn", "OTERYN-CAS")
+            self.assertIsNotNone(loaded)
+            self.assertEqual(loaded.checkpoint, checkpoint_r1)
+            self.assertEqual(loaded.snapshot, snapshot_r1)
             self.assertTrue(outbox.claim_dispatch(winner.reservation_key))
             self.assertFalse(outbox.claim_dispatch(winner.reservation_key))
 
