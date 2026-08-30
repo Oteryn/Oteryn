@@ -1,8 +1,6 @@
 name: META bounded AI review recheck
 
 on:
-  pull_request_review:
-    types: [submitted]
   issue_comment:
     types: [created, edited]
 
@@ -13,14 +11,13 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: meta-ai-review-recheck-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  group: meta-ai-review-recheck-${{ github.event.issue.number || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   same-head-recheck:
     if: >-
-      github.event_name == 'pull_request_review' ||
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request)
+      github.event_name == 'issue_comment' && github.event.issue.pull_request
     runs-on: ubuntu-latest
     steps:
       - name: Resolve live pull-request base
@@ -29,9 +26,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          EVENT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           python3 - "$GITHUB_OUTPUT" <<'PY'
@@ -70,9 +66,6 @@ jobs:
               raise SystemExit("cross-repository pull request is not eligible for write-capable recheck")
           if live_base_ref != os.environ["DEFAULT_BRANCH"]:
               raise SystemExit("pull request no longer targets the protected default branch")
-          event_base = os.environ.get("EVENT_BASE_SHA", "")
-          if event_base and event_base != live_base:
-              raise SystemExit("pull-request review event base is stale; refusing write-capable recheck")
           with open(sys.argv[1], "a", encoding="utf-8") as output:
               output.write(f"base_sha={live_base}\n")
               output.write(f"base_ref={live_base_ref}\n")
@@ -101,7 +94,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR_NUMBER: ${{ github.event.issue.number }}
           EXPECTED_BASE_SHA: ${{ steps.live-pr.outputs.base_sha }}
           EXPECTED_BASE_REF: ${{ steps.live-pr.outputs.base_ref }}
           EXPECTED_HEAD_SHA: ${{ steps.live-pr.outputs.head_sha }}
