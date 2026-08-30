@@ -20,6 +20,30 @@ rdc = _load(ROOT / "tools/governance/test_remote_desktop_action_gate.py", "rdc_f
 execution_guard = _load(ROOT / "tools/agents/execution_guard.py", "execution_guard_review_fixes")
 
 
+def _healthy_snapshot() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "repository": "Oteryn/Oteryn",
+        "pr_number": 107,
+        "task_head_sha": "a" * 40,
+        "integration_main_sha": "",
+        "candidate_frozen": False,
+        "candidate_head_sha": "",
+        "current_action": "implement",
+        "waiting_reason": "",
+        "failure_code": "",
+        "previous_progress_fingerprint": "",
+        "identical_cycle_count": 0,
+        "retry_count": 0,
+        "retry_limit": 0,
+        "external_event_can_change": False,
+        "material_repository_change": False,
+        "terminal_verified": False,
+        "blocked": False,
+        "noop_retrigger_intent": False,
+    }
+
+
 def test_call_gate_validates_declarations_after_matching_entry() -> None:
     packet = rdc.start_process_exception_packet()
     execution = packet["execution_routing"]
@@ -84,30 +108,20 @@ def test_call_gate_preserves_json_boolean_vs_integer_types() -> None:
     assert errors == ["remote desktop call arguments do not match routing packet"]
 
 
+def test_retry_counters_reject_json_booleans() -> None:
+    for key in ("identical_cycle_count", "retry_count", "retry_limit"):
+        snapshot = _healthy_snapshot()
+        snapshot[key] = True
+        try:
+            execution_guard.evaluate_snapshot(snapshot)
+        except ValueError as exc:
+            assert f"{key} must be a non-negative integer" in str(exc)
+        else:
+            raise AssertionError(f"{key}=true must fail closed")
+
+
 def test_zero_retry_budget_does_not_stall_failure_free_initial_work() -> None:
-    result = execution_guard.evaluate_snapshot(
-        {
-            "schema_version": 1,
-            "repository": "Oteryn/Oteryn",
-            "pr_number": 107,
-            "task_head_sha": "a" * 40,
-            "integration_main_sha": "",
-            "candidate_frozen": False,
-            "candidate_head_sha": "",
-            "current_action": "implement",
-            "waiting_reason": "",
-            "failure_code": "",
-            "previous_progress_fingerprint": "",
-            "identical_cycle_count": 0,
-            "retry_count": 0,
-            "retry_limit": 0,
-            "external_event_can_change": False,
-            "material_repository_change": False,
-            "terminal_verified": False,
-            "blocked": False,
-            "noop_retrigger_intent": False,
-        }
-    )
+    result = execution_guard.evaluate_snapshot(_healthy_snapshot())
     assert result["decision"] == "CONTINUE"
     assert result["next_state"] == "RUNNING"
 
