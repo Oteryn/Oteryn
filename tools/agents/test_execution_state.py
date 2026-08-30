@@ -35,6 +35,11 @@ class ExecutionStateContractTests(unittest.TestCase):
         raw = json.loads(CONTRACT.read_text(encoding="utf-8"))
         self.assertEqual(raw["schema_version"], 1)
         self.assertEqual(
+            raw["authority"],
+            "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md",
+        )
+        self.assertTrue((ROOT / raw["authority"]).is_file())
+        self.assertEqual(
             set(raw["durable_fields"]),
             {
                 "candidate_frozen",
