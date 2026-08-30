@@ -45,8 +45,11 @@ GitHub live state is the sole lifecycle authority. Before every material phase a
 5. resolve open PRs touching root `AGENTS.md`, AI-review policy/actions, aggregate gates, rulesets/branch protection or merge settings;
 6. read the current protected-main META AI-review policy, machine policy, execution-routing policy, bounded-autonomous policy if merged, and applicable provider root instructions;
 7. inspect live required checks, branch protection/rulesets, merge methods, queue state and admin capability.
+8. for each of Game, Platform and Atlas, record explicit current-task owner authorization naming the exact repository and permitted branch/PR/settings mutation scope, or mark it `READ-ONLY — AUTHORIZATION MISSING`.
 
 Any SHA, PR number or status written in this prompt/design/plan is a locator only. Do not trust cached checkouts, previous handoffs, old task prose or stale review summaries over live GitHub.
+
+Target-repository lists, META policy authority, existing Issues/PRs and tool/admin access do not themselves authorize provider mutation. If the current user instruction explicitly authorizes all four repositories, record it as satisfying the gate only for that instruction's stated scope; never infer reusable authority from this prompt.
 
 ## Governing architecture
 
@@ -139,8 +142,11 @@ Build one compact table for META/Game/Platform/Atlas containing:
 - overlapping PR/task owners;
 - admin/ruleset write capability;
 - organization required-workflow capability, protected source repository/path and cross-repository access.
+- current-task owner authorization evidence and allowed branch/PR/settings scope for each provider, or `READ-ONLY — AUTHORIZATION MISSING`.
 
 Do not mutate until this matrix is complete.
+
+**Hard provider gate:** before starting any provider lane or Phase C/D/E branch, PR or settings mutation in Game, Platform or Atlas, require that provider's matrix row to name explicit current-task owner authorization for the exact repository and intended scope. Without it, perform read-only inventory only, report the blocker and hand off; do not create/update a branch or PR, change settings, enqueue a canary or claim provider cutover.
 
 ### Phase B — META canonical policy
 
@@ -249,5 +255,6 @@ Do not claim `DONE` until live protected-main and settings readback proves for a
 - P0/P1 blocking and P2 follow-up semantics are deterministic;
 - drift detection exists and passes/accurately reports inaccessible settings;
 - canary merge/readback evidence is durable.
+- every Game/Platform/Atlas branch, PR or settings mutation is preceded by recorded current-task owner authorization for that exact repository and scope; an unauthorized provider remains a read-only handoff/blocker and cannot count as rollout-complete.
 
 Close Issue #102 only after terminal provider readback. Return exact final policy coordinates, provider PR/merge SHAs, required-check/queue settings and canary evidence.

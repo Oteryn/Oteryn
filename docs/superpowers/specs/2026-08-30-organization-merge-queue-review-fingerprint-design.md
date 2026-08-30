@@ -164,6 +164,12 @@ META #69 / PR #71 are historical/live locators for this policy family and must b
 
 ## Authority model
 
+### Operator mutation authorization
+
+Before any branch, PR or settings mutation in Game, Platform or Atlas, the operator must record explicit authorization granted for the current task, naming the exact repository and permitted mutation scope. Listing a repository as a rollout target, META policy ownership, an existing Issue/PR, or available tool/admin access is context or capability, not authorization. A current user instruction that explicitly authorizes all four repositories may be recorded as satisfying this gate for its stated scope, but reusable rollout documents must never infer or carry that authorization forward.
+
+A provider without this recorded authorization remains read-only: inventory its live state, record the missing authority and hand off to its owner. It must not enter provider branch/PR work or settings/cutover phases.
+
 META owns the semantics of:
 
 - review tiers and risk fingerprint;
@@ -207,7 +213,7 @@ Use staged migration, never a flag-day weakening of protection:
 2. publish canonical META merge-integration semantics and deterministic tests;
 3. merge and read back the protected META ruleset workflow, attestation bridge and deterministic event/API fixtures while strict freshness remains active;
 4. enable/require META Merge Queue with one-PR groups while strict freshness remains active, enqueue a live canary, verify exact-`I` bridge success and protected-main readback, and only then switch off strict freshness;
-5. repeat provider adoption in Game, Platform and Atlas, allowing independent provider work where paths and settings are disjoint;
+5. repeat provider adoption only in Game, Platform and Atlas repositories whose exact current-task mutation authorization is recorded, allowing independent provider work where paths and settings are disjoint; keep every other provider read-only and hand it off;
 6. add an organization drift audit comparing expected policy with live repository settings/workflow capabilities;
 7. remove/supersede stale local exact-head-only review language and close provider adoption Issues.
 
@@ -254,3 +260,4 @@ The programme is complete only when:
 - no-op/retrigger loops are deterministically prohibited;
 - live configuration drift is detectable;
 - canary PRs prove the end-to-end flow before old protections are removed.
+- every provider branch/PR/settings mutation is preceded by recorded current-task owner authorization for that exact repository and scope; an unauthorized provider remains a read-only handoff and cannot be represented as rollout-complete.

@@ -25,6 +25,7 @@
 - P0/P1 block. P2 is follow-up unless the finding is escalated to P1 because it proves a merge-blocking invariant violation.
 - Provider repositories may be stricter on tests/risk classification but may not fork review-reuse or integration semantics.
 - A target-local `merge_group` workflow is candidate-controlled and cannot be required integration authority. Require the protected META organization-ruleset workflow by source repository/path; never accept a same-name status as an equivalent.
+- Before any branch, PR or settings mutation in Game, Platform or Atlas, record explicit current-task owner authorization for the exact repository and mutation scope. Target-repository lists, META authority, Issues/PRs and tool/admin capability do not grant that authority.
 - Prefer proportional parallelism: META policy work and each provider rollout may be separate lanes when their owned paths/settings are disjoint; ruleset cutovers for a repository are serialized with that repository's gate rollout.
 
 ---
@@ -38,8 +39,9 @@
 - [ ] Read current META `docs/governance/AI_REVIEW_POLICY.md`, `ecosystem/ai-review-policy.json`, bounded-autonomous policy (if canonical), root `AGENTS.md`, and provider root instructions.
 - [ ] Snapshot live branch-protection/ruleset settings and required check names for all four repos.
 - [ ] Record capability for GitHub Merge Queue, organization **Require workflows to pass before merging**, protected cross-repository source-workflow access and administrative ruleset updates; if any required capability is unavailable, stop the settings cutover and report the exact gap rather than weakening safety.
+- [ ] For each of Game, Platform and Atlas, record the exact evidence of explicit owner authorization granted for this current task and its allowed branch/PR/settings mutation scope, or record `READ-ONLY — AUTHORIZATION MISSING`. An explicit current user instruction covering all four repositories may satisfy this gate within its stated scope; do not infer authorization from this reusable plan or any target list, META role, Issue/PR or tool access.
 
-**Exit:** one live-state matrix showing authoritative policy versions, current aggregate gates, strict-freshness state, queue state, review model and overlapping writers.
+**Exit:** one live-state matrix showing authoritative policy versions, current aggregate gates, strict-freshness state, queue state, review model, overlapping writers and per-provider current-task mutation authorization plus scope. Until a provider row records that authorization, its lane is limited to read-only inventory and owner handoff.
 
 ---
 
@@ -117,7 +119,9 @@ Only after Phase 2 is proven:
 
 ## Phase 4 — Provider gate adoption
 
-For each of Game, Platform and Atlas, create a separately owned provider branch/PR from current protected `main`.
+**Hard authorization gate:** enter Phase 4 for a provider only when its Phase 0 matrix row records explicit current-task owner authorization for that exact repository and branch/PR mutation scope. Otherwise perform no provider mutation: retain read-only inventory, record the blocker and hand off to the owner.
+
+For each authorized provider among Game, Platform and Atlas, create a separately owned provider branch/PR from current protected `main`.
 
 ### Required provider work
 
@@ -141,7 +145,9 @@ After the first provider passes end-to-end, Platform and Atlas may proceed indep
 
 ## Phase 5 — Provider queue cutover
 
-For each provider, serialized per repository:
+**Hard authorization gate:** enter Phase 5 for a provider only when its recorded current-task owner authorization explicitly includes the intended settings/queue cutover. Branch/PR authority alone is insufficient.
+
+For each authorized provider, serialized per repository:
 
 - [ ] Merge and read back the provider bridge contract/configuration from protected `main`; record ruleset JSON and active strict freshness.
 - [ ] Configure squash/single-PR groups, require the protected META ruleset workflow, and enable/require Merge Queue while strict freshness stays active.
@@ -227,6 +233,7 @@ Stable unchanged candidate waits -> same-head re-evaluation/recheck -> no no-op 
 - [ ] Confirm queue is required and strict freshness is no longer the normal integration mechanism.
 - [ ] Confirm canonical review fingerprint/reuse policy is the only authority for external-review invalidation.
 - [ ] Confirm bounded-autonomous anti-loop policy is canonical and provider-adopted.
+- [ ] Confirm every Game/Platform/Atlas branch, PR or settings mutation was preceded by recorded current-task owner authorization for that exact repository and scope; treat every unauthorized repository as read-only handoff/blocker, never as completed rollout.
 - [ ] Archive/close superseded provider tasks without rewriting historical evidence.
 - [ ] Close Issue #102 only after all required provider adoption/readback is terminal.
 
