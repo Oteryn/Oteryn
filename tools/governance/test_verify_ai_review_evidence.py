@@ -965,6 +965,74 @@ def test_current_codex_summary_reuses_review_after_clean_merge_up_with_keep_it_u
     assert found["review_source_kind"] == "issue_comment_result"
 
 
+def test_current_codex_summary_reuses_review_after_clean_merge_up_with_swish_duplicate_echo() -> None:
+    found = _verify_summary_merge_reuse_with_echoes(
+        echo_first_line="Codex Review: Didn't find any major issues. Swish!"
+    )
+    assert found["review_source_kind"] == "issue_comment_result"
+    assert found["review_source_url"].endswith("issuecomment-11")
+
+
+def test_direct_swish_clean_result_remains_authoritative() -> None:
+    repo, _, final = _v1.core_tests.make_repo()
+    current = _v1.core_tests.issue_comment(
+        10, _v1.core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
+    )
+    echo = _v1.core_tests.codex_result(
+        11,
+        final[:10],
+        stamp="2026-08-20T10:01:00Z",
+        text=_observed_duplicate_echo_body(
+            final[:10],
+            first_line="Codex Review: Didn't find any major issues. Swish!",
+        ),
+    )
+    echo["performed_via_github_app"] = {"slug": "chatgpt-codex-connector"}
+
+    found = _v1._verify_with_only_current_anchor([current, echo], repo, final, current)
+    assert found["review_source_kind"] == "issue_comment_result"
+    assert found["review_source_url"].endswith("issuecomment-11")
+
+
+def test_all_compat_v1_direct_flairs_are_guarded_duplicate_echoes() -> None:
+    for flair in (
+        "Swish!",
+        "Hooray!",
+        "Chef's kiss.",
+        "Breezy!",
+        "Nice work!",
+        "Bravo.",
+        ":rocket:",
+        "More of your lovely PRs please.",
+        "You're on a roll.",
+    ):
+        found = _verify_summary_merge_reuse_with_echoes(
+            echo_first_line=f"Codex Review: Didn't find any major issues. {flair}"
+        )
+        assert found["review_source_url"].endswith("issuecomment-11")
+
+
+def test_duplicate_only_flairs_are_not_direct_authoritative_results() -> None:
+    for flair in ("Delightful!", ":tada:"):
+        repo, _, final = _v1.core_tests.make_repo()
+        current = _v1.core_tests.issue_comment(
+            10, _v1.core_tests.request_body(final), stamp="2026-08-20T10:00:00Z",
+        )
+        echo = _v1.core_tests.codex_result(
+            11,
+            final[:10],
+            stamp="2026-08-20T10:01:00Z",
+            text=_observed_duplicate_echo_body(
+                final[:10],
+                first_line=f"Codex Review: Didn't find any major issues. {flair}",
+            ),
+        )
+        echo["performed_via_github_app"] = {"slug": "chatgpt-codex-connector"}
+        _v1.core_tests.expect_fail(
+            lambda: _v1._verify_with_only_current_anchor([current, echo], repo, final, current)
+        )
+
+
 def test_current_codex_summary_reuse_rejects_descendant_p2() -> None:
     _v1.core_tests.expect_fail(
         lambda: _verify_summary_merge_reuse_with_echoes(descendant_p2=True)
