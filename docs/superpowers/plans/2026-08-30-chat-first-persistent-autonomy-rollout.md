@@ -165,9 +165,9 @@ def validate_continuation_snapshot(policy: dict, snapshot: dict) -> None: ...
 def select_execution_surface(policy: dict, facts: dict) -> str: ...
 ```
 
-Reject unknown schema versions, missing authority references, duplicate vocabulary values, unknown dispositions/mechanisms/surfaces, invalid disposition/mechanism pairings and malformed booleans/integers where the schema expects another type.
+Reject unknown schema versions, missing authority references, duplicate vocabulary values, unknown dispositions/mechanisms/surfaces, invalid disposition/mechanism pairings, missing mandatory checkpoint semantics, malformed exact-head identities, empty/multiple `next_action` values and malformed booleans/integers where the schema expects another type.
 
-- [ ] **Step 5: Add fail-closed disposition/resume compatibility tests**
+- [ ] **Step 5: Add fail-closed disposition/resume compatibility and checkpoint-minimum tests**
 
 Test these exact failures:
 
@@ -195,6 +195,29 @@ Test these exact valid pairings:
 ```
 
 For `release_waiting + github_native`, additionally require a fact such as `phase_can_complete_without_replacement_worker=true`; if later worker action is required and no worker-launching mechanism exists, fail closed to `stop_reinvoke_required` rather than claiming automatic worker continuation.
+
+Build one valid baseline snapshot containing at least these always-required checkpoint fields:
+
+```python
+{
+    "repository": "Oteryn/Oteryn",
+    "task_id": "Oteryn/Oteryn#108",
+    "task_branch": "governance/example",
+    "task_head_sha": "0123456789abcdef0123456789abcdef01234567",
+    "phase": "qualification",
+    "bounded_lifecycle_state": "RUNNING",
+    "last_material_progress": "focused tests green",
+    "completed_material_work": ["policy draft"],
+    "validation_evidence_refs": ["check:meta-gate"],
+    "blockers": [],
+    "worker_disposition": "continue_current",
+    "resume_mechanism": "same_session",
+    "resume_locator": None,
+    "next_action": "run exact-head qualification",
+}
+```
+
+Parameterize deletion of every always-required field and assert `validate_continuation_snapshot(...)` rejects the snapshot. Also reject an invalid/non-40-hex `task_head_sha`, empty or non-string `next_action`, multiple next actions encoded as a list, non-list `completed_material_work`/`validation_evidence_refs`/`blockers`, and a missing `pr_id` when the snapshot declares `pr_applicable=true`. Conditionally required evidence such as first material failure, rejected hypotheses, bounded retry/evidence-generation state and context-pressure classification must be required when the corresponding condition/fact says that semantic applies; the validator must not require fabricated values when it does not apply.
 
 - [ ] **Step 6: Add task-lifetime separation tests**
 
@@ -543,7 +566,7 @@ Record exact merged `main` and verify required Atlas gates.
 
 ### Task 8: Add organization drift checks and close the programme
 
-**Prerequisite:** Tasks 4-7 protected-main readbacks PASS.
+**Prerequisite:** Task 4 protected-main readback PASS. For each provider task in Tasks 5-7, require either (a) its protected-main adoption readback PASS, or (b) an explicit owner decision reducing `#108` final scope by deferring/excluding that provider. Absence of provider write authorization by itself is **not** an implicit scope reduction and must remain `OWNER_PERMISSION_REQUIRED` until the owner records a scope decision.
 
 **Files:**
 - Modify: `Oteryn/Oteryn:tools/governance/audit_github_readonly.py` or its current protected-main successor if that audit has been split.
@@ -551,8 +574,8 @@ Record exact merged `main` and verify required Atlas gates.
 - Modify only if current architecture requires: `ecosystem/governance-desired-state.json`.
 
 **Interfaces:**
-- Consumes: exact protected-main META/Game/Platform/Atlas policy identities.
-- Produces: deterministic live-state drift detection for continuation adoption without arbitrary prose parsing as primary authority.
+- Consumes: exact protected-main META identity plus exact protected-main identities for every provider that remains in the final `#108` scope, and the durable owner scope-reduction record for each excluded provider.
+- Produces: deterministic live-state drift detection for in-scope continuation adoption without arbitrary prose parsing as primary authority, plus terminal evidence that distinguishes adopted providers from explicitly deferred/excluded providers.
 
 - [ ] **Step 1: Write RED live-audit fixtures**
 
@@ -567,7 +590,7 @@ Add provider fixtures that fail for:
 - provider missing the protected META continuation policy reference/version after adoption.
 ```
 
-Do not attempt to persist ephemeral per-task provider write authorization in desired-state policy; authorization must instead be verified at the provider mutation boundary by the executing task.
+Do not attempt to persist ephemeral per-task provider write authorization in desired-state policy; authorization must instead be verified at the provider mutation boundary by the executing task. Do not flag an explicitly owner-excluded provider for missing continuation adoption; verify the durable scope-reduction record instead.
 
 - [ ] **Step 2: Prove RED**
 
@@ -575,7 +598,7 @@ Run the focused live-audit regression suite. Expected new drift cases fail befor
 
 - [ ] **Step 3: Implement exact structured drift checks**
 
-Prefer machine policy references/versions and bounded explicit markers. Do not create a broad natural-language parser that attempts to infer arbitrary continuation semantics from free-form Markdown.
+Prefer machine policy references/versions and bounded explicit markers. Do not create a broad natural-language parser that attempts to infer arbitrary continuation semantics from free-form Markdown. Apply adoption drift checks only to providers still in final scope; excluded providers require exact durable scope-decision evidence rather than synthetic adoption state.
 
 - [ ] **Step 4: Run full applicable META governance tests**
 
@@ -591,15 +614,14 @@ Verify:
 
 ```text
 META: continuation policy canonical and green
-Game: continuation adoption canonical and green
-Platform: additive mapping canonical and green
-Atlas: continuation adoption canonical and green
+For each provider still IN_SCOPE: continuation adoption/mapping canonical and green at exact protected-main SHA
+For each provider OUT_OF_SCOPE: explicit owner scope-reduction/defer decision recorded; no provider mutation or adoption is claimed
 #69/#71: sole bounded lifecycle
 #102/#103: sole merge/review-fingerprint lifecycle
 #104/#107: no competing bounded lifecycle
-#108: all scoped acceptance criteria satisfied
+#108: all remaining scoped acceptance criteria satisfied
 ```
 
 - [ ] **Step 7: Close `#108` and terminalize the delivery lifecycle**
 
-Update Issue/PR state, branch disposition and protected-main evidence according to the current terminal branch/task lifecycle. Do not claim `DONE` until the exact protected-main readback is complete.
+Update Issue/PR state, branch disposition and protected-main evidence according to the current terminal branch/task lifecycle. Do not claim `DONE` until the exact protected-main readback is complete and every provider is accounted for as either protected-main adopted or explicitly removed/deferred by owner scope decision.
