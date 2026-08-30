@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "policy_id": "oteryn-bounded-execution-state-v1",
+  "authority": "docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md",
+  "allowed_statuses": [
+    "RUNNING",
+    "READY",
+    "WAITING_EXTERNAL",
+    "BLOCKED",
+    "STALLED",
+    "DONE"
+  ],
+  "durable_fields": {
+    "candidate_frozen": "boolean",
+    "candidate_head_sha": "empty-or-40-hex-sha",
+    "progress_fingerprint": "empty-or-sha256",
+    "failure_fingerprint": "empty-or-sha256",
+    "identical_cycle_count": "non-negative-integer",
+    "retry_count": "non-negative-integer",
+    "retry_limit": "non-negative-integer",
+    "waiting_for": "string",
+    "last_material_progress_at": "offset-aware-iso8601"
+  },
+  "transition_rules": {
+    "running_wait_forbidden": true,
+    "waiting_external_reason_required": true,
+    "frozen_candidate_must_equal_task_head": true,
+    "retry_exhaustion_terminal_states": [
+      "STALLED",
+      "WAITING_EXTERNAL"
+    ]
+  },
+  "migration": {
+    "legacy_records_readable": true,
+    "bounded_fields_required_for": [
+      "new_substantial_task",
+      "updated_substantial_task"
+    ]
+  }
+}
