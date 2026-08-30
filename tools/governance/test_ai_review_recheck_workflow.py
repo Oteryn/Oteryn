@@ -1,3 +1,5 @@
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -30,6 +32,15 @@ class AiReviewRecheckWorkflowTests(unittest.TestCase):
         self.assertIn("pull_request_target", workflow)
         self.assertIn("governance-ai-review.yml", workflow)
         self.assertIn("chatgpt-codex-connector[bot]", workflow)
+
+    def test_execution_policy_review_fix_regressions(self):
+        proc = subprocess.run(
+            [sys.executable, str(ROOT / "tools/governance/test_execution_policy_review_fixes.py")],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
 
 if __name__ == "__main__":
