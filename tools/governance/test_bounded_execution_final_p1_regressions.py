@@ -222,8 +222,7 @@ class FinalMaterialAuthorityP1Tests(unittest.TestCase):
         self.assertEqual(record.snapshot["phase"], "LOOP_BREAKER_AUDIT")
         self.assertEqual(record.snapshot["final_qualification_runs_since_audit"], 0)
 
-    def test_external_wait_observation_persists_new_unfrozen_head(self):
-        previous = snapshot(task_head_sha="a" * 40, candidate_frozen=False)
+    def _unbound_context(self, previous):
         directory = tempfile.TemporaryDirectory()
         outbox = SqliteCheckpointOutbox(Path(directory.name) / "checkpoint.db")
         outbox.seed_checkpoint(
@@ -232,7 +231,11 @@ class FinalMaterialAuthorityP1Tests(unittest.TestCase):
             _checkpoint_digest(previous),
             snapshot=previous,
         )
-        context = ExecutionContext(TestEvidenceAuthority(set(), set()), outbox)
+        return directory, ExecutionContext(TestEvidenceAuthority(set(), set()), outbox)
+
+    def test_external_wait_rejects_new_unfrozen_head_without_persisting_or_releasing(self):
+        previous = snapshot(task_head_sha="a" * 40, candidate_frozen=False)
+        directory, context = self._unbound_context(previous)
         try:
             current = copy.deepcopy(previous)
             current["task_head_sha"] = "c" * 40
@@ -241,20 +244,94 @@ class FinalMaterialAuthorityP1Tests(unittest.TestCase):
             current["gate_state"] = "waiting"
 
             result = raw_decide(previous, current, "observe", POLICY, context=context)
-            record = outbox.load_checkpoint(previous["repository"], previous["task_id"])
+            record = context.checkpoint_outbox.load_checkpoint(
+                previous["repository"], previous["task_id"]
+            )
+        finally:
+            directory.cleanup()
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, previous["state"])
+        self.assertFalse(result.release_session)
+        self.assertEqual(result.reservation_key, "")
+        self.assertIsNotNone(record)
+        self.assertEqual(record.snapshot, previous)
+
+    def test_external_wait_rejects_operational_head_change_without_persisting_or_releasing(self):
+        previous = snapshot(task_head_sha="a" * 40, candidate_frozen=False)
+        directory, context = self._unbound_context(previous)
+        try:
+            current = copy.deepcopy(previous)
+            current["task_head_sha"] = "c" * 40
+            current["blocking_dependency"] = "external:ci-head-c"
+            current["dependency_kind"] = "external"
+            current["gate_state"] = "waiting"
+
+            result = raw_decide(previous, current, "mutate", POLICY, context=context)
+            record = context.checkpoint_outbox.load_checkpoint(
+                previous["repository"], previous["task_id"]
+            )
+        finally:
+            directory.cleanup()
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, previous["state"])
+        self.assertFalse(result.release_session)
+        self.assertEqual(result.reservation_key, "")
+        self.assertIsNotNone(record)
+        self.assertEqual(record.snapshot, previous)
+
+    def test_same_head_external_observation_persists_only_wait_coordinates_and_releases(self):
+        previous = snapshot(task_head_sha="a" * 40, candidate_frozen=False)
+        directory, context = self._unbound_context(previous)
+        try:
+            current = copy.deepcopy(previous)
+            current["blocking_dependency"] = "external:ci-head-a"
+            current["dependency_kind"] = "external"
+            current["gate_state"] = "waiting"
+
+            result = raw_decide(previous, current, "observe", POLICY, context=context)
+            record = context.checkpoint_outbox.load_checkpoint(
+                previous["repository"], previous["task_id"]
+            )
         finally:
             directory.cleanup()
 
         self.assertTrue(result.allowed)
         self.assertEqual(result.state, "WAITING_EXTERNAL")
+        self.assertTrue(result.release_session)
         self.assertIsNotNone(record)
         self.assertEqual(record.snapshot["state"], "WAITING_EXTERNAL")
-        self.assertEqual(record.snapshot["task_head_sha"], "c" * 40)
-        self.assertEqual(record.snapshot["blocking_dependency"], "external:ci-head-c")
+        self.assertEqual(record.snapshot["task_head_sha"], previous["task_head_sha"])
+        self.assertEqual(record.snapshot["blocking_dependency"], "external:ci-head-a")
         self.assertEqual(record.snapshot["dependency_kind"], "external")
         self.assertEqual(record.snapshot["gate_state"], "waiting")
         self.assertFalse(record.snapshot["candidate_frozen"])
         self.assertEqual(record.snapshot["phase"], previous["phase"])
+
+    def test_frozen_head_change_still_requires_repair_generation_before_external_wait(self):
+        previous = snapshot(task_head_sha="a" * 40, candidate_frozen=True)
+        directory, context = self._unbound_context(previous)
+        try:
+            current = copy.deepcopy(previous)
+            current["task_head_sha"] = "c" * 40
+            current["blocking_dependency"] = "external:ci-head-c"
+            current["dependency_kind"] = "external"
+            current["gate_state"] = "waiting"
+
+            with self.assertRaisesRegex(
+                GuardError,
+                "frozen candidate cannot move technical head",
+            ):
+                raw_decide(previous, current, "observe", POLICY, context=context)
+            record = context.checkpoint_outbox.load_checkpoint(
+                previous["repository"], previous["task_id"]
+            )
+        finally:
+            directory.cleanup()
+
+        self.assertIsNotNone(record)
+        self.assertEqual(record.snapshot, previous)
 
     def test_initial_retry_is_consumed_once_per_material_progress_scope(self):
         previous = snapshot()
