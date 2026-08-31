@@ -123,6 +123,8 @@ If `now > expires_at` and the transition has not reached its success condition o
 
 A repository whose serial cutover has not begun is `PENDING`, not `TRANSITION` or `DRIFT`: it remains on its read-back pre-cutover baseline, authorizes no V2 settings deviation, and cannot satisfy target or terminal closeout. `PENDING` becomes `TRANSITION` only after that repository's own bounded receipt exists immediately before its cutover.
 
+A failed cutover is `ROLLED_BACK`, not `TRANSITION`, only when its closed receipt has `terminal_status = ROLLED_BACK`, `post_state_fingerprint` matches `pre_state_fingerprint`, and positive `post_state_readback` proves restoration. `ROLLED_BACK` is terminal non-target evidence, authorizes no continued deviation or terminal closeout, and any retry requires a new bounded receipt; a missing or mismatched restoration proof is `DRIFT`.
+
 ### GS-7 — MQ canary must include a moving-base scenario
 
 Before disabling strict branch freshness for a repository, a normal merge-group canary is insufficient. The repository must prove the exact historical failure mode V2 is intended to remove.
@@ -265,7 +267,7 @@ V2 cannot be declared terminal until, in addition to the original design's crite
 - all four externally required aggregate gates have been proven to execute and terminate explicitly rather than satisfy protection through `skipped`/`neutral`;
 - all four repositories have completed a moving-base MQ canary with unchanged PR head;
 - no active transition is expired;
-- no permanent repository remains `PENDING` at terminal closeout;
+- no permanent repository remains `PENDING` or `ROLLED_BACK` at terminal closeout;
 - no control-plane change in the rollout was terminally self-authorized only by its candidate-controlled governance implementation;
 - the owner break-glass contract has passed one real isolated exercise and post-restore readback;
 - exactly one externally required aggregate gate remains per permanent repository;

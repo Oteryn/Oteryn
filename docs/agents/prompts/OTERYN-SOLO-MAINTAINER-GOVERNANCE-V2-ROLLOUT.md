@@ -233,7 +233,7 @@ aggregate gate = SUCCESS
 A integrates through the queue without mutating head X merely for freshness
 ```
 
-If this cannot be proven, strict freshness stays enabled and the repository remains `TRANSITION`, not `TARGET`.
+Until the bounded canary either succeeds or restores, strict freshness stays enabled and the repository remains `TRANSITION`, not `TARGET`. If the canary fails and restoration readback matches the captured pre-state, close the receipt as `ROLLED_BACK`; it remains non-target and any retry requires a new bounded receipt.
 
 ## Transition contract
 
@@ -262,7 +262,7 @@ post_state_fingerprint
 post_state_readback
 ```
 
-If `now > expires_at` before the transition reaches its success condition or is explicitly rolled back/closed with valid terminal evidence, the state is `DRIFT`, not an indefinitely valid transition. A successfully closed or rolled-back receipt with these machine-readable fields remains terminal and does not become `DRIFT` solely because its historical expiry passes.
+If `now > expires_at` before the transition reaches its success condition or is explicitly rolled back/closed with valid terminal evidence, the state is `DRIFT`, not an indefinitely valid transition. A receipt is terminal `ROLLED_BACK` only when `terminal_status = ROLLED_BACK`, `post_state_fingerprint` matches `pre_state_fingerprint`, and positive `post_state_readback` proves restoration; otherwise it is `DRIFT`. A successfully closed or validly rolled-back receipt with these machine-readable fields remains terminal and does not become `DRIFT` solely because its historical expiry passes.
 
 `ecosystem/governance-desired-state.json` should contain stable target state, not transient PR heads, review generations or temporary exception history.
 
@@ -279,8 +279,9 @@ On canary failure:
 5. repair the implementation through normal reviewed code changes;
 6. do not create no-op/retrigger commits;
 7. do not add a new bypass or required status as a shortcut.
+8. after a matching restoration readback, close the receipt as `ROLLED_BACK`; any retry opens a new bounded receipt.
 
-Do not continue to the next repository until the current repository is either verified `TARGET` or explicitly restored and classified non-target.
+Do not continue to the next repository until the current repository is verified `TARGET`. `ROLLED_BACK` is recovery evidence, not permission to advance the serial rollout.
 
 ## Anti-overengineering rule
 
@@ -332,7 +333,7 @@ Do not declare V2 complete until live evidence proves all of the following:
 - obsolete external `ai-review-gate` and `provenance-gate` contexts are gone after their useful semantics are retired/internalized;
 - desired-state validation agrees with live settings;
 - no temporary transition/bypass remains active;
-- no permanent repository remains `PENDING`;
+- no permanent repository remains `PENDING` or `ROLLED_BACK`;
 - break-glass has passed one isolated real exercise and restoration readback;
 - superseded moving-head design material cannot be mistaken for current authority.
 

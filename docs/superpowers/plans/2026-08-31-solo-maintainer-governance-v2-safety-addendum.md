@@ -50,11 +50,12 @@ A task is not complete merely because its local tests are green if it violates o
 - [ ] Add audit tests that reject a solo-maintainer baseline requiring human/CODEOWNER approval.
 - [ ] Add audit tests for `TRANSITION` expiry: an active transition past `expires_at` without terminal success/rollback must classify as `DRIFT`.
 - [ ] Add audit tests that a serially unstarted repository is explicit `PENDING`, not `DRIFT` or `TRANSITION`; `PENDING` authorizes no settings deviation and blocks terminal V2 closeout.
+- [ ] Add audit tests that a restored failed cutover is `ROLLED_BACK` only with `terminal_status = ROLLED_BACK`, matching pre/post-state fingerprints and positive readback; otherwise classify `DRIFT`, and reject `ROLLED_BACK` at terminal V2 closeout.
 - [ ] Add validation that an active transition record has `transition_id`, `repository`, `issue_or_pr`, `started_at`, `expires_at`, `pre_state_fingerprint`, `allowed_deviations`, `success_condition`, and `rollback_condition`.
 - [ ] Add validation that a terminal receipt appends machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback`; only this evidence distinguishes terminal closure from an expired active transition.
 - [ ] Store the actual transition record in the canonical rollout Issue/PR or existing lifecycle authority rather than inventing a new persistent transition subsystem.
 
-`PENDING` is a classification in the existing read-only audit model, not a new governance authority: it prevents the concrete false-`DRIFT`/unbounded-`TRANSITION` threat while a later repository awaits its serial turn. It adds no status, writer, receipt or bypass and is invalid at terminal closeout.
+`PENDING` and `ROLLED_BACK` are classifications in the existing read-only audit model, not new governance authorities: `PENDING` prevents the concrete false-`DRIFT`/unbounded-`TRANSITION` threat while a later repository awaits its serial turn, while `ROLLED_BACK` prevents an restored failed cutover from being misread as an active transition or target. They add no status, writer, receipt or bypass and are invalid at terminal closeout.
 
 **Verification:**
 
@@ -214,8 +215,8 @@ post_state_readback
 - [ ] The expiry window must be only as long as necessary for the concrete canary/rollback operation; do not use an indefinite or convenience horizon.
 - [ ] Any live deviation not listed in `allowed_deviations` is `DRIFT` immediately.
 - [ ] If the transition expires before success/rollback with valid terminal evidence, classify `DRIFT`.
-- [ ] Terminal success or rollback closes the transition receipt with the machine-readable terminal fields above.
-- [ ] The read-only auditor must surface active/expired/terminal transition state without becoming a settings writer.
+- [ ] Terminal success closes the receipt toward `TARGET`; terminal rollback is `ROLLED_BACK` only when `post_state_fingerprint` matches `pre_state_fingerprint` and readback proves restoration.
+- [ ] The read-only auditor must surface active/expired/terminal/rolled-back transition state without becoming a settings writer.
 
 **Threat justification for the terminal fields:** the concrete threat is false `DRIFT` after a completed serial cutover when `expires_at` later passes. Existing active-receipt fields and free-form comments cannot distinguish closure from an active deviation. The minimal control is the four terminal evidence fields above; without them an auditor can misclassify a safe closed transition, and their operational cost is one receipt update at closeout. They add no new status, writer, database or merge authority.
 
@@ -261,7 +262,7 @@ retirement condition or permanent rationale
 - [ ] Verify exactly one externally required aggregate gate per permanent repository.
 - [ ] Verify no required status depends on comment/reaction/flair parsing.
 - [ ] Verify no expired transition remains.
-- [ ] Verify no permanent repository remains `PENDING`.
+- [ ] Verify no permanent repository remains `PENDING` or `ROLLED_BACK`.
 - [ ] Verify no control-plane PR was terminally self-authorized solely by candidate-controlled governance.
 - [ ] Verify moving-base canary receipts exist for all four repositories.
 - [ ] Verify break-glass isolated exercise receipt exists.
@@ -286,7 +287,7 @@ V2 is terminal only when all items below are directly verified:
 [ ] no governance retrigger/no-op commit mechanism remains
 [ ] CONTROL_PLANE_R2 owner-confirmation rule is active
 [ ] no active transition is expired
-[ ] no permanent repository remains PENDING
+[ ] no permanent repository remains PENDING or ROLLED_BACK
 [ ] break-glass dry-run completed
 [ ] break-glass real isolated exercise completed and restored cleanly
 [ ] no required AI-review/comment/reaction parser authority remains
