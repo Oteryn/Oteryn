@@ -14,6 +14,13 @@ SPEC.loader.exec_module(m)
 
 ACTIONS_APP_ID = 15368
 
+EXPECTED_V2_REQUIRED_CONTEXTS = {
+    "Oteryn/Oteryn": ["meta-gate"],
+    "Oteryn/Oteryn-Game": ["game-gate"],
+    "Oteryn/Oteryn-Platform": ["platform-gate"],
+    "Oteryn/Oteryn-Atlas": ["atlas-gate"],
+}
+
 
 class FakeAudit(m.Audit):
     def __init__(self, responses: dict[str, object]) -> None:
@@ -815,6 +822,23 @@ def test_coordinate_scan_rejects_results_above_github_cap() -> None:
 def test_desired_state_binds_all_required_checks_to_github_actions_app() -> None:
     desired = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
     assert {item["required_check_app_id"] for item in desired["permanent_repositories"]} == {ACTIONS_APP_ID}
+
+
+def test_v2_desired_state_requires_exactly_one_aggregate_gate_per_repository() -> None:
+    desired = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    observed = {
+        item["repository"]: item["required_checks"]
+        for item in desired["permanent_repositories"]
+    }
+    assert observed == EXPECTED_V2_REQUIRED_CONTEXTS
+
+
+def test_v2_desired_state_has_no_solo_maintainer_human_or_codeowner_requirement() -> None:
+    desired = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    for item in desired["permanent_repositories"]:
+        protection = item["protection"]
+        assert protection["required_approving_review_count"] == 0
+        assert protection["require_code_owner_review"] is False
 
 
 def test_game_desired_state_models_gate_transition() -> None:
