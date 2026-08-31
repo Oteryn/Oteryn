@@ -889,6 +889,8 @@ def _reserve_execution(
 def _external_wait_snapshot(
     previous: dict[str, Any] | None,
     current: dict[str, Any],
+    *,
+    preserve_observed_head: bool,
 ) -> dict[str, Any]:
     if previous is None:
         next_snapshot = dict(current)
@@ -896,6 +898,8 @@ def _external_wait_snapshot(
         next_snapshot = dict(previous)
         for field in ("blocking_dependency", "dependency_kind", "gate_state"):
             next_snapshot[field] = current[field]
+        if preserve_observed_head and not previous["candidate_frozen"]:
+            next_snapshot["task_head_sha"] = current["task_head_sha"]
     next_snapshot["state"] = "WAITING_EXTERNAL"
     return next_snapshot
 
@@ -909,8 +913,13 @@ def _transition_external_wait(
     *,
     allowed: bool,
     release_session: bool,
+    preserve_observed_head: bool,
 ) -> Decision:
-    next_snapshot = _external_wait_snapshot(previous, current)
+    next_snapshot = _external_wait_snapshot(
+        previous,
+        current,
+        preserve_observed_head=preserve_observed_head,
+    )
     progress = progress_fingerprint(next_snapshot, policy)
     failure = failure_fingerprint(next_snapshot)
     transition = context.checkpoint_outbox.transition(
@@ -1037,24 +1046,29 @@ def decide(
             raise GuardError("previous/current snapshots must describe the same task")
         _validate_history(previous, current, requested_action, policy)
 
-        if current.get("material_fact_envelope") != previous.get("material_fact_envelope"):
-            envelope = current.get("material_fact_envelope")
-            if (
-                context is None
-                or not isinstance(envelope, dict)
-                or not context.evidence_authority.verify_material_fact_envelope(envelope)
-            ):
-                baseline_progress = progress_fingerprint(previous, policy)
-                failure = failure_fingerprint(current)
-                state = current["state"]
-                return _decision(
-                    False,
-                    state,
-                    "trusted_material_fact_envelope_required: newly introduced or changed material progress evidence is absent, mismatched, or unverified",
-                    state in set(policy["session_release_states"]),
-                    baseline_progress,
-                    failure,
-                )
+    previous_envelope = previous.get("material_fact_envelope") if previous is not None else None
+    if current.get("material_fact_envelope") != previous_envelope:
+        envelope = current.get("material_fact_envelope")
+        if (
+            context is None
+            or not isinstance(envelope, dict)
+            or not context.evidence_authority.verify_material_fact_envelope(envelope)
+        ):
+            baseline_progress = (
+                progress_fingerprint(previous, policy)
+                if previous is not None
+                else progress_fingerprint(current, policy)
+            )
+            failure = failure_fingerprint(current)
+            state = current["state"]
+            return _decision(
+                False,
+                state,
+                "trusted_material_fact_envelope_required: newly introduced or changed material progress evidence is absent, mismatched, or unverified",
+                state in set(policy["session_release_states"]),
+                baseline_progress,
+                failure,
+            )
 
     progress = progress_fingerprint(current, policy)
     failure = failure_fingerprint(current)
@@ -1132,6 +1146,7 @@ def decide(
                 policy,
                 allowed=True,
                 release_session=True,
+                preserve_observed_head=True,
             )
         if requested_action != "complete":
             assert context is not None
@@ -1143,6 +1158,7 @@ def decide(
                 policy,
                 allowed=False,
                 release_session=True,
+                preserve_observed_head=False,
             )
 
     if previous is not None and previous["state"] not in release_states and same_progress and requested_action in {"mutate", "retrigger"}:
