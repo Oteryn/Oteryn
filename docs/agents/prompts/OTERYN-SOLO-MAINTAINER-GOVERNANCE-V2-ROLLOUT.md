@@ -152,51 +152,56 @@ For GitHub settings, there is exactly **one writer lane** at a time.
 
 1. Refresh PR #123 and protected META `main`.
 2. Confirm the V2 design, safety amendment, base plan, safety addendum and this prompt are canonical on protected `main` before implementation.
-3. Build/update the canonical execution-routing packet and fresh GitHub-state snapshot, then validate them with `python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-execution-routing-policy.json --packet <packet.json> --live-state <fresh-github-state.json>` before any implementation or settings mutation. The packet must bind the repository/default SHA/governing Issue/PR/task head, execution target/runner, CI availability, host restrictions, high-effort decision basis, and the one settings-writer lane; repeat this preflight after resumption or a material head change.
+3. For each repository, record the current task's explicit authorization and its exact permitted scope before any repository-content, workflow, branch, PR, live-settings, or break-glass mutation. Repository visibility, organization membership, or authorization for META does not imply authorization for Game, Platform, or Atlas. If the current task does not explicitly cover a repository/scope, keep that repository read-only. This scope record does not replace the distinct current-material-head owner authorization required for `CONTROL_PLANE_R2` integration.
 4. Refresh current `main` SHA and live protection/settings for all four repositories.
-5. Classify every unreadable field as `UNKNOWN`; do not guess.
-6. Classify each repository whose own serial cutover has not begun as `PENDING`: it carries no V2 settings deviation, is not `TRANSITION`, and cannot count toward terminal closeout.
-7. Record rollback snapshots before the first mutation in each repository.
+5. Use a separate execution-routing packet and fresh GitHub-state snapshot for each repository. Immediately before META implementation, and again immediately before the Game, Platform, and Atlas implementation/settings phases, validate that repository's packet with `python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-execution-routing-policy.json --packet <packet.json> --live-state <fresh-github-state.json>`. Each packet's `github_preflight` must describe only the repository/default SHA/governing Issue/PR/task head, execution target/runner, CI availability, host restrictions, high-effort decision basis, and the one settings-writer lane for that repository. A passing packet for an earlier repository cannot authorize or validate a later repository; refresh and revalidate after resumption or a material head/state change.
+6. Classify every unreadable field as `UNKNOWN`; do not guess.
+7. Classify each repository whose own serial cutover has not begun as `PENDING`: it carries no V2 settings deviation, is not `TRANSITION`, and cannot count toward terminal closeout.
+8. Record rollback snapshots before the first mutation in each repository.
 
 ### Phase 1 — META
 
-1. Make V2 the canonical desired-state contract and update deterministic validators/tests using RED -> GREEN TDD.
-2. Make `meta-gate` the complete PR and merge-group aggregate authority.
-3. Preserve existing protection while replacement behavior is being proven.
-4. Retire `ai-review-gate` as an external required context only after the replacement path is proven.
-5. Preserve the canonical R1/R2 review invocation and useful R0/R1/R2 risk classification as review evidence/decision support, without a separate required reaction/comment grammar.
-6. Run the real moving-base canary.
-7. Only after canary success, remove strict freshness for META.
-8. Read back all changed settings.
+1. Immediately before the first META implementation or settings mutation, refresh META live state and validate the META-specific routing packet required in Phase 0.
+2. Make V2 the canonical desired-state contract and update deterministic validators/tests using RED -> GREEN TDD.
+3. Make `meta-gate` the complete PR and merge-group aggregate authority.
+4. Preserve existing protection while replacement behavior is being proven.
+5. Retire `ai-review-gate` as an external required context only after the replacement path is proven.
+6. Preserve the canonical R1/R2 review invocation and useful R0/R1/R2 risk classification as review evidence/decision support, without a separate required reaction/comment grammar.
+7. Run the real moving-base canary.
+8. Only after canary success, remove strict freshness for META.
+9. Read back all changed settings.
 
 ### Phase 2 — Game
 
-1. Refresh and save the complete `Protect main` ruleset snapshot.
-2. Refactor `game-gate` so PR and merge-group identity/range resolution are safe and explicit.
-3. Preserve real dependency, CodeQL, Rust/Linux/Windows and product validation.
-4. Make PR title/body formatting advisory unless an independent product/release invariant proves otherwise.
-5. Set the solo-maintainer target to zero required approvals and no required CODEOWNER approval.
-6. Run the real moving-base canary.
-7. Only after canary success, remove strict freshness.
-8. Read back the final ruleset and required-status map.
+1. Immediately before Game implementation or settings mutation, refresh Game live state and validate a new Game-specific routing packet; do not reuse META's validation.
+2. Refresh and save the complete `Protect main` ruleset snapshot.
+3. Refactor `game-gate` so PR and merge-group identity/range resolution are safe and explicit.
+4. Preserve real dependency, CodeQL, Rust/Linux/Windows and product validation.
+5. Make PR title/body formatting advisory unless an independent product/release invariant proves otherwise.
+6. Set the solo-maintainer target to zero required approvals and no required CODEOWNER approval.
+7. Run the real moving-base canary.
+8. Only after canary success, remove strict freshness.
+9. Read back the final ruleset and required-status map.
 
 ### Phase 3 — Platform
 
-1. Prefer the existing `platform-gate` design; do not redesign a healthy provider without evidence.
-2. Verify broad/fail-closed merge-group validation rather than adding a complex optimizer merely to save CI minutes.
-3. Run the real moving-base canary.
-4. Only after canary success, remove strict freshness.
-5. Read back the final settings.
+1. Immediately before Platform implementation or settings mutation, refresh Platform live state and validate a new Platform-specific routing packet; do not reuse an earlier provider's validation.
+2. Prefer the existing `platform-gate` design; do not redesign a healthy provider without evidence.
+3. Verify broad/fail-closed merge-group validation rather than adding a complex optimizer merely to save CI minutes.
+4. Run the real moving-base canary.
+5. Only after canary success, remove strict freshness.
+6. Read back the final settings.
 
 ### Phase 4 — Atlas
 
-1. Preserve extraction provenance while it remains a real source-integrity invariant.
-2. Internalize provenance into `atlas-gate` rather than exposing `provenance-gate` as a second required context.
-3. Make PR-only change classification/E2E applicability safe for merge-group candidates without weakening coverage.
-4. Before canary admission, prove `provenance-gate` is produced on the exact merge-group candidate. If it is not, only after the replacement path is proven and explicit `CONTROL_PLANE_R2` owner authorization is recorded for the current material head/live PR, use one bounded transition to remove that legacy context, record the allowed deviation and readback, and restore it immediately if the canary fails.
-5. Run the real moving-base canary.
-6. Only after canary success, remove strict freshness and complete the desired-state removal of the obsolete second external provenance context.
-7. Read back final settings.
+1. Immediately before Atlas implementation or settings mutation, refresh Atlas live state and validate a new Atlas-specific routing packet; do not reuse an earlier provider's validation.
+2. Preserve extraction provenance while it remains a real source-integrity invariant.
+3. Internalize provenance into `atlas-gate` rather than exposing `provenance-gate` as a second required context.
+4. Make PR-only change classification/E2E applicability safe for merge-group candidates without weakening coverage.
+5. Before canary admission, prove `provenance-gate` is produced on the exact merge-group candidate. If it is not, only after the replacement path is proven and explicit `CONTROL_PLANE_R2` owner authorization is recorded for the current material head/live PR, use one bounded transition to remove that legacy context, record the allowed deviation and readback, and restore it immediately if the canary fails.
+6. Run the real moving-base canary.
+7. Only after canary success, remove strict freshness and complete the desired-state removal of the obsolete second external provenance context.
+8. Read back final settings.
 
 ### Phase 5 — Break-glass proof
 

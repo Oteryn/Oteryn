@@ -44,6 +44,14 @@ Read-only surfaces inspected during the audit included:
 
 The available GitHub integration exposed required status contexts and repository rulesets but did not provide a complete readback of every classic branch-protection field for META, Platform and Atlas. Full review/admin/bypass/settings state must therefore be refreshed immediately before any mutation. Missing readback is `UNKNOWN`, never assumed safe or unsafe.
 
+## Execution authority and routing boundary
+
+Listing a repository in this design does not itself grant a coordinator authority to write to it. Before any code, workflow, branch, PR, or live-settings mutation in a repository, the rollout record must identify the current task's explicit authorization for that exact repository and its permitted scope. At minimum, the record must distinguish repository-content/PR work, workflow work, protected-settings work, and break-glass work, and bind that scope to the governing Issue/PR or equivalent current task coordinate. If the authorization is absent or ambiguous, that repository remains read-only. Authority recorded for META never implicitly authorizes Game, Platform, or Atlas.
+
+This scope record is separate from, and cannot substitute for, the current-material-head owner authorization required for a `CONTROL_PLANE_R2` integration. It protects against a coordinator with access to multiple repositories treating visibility, a stale task, or one provider's scope as permission to mutate another provider.
+
+Use the existing execution-routing policy as a repository-scoped preflight, not as one organization-wide token. Immediately before each repository's implementation or live-settings phase, refresh that repository's live GitHub snapshot and validate a packet whose `github_preflight` describes only that repository, its current default-branch SHA, governing Issue/PR, task head, execution target/runner, CI availability, host restrictions, and the single settings-writer lane. A passing META packet cannot be reused for Game, Platform, or Atlas; a resumed or materially changed task requires a fresh validation for the affected repository. This is a bounded application of the existing execution-routing policy, adds no external required status, and is intended to prevent out-of-scope or stale-environment mutations rather than create a new autonomous merge authority.
+
 ## Verified audit snapshot
 
 At the time of the final audit refresh:
