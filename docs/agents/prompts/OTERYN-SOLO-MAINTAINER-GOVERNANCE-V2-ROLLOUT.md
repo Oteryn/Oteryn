@@ -152,10 +152,11 @@ For GitHub settings, there is exactly **one writer lane** at a time.
 
 1. Refresh PR #123 and protected META `main`.
 2. Confirm the V2 design, safety amendment, base plan, safety addendum and this prompt are canonical on protected `main` before implementation.
-3. Refresh current `main` SHA and live protection/settings for all four repositories.
-4. Classify every unreadable field as `UNKNOWN`; do not guess.
-5. Classify each repository whose own serial cutover has not begun as `PENDING`: it carries no V2 settings deviation, is not `TRANSITION`, and cannot count toward terminal closeout.
-6. Record rollback snapshots before the first mutation in each repository.
+3. Build/update the canonical execution-routing packet and fresh GitHub-state snapshot, then validate them with `python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-execution-routing-policy.json --packet <packet.json> --live-state <fresh-github-state.json>` before any implementation or settings mutation. The packet must bind the repository/default SHA/governing Issue/PR/task head, execution target/runner, CI availability, host restrictions, high-effort decision basis, and the one settings-writer lane; repeat this preflight after resumption or a material head change.
+4. Refresh current `main` SHA and live protection/settings for all four repositories.
+5. Classify every unreadable field as `UNKNOWN`; do not guess.
+6. Classify each repository whose own serial cutover has not begun as `PENDING`: it carries no V2 settings deviation, is not `TRANSITION`, and cannot count toward terminal closeout.
+7. Record rollback snapshots before the first mutation in each repository.
 
 ### Phase 1 — META
 
@@ -192,9 +193,10 @@ For GitHub settings, there is exactly **one writer lane** at a time.
 1. Preserve extraction provenance while it remains a real source-integrity invariant.
 2. Internalize provenance into `atlas-gate` rather than exposing `provenance-gate` as a second required context.
 3. Make PR-only change classification/E2E applicability safe for merge-group candidates without weakening coverage.
-4. Run the real moving-base canary.
-5. Only after canary success, remove strict freshness and the obsolete second external provenance context.
-6. Read back final settings.
+4. Before canary admission, prove `provenance-gate` is produced on the exact merge-group candidate. If it is not, only after the replacement path is proven and explicit `CONTROL_PLANE_R2` owner authorization is recorded for the current material head/live PR, use one bounded transition to remove that legacy context, record the allowed deviation and readback, and restore it immediately if the canary fails.
+5. Run the real moving-base canary.
+6. Only after canary success, remove strict freshness and complete the desired-state removal of the obsolete second external provenance context.
+7. Read back final settings.
 
 ### Phase 5 — Break-glass proof
 
@@ -233,7 +235,7 @@ aggregate gate = SUCCESS
 A integrates through the queue without mutating head X merely for freshness
 ```
 
-Until the bounded canary either succeeds or restores, strict freshness stays enabled and the repository remains `TRANSITION`, not `TARGET`. If the canary fails and restoration readback matches the captured pre-state, close the receipt as `ROLLED_BACK`; it remains non-target and any retry requires a new bounded receipt.
+Until the bounded canary either succeeds or restores, strict freshness stays enabled and the repository remains `TRANSITION`, not `TARGET`. If the canary fails and timely (`closed_at <= expires_at`) restoration readback matches the captured pre-state, close the receipt as `ROLLED_BACK`; it remains non-target and any retry requires a new bounded receipt. A late closure is `DRIFT` even if settings were ultimately restored.
 
 ## Transition contract
 
@@ -262,7 +264,7 @@ post_state_fingerprint
 post_state_readback
 ```
 
-If `now > expires_at` before the transition reaches its success condition or is explicitly rolled back/closed with valid terminal evidence, the state is `DRIFT`, not an indefinitely valid transition. A receipt is terminal `ROLLED_BACK` only when `terminal_status = ROLLED_BACK`, `post_state_fingerprint` matches `pre_state_fingerprint`, and positive `post_state_readback` proves restoration; otherwise it is `DRIFT`. A successfully closed or validly rolled-back receipt with these machine-readable fields remains terminal and does not become `DRIFT` solely because its historical expiry passes.
+If `now > expires_at` before the transition reaches its success condition or is explicitly rolled back/closed with valid, timely (`closed_at <= expires_at`) terminal evidence, the state is `DRIFT`, not an indefinitely valid transition. A receipt is terminal `ROLLED_BACK` only when `terminal_status = ROLLED_BACK`, timely `closed_at <= expires_at`, `post_state_fingerprint` matches `pre_state_fingerprint`, and positive `post_state_readback` proves restoration; otherwise it is `DRIFT`. A terminal success also requires timely `closed_at <= expires_at`. A successfully closed or validly rolled-back receipt with these machine-readable fields remains terminal and does not become `DRIFT` solely because its historical expiry passes.
 
 `ecosystem/governance-desired-state.json` should contain stable target state, not transient PR heads, review generations or temporary exception history.
 
@@ -279,7 +281,7 @@ On canary failure:
 5. repair the implementation through normal reviewed code changes;
 6. do not create no-op/retrigger commits;
 7. do not add a new bypass or required status as a shortcut.
-8. after a matching restoration readback, close the receipt as `ROLLED_BACK`; any retry opens a new bounded receipt.
+8. after a matching, timely (`closed_at <= expires_at`) restoration readback, close the receipt as `ROLLED_BACK`; any retry opens a new bounded receipt. A late closure is `DRIFT`.
 
 Do not continue to the next repository until the current repository is verified `TARGET`. `ROLLED_BACK` is recovery evidence, not permission to advance the serial rollout.
 

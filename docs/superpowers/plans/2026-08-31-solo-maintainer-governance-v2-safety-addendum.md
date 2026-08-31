@@ -48,11 +48,11 @@ A task is not complete merely because its local tests are green if it violates o
 - [ ] Keep desired state small: do not store transient review generations, transient PR heads or a permanent transition database in `governance-desired-state.json`.
 - [ ] Add audit tests that fail if a permanent repository's target required-status set contains anything other than its single aggregate gate.
 - [ ] Add audit tests that reject a solo-maintainer baseline requiring human/CODEOWNER approval.
-- [ ] Add audit tests for `TRANSITION` expiry: an active transition past `expires_at` without terminal success/rollback must classify as `DRIFT`.
+- [ ] Add audit tests for `TRANSITION` expiry: an active transition past `expires_at` without terminal success/rollback must classify as `DRIFT`, and a receipt whose `closed_at > expires_at` must remain `DRIFT` even if it later declares success or rollback.
 - [ ] Add audit tests that a serially unstarted repository is explicit `PENDING`, not `DRIFT` or `TRANSITION`; `PENDING` authorizes no settings deviation and blocks terminal V2 closeout.
-- [ ] Add audit tests that a restored failed cutover is `ROLLED_BACK` only with `terminal_status = ROLLED_BACK`, matching pre/post-state fingerprints and positive readback; otherwise classify `DRIFT`, and reject `ROLLED_BACK` at terminal V2 closeout.
+- [ ] Add audit tests that a restored failed cutover is `ROLLED_BACK` only with `terminal_status = ROLLED_BACK`, timely `closed_at <= expires_at`, matching pre/post-state fingerprints and positive readback; otherwise classify `DRIFT`, and reject `ROLLED_BACK` at terminal V2 closeout.
 - [ ] Add validation that an active transition record has `transition_id`, `repository`, `issue_or_pr`, `started_at`, `expires_at`, `pre_state_fingerprint`, `allowed_deviations`, `success_condition`, and `rollback_condition`.
-- [ ] Add validation that a terminal receipt appends machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback`; only this evidence distinguishes terminal closure from an expired active transition.
+- [ ] Add validation that a terminal receipt appends machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback`, and that `closed_at <= expires_at`; only timely evidence distinguishes terminal closure from an expired active transition.
 - [ ] Store the actual transition record in the canonical rollout Issue/PR or existing lifecycle authority rather than inventing a new persistent transition subsystem.
 
 `PENDING` and `ROLLED_BACK` are classifications in the existing read-only audit model, not new governance authorities: `PENDING` prevents the concrete false-`DRIFT`/unbounded-`TRANSITION` threat while a later repository awaits its serial turn, while `ROLLED_BACK` prevents an restored failed cutover from being misread as an active transition or target. They add no status, writer, receipt or bypass and are invalid at terminal closeout.
@@ -214,11 +214,11 @@ post_state_readback
 - [ ] `expires_at` must be set before the first mutation.
 - [ ] The expiry window must be only as long as necessary for the concrete canary/rollback operation; do not use an indefinite or convenience horizon.
 - [ ] Any live deviation not listed in `allowed_deviations` is `DRIFT` immediately.
-- [ ] If the transition expires before success/rollback with valid terminal evidence, classify `DRIFT`.
-- [ ] Terminal success closes the receipt toward `TARGET`; terminal rollback is `ROLLED_BACK` only when `post_state_fingerprint` matches `pre_state_fingerprint` and readback proves restoration.
+- [ ] If the transition expires before success/rollback with valid, timely (`closed_at <= expires_at`) terminal evidence, classify `DRIFT`; a late closure is also `DRIFT`.
+- [ ] Terminal success closes the receipt toward `TARGET`; terminal rollback is `ROLLED_BACK` only when timely `closed_at <= expires_at`, `post_state_fingerprint` matches `pre_state_fingerprint`, and readback proves restoration.
 - [ ] The read-only auditor must surface active/expired/terminal/rolled-back transition state without becoming a settings writer.
 
-**Threat justification for the terminal fields:** the concrete threat is false `DRIFT` after a completed serial cutover when `expires_at` later passes. Existing active-receipt fields and free-form comments cannot distinguish closure from an active deviation. The minimal control is the four terminal evidence fields above; without them an auditor can misclassify a safe closed transition, and their operational cost is one receipt update at closeout. They add no new status, writer, database or merge authority.
+**Threat justification for the terminal fields:** the concrete threats are false `DRIFT` after a completed serial cutover when `expires_at` later passes and expiry evasion through a late retroactive closure. Existing active-receipt fields and free-form comments cannot distinguish closure from an active deviation or prove it closed before expiry. The minimal control is the four terminal evidence fields plus `closed_at <= expires_at`; without them an auditor can misclassify a safe closed transition or accept an expired exception, and their operational cost is one receipt update at closeout. They add no new status, writer, database or merge authority.
 
 No new transition microservice/database is permitted under this addendum without a separate GS-10 threat justification.
 

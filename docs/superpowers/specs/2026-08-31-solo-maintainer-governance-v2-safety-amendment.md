@@ -115,15 +115,15 @@ rollback_condition
 
 Optional owner metadata may be included but must not become a second identity authority.
 
-On terminal success or rollback/closure, the receipt must append machine-readable `terminal_status` (`SUCCESS` or `ROLLED_BACK`), `closed_at`, `post_state_fingerprint`, and `post_state_readback`. The auditor must use those terminal fields, not expiry passage or free-form prose, to distinguish a closed receipt from an active deviation. These fields are evidence for the existing receipt and read-only auditor, not a new governance authority, required status or database.
+On terminal success or rollback/closure, the receipt must append machine-readable `terminal_status` (`SUCCESS` or `ROLLED_BACK`), `closed_at`, `post_state_fingerprint`, and `post_state_readback`. Terminal evidence is valid only when `closed_at <= expires_at`; a late closure is `DRIFT`, not a retroactively valid terminal state. The auditor must use those terminal fields, not expiry passage or free-form prose, to distinguish a closed receipt from an active deviation. These fields are evidence for the existing receipt and read-only auditor, not a new governance authority, required status or database.
 
 A transition record belongs in the canonical rollout Issue/PR or another existing durable lifecycle authority. It must not create a new permanent transition database unless a separate threat/operational requirement justifies one.
 
-If `now > expires_at` and the transition has not reached its success condition or been explicitly rolled back/closed with valid terminal evidence, the read-only auditor must classify the state as `DRIFT`, not `TRANSITION`.
+If `now > expires_at` and the transition has not reached its success condition or been explicitly rolled back/closed with valid, timely (`closed_at <= expires_at`) terminal evidence, the read-only auditor must classify the state as `DRIFT`, not `TRANSITION`.
 
 A repository whose serial cutover has not begun is `PENDING`, not `TRANSITION` or `DRIFT`: it remains on its read-back pre-cutover baseline, authorizes no V2 settings deviation, and cannot satisfy target or terminal closeout. `PENDING` becomes `TRANSITION` only after that repository's own bounded receipt exists immediately before its cutover.
 
-A failed cutover is `ROLLED_BACK`, not `TRANSITION`, only when its closed receipt has `terminal_status = ROLLED_BACK`, `post_state_fingerprint` matches `pre_state_fingerprint`, and positive `post_state_readback` proves restoration. `ROLLED_BACK` is terminal non-target evidence, authorizes no continued deviation or terminal closeout, and any retry requires a new bounded receipt; a missing or mismatched restoration proof is `DRIFT`.
+A failed cutover is `ROLLED_BACK`, not `TRANSITION`, only when its closed receipt has `terminal_status = ROLLED_BACK`, timely `closed_at <= expires_at`, `post_state_fingerprint` matches `pre_state_fingerprint`, and positive `post_state_readback` proves restoration. `ROLLED_BACK` is terminal non-target evidence, authorizes no continued deviation or terminal closeout, and any retry requires a new bounded receipt; a missing or mismatched restoration proof is `DRIFT`.
 
 ### GS-7 — MQ canary must include a moving-base scenario
 

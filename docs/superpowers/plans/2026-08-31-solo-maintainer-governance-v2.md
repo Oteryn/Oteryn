@@ -41,7 +41,7 @@
 
 - [ ] **Step 1: Refresh live protection/ruleset/Merge Queue state for all four permanent repositories**
 
-Record exact current `main` SHA, required contexts, strict-freshness setting, PR requirement, force-push/deletion state, approval/CODEOWNER requirement, bypass/admin enforcement, merge methods and Merge Queue state. Any unreadable field remains `UNKNOWN` and blocks mutation of that field until readback is available.
+Record exact current `main` SHA, required contexts, strict-freshness setting, PR requirement, force-push/deletion state, approval/CODEOWNER requirement, bypass/admin enforcement, merge methods and Merge Queue state. Before any implementation or settings mutation, create/update the canonical execution-routing packet and validate it against this fresh GitHub snapshot with `python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-execution-routing-policy.json --packet <packet.json> --live-state <fresh-github-state.json>`; the packet must bind repository/default SHA/governing Issue/PR/task head, execution target/runner, CI availability, host restrictions and the single settings-writer decision. Any unreadable field remains `UNKNOWN` and blocks mutation of that field until readback is available.
 
 - [ ] **Step 2: Write failing desired-state tests for the V2 external-gate contract**
 
@@ -91,12 +91,12 @@ The validator must distinguish:
 PENDING     serial V2 cutover has not begun; live pre-cutover baseline is visible, no V2 deviation is authorized, and the repository is not TARGET
 TARGET      replacement gate/MQ proven and desired state active
 TRANSITION  old protection intentionally retained while replacement is being canaried under a bounded receipt
-ROLLED_BACK failed bounded cutover restored to matching pre-state with valid terminal receipt; non-target and any retry needs a new receipt
+ROLLED_BACK failed bounded cutover restored to matching pre-state with timely (`closed_at <= expires_at`) valid terminal receipt; non-target and any retry needs a new receipt
 DRIFT       live state differs without an authorized transition record or valid restoration evidence
 UNKNOWN     required live field could not be read
 ```
 
-`PENDING` is not `TRANSITION`, requires no expiry receipt, and cannot permit a settings mutation or terminal V2 closeout. It becomes `TRANSITION` only after that repository's own receipt is created immediately before its serial turn. `ROLLED_BACK` is terminal only when `terminal_status = ROLLED_BACK`, `post_state_fingerprint` equals `pre_state_fingerprint`, and positive `post_state_readback` proves restoration; it cannot permit a settings mutation, retry, or terminal V2 closeout. The validator must never classify an explicitly authorized serial cutover as compliant before its repository canary succeeds. Validate the existing active-receipt fields before mutation; on terminal success or rollback, require machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback` so the auditor can distinguish a closed receipt from an expired active deviation.
+`PENDING` is not `TRANSITION`, requires no expiry receipt, and cannot permit a settings mutation or terminal V2 closeout. It becomes `TRANSITION` only after that repository's own receipt is created immediately before its serial turn. `ROLLED_BACK` is terminal only when `terminal_status = ROLLED_BACK`, `closed_at <= expires_at`, `post_state_fingerprint` equals `pre_state_fingerprint`, and positive `post_state_readback` proves restoration; it cannot permit a settings mutation, retry, or terminal V2 closeout. The validator must never classify an explicitly authorized serial cutover as compliant before its repository canary succeeds. Validate the existing active-receipt fields before mutation; on terminal success or rollback, require machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback` so the auditor can distinguish a closed receipt from an expired active deviation.
 
 - [ ] **Step 7: Run all focused META governance tests and verify GREEN**
 
