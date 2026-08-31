@@ -465,7 +465,6 @@ def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> 
             "allow_deletions": {"enabled": False},
             "enforce_admins": {"enabled": True},
             "required_status_checks": {"strict": True},
-            "required_merge_queue": {"enabled": False},
             "required_pull_request_reviews": {
                 "required_approving_review_count": 1,
                 "require_code_owner_reviews": True,

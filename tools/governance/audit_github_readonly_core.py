@@ -1944,8 +1944,6 @@ class Audit:
             strict = status_checks.get("strict") if isinstance(status_checks.get("strict"), bool) else None
         else:
             strict = None
-        raw_queue = protection.get("required_merge_queue")
-        merge_queue = raw_queue.get("enabled") if isinstance(raw_queue, dict) else raw_queue
         broad_bypass = (
             (not enforce_admins) or has_pr_bypass
             if isinstance(enforce_admins, bool) and isinstance(has_pr_bypass, bool) else None
@@ -1958,7 +1956,9 @@ class Audit:
             "strict_required_status_checks": strict,
             "required_approving_review_count": review_count,
             "require_code_owner_review": codeowner_review,
-            "merge_queue": merge_queue if isinstance(merge_queue, bool) else None,
+            # Classic branch protection cannot require Merge Queue; that control
+            # is expressed only by an applicable repository ruleset.
+            "merge_queue": False,
         }
 
     @staticmethod
