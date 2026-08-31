@@ -832,8 +832,16 @@ def _execution_prerequisite_reason(
     return None
 
 
-def _dispatch_scope(current: dict[str, Any], action: str) -> tuple[str, ...]:
+def _dispatch_scope(
+    current: dict[str, Any],
+    action: str,
+    progress: str | None = None,
+) -> tuple[str, ...]:
     scope = list(_review_binding_scope(current.get("review_binding")))
+    if action == "retry":
+        if not isinstance(progress, str) or FINGERPRINT_RE.fullmatch(progress) is None:
+            raise GuardError("retry dispatch scope requires exact material progress fingerprint")
+        scope.append(f"material_progress:{progress}")
     if action == "run_loop_breaker_audit":
         scope.append(f"task_head_sha:{current['task_head_sha']}")
         scope.append(
@@ -863,7 +871,7 @@ def _reserve_execution(
         next_checkpoint=_checkpoint_digest(next_snapshot),
         next_snapshot=next_snapshot,
         action=action,
-        scope=_dispatch_scope(current, action),
+        scope=_dispatch_scope(current, action, progress),
     )
     if not reservation.committed:
         return Decision(
@@ -876,6 +884,63 @@ def _reserve_execution(
             reservation.reservation_key,
         )
     return Decision(True, state, reason, release_session, progress, failure, reservation.reservation_key)
+
+
+def _external_wait_snapshot(
+    previous: dict[str, Any] | None,
+    current: dict[str, Any],
+) -> dict[str, Any]:
+    if previous is None:
+        next_snapshot = dict(current)
+    else:
+        next_snapshot = dict(previous)
+        for field in ("blocking_dependency", "dependency_kind", "gate_state"):
+            next_snapshot[field] = current[field]
+    next_snapshot["state"] = "WAITING_EXTERNAL"
+    return next_snapshot
+
+
+def _transition_external_wait(
+    context: ExecutionContext,
+    previous: dict[str, Any] | None,
+    current: dict[str, Any],
+    reason: str,
+    policy: dict[str, Any],
+    *,
+    allowed: bool,
+    release_session: bool,
+) -> Decision:
+    next_snapshot = _external_wait_snapshot(previous, current)
+    progress = progress_fingerprint(next_snapshot, policy)
+    failure = failure_fingerprint(next_snapshot)
+    transition = context.checkpoint_outbox.transition(
+        repository=current["repository"],
+        task_id=current["task_id"],
+        expected_checkpoint=_checkpoint_digest(previous) if previous is not None else None,
+        next_checkpoint=_checkpoint_digest(next_snapshot),
+        next_snapshot=next_snapshot,
+        reason=reason,
+        scope=_review_binding_scope(next_snapshot.get("review_binding")),
+    )
+    if not transition.committed:
+        return Decision(
+            False,
+            current["state"],
+            transition.reason,
+            False,
+            progress,
+            failure,
+            transition.reservation_key,
+        )
+    return Decision(
+        allowed,
+        "WAITING_EXTERNAL",
+        reason,
+        release_session,
+        progress,
+        failure,
+        transition.reservation_key,
+    )
 
 
 def _transition_state(
@@ -1059,29 +1124,25 @@ def decide(
                     progress,
                     failure,
                 )
-            return _transition_state(
+            return _transition_external_wait(
                 context,
                 previous,
                 current,
-                "WAITING_EXTERNAL",
                 "external dependency is pending",
+                policy,
                 allowed=True,
                 release_session=True,
-                progress=progress,
-                failure=failure,
             )
         if requested_action != "complete":
             assert context is not None
-            return _transition_state(
+            return _transition_external_wait(
                 context,
                 previous,
                 current,
-                "WAITING_EXTERNAL",
                 "external dependency is pending; operational work is forbidden",
+                policy,
                 allowed=False,
                 release_session=True,
-                progress=progress,
-                failure=failure,
             )
 
     if previous is not None and previous["state"] not in release_states and same_progress and requested_action in {"mutate", "retrigger"}:
@@ -1319,6 +1380,28 @@ def decide(
 
     counter_field = ACTION_COUNTER_FIELDS.get(requested_action)
     if counter_field is not None:
+        if (
+            requested_action == "retry"
+            and not current["first_material_failure"]
+            and current[counter_field] == 0
+        ):
+            assert context is not None
+            initial_scope = _dispatch_scope(current, requested_action, progress)
+            if context.checkpoint_outbox.has_acknowledged_dispatch(
+                current["repository"],
+                current["task_id"],
+                requested_action,
+                initial_scope,
+            ):
+                state, release = _counter_denial_state(requested_action, current)
+                return _decision(
+                    False,
+                    state,
+                    "initial_attempt has already been consumed for this durable material progress scope",
+                    release,
+                    progress,
+                    failure,
+                )
         consumption_reason = _action_counter_consumption_reason(
             previous, current, requested_action
         )
