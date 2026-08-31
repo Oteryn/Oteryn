@@ -117,6 +117,34 @@ class FinalMaterialAuthorityP1Tests(unittest.TestCase):
         self.assertFalse(result.allowed)
         self.assertIn("trusted_material_fact_envelope_required", result.reason)
 
+    def test_initial_checkpoint_rejects_untrusted_material_envelope(self):
+        current = snapshot(
+            blocking_dependency="external:review-evidence",
+            dependency_kind="external",
+            gate_state="waiting",
+        )
+        envelope = make_material_fact_envelope(
+            POLICY,
+            repository=current["repository"],
+            task_id=current["task_id"],
+            frozen_head_sha=current["task_head_sha"],
+            reason="review_finding",
+            source_evidence="review-thread:sol-p1-a",
+        )
+        current["material_fact_envelope"] = envelope
+        directory = tempfile.TemporaryDirectory()
+        outbox = SqliteCheckpointOutbox(Path(directory.name) / "checkpoint.db")
+        context = ExecutionContext(TestEvidenceAuthority(set(), set()), outbox)
+        try:
+            result = raw_decide(None, current, "observe", POLICY, context=context)
+            record = outbox.load_checkpoint(current["repository"], current["task_id"])
+        finally:
+            directory.cleanup()
+
+        self.assertFalse(result.allowed)
+        self.assertIn("trusted_material_fact_envelope_required", result.reason)
+        self.assertIsNone(record)
+
     def test_terminal_risk_ledger_cannot_be_edited_during_final_qualification(self):
         previous = snapshot(
             state="READY",
@@ -193,6 +221,40 @@ class FinalMaterialAuthorityP1Tests(unittest.TestCase):
         self.assertFalse(record.snapshot["candidate_frozen"])
         self.assertEqual(record.snapshot["phase"], "LOOP_BREAKER_AUDIT")
         self.assertEqual(record.snapshot["final_qualification_runs_since_audit"], 0)
+
+    def test_external_wait_observation_persists_new_unfrozen_head(self):
+        previous = snapshot(task_head_sha="a" * 40, candidate_frozen=False)
+        directory = tempfile.TemporaryDirectory()
+        outbox = SqliteCheckpointOutbox(Path(directory.name) / "checkpoint.db")
+        outbox.seed_checkpoint(
+            previous["repository"],
+            previous["task_id"],
+            _checkpoint_digest(previous),
+            snapshot=previous,
+        )
+        context = ExecutionContext(TestEvidenceAuthority(set(), set()), outbox)
+        try:
+            current = copy.deepcopy(previous)
+            current["task_head_sha"] = "c" * 40
+            current["blocking_dependency"] = "external:ci-head-c"
+            current["dependency_kind"] = "external"
+            current["gate_state"] = "waiting"
+
+            result = raw_decide(previous, current, "observe", POLICY, context=context)
+            record = outbox.load_checkpoint(previous["repository"], previous["task_id"])
+        finally:
+            directory.cleanup()
+
+        self.assertTrue(result.allowed)
+        self.assertEqual(result.state, "WAITING_EXTERNAL")
+        self.assertIsNotNone(record)
+        self.assertEqual(record.snapshot["state"], "WAITING_EXTERNAL")
+        self.assertEqual(record.snapshot["task_head_sha"], "c" * 40)
+        self.assertEqual(record.snapshot["blocking_dependency"], "external:ci-head-c")
+        self.assertEqual(record.snapshot["dependency_kind"], "external")
+        self.assertEqual(record.snapshot["gate_state"], "waiting")
+        self.assertFalse(record.snapshot["candidate_frozen"])
+        self.assertEqual(record.snapshot["phase"], previous["phase"])
 
     def test_initial_retry_is_consumed_once_per_material_progress_scope(self):
         previous = snapshot()
