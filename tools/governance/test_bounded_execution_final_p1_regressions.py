@@ -150,6 +150,94 @@ class FinalMaterialAuthorityP1Tests(unittest.TestCase):
         finally:
             directory.cleanup()
 
+    def test_external_wait_denial_persists_only_wait_coordinates_not_action_fields(self):
+        previous = snapshot(
+            state="READY",
+            phase="LOOP_BREAKER_AUDIT",
+            candidate_frozen=False,
+            late_material_findings=2,
+            audited_late_material_findings=2,
+            final_qualification_runs_since_audit=0,
+        )
+        directory, context = self._context(previous)
+        try:
+            current = copy.deepcopy(previous)
+            current["review_binding"] = previous["review_binding"]
+            current["blocking_dependency"] = "external:review-evidence"
+            current["dependency_kind"] = "external"
+            current["gate_state"] = "waiting"
+            current["candidate_frozen"] = True
+            current["phase"] = "final_qualification"
+            current["final_qualification_runs_since_audit"] = 1
+
+            result = raw_decide(
+                previous,
+                current,
+                "enter_final_qualification",
+                POLICY,
+                context=context,
+            )
+            record = context.checkpoint_outbox.load_checkpoint(
+                previous["repository"], previous["task_id"]
+            )
+        finally:
+            directory.cleanup()
+
+        self.assertFalse(result.allowed)
+        self.assertEqual(result.state, "WAITING_EXTERNAL")
+        self.assertIsNotNone(record)
+        self.assertEqual(record.snapshot["state"], "WAITING_EXTERNAL")
+        self.assertEqual(record.snapshot["blocking_dependency"], "external:review-evidence")
+        self.assertEqual(record.snapshot["dependency_kind"], "external")
+        self.assertEqual(record.snapshot["gate_state"], "waiting")
+        self.assertFalse(record.snapshot["candidate_frozen"])
+        self.assertEqual(record.snapshot["phase"], "LOOP_BREAKER_AUDIT")
+        self.assertEqual(record.snapshot["final_qualification_runs_since_audit"], 0)
+
+    def test_initial_retry_is_consumed_once_per_material_progress_scope(self):
+        previous = snapshot()
+        directory, context = self._context(previous)
+        try:
+            first = copy.deepcopy(previous)
+            first["review_binding"] = previous["review_binding"]
+            first_result = raw_decide(previous, first, "retry", POLICY, context=context)
+            self.assertTrue(first_result.allowed)
+
+            claimed = context.checkpoint_outbox.claim_pending_dispatch(
+                previous["repository"], previous["task_id"]
+            )
+            self.assertIsNotNone(claimed)
+            self.assertTrue(
+                context.checkpoint_outbox.begin_dispatch(
+                    claimed.reservation_key, claimed.dispatch_generation
+                )
+            )
+            self.assertTrue(
+                context.checkpoint_outbox.acknowledge_dispatch(
+                    claimed.reservation_key, claimed.dispatch_generation
+                )
+            )
+
+            durable = context.checkpoint_outbox.load_checkpoint(
+                previous["repository"], previous["task_id"]
+            )
+            self.assertIsNotNone(durable)
+            second_previous = durable.snapshot
+            second = copy.deepcopy(second_previous)
+            second["review_generation"] = "descriptive-generation-churn"
+            second_result = raw_decide(
+                second_previous,
+                second,
+                "retry",
+                POLICY,
+                context=context,
+            )
+        finally:
+            directory.cleanup()
+
+        self.assertFalse(second_result.allowed)
+        self.assertIn("initial_attempt", second_result.reason)
+
 
 if __name__ == "__main__":
     unittest.main()
