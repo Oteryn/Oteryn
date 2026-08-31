@@ -1,0 +1,28 @@
+name: META merge-group AI review adapter
+
+on:
+  merge_group:
+    types: [checks_requested]
+
+permissions: {}
+
+jobs:
+  ai-review-gate:
+    name: ai-review-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate merge-group lifecycle identity
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref || '' }}
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EVENT_NAME" == "merge_group" ]]
+          [[ "$EVENT_ACTION" == "checks_requested" ]]
+          [[ "$MERGE_GROUP_BASE_REF" == "refs/heads/main" ]]
+          [[ "$MERGE_GROUP_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_SHA" == "$MERGE_GROUP_HEAD_SHA" ]]

@@ -12,7 +12,7 @@ The stable aggregate check name is:
 meta-gate
 ```
 
-Repository protection should require `meta-gate` on the exact pull-request head before merge. Internal steps may evolve without changing that public gate name.
+Repository protection should require `meta-gate` on the exact pull-request head for normal PR qualification and on the exact GitHub Merge Queue integration candidate for queue qualification. Internal steps may evolve without changing that public gate name.
 
 ## Required validation
 
@@ -33,6 +33,7 @@ Repository protection should require `meta-gate` on the exact pull-request head 
 ## Trigger and runner policy
 
 - Pull requests targeting `main` run the gate.
+- Merge Queue `checks_requested` events run the same gate against the exact merge-group candidate (`github.sha` equals `merge_group.head_sha`), not merely the reviewed PR head.
 - Pushes to `main` run the same gate as post-merge verification.
 - Pull-request runs use concurrency cancellation so superseded heads do not waste Actions capacity.
 - The default runner is GitHub-hosted `ubuntu-latest`; META must not require a trusted self-hosted or production-connected runner for ordinary validation.
@@ -50,6 +51,6 @@ A compatible ecosystem release may reference successful provider evidence by imm
 
 ## Branch protection target
 
-During PR #15 enforcement bootstrap, `main` is protected with pull requests required, zero mandatory human approvals for the one-maintainer model, strict `meta-gate` status, administrator enforcement, linear history, conversation resolution, and force-push/deletion disabled. PR #15 installs the trusted-base `ai-review-gate` check; immediately after that PR merges, branch protection must require `ai-review-gate` as the review authority (with deterministic `meta-gate` retained as applicable).
+`main` is protected with pull requests required, zero mandatory human approvals for the one-maintainer model, `meta-gate`, administrator enforcement, linear history, conversation resolution, and force-push/deletion disabled. `ai-review-gate` remains the PR review authority. Its separate merge-group adapter performs only fail-closed lifecycle identity validation after queue admission; it does not inspect candidate code or replace PR review.
 
 Changing branch/ruleset settings is an administrative GitHub operation, not something this workflow attempts to perform with `GITHUB_TOKEN`.
