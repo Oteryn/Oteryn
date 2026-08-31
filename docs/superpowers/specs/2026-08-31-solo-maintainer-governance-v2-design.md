@@ -291,6 +291,8 @@ The canonical desired-state model must change before live settings change, other
 
 The desired state should stay small. It should not encode transient PR heads, review-generation identifiers, external reviewer output grammar or implementation details of internal provider jobs.
 
+During the ordered rollout, a repository whose own cutover has not begun is `PENDING`: its final V2 target is documented, its live protection remains the read-back pre-cutover baseline, no V2 settings deviation is authorized, and it cannot be counted as `TARGET`. `PENDING` is not `TRANSITION` and needs no expiry receipt; it becomes `TRANSITION` only when that repository's bounded receipt is created immediately before its serial cutover. Final V2 closeout rejects any remaining `PENDING` repository.
+
 ## Cutover strategy
 
 Do not perform a big-bang organization-wide mutation.

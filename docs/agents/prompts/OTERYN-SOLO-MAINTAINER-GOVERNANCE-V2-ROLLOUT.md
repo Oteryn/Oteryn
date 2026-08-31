@@ -154,7 +154,8 @@ For GitHub settings, there is exactly **one writer lane** at a time.
 2. Confirm the V2 design, safety amendment, base plan, safety addendum and this prompt are canonical on protected `main` before implementation.
 3. Refresh current `main` SHA and live protection/settings for all four repositories.
 4. Classify every unreadable field as `UNKNOWN`; do not guess.
-5. Record rollback snapshots before the first mutation in each repository.
+5. Classify each repository whose own serial cutover has not begun as `PENDING`: it carries no V2 settings deviation, is not `TRANSITION`, and cannot count toward terminal closeout.
+6. Record rollback snapshots before the first mutation in each repository.
 
 ### Phase 1 — META
 
@@ -331,6 +332,7 @@ Do not declare V2 complete until live evidence proves all of the following:
 - obsolete external `ai-review-gate` and `provenance-gate` contexts are gone after their useful semantics are retired/internalized;
 - desired-state validation agrees with live settings;
 - no temporary transition/bypass remains active;
+- no permanent repository remains `PENDING`;
 - break-glass has passed one isolated real exercise and restoration readback;
 - superseded moving-head design material cannot be mistaken for current authority.
 

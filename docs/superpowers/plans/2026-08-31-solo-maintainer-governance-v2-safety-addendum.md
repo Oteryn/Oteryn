@@ -49,9 +49,12 @@ A task is not complete merely because its local tests are green if it violates o
 - [ ] Add audit tests that fail if a permanent repository's target required-status set contains anything other than its single aggregate gate.
 - [ ] Add audit tests that reject a solo-maintainer baseline requiring human/CODEOWNER approval.
 - [ ] Add audit tests for `TRANSITION` expiry: an active transition past `expires_at` without terminal success/rollback must classify as `DRIFT`.
+- [ ] Add audit tests that a serially unstarted repository is explicit `PENDING`, not `DRIFT` or `TRANSITION`; `PENDING` authorizes no settings deviation and blocks terminal V2 closeout.
 - [ ] Add validation that an active transition record has `transition_id`, `repository`, `issue_or_pr`, `started_at`, `expires_at`, `pre_state_fingerprint`, `allowed_deviations`, `success_condition`, and `rollback_condition`.
 - [ ] Add validation that a terminal receipt appends machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback`; only this evidence distinguishes terminal closure from an expired active transition.
 - [ ] Store the actual transition record in the canonical rollout Issue/PR or existing lifecycle authority rather than inventing a new persistent transition subsystem.
+
+`PENDING` is a classification in the existing read-only audit model, not a new governance authority: it prevents the concrete false-`DRIFT`/unbounded-`TRANSITION` threat while a later repository awaits its serial turn. It adds no status, writer, receipt or bypass and is invalid at terminal closeout.
 
 **Verification:**
 
@@ -258,6 +261,7 @@ retirement condition or permanent rationale
 - [ ] Verify exactly one externally required aggregate gate per permanent repository.
 - [ ] Verify no required status depends on comment/reaction/flair parsing.
 - [ ] Verify no expired transition remains.
+- [ ] Verify no permanent repository remains `PENDING`.
 - [ ] Verify no control-plane PR was terminally self-authorized solely by candidate-controlled governance.
 - [ ] Verify moving-base canary receipts exist for all four repositories.
 - [ ] Verify break-glass isolated exercise receipt exists.
@@ -282,6 +286,7 @@ V2 is terminal only when all items below are directly verified:
 [ ] no governance retrigger/no-op commit mechanism remains
 [ ] CONTROL_PLANE_R2 owner-confirmation rule is active
 [ ] no active transition is expired
+[ ] no permanent repository remains PENDING
 [ ] break-glass dry-run completed
 [ ] break-glass real isolated exercise completed and restored cleanly
 [ ] no required AI-review/comment/reaction parser authority remains

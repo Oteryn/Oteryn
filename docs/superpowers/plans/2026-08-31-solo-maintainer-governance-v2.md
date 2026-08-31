@@ -81,20 +81,21 @@ The amendment must explicitly supersede conflicting moving-head/enterprise-style
 
 - [ ] **Step 5: Change `ecosystem/governance-desired-state.json` to the V2 target shape**
 
-Set the long-term `required_checks` arrays to exactly the four aggregate contexts above. Preserve main protection, squash-only, branch deletion-on-merge preference and security baseline. Extend the schema/validator only as much as necessary to represent `merge_queue` and transitional `strict_required_status_checks` state without embedding transient PR/review data.
+Set the long-term `required_checks` arrays to exactly the four aggregate contexts above. Preserve main protection, squash-only, branch deletion-on-merge preference and security baseline. Extend the schema/validator only as much as necessary to represent `merge_queue`, transitional `strict_required_status_checks`, and explicit `PENDING` status for serially unstarted repositories without embedding transient PR/review data.
 
 - [ ] **Step 6: Update the read-only audit validator to understand transitional rollout state**
 
 The validator must distinguish:
 
 ```text
+PENDING     serial V2 cutover has not begun; live pre-cutover baseline is visible, no V2 deviation is authorized, and the repository is not TARGET
 TARGET      replacement gate/MQ proven and desired state active
-TRANSITION  old protection intentionally retained while replacement is being canaried
+TRANSITION  old protection intentionally retained while replacement is being canaried under a bounded receipt
 DRIFT       live state differs without an authorized transition record
 UNKNOWN     required live field could not be read
 ```
 
-It must never classify an explicitly authorized serial cutover as compliant before its repository canary succeeds. Validate the existing active-receipt fields before mutation; on terminal success or rollback, require machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback` so the auditor can distinguish a closed receipt from an expired active deviation.
+`PENDING` is not `TRANSITION`, requires no expiry receipt, and cannot permit a settings mutation or terminal V2 closeout. It becomes `TRANSITION` only after that repository's own receipt is created immediately before its serial turn. The validator must never classify an explicitly authorized serial cutover as compliant before its repository canary succeeds. Validate the existing active-receipt fields before mutation; on terminal success or rollback, require machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback` so the auditor can distinguish a closed receipt from an expired active deviation.
 
 - [ ] **Step 7: Run all focused META governance tests and verify GREEN**
 
