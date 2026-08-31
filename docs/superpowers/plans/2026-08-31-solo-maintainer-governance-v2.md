@@ -94,7 +94,7 @@ DRIFT       live state differs without an authorized transition record
 UNKNOWN     required live field could not be read
 ```
 
-It must never classify an explicitly authorized serial cutover as compliant before its repository canary succeeds.
+It must never classify an explicitly authorized serial cutover as compliant before its repository canary succeeds. Validate the existing active-receipt fields before mutation; on terminal success or rollback, require machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback` so the auditor can distinguish a closed receipt from an expired active deviation.
 
 - [ ] **Step 7: Run all focused META governance tests and verify GREEN**
 

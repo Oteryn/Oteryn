@@ -48,8 +48,9 @@ A task is not complete merely because its local tests are green if it violates o
 - [ ] Keep desired state small: do not store transient review generations, transient PR heads or a permanent transition database in `governance-desired-state.json`.
 - [ ] Add audit tests that fail if a permanent repository's target required-status set contains anything other than its single aggregate gate.
 - [ ] Add audit tests that reject a solo-maintainer baseline requiring human/CODEOWNER approval.
-- [ ] Add audit tests for `TRANSITION` expiry: a transition past `expires_at` without terminal success/rollback must classify as `DRIFT`.
+- [ ] Add audit tests for `TRANSITION` expiry: an active transition past `expires_at` without terminal success/rollback must classify as `DRIFT`.
 - [ ] Add validation that an active transition record has `transition_id`, `repository`, `issue_or_pr`, `started_at`, `expires_at`, `pre_state_fingerprint`, `allowed_deviations`, `success_condition`, and `rollback_condition`.
+- [ ] Add validation that a terminal receipt appends machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback`; only this evidence distinguishes terminal closure from an expired active transition.
 - [ ] Store the actual transition record in the canonical rollout Issue/PR or existing lifecycle authority rather than inventing a new persistent transition subsystem.
 
 **Verification:**
@@ -195,14 +196,25 @@ success_condition
 rollback_condition
 ```
 
+On terminal success or rollback, append:
+
+```text
+terminal_status  # SUCCESS or ROLLED_BACK
+closed_at
+post_state_fingerprint
+post_state_readback
+```
+
 **Rules:**
 
 - [ ] `expires_at` must be set before the first mutation.
 - [ ] The expiry window must be only as long as necessary for the concrete canary/rollback operation; do not use an indefinite or convenience horizon.
 - [ ] Any live deviation not listed in `allowed_deviations` is `DRIFT` immediately.
-- [ ] If the transition expires before success/rollback, classify `DRIFT`.
-- [ ] Terminal success or rollback closes the transition receipt with post-state fingerprint/readback.
-- [ ] The read-only auditor must surface active/expired transition state without becoming a settings writer.
+- [ ] If the transition expires before success/rollback with valid terminal evidence, classify `DRIFT`.
+- [ ] Terminal success or rollback closes the transition receipt with the machine-readable terminal fields above.
+- [ ] The read-only auditor must surface active/expired/terminal transition state without becoming a settings writer.
+
+**Threat justification for the terminal fields:** the concrete threat is false `DRIFT` after a completed serial cutover when `expires_at` later passes. Existing active-receipt fields and free-form comments cannot distinguish closure from an active deviation. The minimal control is the four terminal evidence fields above; without them an auditor can misclassify a safe closed transition, and their operational cost is one receipt update at closeout. They add no new status, writer, database or merge authority.
 
 No new transition microservice/database is permitted under this addendum without a separate GS-10 threat justification.
 

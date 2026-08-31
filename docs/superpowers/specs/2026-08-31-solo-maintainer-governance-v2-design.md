@@ -167,7 +167,7 @@ Target risk model:
 - **R1:** ordinary code/config/dependency work — normal CI is the required-status authority; the canonical policy requires one fast external review for each stable R1 review fingerprint. The review is evidence, not a separate required branch-protection status.
 - **R2:** security/auth/payment/deployment/migration/governance/workflow/protection changes — the canonical policy requires one deep external review for each stable R2 review fingerprint before deliberate integration. Its result is review evidence, not a separate required branch-protection status or comment-envelope parser.
 
-P0/P1/P2 remains useful as review vocabulary. P0/P1 findings should be addressed before deliberate owner integration. P2 can be tracked as follow-up. This is a human/agent decision contract, not a second cryptographic merge control plane.
+P0/P1/P2 remains useful as review vocabulary. Every review finding must be resolved before deliberate integration. A P2 may be non-blocking only after its exact review thread is resolved and a trusted maintainer records the required same-repository follow-up Issue. This is a human/agent decision contract, not a second cryptographic merge control plane.
 
 ### 5. Retire moving-head review machinery when no independent threat remains
 

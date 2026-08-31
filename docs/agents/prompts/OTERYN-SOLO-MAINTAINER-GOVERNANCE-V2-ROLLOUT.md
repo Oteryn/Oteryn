@@ -252,7 +252,16 @@ success_condition
 rollback_condition
 ```
 
-If `now > expires_at` before the transition reaches its success condition or is explicitly rolled back/closed, the state is `DRIFT`, not an indefinitely valid transition. A successfully closed or rolled-back receipt remains terminal and does not become `DRIFT` solely because its historical expiry passes.
+On terminal success or rollback, append:
+
+```text
+terminal_status  # SUCCESS or ROLLED_BACK
+closed_at
+post_state_fingerprint
+post_state_readback
+```
+
+If `now > expires_at` before the transition reaches its success condition or is explicitly rolled back/closed with valid terminal evidence, the state is `DRIFT`, not an indefinitely valid transition. A successfully closed or rolled-back receipt with these machine-readable fields remains terminal and does not become `DRIFT` solely because its historical expiry passes.
 
 `ecosystem/governance-desired-state.json` should contain stable target state, not transient PR heads, review generations or temporary exception history.
 
