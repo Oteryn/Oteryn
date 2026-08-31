@@ -27,7 +27,7 @@ _OBSERVED_CLEAN_FLAIRS = {
     "Another round soon, please!",
     "Keep it up!",
 }
-_DUPLICATE_ONLY_CLEAN_FLAIRS = {"Delightful!", ":tada:"}
+_DUPLICATE_ONLY_CLEAN_FLAIRS = {"Delightful!", ":tada:", "Keep them coming!"}
 _CODEX_SUMMARY_MARKER = "<!-- codex-pull-request-review-summary -->"
 _CODEX_SUMMARY_APP = "chatgpt-codex-connector"
 _CODEX_SUMMARY_ROW = re.compile(
