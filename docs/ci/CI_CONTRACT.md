@@ -68,4 +68,4 @@ python3 tools/governance/audit_github_readonly.py \
   --material-head-sha <40-hex-sha> --control-plane-scope <exact-scope>
 ```
 
-The read-only command verifies the current open same-repository PR/head, the unedited human comment, and that author's current `admin` repository role. Anything missing, edited, stale, duplicated, non-human, non-owner, or unreadable returns `UNKNOWN`; a new material head needs a new comment.
+The read-only command verifies the current open same-repository PR/head, exactly one identity-matching unedited human comment, and that author's current `admin` repository role. Any extra identity-matching record—including an edited or malformed duplicate—makes the decision `UNKNOWN`; a new material head needs a new comment.

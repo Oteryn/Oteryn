@@ -198,7 +198,7 @@ def transition_record(
             "merge_queue",
             "protection.strict_required_status_checks",
         ],
-        "success_condition": {"moving_base_receipt": moving_base_receipt(wanted)},
+        "success_condition": {"moving_base_canary": "required"},
         "rollback_condition": {"restore_pre_state": True},
     }
 
@@ -211,7 +211,7 @@ def terminal_record(
     transition_id: str = "meta-v2-cutover-1",
     pre_transition_comment_id: int = 2,
 ) -> dict:
-    return {
+    record = {
         "record_type": "TERMINAL",
         "transition_id": transition_id,
         "pre_transition_comment_id": pre_transition_comment_id,
@@ -219,6 +219,9 @@ def terminal_record(
         "post_state_fingerprint": m.core.rollout_state_fingerprint(post_state),
         "post_state_readback": post_state,
     }
+    if terminal_status == "SUCCESS":
+        record["moving_base_receipt"] = moving_base_receipt(wanted)
+    return record
 
 
 def direct_moving_base_responses(wanted: dict, receipt: dict) -> dict[str, object]:
@@ -565,20 +568,32 @@ def test_terminal_success_requires_complete_moving_base_receipt_and_target_readb
     baseline = pending_baseline(wanted)
     target = m.core.target_rollout_state(wanted)
     transition = transition_record(wanted, baseline)
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
     records = [
         lifecycle_comment(1, pending_record(wanted, baseline)),
         lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
-        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
     ]
+    assert transition["success_condition"] == {"moving_base_canary": "required"}
+    assert "moving_base_receipt" not in transition["success_condition"]
     assert m.core.classify_rollout_state(
         wanted, target, records, now="2026-08-31T13:00:00Z"
     ) == "UNKNOWN"
 
-    incomplete = json.loads(json.dumps(transition))
-    del incomplete["success_condition"]["moving_base_receipt"]["main_after_a"]
-    invalid_records = [records[0], lifecycle_comment(2, incomplete, created_at="2026-08-31T10:05:00Z"), records[2]]
+    incomplete = json.loads(json.dumps(terminal))
+    del incomplete["moving_base_receipt"]["main_after_a"]
+    invalid_records = [records[0], records[1], lifecycle_comment(3, incomplete, created_at="2026-08-31T11:00:00Z")]
     assert m.core.classify_rollout_state(
         wanted, target, invalid_records, now="2026-08-31T13:00:00Z"
+    ) == "DRIFT"
+
+    preloaded = json.loads(json.dumps(transition))
+    preloaded["success_condition"]["moving_base_receipt"] = moving_base_receipt(wanted)
+    assert m.core.classify_rollout_state(
+        wanted,
+        target,
+        [records[0], lifecycle_comment(2, preloaded, created_at="2026-08-31T10:05:00Z"), records[2]],
+        now="2026-08-31T13:00:00Z",
     ) == "DRIFT"
 
     mislinked = terminal_record(
@@ -606,11 +621,12 @@ def test_auditor_binds_success_to_direct_github_moving_base_evidence() -> None:
     baseline = pending_baseline(wanted)
     target = m.core.target_rollout_state(wanted)
     transition = transition_record(wanted, baseline)
-    receipt = transition["success_condition"]["moving_base_receipt"]
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+    receipt = terminal["moving_base_receipt"]
     comments = [
         lifecycle_comment(1, pending_record(wanted, baseline)),
         lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
-        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
     ]
     responses = {
         "/repos/Oteryn/Oteryn/issues/102/comments": comments,
@@ -633,11 +649,12 @@ def test_moving_base_receipt_requires_exact_queue_base_parent() -> None:
 
     def classification_with(parents: list[dict]) -> str:
         transition = transition_record(wanted, baseline)
-        receipt = transition["success_condition"]["moving_base_receipt"]
+        terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+        receipt = terminal["moving_base_receipt"]
         comments = [
             lifecycle_comment(1, pending_record(wanted, baseline)),
             lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
-            lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+            lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
         ]
         responses = {
             "/repos/Oteryn/Oteryn/issues/102/comments": comments,
@@ -659,11 +676,12 @@ def test_moving_base_receipt_requires_exact_queue_base_parent() -> None:
     ]) == "DRIFT"
 
     wrong_base = transition_record(wanted, baseline)
-    wrong_base["success_condition"]["moving_base_receipt"]["base_sha"] = "f" * 40
+    wrong_base_terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+    wrong_base_terminal["moving_base_receipt"]["base_sha"] = "f" * 40
     wrong_base_records = [
         lifecycle_comment(1, pending_record(wanted, baseline)),
         lifecycle_comment(2, wrong_base, created_at="2026-08-31T10:05:00Z"),
-        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+        lifecycle_comment(3, wrong_base_terminal, created_at="2026-08-31T11:00:00Z"),
     ]
     assert m.core.classify_rollout_state(
         wanted, target, wrong_base_records, now="2026-08-31T13:00:00Z"
@@ -675,11 +693,12 @@ def test_auditor_rejects_each_forged_or_mismatched_success_receipt_binding() -> 
     baseline = pending_baseline(wanted)
     target = m.core.target_rollout_state(wanted)
     transition = transition_record(wanted, baseline)
-    receipt = transition["success_condition"]["moving_base_receipt"]
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+    receipt = terminal["moving_base_receipt"]
     comments = [
         lifecycle_comment(1, pending_record(wanted, baseline)),
         lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
-        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
     ]
 
     def result_with(mutator) -> str:
@@ -764,9 +783,9 @@ def test_auditor_rejects_each_forged_or_mismatched_success_receipt_binding() -> 
         f"/repos/{repo}/pulls/{receipt['pr_a']}", []
     )) == "DRIFT"
 
-    same_pr = json.loads(json.dumps(transition))
-    same_pr["success_condition"]["moving_base_receipt"]["pr_b"] = receipt["pr_a"]
-    same_comments = [comments[0], lifecycle_comment(2, same_pr, created_at="2026-08-31T10:05:00Z"), comments[2]]
+    same_pr_terminal = json.loads(json.dumps(terminal))
+    same_pr_terminal["moving_base_receipt"]["pr_b"] = receipt["pr_a"]
+    same_comments = [comments[0], comments[1], lifecycle_comment(3, same_pr_terminal, created_at="2026-08-31T11:00:00Z")]
     assert FakeAudit({
         "/repos/Oteryn/Oteryn/issues/102/comments": same_comments,
         **direct_moving_base_responses(wanted, receipt),
@@ -779,11 +798,12 @@ def test_readable_malformed_nested_direct_success_evidence_is_drift() -> None:
     baseline = pending_baseline(wanted)
     target = m.core.target_rollout_state(wanted)
     transition = transition_record(wanted, baseline)
-    receipt = transition["success_condition"]["moving_base_receipt"]
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+    receipt = terminal["moving_base_receipt"]
     comments = [
         lifecycle_comment(1, pending_record(wanted, baseline)),
         lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
-        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
     ]
     repo = wanted["repository"]
 
@@ -870,12 +890,13 @@ def test_readable_missing_direct_success_evidence_is_drift_and_never_a_target() 
     baseline = pending_baseline(wanted)
     target = m.core.target_rollout_state(wanted)
     transition = transition_record(wanted, baseline)
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
     comments = [
         lifecycle_comment(1, pending_record(wanted, baseline)),
         lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
-        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
     ]
-    receipt = transition["success_condition"]["moving_base_receipt"]
+    receipt = terminal["moving_base_receipt"]
     audit = FakeAudit({
         "/repos/Oteryn/Oteryn/issues/102/comments": comments,
         **{path: None for path in direct_moving_base_responses(wanted, receipt)},
@@ -890,11 +911,12 @@ def test_unreadable_direct_success_evidence_is_unknown() -> None:
     baseline = pending_baseline(wanted)
     target = m.core.target_rollout_state(wanted)
     transition = transition_record(wanted, baseline)
-    receipt = transition["success_condition"]["moving_base_receipt"]
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+    receipt = terminal["moving_base_receipt"]
     comments = [
         lifecycle_comment(1, pending_record(wanted, baseline)),
         lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
-        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
     ]
     for failure in (RuntimeError("transport unavailable"), ValueError("decode failure")):
         responses = {
@@ -1023,6 +1045,8 @@ def test_control_plane_classifier_conservatively_covers_authority_and_gate_imple
         "docs/architecture/adr/0002-organization-governance-operating-model.md",
         "docs/ci/CI_CONTRACT.md",
         "docs/governance/AI_REVIEW_POLICY.md",
+        "docs/recovery/organization-recovery-contract.md",
+        "docs/migration/active-cutover-contract.md",
         "ecosystem/governance-desired-state.json",
         "ecosystem/ai-review-policy.json",
         "ecosystem/agent-execution-routing-policy.json",
@@ -1104,6 +1128,14 @@ def test_control_plane_owner_authorization_fails_closed_for_edited_bot_stale_or_
         scope=scope,
     )
     admin = {"permission": "admin", "user": {"login": "blakinio", "type": "User"}}
+    edited_duplicate = {**valid, "id": 78, "updated_at": "2026-08-31T12:01:00Z"}
+    assert FakeAudit({
+        f"/repos/{repository}/pulls/{pull_request}": current_pull_request(
+            repository, pull_request, material_head_sha
+        ),
+        f"/repos/{repository}/issues/{pull_request}/comments": [valid, edited_duplicate],
+        f"/repos/{repository}/collaborators/blakinio/permission": admin,
+    }).control_plane_owner_authorization(repository, pull_request, material_head_sha, scope)["status"] == "UNKNOWN"
     assert result_for({**valid, "updated_at": "2026-08-31T12:01:00Z"}, admin)["status"] == "UNKNOWN"
     bot = json.loads(json.dumps(valid))
     bot["user"]["type"] = "Bot"

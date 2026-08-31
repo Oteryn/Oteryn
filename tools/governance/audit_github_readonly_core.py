@@ -65,8 +65,6 @@ LIFECYCLE_RECORD_TYPES = {"PENDING_BASELINE", "PRE_TRANSITION", "TERMINAL"}
 CONTROL_PLANE_R2_NON_AUTHORITY_PREFIXES = (
     "docs/evidence/",
     "docs/agents/tasks/archive/",
-    "docs/migration/",
-    "docs/recovery/",
 )
 CONTROL_PLANE_OWNER_AUTHORIZATION_RECORD_TYPE = "CONTROL_PLANE_R2_OWNER_AUTHORIZATION"
 CONTROL_PLANE_OWNER_AUTHORIZATION_FIELDS = {
@@ -388,8 +386,7 @@ def _valid_pre_transition_record(record: dict, wanted: dict, baseline: dict) -> 
         or not allowed_deviations
         or not all(isinstance(path, str) and path for path in allowed_deviations)
         or len(allowed_deviations) != len(set(allowed_deviations))
-        or not isinstance(body.get("success_condition"), dict)
-        or not body["success_condition"]
+        or body.get("success_condition") != {"moving_base_canary": "required"}
         or not isinstance(body.get("rollback_condition"), dict)
         or not body["rollback_condition"]
         or "started_at" in body
@@ -445,11 +442,17 @@ def _valid_terminal_record(record: dict, pre_record: dict, baseline: dict, wante
     body = record["body"]
     expires_at = _parse_timestamp(pre_record["body"].get("expires_at"))
     status = body.get("terminal_status")
+    terminal_fields = {
+        "record_type", "transition_id", "pre_transition_comment_id", "terminal_status",
+        "post_state_fingerprint", "post_state_readback",
+    }
+    expected_fields = terminal_fields | ({"moving_base_receipt"} if status == "SUCCESS" else set())
     if (
         body.get("record_type") != "TERMINAL"
         or body.get("transition_id") != pre_record["body"].get("transition_id")
         or body.get("pre_transition_comment_id") != pre_record["id"]
         or status not in {"SUCCESS", "ROLLED_BACK"}
+        or set(body) != expected_fields
         or expires_at is None
         or record["created_at"] > expires_at
         or "started_at" in body
@@ -468,7 +471,7 @@ def _valid_terminal_record(record: dict, pre_record: dict, baseline: dict, wante
     if status == "SUCCESS":
         if not _rollout_states_match(post_state, target_rollout_state(wanted)):
             return None
-        if not _valid_moving_base_receipt((pre_record["body"].get("success_condition") or {}).get("moving_base_receipt"), wanted):
+        if not _valid_moving_base_receipt(body.get("moving_base_receipt"), wanted):
             return None
     else:
         if body.get("post_state_fingerprint") != pre_record["body"].get("pre_state_fingerprint") or not _rollout_states_match(post_state, baseline):
@@ -684,6 +687,34 @@ def _matching_control_plane_owner_authorization_comment(
         "scope": scope,
         "authorize_integration": True,
     }
+
+
+def _matches_control_plane_owner_authorization_identity(
+    comment: object,
+    *,
+    repository: str,
+    pull_request: int,
+    material_head_sha: str,
+    scope: str,
+) -> bool:
+    """Match the immutable identity before deciding whether its evidence is valid.
+
+    A malformed, edited, bot-authored, or otherwise invalid duplicate must not be
+    filtered away before the exactly-one authorization invariant is enforced.
+    """
+    if not isinstance(comment, dict):
+        return False
+    body = _decode_json_comment_body(comment.get("body"))
+    return (
+        isinstance(body, dict)
+        and body.get("record_type") == CONTROL_PLANE_OWNER_AUTHORIZATION_RECORD_TYPE
+        and body.get("repository") == repository
+        and isinstance(body.get("pull_request"), int)
+        and not isinstance(body.get("pull_request"), bool)
+        and body.get("pull_request") == pull_request
+        and body.get("material_head_sha") == material_head_sha
+        and body.get("scope") == scope
+    )
 
 
 def actions_permissions_enabled(payload: object) -> bool:
@@ -1350,20 +1381,28 @@ class Audit:
             or base_repo.get("full_name") != repository
         ):
             return unknown
-        candidates = [
-            evidence
+        identity_matches = [
+            comment
             for comment in comments
-            if (evidence := _matching_control_plane_owner_authorization_comment(
+            if _matches_control_plane_owner_authorization_identity(
                 comment,
                 repository=repository,
                 pull_request=pull_request,
                 material_head_sha=material_head_sha,
                 scope=scope,
-            )) is not None
+            )
         ]
-        if len(candidates) != 1:
+        if len(identity_matches) != 1:
             return unknown
-        evidence = candidates[0]
+        evidence = _matching_control_plane_owner_authorization_comment(
+            identity_matches[0],
+            repository=repository,
+            pull_request=pull_request,
+            material_head_sha=material_head_sha,
+            scope=scope,
+        )
+        if evidence is None:
+            return unknown
         try:
             permission = self.api(
                 f"/repos/{repository}/collaborators/"
@@ -1466,9 +1505,7 @@ class Audit:
         and protected-main objects named by that receipt.  A missing or inconsistent
         object is deliberately not sufficient to classify a repository as target.
         """
-        receipt = (pre_transition_record.get("body", {}).get("success_condition") or {}).get(
-            "moving_base_receipt"
-        )
+        receipt = terminal_record.get("body", {}).get("moving_base_receipt")
         if not _valid_moving_base_receipt(receipt, wanted):
             return False
         if not isinstance(receipt, dict):
