@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import base64
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -16,6 +17,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,6 +33,42 @@ HISTORICAL_PREFIXES = (
 HISTORICAL_FILES = {"ecosystem/repositories.json"}
 POLICY_DECLARATION_FILES = {"ecosystem/governance-desired-state.json"}
 WORKFLOW_RUN_RE = re.compile(r"^https://github\.com/[^/]+/[^/]+/actions/runs/(\d+)(?:/|$)")
+V2_REQUIRED_CONTEXTS = {
+    "Oteryn/Oteryn": ["meta-gate"],
+    "Oteryn/Oteryn-Game": ["game-gate"],
+    "Oteryn/Oteryn-Platform": ["platform-gate"],
+    "Oteryn/Oteryn-Atlas": ["atlas-gate"],
+}
+CANONICAL_V2_ROLLOUT_REPOSITORY = "Oteryn/Oteryn"
+CANONICAL_V2_ROLLOUT_ISSUE = 102
+CANONICAL_V2_ROLLOUT_LOCATOR = f"{CANONICAL_V2_ROLLOUT_REPOSITORY}#{CANONICAL_V2_ROLLOUT_ISSUE}"
+ROLLOUT_STATE_FIELDS = {
+    "repository",
+    "required_checks",
+    "required_check_sources",
+    "main_protected",
+    "squash_only",
+    "delete_branch_on_merge",
+    "merge_queue",
+    "protection",
+}
+ROLLOUT_PROTECTION_FIELDS = {
+    "pull_requests",
+    "force_pushes",
+    "deletions",
+    "broad_bypass",
+    "strict_required_status_checks",
+    "required_approving_review_count",
+    "require_code_owner_review",
+}
+LIFECYCLE_RECORD_TYPES = {"PENDING_BASELINE", "PRE_TRANSITION", "TERMINAL"}
+CONTROL_PLANE_R2_PREFIXES = (
+    ".github/workflows/",
+    "ecosystem/governance-desired-state.json",
+    "tools/governance/",
+    "docs/governance/SOLO_MAINTAINER_BREAK_GLASS.md",
+)
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def expected_checks(item: dict) -> set[str]:
@@ -56,17 +94,521 @@ def expected_sources_satisfied(sources: dict[str, set[int | None]], expected: se
 
 
 def allowed_required_checks(item: dict) -> set[str]:
-    allowed = expected_checks(item)
-    if item.get("gate_mode") == "transition":
-        target = item.get("target_gate")
-        if isinstance(target, str) and target:
-            allowed.add(target)
-    return allowed
+    return expected_checks(item)
 
 
 def required_contexts_match(item: dict, observed: set[str]) -> bool:
-    expected = expected_checks(item)
-    return expected <= observed <= allowed_required_checks(item)
+    return expected_checks(item) == observed
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
+def _normalized_rollout_state(value: object) -> dict | None:
+    if not isinstance(value, dict) or set(value) != ROLLOUT_STATE_FIELDS:
+        return None
+    repository = value.get("repository")
+    checks = value.get("required_checks")
+    sources = value.get("required_check_sources")
+    protection = value.get("protection")
+    if (
+        not isinstance(repository, str)
+        or not repository
+        or not isinstance(checks, list)
+        or not checks
+        or not all(isinstance(check, str) and check for check in checks)
+        or len(checks) != len(set(checks))
+        or not isinstance(sources, dict)
+        or set(sources) != set(checks)
+        or not isinstance(protection, dict)
+        or set(protection) != ROLLOUT_PROTECTION_FIELDS
+    ):
+        return None
+    normalized_sources: dict[str, list[int | None]] = {}
+    for check in checks:
+        app_ids = sources.get(check)
+        if (
+            not isinstance(app_ids, list)
+            or not app_ids
+            or not all(
+                app_id is None
+                or (isinstance(app_id, int) and not isinstance(app_id, bool) and app_id > 0)
+                for app_id in app_ids
+            )
+            or len(app_ids) != len(set(app_ids))
+        ):
+            return None
+        normalized_sources[check] = sorted(
+            app_ids, key=lambda app_id: (-1 if app_id is None else app_id)
+        )
+    if not all(isinstance(value.get(field), bool) for field in (
+        "main_protected", "squash_only", "delete_branch_on_merge", "merge_queue",
+    )):
+        return None
+    if not all(isinstance(protection.get(field), bool) for field in (
+        "pull_requests", "force_pushes", "deletions", "broad_bypass",
+        "strict_required_status_checks", "require_code_owner_review",
+    )):
+        return None
+    if not isinstance(protection.get("required_approving_review_count"), int) or isinstance(
+        protection["required_approving_review_count"], bool
+    ) or protection["required_approving_review_count"] < 0:
+        return None
+    return {
+        "repository": repository,
+        "required_checks": sorted(checks),
+        "required_check_sources": {
+            check: normalized_sources[check]
+            for check in sorted(normalized_sources)
+        },
+        "main_protected": value["main_protected"],
+        "squash_only": value["squash_only"],
+        "delete_branch_on_merge": value["delete_branch_on_merge"],
+        "merge_queue": value["merge_queue"],
+        "protection": {
+            field: protection[field]
+            for field in sorted(ROLLOUT_PROTECTION_FIELDS)
+        },
+    }
+
+
+def target_rollout_state(item: dict) -> dict:
+    required_checks = item.get("required_checks")
+    state = {
+        "repository": item.get("repository"),
+        "required_checks": required_checks,
+        "required_check_sources": (
+            {
+                check: [item.get("required_check_app_id")]
+                for check in required_checks
+            }
+            if isinstance(required_checks, list)
+            else {}
+        ),
+        "main_protected": item.get("main_protected"),
+        "squash_only": item.get("squash_only"),
+        "delete_branch_on_merge": item.get("delete_branch_on_merge"),
+        "merge_queue": item.get("merge_queue"),
+        "protection": item.get("protection"),
+    }
+    normalized = _normalized_rollout_state(state)
+    if normalized is None:
+        raise ValueError(f"invalid desired rollout state: {item}")
+    return normalized
+
+
+def rollout_state_fingerprint(state: object) -> str:
+    normalized = _normalized_rollout_state(state)
+    if normalized is None:
+        raise ValueError("invalid rollout state readback")
+    payload = json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+
+def _rollout_states_match(left: object, right: object) -> bool:
+    normalized_left = _normalized_rollout_state(left)
+    normalized_right = _normalized_rollout_state(right)
+    return normalized_left is not None and normalized_left == normalized_right
+
+
+def _rollout_state_difference_paths(before: dict, after: dict, prefix: str = "") -> set[str]:
+    differences: set[str] = set()
+    for key in set(before) | set(after):
+        path = f"{prefix}.{key}" if prefix else key
+        if key not in before or key not in after:
+            differences.add(path)
+            continue
+        old = before[key]
+        new = after[key]
+        if isinstance(old, dict) and isinstance(new, dict):
+            differences.update(_rollout_state_difference_paths(old, new, path))
+        elif old != new:
+            differences.add(path)
+    return differences
+
+
+def _allowed_rollout_deviations(differences: set[str], allowed: object) -> bool:
+    if not isinstance(allowed, list):
+        return False
+    return all(
+        any(difference == path or difference.startswith(path + ".") for path in allowed)
+        for difference in differences
+    )
+
+
+def _decode_lifecycle_body(body: object) -> dict | None:
+    if not isinstance(body, str):
+        return None
+    candidate = body.strip()
+    if candidate.startswith("```json") and candidate.endswith("```"):
+        candidate = candidate[len("```json"): -3].strip()
+    try:
+        decoded = json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+    return decoded if isinstance(decoded, dict) else None
+
+
+def _is_lifecycle_candidate(body: dict) -> bool:
+    return body.get("record_type") in LIFECYCLE_RECORD_TYPES or any(
+        key in body for key in ("transition_id", "pre_state_fingerprint", "post_state_fingerprint")
+    )
+
+
+def _read_lifecycle_records(records: object) -> tuple[list[dict] | None, list[dict]]:
+    """Return direct-read records and malformed lifecycle candidates for later scoping."""
+    if records is None:
+        return None, []
+    if not isinstance(records, list):
+        return None, []
+    parsed: list[dict] = []
+    malformed: list[dict] = []
+    seen_ids: set[int] = set()
+    for comment in records:
+        if not isinstance(comment, dict):
+            return None, []
+        body = _decode_lifecycle_body(comment.get("body"))
+        if body is None:
+            continue
+        if not _is_lifecycle_candidate(body):
+            continue
+        if body.get("record_type") not in LIFECYCLE_RECORD_TYPES:
+            malformed.append({"id": comment.get("id"), "body": body})
+            continue
+        comment_id = comment.get("id")
+        created_at = _parse_timestamp(comment.get("created_at"))
+        updated_at = comment.get("updated_at")
+        if (
+            not isinstance(comment_id, int)
+            or comment_id <= 0
+            or comment_id in seen_ids
+            or created_at is None
+            or updated_at != comment.get("created_at")
+            or comment.get("in_reply_to_id") not in (None, "")
+        ):
+            malformed.append({"id": comment_id, "body": body})
+            continue
+        seen_ids.add(comment_id)
+        parsed.append({"id": comment_id, "created_at": created_at, "body": body})
+    return parsed, malformed
+
+
+def _malformed_lifecycle_evidence_is_relevant(
+    malformed_records: list[dict], records: list[dict], wanted: dict
+) -> bool:
+    """Only malformed evidence for this provider can invalidate its lifecycle.
+
+    All providers share the canonical Issue.  A malformed record must therefore
+    identify this repository directly, or link to this repository's exact
+    pre-transition record, before it can affect this repository's classification.
+    """
+    repository = wanted.get("repository")
+    pre_repository_by_comment_id: dict[int, str] = {}
+    for record in [*records, *malformed_records]:
+        body = record.get("body")
+        if not isinstance(body, dict) or body.get("record_type") != "PRE_TRANSITION":
+            continue
+        record_repository = body.get("repository")
+        comment_id = record.get("id")
+        if isinstance(record_repository, str) and isinstance(comment_id, int):
+            pre_repository_by_comment_id[comment_id] = record_repository
+    for record in malformed_records:
+        body = record.get("body")
+        if not isinstance(body, dict):
+            continue
+        terminal_shaped = (
+            body.get("record_type") == "TERMINAL"
+            or "pre_transition_comment_id" in body
+            or "terminal_status" in body
+        )
+        if not terminal_shaped and body.get("repository") == repository:
+            return True
+        if pre_repository_by_comment_id.get(body.get("pre_transition_comment_id")) == repository:
+            return True
+    return False
+
+
+def _valid_pending_record(record: dict, wanted: dict) -> dict | None:
+    body = record["body"]
+    if (
+        body.get("record_type") != "PENDING_BASELINE"
+        or body.get("repository") != wanted.get("repository")
+        or _parse_timestamp(body.get("captured_at")) is None
+        or "started_at" in body
+        or "closed_at" in body
+    ):
+        return None
+    readback = _normalized_rollout_state(body.get("pre_state_readback"))
+    if readback is None or readback["repository"] != wanted.get("repository"):
+        return None
+    try:
+        fingerprint = rollout_state_fingerprint(readback)
+    except ValueError:
+        return None
+    if body.get("pre_state_fingerprint") != fingerprint:
+        return None
+    return readback
+
+
+def _valid_pre_transition_record(record: dict, wanted: dict, baseline: dict) -> dict | None:
+    body = record["body"]
+    transition_id = body.get("transition_id")
+    allowed_deviations = body.get("allowed_deviations")
+    if (
+        body.get("record_type") != "PRE_TRANSITION"
+        or not isinstance(transition_id, str)
+        or not transition_id
+        or body.get("repository") != wanted.get("repository")
+        or body.get("issue_or_pr") != CANONICAL_V2_ROLLOUT_LOCATOR
+        or _parse_timestamp(body.get("expires_at")) is None
+        or body.get("pre_state_fingerprint") != rollout_state_fingerprint(baseline)
+        or not isinstance(allowed_deviations, list)
+        or not allowed_deviations
+        or not all(isinstance(path, str) and path for path in allowed_deviations)
+        or len(allowed_deviations) != len(set(allowed_deviations))
+        or not isinstance(body.get("success_condition"), dict)
+        or not body["success_condition"]
+        or not isinstance(body.get("rollback_condition"), dict)
+        or not body["rollback_condition"]
+        or "started_at" in body
+        or "closed_at" in body
+    ):
+        return None
+    return body
+
+
+def _valid_moving_base_receipt(value: object, wanted: dict) -> bool:
+    if not isinstance(value, dict):
+        return False
+    required = {
+        "repository", "pr_a", "a_head", "main_before_b", "pr_b", "main_after_b",
+        "base_sha", "a_head_unchanged", "merge_group_sha", "aggregate_gate_run", "main_after_a",
+    }
+    if set(value) != required or value.get("repository") != wanted.get("repository"):
+        return False
+    if (
+        not isinstance(value.get("pr_a"), int)
+        or value["pr_a"] <= 0
+        or not isinstance(value.get("pr_b"), int)
+        or value["pr_b"] <= 0
+        or value["pr_a"] == value["pr_b"]
+    ):
+        return False
+    for field in (
+        "a_head", "main_before_b", "main_after_b", "base_sha", "a_head_unchanged",
+        "merge_group_sha", "main_after_a",
+    ):
+        if not isinstance(value.get(field), str) or SHA_RE.fullmatch(value[field]) is None:
+            return False
+    if (
+        value["a_head_unchanged"] != value["a_head"]
+        or value["base_sha"] != value["main_after_b"]
+        or value["main_after_b"] == value["main_before_b"]
+        or value["main_after_a"] == value["main_after_b"]
+    ):
+        return False
+    gate = value.get("aggregate_gate_run")
+    return (
+        isinstance(gate, dict)
+        and set(gate) == {"context", "head_sha", "conclusion", "run_id"}
+        and gate.get("context") == wanted.get("required_checks", [None])[0]
+        and gate.get("head_sha") == value["merge_group_sha"]
+        and gate.get("conclusion") == "success"
+        and isinstance(gate.get("run_id"), int)
+        and gate["run_id"] > 0
+    )
+
+
+def _valid_terminal_record(record: dict, pre_record: dict, baseline: dict, wanted: dict) -> tuple[str, dict] | None:
+    body = record["body"]
+    expires_at = _parse_timestamp(pre_record["body"].get("expires_at"))
+    status = body.get("terminal_status")
+    if (
+        body.get("record_type") != "TERMINAL"
+        or body.get("transition_id") != pre_record["body"].get("transition_id")
+        or body.get("pre_transition_comment_id") != pre_record["id"]
+        or status not in {"SUCCESS", "ROLLED_BACK"}
+        or expires_at is None
+        or record["created_at"] > expires_at
+        or "started_at" in body
+        or "closed_at" in body
+    ):
+        return None
+    post_state = _normalized_rollout_state(body.get("post_state_readback"))
+    if post_state is None or post_state["repository"] != wanted.get("repository"):
+        return None
+    try:
+        post_fingerprint = rollout_state_fingerprint(post_state)
+    except ValueError:
+        return None
+    if body.get("post_state_fingerprint") != post_fingerprint:
+        return None
+    if status == "SUCCESS":
+        if not _rollout_states_match(post_state, target_rollout_state(wanted)):
+            return None
+        if not _valid_moving_base_receipt((pre_record["body"].get("success_condition") or {}).get("moving_base_receipt"), wanted):
+            return None
+    else:
+        if body.get("post_state_fingerprint") != pre_record["body"].get("pre_state_fingerprint") or not _rollout_states_match(post_state, baseline):
+            return None
+    return status, post_state
+
+
+def classify_rollout_state(
+    wanted: dict,
+    live_state: object,
+    lifecycle_records: object,
+    *,
+    now: object,
+    success_receipt_verifier=None,
+) -> str:
+    """Classify one repository from direct lifecycle-comment and settings readback.
+
+    `SUCCESS` is a valid terminal receipt whose effective target state is `TARGET`.
+    `PENDING` and `ROLLED_BACK` are deliberately non-target terminal states.
+    """
+    live = _normalized_rollout_state(live_state)
+    records, malformed_records = _read_lifecycle_records(lifecycle_records)
+    current_time = _parse_timestamp(now)
+    if live_state is None or lifecycle_records is None or current_time is None:
+        return "UNKNOWN"
+    if records is None:
+        return "UNKNOWN"
+    if live is None or live["repository"] != wanted.get("repository"):
+        return "DRIFT"
+    if _malformed_lifecycle_evidence_is_relevant(malformed_records, records, wanted):
+        return "DRIFT"
+
+    pending_candidates = [record for record in records if record["body"].get("record_type") == "PENDING_BASELINE" and record["body"].get("repository") == wanted.get("repository")]
+    if len(pending_candidates) != 1:
+        return "DRIFT"
+    baseline = _valid_pending_record(pending_candidates[0], wanted)
+    if baseline is None:
+        return "DRIFT"
+
+    all_pre_records = [
+        record for record in records
+        if record["body"].get("record_type") == "PRE_TRANSITION"
+    ]
+    pre_records = [
+        record for record in all_pre_records
+        if record["body"].get("repository") == wanted.get("repository")
+    ]
+    transitions: dict[str, dict] = {}
+    for record in pre_records:
+        pre = _valid_pre_transition_record(record, wanted, baseline)
+        if pre is None or pre["transition_id"] in transitions:
+            return "DRIFT"
+        transitions[pre["transition_id"]] = record
+
+    pre_records_by_id = {record["id"]: record for record in all_pre_records}
+    terminals_by_transition: dict[str, list[dict]] = {}
+    for record in records:
+        body = record["body"]
+        if body.get("record_type") != "TERMINAL":
+            continue
+        linked_pre = pre_records_by_id.get(body.get("pre_transition_comment_id"))
+        if linked_pre is None or linked_pre["body"].get("repository") != wanted.get("repository"):
+            continue
+        transition_id = body.get("transition_id")
+        pre = transitions.get(transition_id)
+        if pre is None or pre["id"] != linked_pre["id"]:
+            return "DRIFT"
+        terminals_by_transition.setdefault(transition_id, []).append(record)
+    terminal_results: dict[str, tuple[str, dict, dict]] = {}
+    for transition_id, terminal_records in terminals_by_transition.items():
+        if len(terminal_records) != 1:
+            return "DRIFT"
+        terminal_record = terminal_records[0]
+        result = _valid_terminal_record(terminal_record, transitions[transition_id], baseline, wanted)
+        if result is None:
+            return "DRIFT"
+        status, post_state = result
+        terminal_results[transition_id] = (status, post_state, terminal_record)
+
+    active = [record for transition_id, record in transitions.items() if transition_id not in terminal_results]
+    if len(active) > 1:
+        return "DRIFT"
+    if active:
+        pre = active[0]["body"]
+        expires_at = _parse_timestamp(pre.get("expires_at"))
+        if expires_at is None or current_time > expires_at:
+            return "DRIFT"
+        differences = _rollout_state_difference_paths(baseline, live)
+        if not _allowed_rollout_deviations(differences, pre["allowed_deviations"]):
+            return "DRIFT"
+        return "TRANSITION"
+
+    if terminal_results:
+        status, post_state, terminal_record = max(
+            terminal_results.values(),
+            key=lambda value: (value[2]["created_at"], value[2]["id"]),
+        )
+        if status == "SUCCESS":
+            if not _rollout_states_match(live, post_state):
+                return "DRIFT"
+            if success_receipt_verifier is None:
+                return "UNKNOWN"
+            direct_evidence = success_receipt_verifier(
+                wanted,
+                transitions[terminal_record["body"]["transition_id"]],
+                terminal_record,
+            )
+            if direct_evidence not in {"SUCCESS", "DRIFT", "UNKNOWN"}:
+                return "UNKNOWN"
+            return direct_evidence
+        return "ROLLED_BACK" if _rollout_states_match(live, post_state) else "DRIFT"
+    return "PENDING" if _rollout_states_match(live, baseline) else "DRIFT"
+
+
+def terminal_v2_closeout_permitted(classifications: object) -> bool:
+    if not isinstance(classifications, dict) or set(classifications) != set(V2_REQUIRED_CONTEXTS):
+        return False
+    return all(effective_rollout_state(state) == "TARGET" for state in classifications.values())
+
+
+def effective_rollout_state(classification: object) -> str:
+    """Expose the target/non-target lifecycle state used by closeout gates.
+
+    A valid terminal `SUCCESS` receipt is the only way the direct-read classifier
+    reaches the desired target configuration, so it deliberately maps to TARGET.
+    """
+    return "TARGET" if classification == "SUCCESS" else str(classification)
+
+
+def is_control_plane_r2(paths: object) -> bool:
+    if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
+        return True
+    return any(any(path == prefix or path.startswith(prefix) for prefix in CONTROL_PLANE_R2_PREFIXES) for path in paths)
+
+
+def control_plane_integration_permitted(
+    paths: object,
+    *,
+    candidate_ci_passed: bool,
+    independent_deep_review: bool,
+    owner_authorization_verified: bool,
+    merge_queue_required: bool,
+    merge_queue_validated: bool,
+) -> bool:
+    if not candidate_ci_passed:
+        return False
+    if not is_control_plane_r2(paths):
+        return True
+    return (
+        independent_deep_review
+        and owner_authorization_verified
+        and (not merge_queue_required or merge_queue_validated)
+    )
 
 
 def actions_permissions_enabled(payload: object) -> bool:
@@ -506,25 +1048,24 @@ def merge_sources(*groups: dict[str, set[int | None]]) -> dict[str, set[int | No
 
 def load_desired() -> dict:
     data = json.loads(DESIRED_PATH.read_text(encoding="utf-8"))
-    if data.get("schema_version") != 1:
-        raise SystemExit("governance desired-state schema_version must be 1")
+    if data.get("schema_version") != 2:
+        raise SystemExit("governance desired-state schema_version must be 2")
     repos = data.get("permanent_repositories")
     if not isinstance(repos, list) or len(repos) != 4:
         raise SystemExit("exactly four permanent repositories are required")
     coordinates = [item.get("repository") for item in repos]
-    expected = {
-        "Oteryn/Oteryn",
-        "Oteryn/Oteryn-Game",
-        "Oteryn/Oteryn-Platform",
-        "Oteryn/Oteryn-Atlas",
-    }
+    expected = set(V2_REQUIRED_CONTEXTS)
     if set(coordinates) != expected or len(coordinates) != len(expected):
         raise SystemExit(f"unexpected permanent repository set: {coordinates}")
     for item in repos:
         if not isinstance(item.get("repository_id"), int):
             raise SystemExit(f"missing repository_id: {item}")
-        if item.get("gate_mode") not in {"stable", "transition"}:
-            raise SystemExit(f"invalid gate_mode: {item}")
+        if item.get("required_checks") != V2_REQUIRED_CONTEXTS[item["repository"]]:
+            raise SystemExit(f"repository must require exactly its V2 aggregate gate: {item}")
+        if "gate_mode" in item or "target_gate" in item:
+            raise SystemExit(f"repository must not retain a desired-state gate transition: {item}")
+        if item.get("merge_queue") is not True:
+            raise SystemExit(f"repository must require merge_queue=true: {item}")
         expected_checks(item)
         expected_check_app_id(item)
         for field in ("main_protected", "squash_only", "delete_branch_on_merge"):
@@ -536,7 +1077,9 @@ def load_desired() -> dict:
             "force_pushes": False,
             "deletions": False,
             "broad_bypass": False,
-            "strict_required_status_checks": True,
+            "strict_required_status_checks": False,
+            "required_approving_review_count": 0,
+            "require_code_owner_review": False,
         }
         if protection != required_protection:
             raise SystemExit(f"repository has incomplete or weakened protection contract: {item}")
@@ -550,10 +1093,6 @@ def load_desired() -> dict:
             raise SystemExit(f"repository has incomplete security contract: {item}")
         if not all(security.get(field) is True for field in required_security):
             raise SystemExit(f"repository security controls must all be true: {item}")
-        if item.get("gate_mode") == "transition":
-            target = item.get("target_gate")
-            if not isinstance(target, str) or not target:
-                raise SystemExit(f"transition repository lacks target_gate: {item}")
         codeowner_paths = item.get("codeowners_required_paths")
         if not isinstance(codeowner_paths, list) or not codeowner_paths or not all(
             isinstance(path, str) and path and not path.startswith("/") for path in codeowner_paths
@@ -643,6 +1182,8 @@ class Audit:
         self.token = token
         self.errors: list[str] = []
         self.warnings: list[str] = []
+        self.unknowns: list[str] = []
+        self.rollout_classifications: dict[str, str] = {}
         self._workflow_runs: dict[tuple[str, int], dict] = {}
         self._workflow_definitions: dict[tuple[str, int], dict | None] = {}
         self._workflow_trigger_validity: dict[tuple[str, int, str], bool] = {}
@@ -681,6 +1222,256 @@ class Audit:
             if len(payload) < 100:
                 return items
             page += 1
+
+    def classify_rollout_readback(self, wanted: dict, live_state: object, *, now: object) -> str:
+        """Classify direct settings readback against the canonical Issue lifecycle records.
+
+        The Issue comments endpoint returns top-level GitHub comments. No audit-log,
+        attestation, writer, or auxiliary state store participates in this decision.
+        """
+        try:
+            comments = self.api_list(
+                f"/repos/{CANONICAL_V2_ROLLOUT_REPOSITORY}/issues/{CANONICAL_V2_ROLLOUT_ISSUE}/comments"
+            )
+        except (RuntimeError, ValueError):
+            return "UNKNOWN"
+        return classify_rollout_state(
+            wanted,
+            live_state,
+            comments,
+            now=now,
+            success_receipt_verifier=self.verify_moving_base_receipt_direct,
+        )
+
+    def verify_moving_base_receipt_direct(
+        self, wanted: dict, pre_transition_record: dict, terminal_record: dict
+    ) -> str:
+        """Classify direct moving-base evidence without hiding readable mismatch."""
+        direct_match = self._moving_base_receipt_matches_direct(
+            wanted, pre_transition_record, terminal_record
+        )
+        if direct_match is None:
+            return "UNKNOWN"
+        return "SUCCESS" if direct_match else "DRIFT"
+
+    def _moving_base_receipt_matches_direct(
+        self, wanted: dict, pre_transition_record: dict, terminal_record: dict
+    ) -> bool | None:
+        """Bind a terminal SUCCESS receipt to direct, read-only GitHub evidence.
+
+        Lifecycle comments identify the intended bounded operation, but cannot prove
+        it happened.  This verifier reads the real PR, commit, merge-group, check,
+        and protected-main objects named by that receipt.  A missing or inconsistent
+        object is deliberately not sufficient to classify a repository as target.
+        """
+        receipt = (pre_transition_record.get("body", {}).get("success_condition") or {}).get(
+            "moving_base_receipt"
+        )
+        if not _valid_moving_base_receipt(receipt, wanted):
+            return False
+        if not isinstance(receipt, dict):
+            return False
+        repository = receipt["repository"]
+        pr_a = receipt["pr_a"]
+        pr_b = receipt["pr_b"]
+        gate = receipt["aggregate_gate_run"]
+        expected_context = wanted["required_checks"][0]
+        expected_app_id = wanted.get("required_check_app_id")
+        if not isinstance(expected_app_id, int) or isinstance(expected_app_id, bool) or expected_app_id <= 0:
+            return False
+
+        def matching_pull(payload: object, number: int, *, head_sha: str | None = None, merge_sha: str | None = None) -> bool:
+            if not isinstance(payload, dict):
+                return False
+            base = payload.get("base")
+            base_repo = base.get("repo") if isinstance(base, dict) else None
+            if (
+                payload.get("number") != number
+                or payload.get("merged") is not True
+                or not isinstance(payload.get("merged_at"), str)
+                or not isinstance(base, dict)
+                or base.get("ref") != "main"
+                or not isinstance(base_repo, dict)
+                or base_repo.get("full_name") != repository
+            ):
+                return False
+            if head_sha is not None:
+                head = payload.get("head")
+                if not isinstance(head, dict) or head.get("sha") != head_sha:
+                    return False
+            return merge_sha is None or payload.get("merge_commit_sha") == merge_sha
+
+        def has_successful_check(
+            payload: object,
+            *,
+            sha: str,
+            require_pr: int | None,
+            require_run: int | None,
+        ) -> dict | None:
+            if not isinstance(payload, dict) or not isinstance(payload.get("check_runs"), list):
+                return None
+            for check_run in payload["check_runs"]:
+                if not isinstance(check_run, dict):
+                    continue
+                app = check_run.get("app")
+                if (
+                    check_run.get("name") != expected_context
+                    or not isinstance(app, dict)
+                    or app.get("id") != expected_app_id
+                    or check_run.get("head_sha") != sha
+                    or check_run.get("conclusion") != "success"
+                ):
+                    continue
+                if require_pr is not None:
+                    pull_requests = check_run.get("pull_requests")
+                    if not isinstance(pull_requests, list):
+                        continue
+                    associated = {
+                        item.get("number") for item in pull_requests
+                        if isinstance(item, dict)
+                    }
+                    if require_pr not in associated:
+                        continue
+                if require_run is not None:
+                    match = WORKFLOW_RUN_RE.match(str(check_run.get("details_url") or ""))
+                    if match is None or int(match.group(1)) != require_run:
+                        continue
+                return check_run
+            return None
+
+        try:
+            pull_a = self.api(f"/repos/{repository}/pulls/{pr_a}", allow_404=True)
+            pull_b = self.api(f"/repos/{repository}/pulls/{pr_b}", allow_404=True)
+            a_checks = self.api(
+                f"/repos/{repository}/commits/{receipt['a_head']}/check-runs?per_page=100",
+                allow_404=True,
+            )
+            after_b = self.api(f"/repos/{repository}/commits/{receipt['main_after_b']}", allow_404=True)
+            after_a = self.api(f"/repos/{repository}/commits/{receipt['main_after_a']}", allow_404=True)
+            b_advance = self.api(
+                f"/repos/{repository}/compare/{receipt['main_before_b']}...{receipt['main_after_b']}",
+                allow_404=True,
+            )
+            aggregate_run = self.api(
+                f"/repos/{repository}/actions/runs/{gate['run_id']}", allow_404=True
+            )
+            merge_group_commit = self.api(
+                f"/repos/{repository}/commits/{receipt['merge_group_sha']}", allow_404=True
+            )
+            merge_group_checks = self.api(
+                f"/repos/{repository}/commits/{receipt['merge_group_sha']}/check-runs?per_page=100",
+                allow_404=True,
+            )
+            protected_main = self.api(f"/repos/{repository}/branches/main", allow_404=True)
+        except (RuntimeError, ValueError):
+            return None
+
+        if not matching_pull(
+            pull_a, pr_a, head_sha=receipt["a_head"], merge_sha=receipt["main_after_a"]
+        ):
+            return False
+        if not matching_pull(pull_b, pr_b, merge_sha=receipt["main_after_b"]):
+            return False
+        a_check = has_successful_check(
+            a_checks, sha=receipt["a_head"], require_pr=pr_a, require_run=None
+        )
+        if a_check is None:
+            return False
+        after_b_parents = after_b.get("parents") if isinstance(after_b, dict) else None
+        if (
+            not isinstance(after_b, dict)
+            or after_b.get("sha") != receipt["main_after_b"]
+            or not isinstance(after_b_parents, list)
+            or receipt["main_before_b"] not in {
+                parent.get("sha") for parent in after_b_parents if isinstance(parent, dict)
+            }
+            or not isinstance(b_advance, dict)
+            or b_advance.get("status") != "ahead"
+        ):
+            return False
+        after_a_parents = after_a.get("parents") if isinstance(after_a, dict) else None
+        if (
+            not isinstance(after_a, dict)
+            or after_a.get("sha") != receipt["main_after_a"]
+            or not isinstance(after_a_parents, list)
+            or receipt["main_after_b"] not in {
+                parent.get("sha") for parent in after_a_parents if isinstance(parent, dict)
+            }
+        ):
+            return False
+        if (
+            not isinstance(aggregate_run, dict)
+            or aggregate_run.get("id") != gate["run_id"]
+            or aggregate_run.get("event") != "merge_group"
+            or aggregate_run.get("head_sha") != receipt["merge_group_sha"]
+            or aggregate_run.get("status") != "completed"
+            or aggregate_run.get("conclusion") != "success"
+        ):
+            return False
+        if (
+            not isinstance(merge_group_commit, dict)
+            or merge_group_commit.get("sha") != receipt["merge_group_sha"]
+            or not isinstance(merge_group_commit.get("parents"), list)
+            or len(merge_group_commit["parents"]) != 2
+            or not all(isinstance(parent, dict) for parent in merge_group_commit["parents"])
+            or merge_group_commit["parents"][0].get("sha") != receipt["base_sha"]
+            or merge_group_commit["parents"][1].get("sha") != receipt["a_head"]
+        ):
+            return False
+        merge_group_check = has_successful_check(
+            merge_group_checks,
+            sha=receipt["merge_group_sha"],
+            require_pr=None,
+            require_run=gate["run_id"],
+        )
+        if merge_group_check is None:
+            return False
+        a_green_at = _parse_timestamp(a_check.get("completed_at"))
+        b_merged_at = _parse_timestamp(pull_b.get("merged_at")) if isinstance(pull_b, dict) else None
+        a_merged_at = _parse_timestamp(pull_a.get("merged_at")) if isinstance(pull_a, dict) else None
+        merge_group_started_at = _parse_timestamp(
+            aggregate_run.get("run_started_at") or aggregate_run.get("created_at")
+        ) if isinstance(aggregate_run, dict) else None
+        merge_group_completed_at = _parse_timestamp(merge_group_check.get("completed_at"))
+        if (
+            a_green_at is None
+            or b_merged_at is None
+            or a_merged_at is None
+            or merge_group_started_at is None
+            or merge_group_completed_at is None
+            or a_green_at > b_merged_at
+            or b_merged_at > merge_group_started_at
+            or merge_group_started_at > merge_group_completed_at
+            or merge_group_completed_at > a_merged_at
+        ):
+            return False
+        protected_main_commit = (
+            protected_main.get("commit") if isinstance(protected_main, dict) else None
+        )
+        if (
+            not isinstance(protected_main, dict)
+            or protected_main.get("protected") is not True
+            or not isinstance(protected_main_commit, dict)
+            or not isinstance(protected_main_commit.get("sha"), str)
+        ):
+            return False
+        main_head = protected_main_commit["sha"]
+        if main_head == receipt["main_after_a"]:
+            return True
+        try:
+            integrated = self.api(
+                f"/repos/{repository}/compare/{receipt['main_after_a']}...{main_head}",
+                allow_404=True,
+            )
+        except (RuntimeError, ValueError):
+            return None
+        integration_base = integrated.get("merge_base_commit") if isinstance(integrated, dict) else None
+        return (
+            isinstance(integrated, dict)
+            and integrated.get("status") == "ahead"
+            and isinstance(integration_base, dict)
+            and integration_base.get("sha") == receipt["main_after_a"]
+        )
 
     def check(self, condition: bool, message: str) -> None:
         if not condition:
@@ -796,64 +1587,283 @@ class Audit:
                     self._add_source(sources, context, None)
         return sources
 
-    def main_protection_controls(
-        self, repo: str, *, branch: str = "main", default_branch: str = "main"
-    ) -> dict[str, bool]:
+    def _applicable_rulesets(
+        self, repo: str, *, branch: str, default_branch: str
+    ) -> list[dict]:
         applicable: list[dict] = []
         for summary in self.api_list(f"/repos/{repo}/rulesets"):
             if summary.get("enforcement") != "active":
                 continue
             detail = self.api(f"/repos/{repo}/rulesets/{summary['id']}")
+            if not isinstance(detail, dict):
+                raise RuntimeError(f"GET /repos/{repo}/rulesets/{summary['id']} -> expected object payload")
             if ruleset_applies_to_branch(detail, branch=branch, default_branch=default_branch):
                 applicable.append(detail)
-        if applicable:
-            rule_types = {
-                rule.get("type") for detail in applicable for rule in detail.get("rules", [])
-                if isinstance(rule, dict)
-            }
-            return {
-                "pull_requests": "pull_request" in rule_types,
-                "force_pushes": "non_fast_forward" not in rule_types,
-                "deletions": "deletion" not in rule_types,
-                "broad_bypass": any(bool(detail.get("bypass_actors")) for detail in applicable),
-                "strict_required_status_checks": bool(
-                    [
-                        rule for detail in applicable for rule in detail.get("rules", [])
-                        if isinstance(rule, dict) and rule.get("type") == "required_status_checks"
-                    ]
-                ) and all(
-                    (rule.get("parameters") or {}).get("strict_required_status_checks_policy") is True
-                    for detail in applicable for rule in detail.get("rules", [])
-                    if isinstance(rule, dict) and rule.get("type") == "required_status_checks"
-                ),
-            }
+        return applicable
+
+    @staticmethod
+    def _ruleset_rollout_controls(applicable: list[dict]) -> dict[str, bool | int | None]:
+        rules = [
+            rule for detail in applicable for rule in detail.get("rules", []) if isinstance(rule, dict)
+        ]
+        rule_types = {rule.get("type") for rule in rules}
+        pull_rules = [rule for rule in rules if rule.get("type") == "pull_request"]
+        status_rules = [rule for rule in rules if rule.get("type") == "required_status_checks"]
+        bypasses = [detail.get("bypass_actors") for detail in applicable]
+
+        counts: list[int] = []
+        codeowner_flags: list[bool] = []
+        for rule in pull_rules:
+            parameters = rule.get("parameters")
+            count = parameters.get("required_approving_review_count") if isinstance(parameters, dict) else None
+            codeowner = parameters.get("require_code_owner_review") if isinstance(parameters, dict) else None
+            if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                counts = []
+                codeowner_flags = []
+                break
+            if not isinstance(codeowner, bool):
+                counts = []
+                codeowner_flags = []
+                break
+            counts.append(count)
+            codeowner_flags.append(codeowner)
+        review_count: int | None
+        codeowner_review: bool | None
+        if not pull_rules:
+            review_count, codeowner_review = 0, False
+        elif len(counts) != len(pull_rules) or len(codeowner_flags) != len(pull_rules):
+            review_count, codeowner_review = None, None
+        else:
+            review_count, codeowner_review = max(counts), any(codeowner_flags)
+
+        strict_values: list[bool] = []
+        for rule in status_rules:
+            parameters = rule.get("parameters")
+            strict = parameters.get("strict_required_status_checks_policy") if isinstance(parameters, dict) else None
+            if not isinstance(strict, bool):
+                strict_values = []
+                break
+            strict_values.append(strict)
+        strict: bool | None
+        if not status_rules:
+            strict = False
+        elif len(strict_values) != len(status_rules):
+            strict = None
+        else:
+            strict = any(strict_values)
+        return {
+            "pull_requests": "pull_request" in rule_types,
+            "force_pushes": "non_fast_forward" not in rule_types,
+            "deletions": "deletion" not in rule_types,
+            "broad_bypass": (
+                any(bool(value) for value in bypasses)
+                if all(isinstance(value, list) for value in bypasses) else None
+            ),
+            "strict_required_status_checks": strict,
+            "required_approving_review_count": review_count,
+            "require_code_owner_review": codeowner_review,
+            "merge_queue": "merge_queue" in rule_types,
+        }
+
+    @staticmethod
+    def _classic_rollout_controls(protection: object) -> dict[str, bool | int | None] | None:
+        """Return classic protection controls, or ``None`` when no classic surface exists."""
+        if protection is None:
+            return None
+        if not isinstance(protection, dict):
+            return {key: None for key in (
+                "pull_requests", "force_pushes", "deletions", "broad_bypass",
+                "strict_required_status_checks", "required_approving_review_count",
+                "require_code_owner_review", "merge_queue",
+            )}
+        reviews = protection.get("required_pull_request_reviews")
+        if reviews is None:
+            pull_requests, review_count, codeowner_review, has_pr_bypass = False, 0, False, False
+        elif isinstance(reviews, dict):
+            count = reviews.get("required_approving_review_count")
+            codeowner = reviews.get("require_code_owner_reviews")
+            bypass_allowances = reviews.get("bypass_pull_request_allowances") or {}
+            pull_requests = True
+            review_count = (
+                count if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else None
+            )
+            codeowner_review = codeowner if isinstance(codeowner, bool) else None
+            has_pr_bypass = (
+                any(bool(bypass_allowances.get(kind)) for kind in ("users", "teams", "apps"))
+                if isinstance(bypass_allowances, dict) else None
+            )
+        else:
+            pull_requests = review_count = codeowner_review = has_pr_bypass = None
+
+        allow_force_pushes = (protection.get("allow_force_pushes") or {}).get("enabled")
+        allow_deletions = (protection.get("allow_deletions") or {}).get("enabled")
+        enforce_admins = (protection.get("enforce_admins") or {}).get("enabled")
+        status_checks = protection.get("required_status_checks")
+        if status_checks is None:
+            strict = False
+        elif isinstance(status_checks, dict):
+            strict = status_checks.get("strict") if isinstance(status_checks.get("strict"), bool) else None
+        else:
+            strict = None
+        raw_queue = protection.get("required_merge_queue")
+        merge_queue = raw_queue.get("enabled") if isinstance(raw_queue, dict) else raw_queue
+        broad_bypass = (
+            (not enforce_admins) or has_pr_bypass
+            if isinstance(enforce_admins, bool) and isinstance(has_pr_bypass, bool) else None
+        )
+        return {
+            "pull_requests": pull_requests,
+            "force_pushes": allow_force_pushes if isinstance(allow_force_pushes, bool) else None,
+            "deletions": allow_deletions if isinstance(allow_deletions, bool) else None,
+            "broad_bypass": broad_bypass,
+            "strict_required_status_checks": strict,
+            "required_approving_review_count": review_count,
+            "require_code_owner_review": codeowner_review,
+            "merge_queue": merge_queue if isinstance(merge_queue, bool) else None,
+        }
+
+    @staticmethod
+    def _compose_rollout_protection_controls(
+        ruleset: dict[str, bool | int | None] | None,
+        classic: dict[str, bool | int | None] | None,
+    ) -> dict[str, bool | int | None]:
+        """Compose overlapping enforcement surfaces; neither can hide the other."""
+        unknown = {
+            "pull_requests": None,
+            "force_pushes": None,
+            "deletions": None,
+            "broad_bypass": None,
+            "strict_required_status_checks": None,
+            "required_approving_review_count": None,
+            "require_code_owner_review": None,
+            "merge_queue": None,
+        }
+        if ruleset is None and classic is None:
+            return unknown
+        if ruleset is None:
+            return classic if classic is not None else unknown
+        if classic is None:
+            return ruleset
+
+        def both(value_a: object, value_b: object) -> bool | None:
+            return value_a and value_b if isinstance(value_a, bool) and isinstance(value_b, bool) else None
+
+        def either(value_a: object, value_b: object) -> bool | None:
+            return value_a or value_b if isinstance(value_a, bool) and isinstance(value_b, bool) else None
+
+        rule_count = ruleset.get("required_approving_review_count")
+        classic_count = classic.get("required_approving_review_count")
+        return {
+            "pull_requests": either(ruleset.get("pull_requests"), classic.get("pull_requests")),
+            "force_pushes": both(ruleset.get("force_pushes"), classic.get("force_pushes")),
+            "deletions": both(ruleset.get("deletions"), classic.get("deletions")),
+            "broad_bypass": either(ruleset.get("broad_bypass"), classic.get("broad_bypass")),
+            "strict_required_status_checks": either(
+                ruleset.get("strict_required_status_checks"), classic.get("strict_required_status_checks")
+            ),
+            "required_approving_review_count": (
+                max(rule_count, classic_count)
+                if isinstance(rule_count, int) and not isinstance(rule_count, bool)
+                and isinstance(classic_count, int) and not isinstance(classic_count, bool)
+                else None
+            ),
+            "require_code_owner_review": either(
+                ruleset.get("require_code_owner_review"), classic.get("require_code_owner_review")
+            ),
+            "merge_queue": either(ruleset.get("merge_queue"), classic.get("merge_queue")),
+        }
+
+    def _read_composed_rollout_protection_controls(
+        self, repo: str, *, branch: str, default_branch: str
+    ) -> dict[str, bool | int | None]:
+        applicable = self._applicable_rulesets(repo, branch=branch, default_branch=default_branch)
         protection = self.api(
             f"/repos/{repo}/branches/{urllib.parse.quote(branch, safe='')}/protection",
             allow_404=True,
         )
-        if not protection:
-            return {
-                "pull_requests": False,
-                "force_pushes": True,
-                "deletions": True,
-                "broad_bypass": True,
-                "strict_required_status_checks": False,
-            }
-        bypass_allowances = (
-            (protection.get("required_pull_request_reviews") or {}).get("bypass_pull_request_allowances") or {}
+        return self._compose_rollout_protection_controls(
+            self._ruleset_rollout_controls(applicable) if applicable else None,
+            self._classic_rollout_controls(protection),
         )
-        has_pr_bypass = any(bool(bypass_allowances.get(kind)) for kind in ("users", "teams", "apps"))
+
+    def main_protection_controls(
+        self, repo: str, *, branch: str = "main", default_branch: str = "main"
+    ) -> dict[str, bool | None]:
+        try:
+            controls = self._read_composed_rollout_protection_controls(
+                repo, branch=branch, default_branch=default_branch
+            )
+        except (RuntimeError, ValueError):
+            controls = self._compose_rollout_protection_controls(None, None)
         return {
-            "pull_requests": protection.get("required_pull_request_reviews") is not None,
-            "force_pushes": bool((protection.get("allow_force_pushes") or {}).get("enabled")),
-            "deletions": bool((protection.get("allow_deletions") or {}).get("enabled")),
-            "broad_bypass": (
-                not bool((protection.get("enforce_admins") or {}).get("enabled")) or has_pr_bypass
-            ),
-            "strict_required_status_checks": (
-                (protection.get("required_status_checks") or {}).get("strict") is True
-            ),
+            field: controls.get(field)
+            for field in (
+                "pull_requests", "force_pushes", "deletions", "broad_bypass",
+                "strict_required_status_checks",
+            )
         }
+
+    def rollout_protection_controls(
+        self, repo: str, *, branch: str = "main", default_branch: str = "main"
+    ) -> dict[str, bool | int | None]:
+        """Compose every applicable ruleset and classic branch-protection surface."""
+        try:
+            return self._read_composed_rollout_protection_controls(
+                repo, branch=branch, default_branch=default_branch
+            )
+        except (RuntimeError, ValueError):
+            return self._compose_rollout_protection_controls(None, None)
+
+    def rollout_state_readback(self, repo: str) -> dict | None:
+        """Build the compact, direct settings readback stored in lifecycle records."""
+        live = self.api(f"/repos/{repo}")
+        if not isinstance(live, dict):
+            return None
+        default_branch = live.get("default_branch") if isinstance(live.get("default_branch"), str) else None
+        if default_branch != "main":
+            return None
+        branch = self.api(f"/repos/{repo}/branches/main")
+        if not isinstance(branch, dict):
+            return None
+        try:
+            required_sources = self.required_context_sources(repo, branch="main", default_branch=default_branch)
+            controls = self.rollout_protection_controls(repo, branch="main", default_branch=default_branch)
+        except (RuntimeError, ValueError):
+            return None
+        if not isinstance(controls, dict):
+            return None
+        if not isinstance(controls.get("required_approving_review_count"), int) or isinstance(controls.get("required_approving_review_count"), bool):
+            return None
+        if not all(isinstance(value, bool) for value in (
+            branch.get("protected"), live.get("allow_squash_merge"), live.get("allow_merge_commit"),
+            live.get("allow_rebase_merge"), live.get("delete_branch_on_merge"), controls.get("merge_queue"),
+            controls.get("pull_requests"), controls.get("force_pushes"), controls.get("deletions"),
+            controls.get("broad_bypass"), controls.get("strict_required_status_checks"),
+            controls.get("require_code_owner_review"),
+        )):
+            return None
+        state = {
+            "repository": repo,
+            "required_checks": sorted(required_sources),
+            "required_check_sources": {
+                context: sorted(app_ids, key=lambda app_id: (-1 if app_id is None else app_id))
+                for context, app_ids in sorted(required_sources.items())
+            },
+            "main_protected": branch["protected"],
+            "squash_only": live["allow_squash_merge"] and not live["allow_merge_commit"] and not live["allow_rebase_merge"],
+            "delete_branch_on_merge": live["delete_branch_on_merge"],
+            "merge_queue": controls["merge_queue"],
+            "protection": {
+                "pull_requests": controls["pull_requests"],
+                "force_pushes": controls["force_pushes"],
+                "deletions": controls["deletions"],
+                "broad_bypass": controls["broad_bypass"],
+                "strict_required_status_checks": controls["strict_required_status_checks"],
+                "required_approving_review_count": controls["required_approving_review_count"],
+                "require_code_owner_review": controls["require_code_owner_review"],
+            },
+        }
+        return _normalized_rollout_state(state)
 
     def private_vulnerability_reporting_enabled(self, repo: str) -> bool:
         state = self.api(f"/repos/{repo}/private-vulnerability-reporting", allow_404=True)
@@ -1024,39 +2034,53 @@ class Audit:
         if wanted.get("delete_branch_on_merge"):
             self.check(bool(live.get("delete_branch_on_merge")), f"{repo}: merged branch auto-delete disabled")
 
+        rollout_state = self.rollout_state_readback(repo)
+        classification = self.classify_rollout_readback(
+            wanted,
+            rollout_state,
+            now=datetime.now(timezone.utc).isoformat(),
+        )
+        self.rollout_classifications[repo] = classification
+        if classification == "DRIFT":
+            self.errors.append(f"{repo}: rollout lifecycle DRIFT")
+        elif classification == "UNKNOWN":
+            message = f"{repo}: rollout lifecycle UNKNOWN (required direct readback unavailable)"
+            self.unknowns.append(message)
+            self.warnings.append(message)
+        target_active = classification in {"SUCCESS", "TARGET"}
+
         branch = self.api(f"/repos/{repo}/branches/main")
         self.check(bool(branch.get("protected")) == bool(wanted.get("main_protected")), f"{repo}: main protection drift")
-        expected = expected_checks(wanted)
-        expected_app = expected_check_app_id(wanted)
-        required_sources = self.required_context_sources(
-            repo,
-            branch="main",
-            default_branch=live.get("default_branch") or "main",
-        )
-        required_names = set(required_sources)
-        allowed_names = allowed_required_checks(wanted)
-        self.check(required_contexts_match(wanted, required_names), f"{repo}: required checks drift: expected {sorted(expected)}, allowed {sorted(allowed_names)}, got {sorted(required_names)}")
-        proof_names = required_names & allowed_names
-        for context in proof_names:
-            observed_apps = required_sources.get(context, set())
-            self.check(observed_apps == {expected_app}, f"{repo}: required check {context!r} App binding drift: expected {expected_app}, got {sorted(str(value) for value in observed_apps)}")
-        emitted = self.representative_check_sources(repo, proof_names, expected_app)
-        emitted_names = set(emitted)
-        self.check(proof_names <= emitted_names, f"{repo}: required checks not proven on current protected push or a current internal PR containing current main: expected {sorted(proof_names)}, observed {sorted(emitted_names)}")
-        for context in proof_names:
-            observed_apps = emitted.get(context, set())
-            self.check(observed_apps == {expected_app}, f"{repo}: emitted check {context!r} App drift: expected {expected_app}, got {sorted(str(value) for value in observed_apps)}")
-        if wanted.get("gate_mode") == "transition" and wanted.get("target_gate") and wanted["target_gate"] not in required_names:
-            self.warnings.append(f"{repo}: transition target gate not required yet: {wanted['target_gate']}")
-
-        actual_protection = self.main_protection_controls(
-            repo, branch="main", default_branch=live.get("default_branch") or "main"
-        )
-        for control, expected_value in wanted["protection"].items():
-            self.check(
-                actual_protection.get(control) is expected_value,
-                f"{repo}: protection control {control} drift: expected {expected_value}, got {actual_protection.get(control)}",
+        if target_active:
+            expected = expected_checks(wanted)
+            expected_app = expected_check_app_id(wanted)
+            required_sources = self.required_context_sources(
+                repo,
+                branch="main",
+                default_branch=live.get("default_branch") or "main",
             )
+            required_names = set(required_sources)
+            allowed_names = allowed_required_checks(wanted)
+            self.check(required_contexts_match(wanted, required_names), f"{repo}: required checks drift: expected {sorted(expected)}, allowed {sorted(allowed_names)}, got {sorted(required_names)}")
+            proof_names = required_names & allowed_names
+            for context in proof_names:
+                observed_apps = required_sources.get(context, set())
+                self.check(observed_apps == {expected_app}, f"{repo}: required check {context!r} App binding drift: expected {expected_app}, got {sorted(str(value) for value in observed_apps)}")
+            emitted = self.representative_check_sources(repo, proof_names, expected_app)
+            emitted_names = set(emitted)
+            self.check(proof_names <= emitted_names, f"{repo}: required checks not proven on current protected push or a current internal PR containing current main: expected {sorted(proof_names)}, observed {sorted(emitted_names)}")
+            for context in proof_names:
+                observed_apps = emitted.get(context, set())
+                self.check(observed_apps == {expected_app}, f"{repo}: emitted check {context!r} App drift: expected {expected_app}, got {sorted(str(value) for value in observed_apps)}")
+
+            actual_protection = self.rollout_protection_controls(
+                repo, branch="main", default_branch=live.get("default_branch") or "main"
+            )
+            for control, expected_value in wanted["protection"].items():
+                self.check(
+                    actual_protection.get(control) == expected_value,
+                    f"{repo}: protection control {control} drift: expected {expected_value}, got {actual_protection.get(control)}",
+                )
 
         sec = live.get("security_and_analysis") or {}
         expected_sec = wanted.get("security") or {}
@@ -1157,9 +2181,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--offline", action="store_true", help="validate desired-state only")
     parser.add_argument("--scan-coordinates", action="store_true", help="also query GitHub code search")
+    parser.add_argument(
+        "--terminal-closeout",
+        action="store_true",
+        help="reject V2 closeout unless every permanent repository has reached its target",
+    )
     args = parser.parse_args()
     desired = load_desired()
     if args.offline:
+        if args.terminal_closeout:
+            print("UNKNOWN: terminal closeout requires direct GitHub lifecycle and settings readback", file=sys.stderr)
+            return 2
         print(f"offline desired-state validation PASS: {len(desired['permanent_repositories'])} permanent repositories")
         return 0
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
@@ -1174,15 +2206,24 @@ def main() -> int:
             audit.audit_administrative_repo(repo)
         if args.scan_coordinates:
             audit.coordinate_scan(desired)
+        if args.terminal_closeout and not terminal_v2_closeout_permitted(audit.rollout_classifications):
+            audit.errors.append(
+                "V2 terminal closeout rejected: every permanent repository must be TARGET/SUCCESS; "
+                f"got {audit.rollout_classifications}"
+            )
     except RuntimeError as exc:
         print(f"UNKNOWN: {exc}", file=sys.stderr)
         return 2
     for warning in audit.warnings:
         print(f"WARN: {warning}")
+    for repo, classification in sorted(audit.rollout_classifications.items()):
+        print(f"ROLLOUT: {repo}: {classification}")
     for error in audit.errors:
         print(f"FAIL: {error}")
     if audit.errors:
         return 1
+    if audit.unknowns:
+        return 2
     print(f"PASS: live governance audit; warnings={len(audit.warnings)}")
     return 0
 

@@ -175,6 +175,32 @@ Create `.github` only when at least two repositories demonstrably need the same 
 
 Create `.github-private` only under a future explicit ADR if there is a real member-only organization-profile requirement; no such requirement is part of this baseline.
 
+### 2026-08-31 amendment — Solo-Maintainer Governance V2
+
+This dated amendment makes the approved Solo-Maintainer Governance V2 target canonical for META authority. It supersedes conflicting moving-head, review-envelope and enterprise-style approval clauses while retaining the historical rationale that led to those controls. It does not authorize a live settings change, provider mutation, Merge Queue admission, break-glass action, or control-plane integration by itself.
+
+Solo-maintainer baseline:
+
+- exactly one stable required aggregate gate per permanent repository;
+- zero mandatory human approvals and no required CODEOWNER approval while the organization has one human maintainer;
+- Merge Queue owns integration freshness after a repository canary;
+- strict branch freshness is transitional and removed after that canary;
+- AI review is risk-based evidence, not an independent required status;
+- provider-internal provenance/security/test jobs feed the aggregate gate rather than expanding branch-protection contexts;
+- one narrow auditable owner break-glass recovery mechanism is required.
+
+The permanent external map is exactly `meta-gate`, `game-gate`, `platform-gate`, and `atlas-gate` for META, Game, Platform, and Atlas respectively. A gate must always execute on protected pull-request and merge-group candidates, fan in all applicable internal validation, and fail explicitly for missing, cancelled, unknown, skipped-without-`NOT_APPLICABLE`, neutral, or failing required work. A second externally required status needs a separately reviewed threat justification; it is not a substitute for aggregate-gate fan-in.
+
+This amendment adopts the Global Safety Contract: GS-1 no moving-head governance dependency; GS-2 no mandatory second-human dependency; GS-3 fail-closed aggregate gates; GS-4 no governance no-op/retrigger commits; GS-5 no autonomous control-plane self-authorization; GS-6 bounded, expiring transitions; GS-7 moving-base Merge Queue canaries; GS-8 independently verifiable break-glass restoration; GS-9 exactly one aggregate external gate; and GS-10 a concrete threat justification for every retained or new governance mechanism.
+
+The read-only META auditor recognizes `PENDING`, `TRANSITION`, `ROLLED_BACK`, `SUCCESS`, `DRIFT`, and `UNKNOWN`; a valid `SUCCESS` receipt has the effective target state `TARGET`. `PENDING` is allowed only for a serially unstarted repository whose direct current settings readback matches a unique, unedited pending baseline in canonical rollout Issue `Oteryn/Oteryn#102`. The baseline records `repository`, `captured_at`, `pre_state_fingerprint`, and `pre_state_readback`. The compact readback preserves both required-gate names and their GitHub App bindings. Each lifecycle comment is a machine-readable JSON object with `record_type` solely as a discriminator; `allowed_deviations` is a unique list of compact state-field paths. `TRANSITION` uses a separate unique, unedited pre-transition top-level Issue/PR comment with `transition_id`, repository, issue/PR locator, expiry, pre-state fingerprint, allowed deviations, success condition, and rollback condition. Its canonical start is GitHub's `created_at`, never a body timestamp.
+
+Terminal evidence is a distinct unique, unedited top-level comment linked by exact transition ID and pre-transition comment ID. Its canonical close time is its GitHub `created_at`; it supplies machine-readable terminal status, post-state fingerprint, and post-state readback. The auditor recomputes every fingerprint and requires `closed_at <= expires_at`. `SUCCESS` additionally requires desired-target readback and a complete moving-base canary receipt: unchanged PR A head, an intervening protected-main advance, the exact merge-group SHA, successful aggregate-gate run on that SHA, and protected-main integration. `ROLLED_BACK` requires timely positive restoration readback whose post-state fingerprint equals the pre-state fingerprint. Missing, edited, duplicate, malformed, mis-linked, or late lifecycle evidence is `DRIFT`; an unreadable required live field is `UNKNOWN`. This trusted owner/serial-writer boundary intentionally does not depend on organization audit-log proof of record creation or mutation ordering, and it creates no new writer, database, status, attestation, merge authority, or identity service.
+
+`PENDING`, `TRANSITION`, `ROLLED_BACK`, `DRIFT`, and `UNKNOWN` are all non-target for terminal V2 closeout. In particular, a restored failed cutover is recovery evidence, not permission to retry without a new receipt or to close the rollout. Terminal closeout accepts only repositories with a valid successful target receipt.
+
+Changes to workflows, aggregate-gate fan-in, branch protection/rulesets/Merge Queue configuration, `ecosystem/governance-desired-state.json`, privileged Actions boundaries, break-glass machinery, or equivalent auth/security/deployment control-plane surfaces are `CONTROL_PLANE_R2`. Candidate-controlled CI cannot by itself authorize their integration. They require deterministic validation, independent deep review of the current material candidate, a new unedited top-level human-owner authorization directly verified against current GitHub owner authority and bound to repository, PR, material head SHA, scope, and positive integration authorization, plus Merge Queue validation where canonical. This is a narrow owner-decision evidence boundary, not a required status, CODEOWNER requirement, second-human dependency, review parser, or replacement attestation mechanism.
+
 ## Migration completion baseline
 
 As of the validated v3.9 audit snapshot, all three migrated product lines remain incomplete:

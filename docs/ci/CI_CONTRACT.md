@@ -51,6 +51,6 @@ A compatible ecosystem release may reference successful provider evidence by imm
 
 ## Branch protection target
 
-`main` is protected with pull requests required, zero mandatory human approvals for the one-maintainer model, `meta-gate`, administrator enforcement, linear history, conversation resolution, and force-push/deletion disabled. `ai-review-gate` remains the PR review authority. Its separate merge-group adapter performs only fail-closed lifecycle identity validation after queue admission; it does not inspect candidate code or replace PR review.
+`main` is protected with pull requests required, zero mandatory human approvals and no required CODEOWNER approval for the one-maintainer model, `meta-gate` as its only external required status, administrator enforcement, linear history, conversation resolution, and force-push/deletion disabled. After the moving-base Merge Queue canary, Merge Queue owns integration freshness and strict required-status freshness is removed. AI review remains risk-based R1/R2 evidence for deliberate integration decisions, not an independent required status; provider/internal security and validation outcomes belong in the aggregate gate rather than adding external contexts.
 
 Changing branch/ruleset settings is an administrative GitHub operation, not something this workflow attempts to perform with `GITHUB_TOKEN`.

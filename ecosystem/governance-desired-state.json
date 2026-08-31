@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "authority": "docs/architecture/adr/0002-organization-governance-operating-model.md",
   "permanent_repositories": [
     {
@@ -7,11 +7,10 @@
       "repository_id": 1338152366,
       "role": "META",
       "required_checks": [
-        "meta-gate",
-        "ai-review-gate"
+        "meta-gate"
       ],
       "required_check_app_id": 15368,
-      "gate_mode": "stable",
+      "merge_queue": true,
       "main_protected": true,
       "squash_only": true,
       "delete_branch_on_merge": true,
@@ -28,7 +27,9 @@
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false,
-        "strict_required_status_checks": true
+        "strict_required_status_checks": false,
+        "required_approving_review_count": 0,
+        "require_code_owner_review": false
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",
@@ -41,11 +42,10 @@
       "repository_id": 1338291140,
       "role": "GAME",
       "required_checks": [
-        "Merge gate / validate"
+        "game-gate"
       ],
       "required_check_app_id": 15368,
-      "target_gate": "game-gate",
-      "gate_mode": "transition",
+      "merge_queue": true,
       "main_protected": true,
       "squash_only": true,
       "delete_branch_on_merge": true,
@@ -62,7 +62,9 @@
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false,
-        "strict_required_status_checks": true
+        "strict_required_status_checks": false,
+        "required_approving_review_count": 0,
+        "require_code_owner_review": false
       },
       "codeowners_required_paths": [
         ".github/workflows/merge-gate.yml",
@@ -78,7 +80,7 @@
         "platform-gate"
       ],
       "required_check_app_id": 15368,
-      "gate_mode": "stable",
+      "merge_queue": true,
       "main_protected": true,
       "squash_only": true,
       "delete_branch_on_merge": true,
@@ -95,7 +97,9 @@
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false,
-        "strict_required_status_checks": true
+        "strict_required_status_checks": false,
+        "required_approving_review_count": 0,
+        "require_code_owner_review": false
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",
@@ -108,11 +112,10 @@
       "repository_id": 1337995824,
       "role": "ATLAS",
       "required_checks": [
-        "atlas-gate",
-        "provenance-gate"
+        "atlas-gate"
       ],
       "required_check_app_id": 15368,
-      "gate_mode": "stable",
+      "merge_queue": true,
       "main_protected": true,
       "squash_only": true,
       "delete_branch_on_merge": true,
@@ -129,7 +132,9 @@
         "force_pushes": false,
         "deletions": false,
         "broad_bypass": false,
-        "strict_required_status_checks": true
+        "strict_required_status_checks": false,
+        "required_approving_review_count": 0,
+        "require_code_owner_review": false
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",

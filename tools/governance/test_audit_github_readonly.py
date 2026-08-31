@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import base64
+import tempfile
 from pathlib import Path
 
 MODULE_PATH = Path(__file__).with_name("audit_github_readonly.py")
@@ -323,13 +324,10 @@ def test_dependabot_security_updates_treat_404_as_disabled() -> None:
 
 
 def test_required_context_contract_rejects_undeclared_contexts() -> None:
-    stable = {"required_checks": ["gate"], "gate_mode": "stable"}
+    stable = {"required_checks": ["gate"]}
     assert m.core.required_contexts_match(stable, {"gate"})
     assert not m.core.required_contexts_match(stable, {"gate", "stale"})
-    transition = {"required_checks": ["old-gate"], "gate_mode": "transition", "target_gate": "new-gate"}
-    assert m.core.required_contexts_match(transition, {"old-gate"})
-    assert m.core.required_contexts_match(transition, {"old-gate", "new-gate"})
-    assert not m.core.required_contexts_match(transition, {"old-gate", "stale"})
+    assert not m.core.required_contexts_match(stable, {"gate", "replacement-gate"})
 
 
 def test_ruleset_protection_controls_require_no_bypass_force_or_delete() -> None:
@@ -439,6 +437,77 @@ def test_classic_protection_controls_require_strict_status_checks() -> None:
         },
     })
     assert audit.main_protection_controls("Oteryn/Test")["strict_required_status_checks"] is False
+
+
+def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> None:
+    repo = "Oteryn/Test"
+    ruleset = {
+        "target": "branch", "enforcement": "active", "bypass_actors": [],
+        "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+        "rules": [
+            {"type": "pull_request", "parameters": {
+                "required_approving_review_count": 0,
+                "require_code_owner_review": False,
+            }},
+            {"type": "merge_queue"},
+            {"type": "deletion"},
+            {"type": "non_fast_forward"},
+            {"type": "required_status_checks", "parameters": {
+                "strict_required_status_checks_policy": False,
+            }},
+        ],
+    }
+    audit = FakeAudit({
+        f"/repos/{repo}/rulesets": [{"id": 1, "enforcement": "active"}],
+        f"/repos/{repo}/rulesets/1": ruleset,
+        f"/repos/{repo}/branches/main/protection": {
+            "allow_force_pushes": {"enabled": False},
+            "allow_deletions": {"enabled": False},
+            "enforce_admins": {"enabled": True},
+            "required_status_checks": {"strict": True},
+            "required_merge_queue": {"enabled": False},
+            "required_pull_request_reviews": {
+                "required_approving_review_count": 1,
+                "require_code_owner_reviews": True,
+                "bypass_pull_request_allowances": {"users": [], "teams": [], "apps": []},
+            },
+        },
+    })
+    assert audit.rollout_protection_controls(repo) == {
+        "pull_requests": True,
+        "force_pushes": False,
+        "deletions": False,
+        "broad_bypass": False,
+        "strict_required_status_checks": True,
+        "required_approving_review_count": 1,
+        "require_code_owner_review": True,
+        "merge_queue": True,
+    }
+    assert f"/repos/{repo}/branches/main/protection" in audit.calls
+
+
+def test_rollout_protection_is_unknown_when_classic_overlay_is_unreadable() -> None:
+    repo = "Oteryn/Test"
+
+    class UnreadableClassicAudit(FakeAudit):
+        def api(self, path: str, *, allow_404: bool = False):
+            if path == f"/repos/{repo}/branches/main/protection":
+                raise RuntimeError("classic protection unreadable")
+            return super().api(path, allow_404=allow_404)
+
+    audit = UnreadableClassicAudit({
+        f"/repos/{repo}/rulesets": [{"id": 1, "enforcement": "active"}],
+        f"/repos/{repo}/rulesets/1": {
+            "target": "branch", "enforcement": "active", "bypass_actors": [],
+            "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+            "rules": [{"type": "pull_request", "parameters": {
+                "required_approving_review_count": 0,
+                "require_code_owner_review": False,
+            }}],
+        },
+    })
+    controls = audit.rollout_protection_controls(repo)
+    assert all(value is None for value in controls.values())
 
 
 def test_private_vulnerability_reporting_status() -> None:
@@ -841,13 +910,41 @@ def test_v2_desired_state_has_no_solo_maintainer_human_or_codeowner_requirement(
         assert protection["require_code_owner_review"] is False
 
 
-def test_game_desired_state_models_gate_transition() -> None:
+def test_v2_desired_state_validator_rejects_extra_gate_and_solo_approval_requirements() -> None:
+    data = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    original_path = m.core.DESIRED_PATH
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "desired.json"
+        mutations = (
+            lambda item: item["required_checks"].append("unexpected-gate"),
+            lambda item: item["protection"].__setitem__("required_approving_review_count", 1),
+            lambda item: item["protection"].__setitem__("require_code_owner_review", True),
+            lambda item: item["protection"].__setitem__("strict_required_status_checks", True),
+            lambda item: item.__setitem__("merge_queue", False),
+        )
+        try:
+            for mutate in mutations:
+                broken = json.loads(json.dumps(data))
+                mutate(broken["permanent_repositories"][0])
+                path.write_text(json.dumps(broken), encoding="utf-8")
+                m.core.DESIRED_PATH = path
+                try:
+                    m.core.load_desired()
+                except SystemExit:
+                    pass
+                else:
+                    raise AssertionError("weakened or expanded V2 target must fail closed")
+        finally:
+            m.core.DESIRED_PATH = original_path
+
+
+def test_game_desired_state_declares_the_v2_target_not_a_gate_transition() -> None:
     desired = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
     game = next(item for item in desired["permanent_repositories"] if item["repository"] == "Oteryn/Oteryn-Game")
-    assert game["required_checks"] == ["Merge gate / validate"]
+    assert game["required_checks"] == ["game-gate"]
     assert game["required_check_app_id"] == ACTIONS_APP_ID
-    assert game["gate_mode"] == "transition"
-    assert game["target_gate"] == "game-gate"
+    assert game["merge_queue"] is True
+    assert game["protection"]["strict_required_status_checks"] is False
 
 
 def main() -> int:

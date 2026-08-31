@@ -26,7 +26,15 @@ class FakeAudit(m.Audit):
     def api(self, path: str, *, allow_404: bool = False):
         self.calls.append(path)
         if path in self.responses:
-            return self.responses[path]
+            response = self.responses[path]
+            if isinstance(response, BaseException):
+                raise response
+            return response
+        if "?per_page=100&page=" in path:
+            base, page = path.rsplit("?per_page=100&page=", 1)
+            if page == "1" and base in self.responses:
+                return self.responses[base]
+            return []
         if path.startswith("/repos/Oteryn/Test/actions/workflows/"):
             return {"id": 1, "state": "active", "path": ".github/workflows/gate.yml"}
         if path.startswith("/repos/Oteryn/Test/contents/.github/workflows/gate.yml"):
@@ -64,6 +72,930 @@ def target_run(main: str, head: str, *, pr_number: int = 7) -> dict:
             "head": {"sha": head, "repo": repository},
         }],
     }
+
+
+def v2_wanted(repo: str = "Oteryn/Oteryn") -> dict:
+    desired = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    return next(item for item in desired["permanent_repositories"] if item["repository"] == repo)
+
+
+def lifecycle_comment(
+    comment_id: int,
+    body: dict,
+    *,
+    created_at: str = "2026-08-31T10:00:00Z",
+    updated_at: str | None = None,
+    in_reply_to_id: int | None = None,
+) -> dict:
+    comment = {
+        "id": comment_id,
+        "body": json.dumps(body),
+        "created_at": created_at,
+        "updated_at": created_at if updated_at is None else updated_at,
+    }
+    if in_reply_to_id is not None:
+        comment["in_reply_to_id"] = in_reply_to_id
+    return comment
+
+
+def pending_baseline(wanted: dict) -> dict:
+    baseline = json.loads(json.dumps(m.core.target_rollout_state(wanted)))
+    baseline["required_checks"] = ["legacy-gate"]
+    baseline["required_check_sources"] = {"legacy-gate": [ACTIONS_APP_ID]}
+    baseline["merge_queue"] = False
+    baseline["protection"]["strict_required_status_checks"] = True
+    return baseline
+
+
+def pending_record(wanted: dict, baseline: dict) -> dict:
+    return {
+        "record_type": "PENDING_BASELINE",
+        "repository": wanted["repository"],
+        "captured_at": "2026-08-31T09:59:00Z",
+        "pre_state_fingerprint": m.core.rollout_state_fingerprint(baseline),
+        "pre_state_readback": baseline,
+    }
+
+
+def moving_base_receipt(wanted: dict) -> dict:
+    gate = wanted["required_checks"][0]
+    return {
+        "repository": wanted["repository"],
+        "pr_a": 124,
+        "a_head": "a" * 40,
+        "main_before_b": "b" * 40,
+        "pr_b": 125,
+        "main_after_b": "c" * 40,
+        "base_sha": "c" * 40,
+        "a_head_unchanged": "a" * 40,
+        "merge_group_sha": "d" * 40,
+        "aggregate_gate_run": {
+            "context": gate,
+            "head_sha": "d" * 40,
+            "conclusion": "success",
+            "run_id": 77,
+        },
+        "main_after_a": "e" * 40,
+    }
+
+
+def transition_record(
+    wanted: dict,
+    baseline: dict,
+    *,
+    transition_id: str = "meta-v2-cutover-1",
+    expires_at: str = "2026-08-31T12:00:00Z",
+) -> dict:
+    return {
+        "record_type": "PRE_TRANSITION",
+        "transition_id": transition_id,
+        "repository": wanted["repository"],
+        "issue_or_pr": "Oteryn/Oteryn#102",
+        "expires_at": expires_at,
+        "pre_state_fingerprint": m.core.rollout_state_fingerprint(baseline),
+        "allowed_deviations": [
+            "required_checks",
+            "required_check_sources",
+            "merge_queue",
+            "protection.strict_required_status_checks",
+        ],
+        "success_condition": {"moving_base_receipt": moving_base_receipt(wanted)},
+        "rollback_condition": {"restore_pre_state": True},
+    }
+
+
+def terminal_record(
+    wanted: dict,
+    post_state: dict,
+    *,
+    terminal_status: str,
+    transition_id: str = "meta-v2-cutover-1",
+    pre_transition_comment_id: int = 2,
+) -> dict:
+    return {
+        "record_type": "TERMINAL",
+        "transition_id": transition_id,
+        "pre_transition_comment_id": pre_transition_comment_id,
+        "terminal_status": terminal_status,
+        "post_state_fingerprint": m.core.rollout_state_fingerprint(post_state),
+        "post_state_readback": post_state,
+    }
+
+
+def direct_moving_base_responses(wanted: dict, receipt: dict) -> dict[str, object]:
+    """The direct REST evidence a valid terminal SUCCESS must bind to."""
+    repo = wanted["repository"]
+    gate = receipt["aggregate_gate_run"]
+    gate_name = wanted["required_checks"][0]
+    app_id = wanted["required_check_app_id"]
+    pr_a = receipt["pr_a"]
+    pr_b = receipt["pr_b"]
+    return {
+        f"/repos/{repo}/pulls/{pr_a}": {
+            "number": pr_a,
+            "base": {"ref": "main", "repo": {"full_name": repo}},
+            "head": {"sha": receipt["a_head"]},
+            "merged": True,
+            "merged_at": "2026-08-31T11:00:00Z",
+            "merge_commit_sha": receipt["main_after_a"],
+        },
+        f"/repos/{repo}/pulls/{pr_b}": {
+            "number": pr_b,
+            "base": {"ref": "main", "repo": {"full_name": repo}},
+            "head": {"sha": "f" * 40},
+            "merged": True,
+            "merged_at": "2026-08-31T10:30:00Z",
+            "merge_commit_sha": receipt["main_after_b"],
+        },
+        f"/repos/{repo}/commits/{receipt['a_head']}/check-runs?per_page=100": {
+            "check_runs": [{
+                "name": gate_name,
+                "app": {"id": app_id},
+                "head_sha": receipt["a_head"],
+                "conclusion": "success",
+                "completed_at": "2026-08-31T10:00:00Z",
+                "pull_requests": [{"number": pr_a}],
+            }],
+        },
+        f"/repos/{repo}/commits/{receipt['main_after_b']}": {
+            "sha": receipt["main_after_b"],
+            "parents": [{"sha": receipt["main_before_b"]}],
+        },
+        f"/repos/{repo}/commits/{receipt['main_after_a']}": {
+            "sha": receipt["main_after_a"],
+            "parents": [{"sha": receipt["main_after_b"]}],
+        },
+        f"/repos/{repo}/compare/{receipt['main_before_b']}...{receipt['main_after_b']}": {
+            "status": "ahead",
+        },
+        f"/repos/{repo}/actions/runs/{gate['run_id']}": {
+            "id": gate["run_id"],
+            "event": "merge_group",
+            "head_sha": receipt["merge_group_sha"],
+            "status": "completed",
+            "conclusion": "success",
+            "run_started_at": "2026-08-31T10:40:00Z",
+        },
+        f"/repos/{repo}/commits/{receipt['merge_group_sha']}": {
+            "sha": receipt["merge_group_sha"],
+            "parents": [
+                {"sha": receipt["main_after_b"]},
+                {"sha": receipt["a_head"]},
+            ],
+        },
+        f"/repos/{repo}/commits/{receipt['merge_group_sha']}/check-runs?per_page=100": {
+            "check_runs": [{
+                "name": gate_name,
+                "app": {"id": app_id},
+                "head_sha": receipt["merge_group_sha"],
+                "conclusion": "success",
+                "completed_at": "2026-08-31T10:50:00Z",
+                "details_url": f"https://github.com/Oteryn/Oteryn/actions/runs/{gate['run_id']}/job/100",
+            }],
+        },
+        f"/repos/{repo}/branches/main": {
+            "protected": True,
+            "commit": {"sha": receipt["main_after_a"]},
+        },
+        f"/repos/{repo}/compare/{receipt['main_after_a']}...{receipt['main_after_a']}": {
+            "status": "identical",
+        },
+    }
+
+
+def test_pending_requires_one_unedited_matching_direct_readback_baseline() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    records = [lifecycle_comment(1, pending_record(wanted, baseline))]
+    assert m.core.classify_rollout_state(
+        wanted, baseline, records, now="2026-08-31T10:30:00Z"
+    ) == "PENDING"
+
+    changed = json.loads(json.dumps(baseline))
+    changed["required_checks"] = ["legacy-gate", "unrecorded-gate"]
+    changed["required_check_sources"]["unrecorded-gate"] = [ACTIONS_APP_ID]
+    assert m.core.classify_rollout_state(
+        wanted, changed, records, now="2026-08-31T10:30:00Z"
+    ) == "DRIFT"
+
+    rebound = json.loads(json.dumps(baseline))
+    rebound["required_check_sources"]["legacy-gate"] = [999]
+    assert m.core.classify_rollout_state(
+        wanted, rebound, records, now="2026-08-31T10:30:00Z"
+    ) == "DRIFT"
+
+    edited = [lifecycle_comment(1, pending_record(wanted, baseline), updated_at="2026-08-31T10:01:00Z")]
+    assert m.core.classify_rollout_state(
+        wanted, baseline, edited, now="2026-08-31T10:30:00Z"
+    ) == "DRIFT"
+    duplicate = records + [lifecycle_comment(4, pending_record(wanted, baseline))]
+    assert m.core.classify_rollout_state(
+        wanted, baseline, duplicate, now="2026-08-31T10:30:00Z"
+    ) == "DRIFT"
+    assert m.core.classify_rollout_state(
+        wanted, baseline, [], now="2026-08-31T10:30:00Z"
+    ) == "DRIFT"
+    assert m.core.classify_rollout_state(
+        wanted, baseline, None, now="2026-08-31T10:30:00Z"
+    ) == "UNKNOWN"
+
+
+def test_auditor_reads_canonical_top_level_lifecycle_comments_before_classification() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    audit = FakeAudit({
+        "/repos/Oteryn/Oteryn/issues/102/comments": [
+            lifecycle_comment(1, pending_record(wanted, baseline)),
+        ],
+    })
+    assert audit.classify_rollout_readback(
+        wanted, baseline, now="2026-08-31T10:30:00Z"
+    ) == "PENDING"
+    assert "/repos/Oteryn/Oteryn/issues/102/comments?per_page=100&page=1" in audit.calls
+
+
+def test_lifecycle_records_for_another_provider_do_not_drift_this_provider() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    other_wanted = v2_wanted("Oteryn/Oteryn-Game")
+    other_baseline = pending_baseline(other_wanted)
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(10, pending_record(other_wanted, other_baseline)),
+        lifecycle_comment(11, transition_record(other_wanted, other_baseline), created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(
+            12,
+            terminal_record(
+                other_wanted,
+                m.core.target_rollout_state(other_wanted),
+                terminal_status="SUCCESS",
+                pre_transition_comment_id=11,
+            ),
+            created_at="2026-08-31T11:00:00Z",
+        ),
+    ]
+    assert m.core.classify_rollout_state(
+        wanted, baseline, records, now="2026-08-31T13:00:00Z"
+    ) == "PENDING"
+
+
+def test_malformed_lifecycle_evidence_is_scoped_to_its_repository() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    other_wanted = v2_wanted("Oteryn/Oteryn-Game")
+    other_baseline = pending_baseline(other_wanted)
+    meta_pending = lifecycle_comment(1, pending_record(wanted, baseline))
+    edited_game = lifecycle_comment(
+        10,
+        pending_record(other_wanted, other_baseline),
+        updated_at="2026-08-31T10:01:00Z",
+    )
+    assert m.core.classify_rollout_state(
+        wanted, baseline, [meta_pending, edited_game], now="2026-08-31T10:30:00Z"
+    ) == "PENDING"
+
+    edited_meta = lifecycle_comment(
+        11,
+        pending_record(wanted, baseline),
+        updated_at="2026-08-31T10:01:00Z",
+    )
+    assert m.core.classify_rollout_state(
+        wanted, baseline, [meta_pending, edited_meta], now="2026-08-31T10:30:00Z"
+    ) == "DRIFT"
+
+    meta_transition = lifecycle_comment(
+        12, transition_record(wanted, baseline), created_at="2026-08-31T10:05:00Z"
+    )
+    malformed_linked_meta = lifecycle_comment(
+        13,
+        {
+            "record_type": "NOT_A_LIFECYCLE_RECORD",
+            "transition_id": "meta-v2-cutover-1",
+            "pre_transition_comment_id": 12,
+        },
+        created_at="2026-08-31T10:10:00Z",
+    )
+    assert m.core.classify_rollout_state(
+        wanted,
+        baseline,
+        [meta_pending, meta_transition, malformed_linked_meta],
+        now="2026-08-31T10:30:00Z",
+    ) == "DRIFT"
+
+
+def test_terminal_lifecycle_is_scoped_by_exact_pre_transition_comment_link() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    other_wanted = v2_wanted("Oteryn/Oteryn-Game")
+    other_baseline = pending_baseline(other_wanted)
+    shared_transition_id = "shared-cutover"
+    meta_pre = transition_record(wanted, baseline, transition_id=shared_transition_id)
+    game_pre = transition_record(other_wanted, other_baseline, transition_id=shared_transition_id)
+    common_records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(10, pending_record(other_wanted, other_baseline)),
+        lifecycle_comment(2, meta_pre, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(20, game_pre, created_at="2026-08-31T10:06:00Z"),
+    ]
+
+    def classify(records: list[dict]) -> str:
+        return m.core.classify_rollout_state(
+            wanted, baseline, records, now="2026-08-31T11:00:00Z"
+        )
+
+    game_terminal = terminal_record(
+        other_wanted,
+        m.core.target_rollout_state(other_wanted),
+        terminal_status="SUCCESS",
+        transition_id=shared_transition_id,
+        pre_transition_comment_id=20,
+    )
+    assert classify(common_records + [
+        lifecycle_comment(21, game_terminal, created_at="2026-08-31T10:30:00Z"),
+    ]) == "TRANSITION"
+
+    assert classify(common_records + [
+        lifecycle_comment(
+            22, game_terminal, created_at="2026-08-31T10:30:00Z", updated_at="2026-08-31T10:31:00Z",
+        ),
+    ]) == "TRANSITION"
+
+    terminal_shaped_game_record = {
+        "record_type": "NOT_A_LIFECYCLE_RECORD",
+        "repository": wanted["repository"],
+        "transition_id": shared_transition_id,
+        "pre_transition_comment_id": 20,
+        "terminal_status": "SUCCESS",
+    }
+    assert classify(common_records + [
+        lifecycle_comment(221, terminal_shaped_game_record, created_at="2026-08-31T10:30:00Z"),
+    ]) == "TRANSITION"
+
+    unlinked_terminal = terminal_record(
+        wanted,
+        baseline,
+        terminal_status="ROLLED_BACK",
+        transition_id=shared_transition_id,
+        pre_transition_comment_id=999,
+    )
+    assert classify(common_records + [
+        lifecycle_comment(23, unlinked_terminal, created_at="2026-08-31T10:30:00Z"),
+    ]) == "TRANSITION"
+
+    malformed_meta_terminal = terminal_record(
+        wanted,
+        baseline,
+        terminal_status="ROLLED_BACK",
+        transition_id=shared_transition_id,
+        pre_transition_comment_id=2,
+    )
+    assert classify(common_records + [
+        lifecycle_comment(
+            24,
+            malformed_meta_terminal,
+            created_at="2026-08-31T10:30:00Z",
+            updated_at="2026-08-31T10:31:00Z",
+        ),
+    ]) == "DRIFT"
+
+
+def test_active_transition_expires_and_late_terminal_records_stay_drift() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    transition = transition_record(wanted, baseline)
+    active = json.loads(json.dumps(baseline))
+    active["required_checks"] = ["meta-gate"]
+    active["required_check_sources"] = {"meta-gate": [ACTIONS_APP_ID]}
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+    ]
+    assert m.core.classify_rollout_state(
+        wanted, active, records, now="2026-08-31T11:00:00Z"
+    ) == "TRANSITION"
+    assert m.core.classify_rollout_state(
+        wanted, active, records, now="2026-08-31T12:01:00Z"
+    ) == "DRIFT"
+
+    late_rollback = terminal_record(wanted, baseline, terminal_status="ROLLED_BACK")
+    records.append(lifecycle_comment(3, late_rollback, created_at="2026-08-31T12:01:00Z"))
+    assert m.core.classify_rollout_state(
+        wanted, baseline, records, now="2026-08-31T12:02:00Z"
+    ) == "DRIFT"
+
+
+def test_transition_records_must_be_unique_unedited_and_top_level() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    active = json.loads(json.dumps(baseline))
+    active["required_checks"] = ["meta-gate"]
+    active["required_check_sources"] = {"meta-gate": [ACTIONS_APP_ID]}
+    transition = transition_record(wanted, baseline)
+    pending = lifecycle_comment(1, pending_record(wanted, baseline))
+    valid = lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z")
+    assert m.core.classify_rollout_state(
+        wanted, active, [pending, valid], now="2026-08-31T11:00:00Z"
+    ) == "TRANSITION"
+
+    edited = lifecycle_comment(
+        2,
+        transition,
+        created_at="2026-08-31T10:05:00Z",
+        updated_at="2026-08-31T10:06:00Z",
+    )
+    assert m.core.classify_rollout_state(
+        wanted, active, [pending, edited], now="2026-08-31T11:00:00Z"
+    ) == "DRIFT"
+    nested = lifecycle_comment(
+        2,
+        transition,
+        created_at="2026-08-31T10:05:00Z",
+        in_reply_to_id=99,
+    )
+    assert m.core.classify_rollout_state(
+        wanted, active, [pending, nested], now="2026-08-31T11:00:00Z"
+    ) == "DRIFT"
+    duplicate = lifecycle_comment(4, transition, created_at="2026-08-31T10:06:00Z")
+    assert m.core.classify_rollout_state(
+        wanted, active, [pending, valid, duplicate], now="2026-08-31T11:00:00Z"
+    ) == "DRIFT"
+
+
+def test_terminal_success_requires_complete_moving_base_receipt_and_target_readback() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+    ]
+    assert m.core.classify_rollout_state(
+        wanted, target, records, now="2026-08-31T13:00:00Z"
+    ) == "UNKNOWN"
+
+    incomplete = json.loads(json.dumps(transition))
+    del incomplete["success_condition"]["moving_base_receipt"]["main_after_a"]
+    invalid_records = [records[0], lifecycle_comment(2, incomplete, created_at="2026-08-31T10:05:00Z"), records[2]]
+    assert m.core.classify_rollout_state(
+        wanted, target, invalid_records, now="2026-08-31T13:00:00Z"
+    ) == "DRIFT"
+
+    mislinked = terminal_record(
+        wanted, target, terminal_status="SUCCESS", pre_transition_comment_id=99
+    )
+    assert m.core.classify_rollout_state(
+        wanted,
+        target,
+        [records[0], records[1], lifecycle_comment(3, mislinked, created_at="2026-08-31T11:00:00Z")],
+        now="2026-08-31T13:00:00Z",
+    ) == "DRIFT"
+
+    body_timestamp = terminal_record(wanted, target, terminal_status="SUCCESS")
+    body_timestamp["closed_at"] = "2026-08-31T11:00:00Z"
+    assert m.core.classify_rollout_state(
+        wanted,
+        target,
+        [records[0], records[1], lifecycle_comment(3, body_timestamp, created_at="2026-08-31T11:00:00Z")],
+        now="2026-08-31T13:00:00Z",
+    ) == "DRIFT"
+
+
+def test_auditor_binds_success_to_direct_github_moving_base_evidence() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    receipt = transition["success_condition"]["moving_base_receipt"]
+    comments = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+    ]
+    responses = {
+        "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+        **direct_moving_base_responses(wanted, receipt),
+    }
+    audit = FakeAudit(responses)
+    assert audit.classify_rollout_readback(
+        wanted, target, now="2026-08-31T13:00:00Z"
+    ) == "SUCCESS"
+    assert f"/repos/{wanted['repository']}/pulls/{receipt['pr_a']}" in audit.calls
+    assert f"/repos/{wanted['repository']}/actions/runs/{receipt['aggregate_gate_run']['run_id']}" in audit.calls
+    assert f"/repos/{wanted['repository']}/commits/{receipt['main_after_a']}" in audit.calls
+    assert f"/repos/{wanted['repository']}/commits/{receipt['merge_group_sha']}" in audit.calls
+
+
+def test_moving_base_receipt_requires_exact_queue_base_parent() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+
+    def classification_with(parents: list[dict]) -> str:
+        transition = transition_record(wanted, baseline)
+        receipt = transition["success_condition"]["moving_base_receipt"]
+        comments = [
+            lifecycle_comment(1, pending_record(wanted, baseline)),
+            lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+            lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+        ]
+        responses = {
+            "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+            **direct_moving_base_responses(wanted, receipt),
+        }
+        responses[f"/repos/{wanted['repository']}/commits/{receipt['merge_group_sha']}"]["parents"] = parents
+        return FakeAudit(responses).classify_rollout_readback(
+            wanted, target, now="2026-08-31T13:00:00Z"
+        )
+
+    receipt = moving_base_receipt(wanted)
+    assert classification_with([
+        {"sha": receipt["base_sha"]},
+        {"sha": receipt["a_head"]},
+    ]) == "SUCCESS"
+    assert classification_with([
+        {"sha": receipt["a_head"]},
+        {"sha": receipt["base_sha"]},
+    ]) == "DRIFT"
+
+    wrong_base = transition_record(wanted, baseline)
+    wrong_base["success_condition"]["moving_base_receipt"]["base_sha"] = "f" * 40
+    wrong_base_records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, wrong_base, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+    ]
+    assert m.core.classify_rollout_state(
+        wanted, target, wrong_base_records, now="2026-08-31T13:00:00Z"
+    ) == "DRIFT"
+
+
+def test_auditor_rejects_each_forged_or_mismatched_success_receipt_binding() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    receipt = transition["success_condition"]["moving_base_receipt"]
+    comments = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+    ]
+
+    def result_with(mutator) -> str:
+        responses = {
+            "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+            **direct_moving_base_responses(wanted, receipt),
+        }
+        mutator(responses)
+        return FakeAudit(responses).classify_rollout_readback(
+            wanted, target, now="2026-08-31T13:00:00Z"
+        )
+
+    repo = wanted["repository"]
+    gate = receipt["aggregate_gate_run"]
+    assert result_with(lambda responses: responses.__setitem__(
+        f"/repos/{repo}/pulls/{receipt['pr_a']}",
+        {**responses[f"/repos/{repo}/pulls/{receipt['pr_a']}"], "head": {"sha": "0" * 40}},
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/commits/{receipt['a_head']}/check-runs?per_page=100"]["check_runs"][0].update(
+        {"head_sha": "0" * 40}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/commits/{receipt['a_head']}/check-runs?per_page=100"]["check_runs"][0].update(
+        {"completed_at": "2026-08-31T10:45:00Z"}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/pulls/{receipt['pr_b']}"].update(
+        {"merge_commit_sha": "0" * 40}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/commits/{receipt['main_after_b']}"].update(
+        {"parents": [{"sha": "0" * 40}]}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/commits/{receipt['main_after_a']}"].update(
+        {"parents": [{"sha": "0" * 40}]}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/compare/{receipt['main_before_b']}...{receipt['main_after_b']}"].update(
+        {"status": "diverged"}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/actions/runs/{gate['run_id']}"].update(
+        {"event": "pull_request"}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/actions/runs/{gate['run_id']}"].update(
+        {"head_sha": "0" * 40}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/actions/runs/{gate['run_id']}"].update(
+        {"conclusion": "failure"}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/actions/runs/{gate['run_id']}"].update(
+        {"run_started_at": "2026-08-31T10:00:00Z"}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/commits/{receipt['merge_group_sha']}"].update(
+        {"parents": [{"sha": receipt["a_head"]}]}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses[
+        f"/repos/{repo}/commits/{receipt['merge_group_sha']}/check-runs?per_page=100"
+    ]["check_runs"][0].update({"app": {"id": 1}})) == "DRIFT"
+    assert result_with(lambda responses: responses[
+        f"/repos/{repo}/commits/{receipt['merge_group_sha']}/check-runs?per_page=100"
+    ]["check_runs"][0].update({"name": "forged-gate"})) == "DRIFT"
+    assert result_with(lambda responses: responses[
+        f"/repos/{repo}/commits/{receipt['merge_group_sha']}/check-runs?per_page=100"
+    ]["check_runs"][0].update({"head_sha": "0" * 40})) == "DRIFT"
+    assert result_with(lambda responses: responses[
+        f"/repos/{repo}/commits/{receipt['merge_group_sha']}/check-runs?per_page=100"
+    ]["check_runs"][0].update({"conclusion": "failure"})) == "DRIFT"
+    assert result_with(lambda responses: responses[
+        f"/repos/{repo}/commits/{receipt['merge_group_sha']}/check-runs?per_page=100"
+    ]["check_runs"][0].update({"completed_at": "2026-08-31T11:10:00Z"})) == "DRIFT"
+    assert result_with(lambda responses: responses[f"/repos/{repo}/branches/main"].update(
+        {"protected": False}
+    )) == "DRIFT"
+
+    def not_integrated(responses: dict[str, object]) -> None:
+        main_head = "f" * 40
+        responses[f"/repos/{repo}/branches/main"]["commit"] = {"sha": main_head}
+        responses[f"/repos/{repo}/compare/{receipt['main_after_a']}...{main_head}"] = {
+            "status": "behind",
+            "merge_base_commit": {"sha": "0" * 40},
+        }
+
+    assert result_with(not_integrated) == "DRIFT"
+
+    assert result_with(lambda responses: responses.__setitem__(
+        f"/repos/{repo}/pulls/{receipt['pr_a']}", []
+    )) == "DRIFT"
+
+    same_pr = json.loads(json.dumps(transition))
+    same_pr["success_condition"]["moving_base_receipt"]["pr_b"] = receipt["pr_a"]
+    same_comments = [comments[0], lifecycle_comment(2, same_pr, created_at="2026-08-31T10:05:00Z"), comments[2]]
+    assert FakeAudit({
+        "/repos/Oteryn/Oteryn/issues/102/comments": same_comments,
+        **direct_moving_base_responses(wanted, receipt),
+    }).classify_rollout_readback(wanted, target, now="2026-08-31T13:00:00Z") == "DRIFT"
+
+
+def test_readable_malformed_nested_direct_success_evidence_is_drift() -> None:
+    """A decoded-but-wrong REST shape is evidence mismatch, never unreadability."""
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    receipt = transition["success_condition"]["moving_base_receipt"]
+    comments = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+    ]
+    repo = wanted["repository"]
+
+    def result_with(mutator) -> str:
+        responses = {
+            "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+            **direct_moving_base_responses(wanted, receipt),
+        }
+        mutator(responses)
+        try:
+            return FakeAudit(responses).classify_rollout_readback(
+                wanted, target, now="2026-08-31T13:00:00Z"
+            )
+        except (TypeError, AttributeError) as error:
+            return f"CRASH:{type(error).__name__}"
+
+    def malformed_integrated_base(responses: dict[str, object]) -> None:
+        main_head = "f" * 40
+        responses[f"/repos/{repo}/branches/main"]["commit"] = {"sha": main_head}
+        responses[f"/repos/{repo}/compare/{receipt['main_after_a']}...{main_head}"] = {
+            "status": "ahead",
+            "merge_base_commit": "malformed",
+        }
+
+    malformed_payloads = (
+        (
+            "main-after-b parents",
+            lambda responses: responses[f"/repos/{repo}/commits/{receipt['main_after_b']}"].update(
+                {"parents": None}
+            ),
+        ),
+        (
+            "main-after-a parents",
+            lambda responses: responses[f"/repos/{repo}/commits/{receipt['main_after_a']}"].update(
+                {"parents": "malformed"}
+            ),
+        ),
+        (
+            "pull base",
+            lambda responses: responses[f"/repos/{repo}/pulls/{receipt['pr_a']}"].update(
+                {"base": "malformed"}
+            ),
+        ),
+        (
+            "pull base repository",
+            lambda responses: responses[f"/repos/{repo}/pulls/{receipt['pr_a']}"]["base"].update(
+                {"repo": "malformed"}
+            ),
+        ),
+        (
+            "pull head",
+            lambda responses: responses[f"/repos/{repo}/pulls/{receipt['pr_a']}"].update(
+                {"head": "malformed"}
+            ),
+        ),
+        (
+            "check app",
+            lambda responses: responses[
+                f"/repos/{repo}/commits/{receipt['a_head']}/check-runs?per_page=100"
+            ]["check_runs"][0].update({"app": "malformed"}),
+        ),
+        (
+            "check pull requests",
+            lambda responses: responses[
+                f"/repos/{repo}/commits/{receipt['a_head']}/check-runs?per_page=100"
+            ]["check_runs"][0].update({"pull_requests": None}),
+        ),
+        (
+            "protected branch commit",
+            lambda responses: responses[f"/repos/{repo}/branches/main"].update(
+                {"commit": "malformed"}
+            ),
+        ),
+        ("integration merge base", malformed_integrated_base),
+    )
+
+    for label, mutator in malformed_payloads:
+        result = result_with(mutator)
+        assert result == "DRIFT", f"{label}: {result}"
+
+
+def test_readable_missing_direct_success_evidence_is_drift_and_never_a_target() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    comments = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+    ]
+    receipt = transition["success_condition"]["moving_base_receipt"]
+    audit = FakeAudit({
+        "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+        **{path: None for path in direct_moving_base_responses(wanted, receipt)},
+    })
+    classification = audit.classify_rollout_readback(wanted, target, now="2026-08-31T13:00:00Z")
+    assert classification == "DRIFT"
+    assert m.core.effective_rollout_state(classification) != "TARGET"
+
+
+def test_unreadable_direct_success_evidence_is_unknown() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    receipt = transition["success_condition"]["moving_base_receipt"]
+    comments = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal_record(wanted, target, terminal_status="SUCCESS"), created_at="2026-08-31T11:00:00Z"),
+    ]
+    for failure in (RuntimeError("transport unavailable"), ValueError("decode failure")):
+        responses = {
+            "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+            **direct_moving_base_responses(wanted, receipt),
+            f"/repos/{wanted['repository']}/pulls/{receipt['pr_a']}": failure,
+        }
+        assert FakeAudit(responses).classify_rollout_readback(
+            wanted, target, now="2026-08-31T13:00:00Z"
+        ) == "UNKNOWN"
+
+
+def test_valid_rollback_is_non_target_and_terminal_closeout_rejects_it() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition_record(wanted, baseline), created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal_record(wanted, baseline, terminal_status="ROLLED_BACK"), created_at="2026-08-31T11:00:00Z"),
+    ]
+    assert m.core.classify_rollout_state(
+        wanted, baseline, records, now="2026-08-31T13:00:00Z"
+    ) == "ROLLED_BACK"
+    assert not m.core.terminal_v2_closeout_permitted({
+        "Oteryn/Oteryn": "SUCCESS",
+        "Oteryn/Oteryn-Game": "SUCCESS",
+        "Oteryn/Oteryn-Platform": "SUCCESS",
+        "Oteryn/Oteryn-Atlas": "ROLLED_BACK",
+    })
+    assert not m.core.terminal_v2_closeout_permitted({
+        "Oteryn/Oteryn": "SUCCESS",
+        "Oteryn/Oteryn-Game": "SUCCESS",
+        "Oteryn/Oteryn-Platform": "SUCCESS",
+        "Oteryn/Oteryn-Atlas": "PENDING",
+    })
+    assert m.core.effective_rollout_state("SUCCESS") == "TARGET"
+    assert m.core.effective_rollout_state("ROLLED_BACK") == "ROLLED_BACK"
+
+
+def test_multiple_valid_rollback_receipts_use_the_latest_terminal_state() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    first = transition_record(wanted, baseline, transition_id="meta-v2-cutover-1")
+    second = transition_record(wanted, baseline, transition_id="meta-v2-cutover-2")
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, first, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(
+            3,
+            terminal_record(
+                wanted, baseline, terminal_status="ROLLED_BACK", transition_id="meta-v2-cutover-1",
+            ),
+            created_at="2026-08-31T10:30:00Z",
+        ),
+        lifecycle_comment(4, second, created_at="2026-08-31T10:35:00Z"),
+        lifecycle_comment(
+            5,
+            terminal_record(
+                wanted,
+                baseline,
+                terminal_status="ROLLED_BACK",
+                transition_id="meta-v2-cutover-2",
+                pre_transition_comment_id=4,
+            ),
+            created_at="2026-08-31T11:00:00Z",
+        ),
+    ]
+    assert m.core.classify_rollout_state(
+        wanted, baseline, records, now="2026-08-31T13:00:00Z"
+    ) == "ROLLED_BACK"
+
+
+def test_latest_rollback_does_not_reverify_stale_success_evidence() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    first = transition_record(wanted, baseline, transition_id="meta-v2-cutover-success")
+    second = transition_record(wanted, baseline, transition_id="meta-v2-cutover-rollback")
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, first, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(
+            3,
+            terminal_record(
+                wanted,
+                target,
+                terminal_status="SUCCESS",
+                transition_id="meta-v2-cutover-success",
+            ),
+            created_at="2026-08-31T10:30:00Z",
+        ),
+        lifecycle_comment(4, second, created_at="2026-08-31T10:35:00Z"),
+        lifecycle_comment(
+            5,
+            terminal_record(
+                wanted,
+                baseline,
+                terminal_status="ROLLED_BACK",
+                transition_id="meta-v2-cutover-rollback",
+                pre_transition_comment_id=4,
+            ),
+            created_at="2026-08-31T11:00:00Z",
+        ),
+    ]
+    verification_calls: list[int] = []
+
+    def unavailable_stale_success(_wanted: dict, _pre: dict, terminal: dict) -> str:
+        verification_calls.append(terminal["id"])
+        return "UNKNOWN"
+
+    assert m.core.classify_rollout_state(
+        wanted,
+        baseline,
+        records,
+        now="2026-08-31T13:00:00Z",
+        success_receipt_verifier=unavailable_stale_success,
+    ) == "ROLLED_BACK"
+    assert verification_calls == []
+
+
+def test_control_plane_candidates_cannot_self_authorize_from_candidate_ci() -> None:
+    assert not m.core.is_control_plane_r2(["docs/architecture/adr/0002-organization-governance-operating-model.md"])
+    assert m.core.is_control_plane_r2(["ecosystem/governance-desired-state.json"])
+    assert m.core.is_control_plane_r2([".github/workflows/ci.yml"])
+    assert not m.core.control_plane_integration_permitted(
+        [".github/workflows/ci.yml"],
+        candidate_ci_passed=True,
+        independent_deep_review=True,
+        owner_authorization_verified=False,
+        merge_queue_required=False,
+        merge_queue_validated=False,
+    )
+    assert m.core.control_plane_integration_permitted(
+        ["ecosystem/governance-desired-state.json"],
+        candidate_ci_passed=True,
+        independent_deep_review=True,
+        owner_authorization_verified=True,
+        merge_queue_required=True,
+        merge_queue_validated=True,
+    )
 
 
 def test_pull_request_target_is_read_from_current_candidate_commit() -> None:
