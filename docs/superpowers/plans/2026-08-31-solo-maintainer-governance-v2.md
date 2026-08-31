@@ -128,7 +128,7 @@ git commit -m "docs(governance): adopt solo-maintainer governance v2"
 
 **Interfaces:**
 - Consumes: canonical V2 desired state from Task 1.
-- Produces: `meta-gate` as the only required META merge status, with deterministic PR and merge-group validation; AI review remains advisory/risk-based and cannot deadlock protected integration through comment/reaction grammar.
+- Produces: `meta-gate` as the only required META merge status, with deterministic PR and merge-group validation; the canonical policy still requires R1/R2 external review evidence, but no separate AI-review status or comment/reaction grammar can deadlock protected integration.
 
 - [ ] **Step 1: Enumerate every repository reference to `ai-review-gate`, trusted review envelopes, attestation verification, review fingerprints and the merge-group AI adapter**
 
@@ -148,9 +148,9 @@ on:
 
 and must require the merge-group path to validate `github.sha == github.event.merge_group.head_sha` and target `refs/heads/main` before testing the candidate.
 
-- [ ] **Step 3: Simplify AI review policy to risk classification and advisory evidence**
+- [ ] **Step 3: Simplify AI-review implementation while preserving canonical R1/R2 invocation**
 
-Retain R0/R1/R2 classification and sensitive-path detection if they continue to improve agent behavior. Remove requirements whose only purpose is making an independent `ai-review-gate` status mechanically green, including external-output flair/reaction grammar and bridge-specific envelope requirements.
+Retain R0/R1/R2 classification, sensitive-path detection, and the canonical requirement for one configured external review per stable R1/R2 fingerprint. Remove only requirements whose purpose is making an independent `ai-review-gate` status mechanically green, including external-output flair/reaction grammar and bridge-specific envelope requirements. Do not weaken the review-invocation requirement without a separately reviewed canonical policy amendment.
 
 - [ ] **Step 4: Keep privileged workflow boundaries safe during retirement**
 

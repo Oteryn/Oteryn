@@ -153,7 +153,7 @@ Target policy:
 - CODEOWNERS may remain as ownership/documentation and risk-path metadata;
 - unresolved blocking review conversations may still block merge where the platform supports that cleanly.
 
-High-risk changes are protected by deterministic tests, security tooling, optional independent AI review, deliberate owner confirmation for rare dangerous control-plane mutations, and Merge Queue integration testing — not by pretending a second human maintainer exists.
+High-risk changes are protected by deterministic tests, security tooling, the canonical risk-tiered independent AI-review invocation, deliberate owner confirmation for rare dangerous control-plane mutations, and Merge Queue integration testing — not by pretending a second human maintainer exists.
 
 ### 4. AI review remains useful but stops being a fragile merge authority
 
@@ -164,8 +164,8 @@ It should not require GitHub to mechanically interpret an evolving product-outpu
 Target risk model:
 
 - **R0:** prose/generated/evidence-only low-risk changes — no independent AI review required.
-- **R1:** ordinary code/config/dependency work — normal CI is authoritative; fast AI review is optional/recommended according to risk and cost.
-- **R2:** security/auth/payment/deployment/migration/governance/workflow/protection changes — independent deep AI review is strongly recommended before merge, but its comment-envelope parser is not a separate required branch-protection status.
+- **R1:** ordinary code/config/dependency work — normal CI is the required-status authority; the canonical policy requires one fast external review for each stable R1 review fingerprint. The review is evidence, not a separate required branch-protection status.
+- **R2:** security/auth/payment/deployment/migration/governance/workflow/protection changes — the canonical policy requires one deep external review for each stable R2 review fingerprint before deliberate integration. Its result is review evidence, not a separate required branch-protection status or comment-envelope parser.
 
 P0/P1/P2 remains useful as review vocabulary. P0/P1 findings should be addressed before deliberate owner integration. P2 can be tracked as follow-up. This is a human/agent decision contract, not a second cryptographic merge control plane.
 
@@ -225,10 +225,10 @@ Keep:
 Change:
 
 - remove `ai-review-gate` from required status contexts after replacement safety is proven;
-- keep AI review as risk-based advisory/owner evidence instead of independent merge authority;
+- keep the canonical risk-tiered R1/R2 review invocation as required evidence while no longer exposing it as an independent required branch-protection status;
 - retire `merge-group-ai-review-adapter.yml` after it has no required consumer;
 - retire review envelope/attestation/fingerprint bridge machinery that exists only to connect the old AI-review authority to Merge Queue;
-- simplify `ecosystem/ai-review-policy.json` to the policy that remains useful after this retirement.
+- simplify `ecosystem/ai-review-policy.json` only without weakening the canonical R1/R2 review-invocation requirement.
 
 ### Game
 

@@ -162,7 +162,7 @@ For GitHub settings, there is exactly **one writer lane** at a time.
 2. Make `meta-gate` the complete PR and merge-group aggregate authority.
 3. Preserve existing protection while replacement behavior is being proven.
 4. Retire `ai-review-gate` as an external required context only after the replacement path is proven.
-5. Preserve useful R0/R1/R2 risk classification as advisory/decision support without required reaction/comment grammar.
+5. Preserve the canonical R1/R2 review invocation and useful R0/R1/R2 risk classification as review evidence/decision support, without a separate required reaction/comment grammar.
 6. Run the real moving-base canary.
 7. Only after canary success, remove strict freshness for META.
 8. Read back all changed settings.
@@ -247,7 +247,7 @@ issue_or_pr
 started_at
 expires_at
 pre_state_fingerprint
-exact_allowed_deviations
+allowed_deviations
 success_condition
 rollback_condition
 ```
