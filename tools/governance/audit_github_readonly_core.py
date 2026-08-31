@@ -533,7 +533,11 @@ def classify_rollout_state(
         if body.get("record_type") != "TERMINAL":
             continue
         linked_pre = pre_records_by_id.get(body.get("pre_transition_comment_id"))
-        if linked_pre is None or linked_pre["body"].get("repository") != wanted.get("repository"):
+        if linked_pre is None:
+            if body.get("transition_id") in transitions:
+                return "DRIFT"
+            continue
+        if linked_pre["body"].get("repository") != wanted.get("repository"):
             continue
         transition_id = body.get("transition_id")
         pre = transitions.get(transition_id)
@@ -1672,16 +1676,22 @@ class Audit:
             aggregate_run.get("run_started_at") or aggregate_run.get("created_at")
         ) if isinstance(aggregate_run, dict) else None
         merge_group_completed_at = _parse_timestamp(merge_group_check.get("completed_at"))
+        transition_started_at = pre_transition_record.get("created_at")
+        transition_closed_at = terminal_record.get("created_at")
         if (
             a_green_at is None
             or b_merged_at is None
             or a_merged_at is None
             or merge_group_started_at is None
             or merge_group_completed_at is None
+            or not isinstance(transition_started_at, datetime)
+            or not isinstance(transition_closed_at, datetime)
+            or a_green_at < transition_started_at
             or a_green_at > b_merged_at
             or b_merged_at > merge_group_started_at
             or merge_group_started_at > merge_group_completed_at
             or merge_group_completed_at > a_merged_at
+            or a_merged_at > transition_closed_at
         ):
             return False
         protected_main_commit = (

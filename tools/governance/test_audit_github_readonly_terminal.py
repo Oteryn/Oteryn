@@ -255,7 +255,7 @@ def direct_moving_base_responses(wanted: dict, receipt: dict) -> dict[str, objec
                 "app": {"id": app_id},
                 "head_sha": receipt["a_head"],
                 "conclusion": "success",
-                "completed_at": "2026-08-31T10:00:00Z",
+                "completed_at": "2026-08-31T10:10:00Z",
                 "pull_requests": [{"number": pr_a}],
             }],
         },
@@ -482,7 +482,7 @@ def test_terminal_lifecycle_is_scoped_by_exact_pre_transition_comment_link() -> 
     )
     assert classify(common_records + [
         lifecycle_comment(23, unlinked_terminal, created_at="2026-08-31T10:30:00Z"),
-    ]) == "TRANSITION"
+    ]) == "DRIFT"
 
     malformed_meta_terminal = terminal_record(
         wanted,
@@ -640,6 +640,39 @@ def test_auditor_binds_success_to_direct_github_moving_base_evidence() -> None:
     assert f"/repos/{wanted['repository']}/actions/runs/{receipt['aggregate_gate_run']['run_id']}" in audit.calls
     assert f"/repos/{wanted['repository']}/commits/{receipt['main_after_a']}" in audit.calls
     assert f"/repos/{wanted['repository']}/commits/{receipt['merge_group_sha']}" in audit.calls
+
+
+def test_moving_base_canary_events_must_fit_the_current_transition_window() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+
+    def classification_with(pre_created_at: str, terminal_created_at: str) -> str:
+        transition = transition_record(wanted, baseline)
+        terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+        receipt = terminal["moving_base_receipt"]
+        comments = [
+            lifecycle_comment(1, pending_record(wanted, baseline)),
+            lifecycle_comment(2, transition, created_at=pre_created_at),
+            lifecycle_comment(3, terminal, created_at=terminal_created_at),
+        ]
+        responses = {
+            "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+            **direct_moving_base_responses(wanted, receipt),
+        }
+        return FakeAudit(responses).classify_rollout_readback(
+            wanted, target, now="2026-08-31T13:00:00Z"
+        )
+
+    assert classification_with(
+        "2026-08-31T10:05:00Z", "2026-08-31T11:00:00Z"
+    ) == "SUCCESS"
+    assert classification_with(
+        "2026-08-31T10:05:00Z", "2026-08-31T10:55:00Z"
+    ) == "DRIFT"
+    assert classification_with(
+        "2026-08-31T11:05:00Z", "2026-08-31T11:30:00Z"
+    ) == "DRIFT"
 
 
 def test_moving_base_receipt_requires_exact_queue_base_parent() -> None:
