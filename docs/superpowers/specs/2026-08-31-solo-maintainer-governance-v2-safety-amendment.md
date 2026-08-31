@@ -101,13 +101,12 @@ Where candidate-controlled workflow code could otherwise grant itself privileged
 
 `TRANSITION` is never an open-ended compliance state.
 
-Every authorized transition record must include at least:
+Every authorized transition receipt carries canonical `started_at` derived solely from the pre-transition record's GitHub server `created_at`; the unedited pre-transition record body must include at least:
 
 ```text
 transition_id
 repository
 issue_or_pr
-started_at
 expires_at
 pre_state_fingerprint
 allowed_deviations
@@ -117,7 +116,7 @@ rollback_condition
 
 Optional owner metadata may be included but must not become a second identity authority.
 
-Transition evidence uses two distinct, unedited top-level records in the existing canonical rollout Issue/PR: a pre-transition record containing the fields above, created before the first mutation, and a terminal record containing `transition_id`, the GitHub `pre_transition_comment_id`, machine-readable `terminal_status` (`SUCCESS` or `ROLLED_BACK`), `closed_at`, `post_state_fingerprint`, and `post_state_readback`. Direct GitHub readback must prove each record's unique immutable ID, top-level placement, and `created_at == updated_at`; the pre-transition and terminal GitHub creation timestamps are the canonical `started_at` and `closed_at`, and a conflicting supplied timestamp is invalid. Missing, deleted, edited, duplicate, mis-linked, or unreadable evidence is `DRIFT`. Terminal evidence is valid only when the derived `closed_at <= expires_at`; a late closure is `DRIFT`, not a retroactively valid terminal state. The auditor must recompute `post_state_fingerprint` from the readback. For `SUCCESS`, it must also prove the readback matches the repository's desired target and that the receipt's `success_condition` is satisfied by the complete GS-7 moving-base canary evidence, including unchanged candidate head, intervening `main` advance, exact merge-group SHA, successful aggregate-gate run, and resulting protected-main integration. A self-declared status, a free-form success note, or a passing normal PR check is insufficient. The auditor must use these fields and direct GitHub evidence, not expiry passage or mutable prose, to distinguish a closed receipt from an active deviation. These fields constrain the existing receipt and read-only auditor; they are not a new governance authority, required status, writer, database, or identity service.
+Transition evidence uses two distinct, unedited top-level records in the existing canonical rollout Issue/PR: a pre-transition record containing the fields above, created before the first mutation, and a terminal record containing `transition_id`, the GitHub `pre_transition_comment_id`, machine-readable `terminal_status` (`SUCCESS` or `ROLLED_BACK`), `post_state_fingerprint`, and `post_state_readback`. Direct GitHub readback must prove each record's unique immutable ID, top-level placement, and `created_at == updated_at`; the pre-transition and terminal GitHub creation timestamps, never values supplied in comment bodies, are the canonical `started_at` and `closed_at`. Missing, deleted, edited, duplicate, mis-linked, or unreadable evidence is `DRIFT`. Terminal evidence is valid only when the derived `closed_at <= expires_at`; a late closure is `DRIFT`, not a retroactively valid terminal state. The auditor must recompute `post_state_fingerprint` from the readback. For `SUCCESS`, it must also prove the readback matches the repository's desired target and that the receipt's `success_condition` is satisfied by the complete GS-7 moving-base canary evidence, including unchanged candidate head, intervening `main` advance, exact merge-group SHA, successful aggregate-gate run, and resulting protected-main integration. A self-declared status, a free-form success note, or a passing normal PR check is insufficient. The auditor must use these fields and direct GitHub evidence, not expiry passage or mutable prose, to distinguish a closed receipt from an active deviation. These fields constrain the existing receipt and read-only auditor; they are not a new governance authority, required status, writer, database, or identity service.
 
 A transition record belongs in the canonical rollout Issue/PR or another existing durable lifecycle authority. It must not create a new permanent transition database unless a separate threat/operational requirement justifies one.
 
