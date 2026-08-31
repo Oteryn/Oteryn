@@ -189,6 +189,18 @@ jobs:
           python3 tools/governance/test_agent_execution_routing.py
           python3 tools/governance/test_remote_desktop_action_gate.py
 
+      - name: Validate bounded autonomous execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/governance/test_bounded_execution_guard.py
+          python3 tools/governance/test_bounded_execution_loop_breaker.py
+          python3 tools/governance/test_bounded_execution_closeout_batch.py
+          python3 tools/governance/test_bounded_execution_atomic_transitions.py
+          python3 tools/governance/test_ai_review_recheck.py
+          python3 tools/governance/test_ai_review_recheck_linkage.py
+          python3 tools/governance/test_bounded_execution_final_p1_regressions.py
+
       - name: Validate AI review risk policy
         shell: bash
         run: |

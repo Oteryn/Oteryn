@@ -247,6 +247,44 @@ def _verify_summary(*, summary_prefix: str | None = None,
     )
 
 
+def test_live_verifier_supplies_review_threads_to_canonical_verifier() -> None:
+    module = _v1.m
+    core = module._v1._core
+    originals = {
+        "fetch_comments": core.fetch_comments,
+        "fetch_reviews": core.fetch_reviews,
+        "fetch_review_comments": core.fetch_review_comments,
+        "fetch_review_threads": module.fetch_review_threads,
+        "fetch_pr_reactions": module.fetch_pr_reactions,
+        "verify_records": module.verify_records,
+    }
+    captured = {}
+    try:
+        core.fetch_comments = lambda *args: []
+        core.fetch_reviews = lambda *args: []
+        core.fetch_review_comments = lambda *args: []
+        module.fetch_review_threads = lambda *args: [{"id": "thread-1", "isResolved": True, "comments": []}]
+        module.fetch_pr_reactions = lambda *args: []
+        def fake_verify_records(comments, **kwargs):
+            captured.update(kwargs)
+            return {"verified": True}
+        module.verify_records = fake_verify_records
+        result = module.verify_live_review_evidence(
+            repository="Oteryn/Test", pr_number=7, token="x", policy={},
+            repo_root=".", tier="R2", fingerprint="f" * 64,
+            head="a" * 40, base="b" * 40,
+        )
+        assert result == {"verified": True}
+        assert captured.get("review_threads") == [{"id": "thread-1", "isResolved": True, "comments": []}]
+    finally:
+        core.fetch_comments = originals["fetch_comments"]
+        core.fetch_reviews = originals["fetch_reviews"]
+        core.fetch_review_comments = originals["fetch_review_comments"]
+        module.fetch_review_threads = originals["fetch_review_threads"]
+        module.fetch_pr_reactions = originals["fetch_pr_reactions"]
+        module.verify_records = originals["verify_records"]
+
+
 def test_current_codex_completed_summary_plus_pr_reaction_passes() -> None:
     found = _verify_summary()
     assert found["review_source_kind"] == "issue_comment_result"

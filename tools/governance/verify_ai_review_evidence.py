@@ -934,6 +934,39 @@ def fetch_pr_reactions(repository: str, pr_number: int, token: str) -> list[dict
     )
 
 
+def verify_live_review_evidence(
+    *,
+    repository: str,
+    pr_number: int,
+    token: str,
+    policy: dict,
+    repo_root: str | Path,
+    tier: str,
+    fingerprint: str,
+    head: str,
+    base: str,
+) -> dict:
+    """Verify the same live evidence envelope used by the required AI gate."""
+
+    trusted_policy = deepcopy(policy)
+    trusted_policy["_trusted_integration_base_sha"] = base
+    return verify_records(
+        _v1._core.fetch_comments(repository, pr_number, token),
+        policy=trusted_policy,
+        repo_root=repo_root,
+        tier=tier,
+        fingerprint=fingerprint,
+        head=head,
+        repository=repository,
+        pr_number=pr_number,
+        token=token,
+        reviews=_v1._core.fetch_reviews(repository, pr_number, token),
+        review_comments=_v1._core.fetch_review_comments(repository, pr_number, token),
+        review_threads=fetch_review_threads(repository, pr_number, token),
+        pr_reactions=fetch_pr_reactions(repository, pr_number, token),
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repository", required=True)
@@ -949,21 +982,16 @@ def main() -> int:
     policy = json.loads(Path(args.policy_file).read_text(encoding="utf-8"))
     if not _v1._core.FULL_SHA.fullmatch(args.base):
         raise SystemExit("base must be a lowercase 40-hex SHA")
-    policy["_trusted_integration_base_sha"] = args.base
-    match = verify_records(
-        _v1._core.fetch_comments(args.repository, args.pr_number, args.token),
+    match = verify_live_review_evidence(
+        repository=args.repository,
+        pr_number=args.pr_number,
+        token=args.token,
         policy=policy,
         repo_root=args.repo_root,
         tier=args.tier,
         fingerprint=args.fingerprint,
         head=args.head,
-        repository=args.repository,
-        pr_number=args.pr_number,
-        token=args.token,
-        reviews=_v1._core.fetch_reviews(args.repository, args.pr_number, args.token),
-        review_comments=_v1._core.fetch_review_comments(args.repository, args.pr_number, args.token),
-        review_threads=lambda: fetch_review_threads(args.repository, args.pr_number, args.token),
-        pr_reactions=fetch_pr_reactions(args.repository, args.pr_number, args.token),
+        base=args.base,
     )
     print(json.dumps(match, sort_keys=True))
     return 0
