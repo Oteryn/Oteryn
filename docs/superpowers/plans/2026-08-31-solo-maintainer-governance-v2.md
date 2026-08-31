@@ -83,14 +83,14 @@ The amendment must explicitly supersede conflicting moving-head/enterprise-style
 
 - [ ] **Step 5: Change `ecosystem/governance-desired-state.json` to the V2 target shape**
 
-Set the long-term `required_checks` arrays to exactly the four aggregate contexts above. Preserve main protection, squash-only, branch deletion-on-merge preference and security baseline. Extend the schema/validator only as much as necessary to represent `merge_queue`, transitional `strict_required_status_checks`, and explicit `PENDING` status for serially unstarted repositories without embedding transient PR/review data.
+Set the long-term `required_checks` arrays to exactly the four aggregate contexts above. Preserve main protection, squash-only, branch deletion-on-merge preference and security baseline. Extend the schema/validator only as much as necessary to represent `merge_queue`, transitional `strict_required_status_checks`, and explicit `PENDING` status for serially unstarted repositories without embedding transient PR/review data. Keep each `PENDING` baseline in the existing canonical rollout Issue/PR, not in desired state: it must be captured from direct live GitHub readback before classification and contain `repository`, `captured_at`, `pre_state_fingerprint`, and `pre_state_readback`.
 
 - [ ] **Step 6: Update the read-only audit validator to understand transitional rollout state**
 
 The validator must distinguish:
 
 ```text
-PENDING     serial V2 cutover has not begun; live pre-cutover baseline is visible, no V2 deviation is authorized, and the repository is not TARGET
+PENDING     serial V2 cutover has not begun; current live state matches a captured authoritative pre-cutover baseline, no V2 deviation is authorized, and the repository is not TARGET
 TARGET      replacement gate/MQ proven and desired state active
 TRANSITION  old protection intentionally retained while replacement is being canaried under a bounded receipt
 ROLLED_BACK failed bounded cutover restored to matching pre-state with timely (`closed_at <= expires_at`) valid terminal receipt; non-target and any retry needs a new receipt
@@ -98,7 +98,7 @@ DRIFT       live state differs without an authorized transition record or valid 
 UNKNOWN     required live field could not be read
 ```
 
-`PENDING` is not `TRANSITION`, requires no expiry receipt, and cannot permit a settings mutation or terminal V2 closeout. It becomes `TRANSITION` only after that repository's own receipt is created immediately before its serial turn. `ROLLED_BACK` is terminal only when `terminal_status = ROLLED_BACK`, `closed_at <= expires_at`, `post_state_fingerprint` equals `pre_state_fingerprint`, and positive `post_state_readback` proves restoration; it cannot permit a settings mutation, retry, or terminal V2 closeout. The validator must never classify an explicitly authorized serial cutover as compliant before its repository canary succeeds. Validate the existing active-receipt fields before mutation; on terminal success or rollback, require machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback` so the auditor can distinguish a closed receipt from an expired active deviation.
+`PENDING` is not `TRANSITION`, requires no expiry receipt, and cannot permit a settings mutation or terminal V2 closeout. It is valid only when the canonical rollout Issue/PR has a direct-readback pending baseline containing `repository`, `captured_at`, `pre_state_fingerprint`, and `pre_state_readback`, whose recomputed fingerprint and current live state match; missing, malformed, or mismatching evidence is `DRIFT`. It becomes `TRANSITION` only after a fresh matching readback and that repository's own receipt are created immediately before its serial turn. `ROLLED_BACK` is terminal only when `terminal_status = ROLLED_BACK`, `closed_at <= expires_at`, `post_state_fingerprint` equals `pre_state_fingerprint`, and positive `post_state_readback` proves restoration; it cannot permit a settings mutation, retry, or terminal V2 closeout. The validator must never classify an explicitly authorized serial cutover as compliant before its repository canary succeeds. Validate the existing active-receipt fields before mutation; on terminal success or rollback, require machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback` so the auditor can distinguish a closed receipt from an expired active deviation. A timely `SUCCESS` is valid only when the auditor recomputes the post-state fingerprint, the readback matches the desired target, and the `success_condition` is evidenced by the complete GS-7 moving-base receipt (unchanged head, intervening main advance, exact merge-group candidate, successful aggregate gate, and protected-main integration).
 
 - [ ] **Step 7: Run all focused META governance tests and verify GREEN**
 
