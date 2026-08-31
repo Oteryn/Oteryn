@@ -741,6 +741,10 @@ def _validate_history(
                 "refreeze requires a changed trusted review risk binding, not a SHA-only move"
             )
 
+    ledger_changed = current.get("risk_ledger") != previous.get("risk_ledger")
+    if ledger_changed and action != "record_loop_breaker_audit":
+        raise GuardError("risk ledger may change only through record_loop_breaker_audit")
+
     ledger_certified = not _ledger_terminal(previous, policy) and _ledger_terminal(current, policy)
     if ledger_certified and action != "record_loop_breaker_audit":
         raise GuardError("terminal risk-ledger certification may occur only through record_loop_breaker_audit")
@@ -967,6 +971,25 @@ def decide(
         if previous["repository"] != current["repository"] or previous["task_id"] != current["task_id"]:
             raise GuardError("previous/current snapshots must describe the same task")
         _validate_history(previous, current, requested_action, policy)
+
+        if current.get("material_fact_envelope") != previous.get("material_fact_envelope"):
+            envelope = current.get("material_fact_envelope")
+            if (
+                context is None
+                or not isinstance(envelope, dict)
+                or not context.evidence_authority.verify_material_fact_envelope(envelope)
+            ):
+                baseline_progress = progress_fingerprint(previous, policy)
+                failure = failure_fingerprint(current)
+                state = current["state"]
+                return _decision(
+                    False,
+                    state,
+                    "trusted_material_fact_envelope_required: newly introduced or changed material progress evidence is absent, mismatched, or unverified",
+                    state in set(policy["session_release_states"]),
+                    baseline_progress,
+                    failure,
+                )
 
     progress = progress_fingerprint(current, policy)
     failure = failure_fingerprint(current)
