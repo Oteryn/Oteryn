@@ -329,9 +329,9 @@ Do not remove the pinned legacy-source identity or negative provenance tests. Th
 
 Record the exact successful runs.
 
-- [ ] **Step 7: Prove the legacy provenance context cannot deadlock a real Atlas Merge Queue canary**
+- [ ] **Step 7: Rule out a legacy provenance deadlock before the real Atlas Merge Queue canary**
 
-Before admission, prove `provenance-gate` is produced and succeeds on the exact synthetic merge-group candidate. If that context does not support `merge_group`, do not leave the queue waiting: after Step 6 and only through an explicitly authorized, bounded settings transition, temporarily remove `provenance-gate` from required contexts, record the deviation in the transition receipt, and restore it immediately if the canary fails. The synthetic candidate must receive a successful `atlas-gate` and execute the conservative integration-safe internal validation set.
+Before admission, inspect the trusted protected-`main` workflow trigger/configuration and current required-context readback to determine whether legacy `provenance-gate` can run on `merge_group`. Do not require production of an exact synthetic candidate as the precondition for that decision when a missing legacy context can itself block admission. If protected-source/live evidence shows no `merge_group` support, or cannot establish support without that deadlock, do not leave the queue waiting: after Step 6 and only through an explicitly authorized, bounded settings transition, temporarily remove `provenance-gate` from required contexts, record the deviation in the transition receipt, and restore it immediately if the canary fails. The admitted canary must then receive a successful `atlas-gate` and execute its conservative integration-safe internal validation set, including mechanically blocking provenance.
 
 - [ ] **Step 8: Complete the desired-state removal of `provenance-gate` after canary success**
 
