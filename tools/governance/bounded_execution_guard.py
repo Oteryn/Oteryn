@@ -889,8 +889,6 @@ def _reserve_execution(
 def _external_wait_snapshot(
     previous: dict[str, Any] | None,
     current: dict[str, Any],
-    *,
-    preserve_observed_head: bool,
 ) -> dict[str, Any]:
     if previous is None:
         next_snapshot = dict(current)
@@ -898,8 +896,6 @@ def _external_wait_snapshot(
         next_snapshot = dict(previous)
         for field in ("blocking_dependency", "dependency_kind", "gate_state"):
             next_snapshot[field] = current[field]
-        if preserve_observed_head and not previous["candidate_frozen"]:
-            next_snapshot["task_head_sha"] = current["task_head_sha"]
     next_snapshot["state"] = "WAITING_EXTERNAL"
     return next_snapshot
 
@@ -913,13 +909,8 @@ def _transition_external_wait(
     *,
     allowed: bool,
     release_session: bool,
-    preserve_observed_head: bool,
 ) -> Decision:
-    next_snapshot = _external_wait_snapshot(
-        previous,
-        current,
-        preserve_observed_head=preserve_observed_head,
-    )
+    next_snapshot = _external_wait_snapshot(previous, current)
     progress = progress_fingerprint(next_snapshot, policy)
     failure = failure_fingerprint(next_snapshot)
     transition = context.checkpoint_outbox.transition(
@@ -1128,6 +1119,16 @@ def decide(
         )
 
     if current["dependency_kind"] == "external" and current["blocking_dependency"] and current["state"] != "WAITING_EXTERNAL":
+        if previous is not None and current["task_head_sha"] != previous["task_head_sha"]:
+            assert previous_progress is not None
+            return _decision(
+                False,
+                previous["state"],
+                "candidate_transition_required: external waiting cannot adopt a new task head",
+                False,
+                previous_progress,
+                failure,
+            )
         if requested_action == "observe":
             if context is None:
                 return _decision(
@@ -1146,7 +1147,6 @@ def decide(
                 policy,
                 allowed=True,
                 release_session=True,
-                preserve_observed_head=True,
             )
         if requested_action != "complete":
             assert context is not None
@@ -1158,7 +1158,6 @@ def decide(
                 policy,
                 allowed=False,
                 release_session=True,
-                preserve_observed_head=False,
             )
 
     if previous is not None and previous["state"] not in release_states and same_progress and requested_action in {"mutate", "retrigger"}:
