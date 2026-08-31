@@ -350,6 +350,22 @@ class FinalFindingRegressionTests(unittest.TestCase):
         self.assertEqual(result.action, "RERUN")
         self.assertEqual(client.rerun_calls, [901])
 
+    def test_p2_closeout_contract_requires_explicit_wakeup_producer(self):
+        docs = (ROOT / "docs/governance/AI_REVIEW_POLICY.md").read_text(encoding="utf-8")
+        start = docs.index("`ACCEPTED_WITH_FOLLOW_UP`")
+        closeout = docs[start : start + 2600]
+
+        self.assertIn("Tracked in #<issue>.", closeout)
+        self.assertIn(P2_EVIDENCE_WAKEUP_MARKER, closeout)
+        self.assertLess(
+            closeout.index("Tracked in #<issue>."),
+            closeout.index(P2_EVIDENCE_WAKEUP_MARKER),
+        )
+        lowered = closeout.lower()
+        self.assertIn("top-level pull-request conversation comment", lowered)
+        self.assertIn("wake-up producer only", lowered)
+        self.assertIn("grants no review authority", lowered)
+
     def test_maintainer_p2_evidence_marker_is_wakeup_only_not_authority(self):
         client = FakeClient(runs=[recheck_run_payload(902)], active_evidence=False)
 
