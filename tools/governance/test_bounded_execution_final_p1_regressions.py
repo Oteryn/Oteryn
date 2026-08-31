@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from bounded_execution_guard import (  # noqa: E402
     ExecutionContext,
+    GuardError,
     _checkpoint_digest,
     decide as raw_decide,
     make_material_fact_envelope,
@@ -135,15 +136,19 @@ class FinalMaterialAuthorityP1Tests(unittest.TestCase):
                 "status": "NOT_APPLICABLE",
                 "reason": "caller changed terminal audit result",
             }
-            result = raw_decide(
-                previous, current, "enter_final_qualification", POLICY, context=context
-            )
+            with self.assertRaisesRegex(
+                GuardError,
+                "risk ledger may change only through record_loop_breaker_audit",
+            ):
+                raw_decide(
+                    previous,
+                    current,
+                    "enter_final_qualification",
+                    POLICY,
+                    context=context,
+                )
         finally:
             directory.cleanup()
-
-        self.assertFalse(result.allowed)
-        self.assertIn("risk ledger", result.reason.lower())
-        self.assertIn("record_loop_breaker_audit", result.reason)
 
 
 if __name__ == "__main__":
