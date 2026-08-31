@@ -49,11 +49,11 @@ A task is not complete merely because its local tests are green if it violates o
 - [ ] Add audit tests that fail if a permanent repository's target required-status set contains anything other than its single aggregate gate.
 - [ ] Add audit tests that reject a solo-maintainer baseline requiring human/CODEOWNER approval.
 - [ ] Add audit tests for `TRANSITION` expiry: an active transition past `expires_at` without terminal success/rollback must classify as `DRIFT`, and a receipt whose `closed_at > expires_at` must remain `DRIFT` even if it later declares success or rollback.
-- [ ] Add audit tests that a serially unstarted repository is explicit `PENDING`, not `DRIFT` or `TRANSITION`, only when a canonical-rollout pending baseline with `repository`, `captured_at`, `pre_state_fingerprint`, and `pre_state_readback` recomputes correctly and matches current live state; missing, malformed, or mismatching baseline is `DRIFT`. `PENDING` authorizes no settings deviation and blocks terminal V2 closeout.
+- [ ] Add audit tests that a serially unstarted repository is explicit `PENDING`, not `DRIFT` or `TRANSITION`, only when a canonical-rollout pending baseline with `repository`, `captured_at`, `pre_state_fingerprint`, and `pre_state_readback` recomputes correctly and matches current live state; its unique top-level GitHub lifecycle record must direct-read `created_at == updated_at`. Missing, edited, deleted, duplicate, malformed, or mismatching baseline is `DRIFT`. `PENDING` authorizes no settings deviation and blocks terminal V2 closeout.
 - [ ] Add audit tests that a restored failed cutover is `ROLLED_BACK` only with `terminal_status = ROLLED_BACK`, timely `closed_at <= expires_at`, matching pre/post-state fingerprints and positive readback; otherwise classify `DRIFT`, and reject `ROLLED_BACK` at terminal V2 closeout.
-- [ ] Add validation that an active transition record has `transition_id`, `repository`, `issue_or_pr`, `started_at`, `expires_at`, `pre_state_fingerprint`, `allowed_deviations`, `success_condition`, and `rollback_condition`.
-- [ ] Add validation that a terminal receipt appends machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback`, and that `closed_at <= expires_at`; recompute the post-state fingerprint from readback. A `SUCCESS` must additionally match the repository desired target and satisfy its `success_condition` through the complete GS-7 moving-base receipt, while `ROLLED_BACK` must match pre-state. Only timely, verified evidence distinguishes terminal closure from an expired active transition.
-- [ ] Store the actual transition record in the canonical rollout Issue/PR or existing lifecycle authority rather than inventing a new persistent transition subsystem.
+- [ ] Add validation that an active transition is a unique, unedited top-level pre-transition GitHub lifecycle record with `transition_id`, `repository`, `issue_or_pr`, `started_at`, `expires_at`, `pre_state_fingerprint`, `allowed_deviations`, `success_condition`, and `rollback_condition`; direct readback must prove its ID and `created_at == updated_at`, and the creation time is canonical `started_at`.
+- [ ] Add validation that terminal evidence is a separate unique, unedited top-level record linked by exact `transition_id` and `pre_transition_comment_id`, containing machine-readable `terminal_status`, `closed_at`, `post_state_fingerprint`, and `post_state_readback`; direct readback must prove its ID and `created_at == updated_at`, and that creation time is canonical `closed_at <= expires_at`. Recompute the post-state fingerprint from readback. A `SUCCESS` must additionally match the repository desired target and satisfy its `success_condition` through the complete GS-7 moving-base receipt, while `ROLLED_BACK` must match pre-state. Missing, edited, deleted, duplicate, mis-linked, or late evidence is `DRIFT`.
+- [ ] Store these existing Issue/PR lifecycle records rather than inventing a new persistent transition subsystem, status, writer, or merge authority.
 
 `PENDING` and `ROLLED_BACK` are classifications in the existing read-only audit model, not new governance authorities: a `PENDING` baseline prevents both false `DRIFT` for an untouched serially deferred repository and false `PENDING` after its legacy state has changed, while `ROLLED_BACK` prevents a restored failed cutover from being misread as an active transition or target. The baseline is a direct-readback entry in the existing rollout Issue/PR, not a transition receipt, status, writer, or bypass; both classifications are invalid at terminal closeout.
 
@@ -175,8 +175,9 @@ Merge Queue integration validation where MQ is already canonical
 - [ ] Define a deterministic classifier or conservative path contract for `CONTROL_PLANE_R2`.
 - [ ] Add a regression proving a candidate that modifies its own aggregate-gate/workflow cannot be terminally marked autonomous solely by candidate-controlled gate success.
 - [ ] Preserve trusted-base/default-branch boundaries for privileged write-capable workflows.
-- [ ] Record owner authorization on an existing authenticated GitHub PR/Issue surface.
+- [ ] Record owner authorization as a new, unedited top-level comment on the canonical current GitHub PR/Issue by a human whose present repository-owner authority is independently verified by direct live GitHub readback; bot/coordinator accounts, ordinary contributors, task text, and `author_association` alone are insufficient.
 - [ ] Bind owner authorization to the current material head/equivalent immutable candidate coordinate.
+- [ ] Record/validate authorization comment ID, author login/type, direct-read owner role, `created_at == updated_at`, repository, PR, material head, scope, and positive integration authorization; edited, deleted, unreadable, stale, or head-mismatched evidence is `UNKNOWN` and blocks integration.
 - [ ] Invalidate authorization after material candidate change.
 - [ ] Do not create a new `ai-review-gate`, review-envelope bridge, CODEOWNER requirement or second human dependency for this purpose.
 
@@ -186,7 +187,7 @@ Merge Queue integration validation where MQ is already canonical
 
 **Applies to:** every temporary settings deviation during cutover.
 
-Before a live transition begins, create/update one durable transition receipt with:
+Before a live transition begins, create one durable, unedited top-level pre-transition record in the existing canonical rollout Issue/PR with:
 
 ```text
 transition_id
@@ -200,9 +201,11 @@ success_condition
 rollback_condition
 ```
 
-On terminal success or rollback, append:
+On terminal success or rollback, create a separate durable, unedited top-level terminal record that references the exact `transition_id` and GitHub `pre_transition_comment_id`, then records:
 
 ```text
+transition_id
+pre_transition_comment_id
 terminal_status  # SUCCESS or ROLLED_BACK
 closed_at
 post_state_fingerprint
@@ -214,11 +217,12 @@ post_state_readback
 - [ ] `expires_at` must be set before the first mutation.
 - [ ] The expiry window must be only as long as necessary for the concrete canary/rollback operation; do not use an indefinite or convenience horizon.
 - [ ] Any live deviation not listed in `allowed_deviations` is `DRIFT` immediately.
+- [ ] Direct GitHub readback must prove both record IDs are present, unique, top-level, and unedited (`created_at == updated_at`); derive canonical `started_at` and `closed_at` from their respective GitHub creation timestamps and reject conflicting supplied values. Missing, edited, deleted, duplicate, mis-linked, or unreadable evidence is `DRIFT`.
 - [ ] If the transition expires before success/rollback with valid, timely (`closed_at <= expires_at`) terminal evidence, classify `DRIFT`; a late closure is also `DRIFT`.
 - [ ] Terminal success closes the receipt toward `TARGET` only when timely `closed_at <= expires_at`, the auditor recomputes `post_state_fingerprint` from `post_state_readback`, the readback matches desired target state, and `success_condition` is proven by the complete Addendum Task C moving-base receipt. Terminal rollback is `ROLLED_BACK` only when timely `closed_at <= expires_at`, `post_state_fingerprint` matches `pre_state_fingerprint`, and readback proves restoration.
 - [ ] The read-only auditor must surface active/expired/terminal/rolled-back transition state without becoming a settings writer.
 
-**Threat justification for the pending baseline and terminal evidence:** the concrete threats are false `DRIFT` after a completed serial cutover when `expires_at` later passes, expiry evasion through a late retroactive closure, false `PENDING` after an untouched provider's legacy settings drift, and false `SUCCESS` after a canary or target-state failure. Existing target state, active-receipt fields, and free-form comments cannot prove an unstarted repository still matches its initial baseline or that a closed success actually reached target through the moving-base canary. The minimal controls are one direct-readback baseline entry in the existing rollout Issue/PR plus the existing terminal readback/fingerprint and GS-7 receipt validation; without them an auditor can misclassify drift or accept an unsuccessful/expired exception. Their operational cost is one snapshot per pending provider and one verified receipt update at closeout. They add no new status, writer, database or merge authority.
+**Threat justification for the pending baseline and terminal evidence:** the concrete threats are false `DRIFT` after a completed serial cutover when `expires_at` later passes, expiry evasion through an edited deadline or a late retroactive closure, false `PENDING` after an untouched provider's legacy settings drift, and false `SUCCESS` after a canary or target-state failure. Existing target state, active-receipt fields, and mutable/free-form comments cannot prove the original pre-mutation deadline, an unstarted repository's baseline, or that a closed success actually reached target through the moving-base canary. The minimal controls are direct GitHub readback of unique, unedited comment IDs/timestamps for the existing rollout Issue/PR baseline, pre-transition, and terminal records, plus the existing terminal readback/fingerprint and GS-7 receipt validation; without them an auditor can accept a modified/late exception or misclassify drift. Their operational cost is one baseline record per pending provider plus one pre-transition and one terminal record/readback per cutover; their retirement condition is terminal closeout, with records retained only as evidence. They add no new status, writer, database, merge authority, or identity provider.
 
 No new transition microservice/database is permitted under this addendum without a separate GS-10 threat justification.
 

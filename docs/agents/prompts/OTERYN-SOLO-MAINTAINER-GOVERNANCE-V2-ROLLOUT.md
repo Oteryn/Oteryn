@@ -123,6 +123,8 @@ Before any terminal integration of a `CONTROL_PLANE_R2` change require:
 
 Do not recreate the retired `ai-review-gate`, reaction parser, review-envelope or attestation bridge merely to satisfy this rule.
 
+The authorization is valid only when it is a new, unedited top-level comment on the canonical current PR/Issue by a human whose present repository-owner authority is verified by direct GitHub readback. Record and verify the immutable comment ID, author login and actor type, the independently read owner role, `created_at == updated_at`, repository, PR, exact material head, control-plane scope, and positive integration authorization. A bot, coordinator, ordinary contributor, stale/head-mismatched, edited, or unverifiable actor is `UNKNOWN`, not owner authorization; a comment's text or `author_association` alone is insufficient.
+
 This prompt itself does **not** constitute blanket owner authorization for future live `CONTROL_PLANE_R2` mutations. Pause only when explicit owner authorization is actually required by GS-5 or when a genuine safety/policy blocker exists.
 
 ## Writer and parallelism rules
@@ -246,7 +248,7 @@ Until the bounded canary either succeeds or restores, strict freshness stays ena
 
 Do not build a permanent transition database.
 
-Use the canonical rollout Issue/PR as the durable transition receipt. Each live settings transition must record at least:
+Use the canonical rollout Issue/PR as the durable transition receipt, using distinct, unedited top-level comments rather than editing a record in place. The pre-transition comment, created before the first mutation, must record at least:
 
 ```text
 transition_id
@@ -260,16 +262,20 @@ success_condition
 rollback_condition
 ```
 
-On terminal success or rollback, append:
+At terminal success or rollback, create a separate terminal comment that references the exact `transition_id` and GitHub `pre_transition_comment_id`, then records:
 
 ```text
+transition_id
+pre_transition_comment_id
 terminal_status  # SUCCESS or ROLLED_BACK
 closed_at
 post_state_fingerprint
 post_state_readback
 ```
 
-If `now > expires_at` before the transition reaches its success condition or is explicitly rolled back/closed with valid, timely (`closed_at <= expires_at`) terminal evidence, the state is `DRIFT`, not an indefinitely valid transition. A receipt is terminal `ROLLED_BACK` only when `terminal_status = ROLLED_BACK`, timely `closed_at <= expires_at`, `post_state_fingerprint` matches `pre_state_fingerprint`, and positive `post_state_readback` proves restoration; otherwise it is `DRIFT`. A terminal `SUCCESS` also requires timely `closed_at <= expires_at`, a recomputed `post_state_fingerprint`, a `post_state_readback` that passes the repository desired-target validator, and `success_condition` proof from the complete moving-base canary receipt: unchanged candidate head, intervening protected-main advance, exact synthetic merge-group SHA, successful repository aggregate-gate run, and resulting protected-main integration. A self-declared success, normal PR green status, or free-form note is not enough. A successfully closed or validly rolled-back receipt with these machine-readable fields remains terminal and does not become `DRIFT` solely because its historical expiry passes.
+The read-only auditor must directly read both GitHub comments and accept them only when their IDs are present and unique, they are top-level records, `created_at == updated_at`, and the pre-transition `created_at` and terminal `created_at` are the canonical `started_at` and `closed_at` respectively (reject a conflicting supplied timestamp). A missing, deleted, edited, duplicated, mis-linked, or unreadable record is `DRIFT`; the same unedited-ID/timestamp proof is required for a `PENDING` baseline. This constrains the existing lifecycle record and read-only auditor; it is not a new status, writer, database, or merge authority.
+
+If `now > expires_at` before the transition reaches its success condition or is explicitly rolled back/closed with valid, timely (`closed_at <= expires_at`) terminal evidence, the state is `DRIFT`, not an indefinitely valid transition. A receipt is terminal `ROLLED_BACK` only when its unedited terminal comment references the exact pre-transition record, has `terminal_status = ROLLED_BACK`, timely `closed_at <= expires_at`, `post_state_fingerprint` matches `pre_state_fingerprint`, and positive `post_state_readback` proves restoration; otherwise it is `DRIFT`. A terminal `SUCCESS` also requires the same record linkage and timely `closed_at <= expires_at`, a recomputed `post_state_fingerprint`, a `post_state_readback` that passes the repository desired-target validator, and `success_condition` proof from the complete moving-base canary receipt: unchanged candidate head, intervening protected-main advance, exact synthetic merge-group SHA, successful repository aggregate-gate run, and resulting protected-main integration. A self-declared success, normal PR green status, or free-form note is not enough. A successfully closed or validly rolled-back receipt with these machine-readable fields remains terminal and does not become `DRIFT` solely because its historical expiry passes.
 
 `ecosystem/governance-desired-state.json` should contain stable target state, not transient PR heads, review generations or temporary exception history.
 
