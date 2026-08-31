@@ -62,12 +62,21 @@ ROLLOUT_PROTECTION_FIELDS = {
     "require_code_owner_review",
 }
 LIFECYCLE_RECORD_TYPES = {"PENDING_BASELINE", "PRE_TRANSITION", "TERMINAL"}
-CONTROL_PLANE_R2_PREFIXES = (
-    ".github/workflows/",
-    "ecosystem/governance-desired-state.json",
-    "tools/governance/",
-    "docs/governance/SOLO_MAINTAINER_BREAK_GLASS.md",
+CONTROL_PLANE_R2_NON_AUTHORITY_PREFIXES = (
+    "docs/evidence/",
+    "docs/agents/tasks/archive/",
+    "docs/migration/",
+    "docs/recovery/",
 )
+CONTROL_PLANE_OWNER_AUTHORIZATION_RECORD_TYPE = "CONTROL_PLANE_R2_OWNER_AUTHORIZATION"
+CONTROL_PLANE_OWNER_AUTHORIZATION_FIELDS = {
+    "record_type",
+    "repository",
+    "pull_request",
+    "material_head_sha",
+    "scope",
+    "authorize_integration",
+}
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -245,7 +254,7 @@ def _allowed_rollout_deviations(differences: set[str], allowed: object) -> bool:
     )
 
 
-def _decode_lifecycle_body(body: object) -> dict | None:
+def _decode_json_comment_body(body: object) -> dict | None:
     if not isinstance(body, str):
         return None
     candidate = body.strip()
@@ -256,6 +265,10 @@ def _decode_lifecycle_body(body: object) -> dict | None:
     except json.JSONDecodeError:
         return None
     return decoded if isinstance(decoded, dict) else None
+
+
+def _decode_lifecycle_body(body: object) -> dict | None:
+    return _decode_json_comment_body(body)
 
 
 def _is_lifecycle_candidate(body: dict) -> bool:
@@ -586,29 +599,91 @@ def effective_rollout_state(classification: object) -> str:
 
 
 def is_control_plane_r2(paths: object) -> bool:
-    if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
-        return True
-    return any(any(path == prefix or path.startswith(prefix) for prefix in CONTROL_PLANE_R2_PREFIXES) for path in paths)
+    """Return whether a candidate needs the GS-5 owner-confirmation path.
 
-
-def control_plane_integration_permitted(
-    paths: object,
-    *,
-    candidate_ci_passed: bool,
-    independent_deep_review: bool,
-    owner_authorization_verified: bool,
-    merge_queue_required: bool,
-    merge_queue_validated: bool,
-) -> bool:
-    if not candidate_ci_passed:
-        return False
-    if not is_control_plane_r2(paths):
+    Aggregate-gate fan-in can be implemented outside a fixed directory, so a
+    path allowlist would let a new implementation path evade the control.  The
+    intentionally conservative contract treats every material repository path
+    as R2 except directories explicitly reserved for historical, non-authority
+    records.  Missing, malformed, or empty path input fails closed as R2.
+    """
+    if (
+        not isinstance(paths, list)
+        or not paths
+        or not all(isinstance(path, str) and path for path in paths)
+    ):
         return True
-    return (
-        independent_deep_review
-        and owner_authorization_verified
-        and (not merge_queue_required or merge_queue_validated)
+    return any(
+        not any(path.startswith(prefix) for prefix in CONTROL_PLANE_R2_NON_AUTHORITY_PREFIXES)
+        for path in paths
     )
+
+
+def _unknown_control_plane_owner_authorization(
+    repository: object,
+    pull_request: object,
+    material_head_sha: object,
+    scope: object,
+) -> dict:
+    return {
+        "status": "UNKNOWN",
+        "repository": repository,
+        "pull_request": pull_request,
+        "material_head_sha": material_head_sha,
+        "scope": scope,
+    }
+
+
+def _matching_control_plane_owner_authorization_comment(
+    comment: object,
+    *,
+    repository: str,
+    pull_request: int,
+    material_head_sha: str,
+    scope: str,
+) -> dict | None:
+    if not isinstance(comment, dict):
+        return None
+    comment_id = comment.get("id")
+    user = comment.get("user")
+    body = _decode_json_comment_body(comment.get("body"))
+    created_at = comment.get("created_at")
+    if (
+        not isinstance(comment_id, int)
+        or isinstance(comment_id, bool)
+        or comment_id <= 0
+        or not isinstance(user, dict)
+        or not isinstance(user.get("login"), str)
+        or not user["login"]
+        or user.get("type") != "User"
+        or comment.get("updated_at") != created_at
+        or _parse_timestamp(created_at) is None
+        or not isinstance(body, dict)
+        or set(body) != CONTROL_PLANE_OWNER_AUTHORIZATION_FIELDS
+        or body.get("record_type") != CONTROL_PLANE_OWNER_AUTHORIZATION_RECORD_TYPE
+        or body.get("repository") != repository
+        or body.get("pull_request") != pull_request
+        or not isinstance(body.get("pull_request"), int)
+        or isinstance(body.get("pull_request"), bool)
+        or body.get("material_head_sha") != material_head_sha
+        or not isinstance(body.get("material_head_sha"), str)
+        or SHA_RE.fullmatch(body["material_head_sha"]) is None
+        or body.get("scope") != scope
+        or not isinstance(body.get("scope"), str)
+        or not body["scope"].strip()
+        or body.get("authorize_integration") is not True
+    ):
+        return None
+    return {
+        "comment_id": comment_id,
+        "author_login": user["login"],
+        "actor_type": user["type"],
+        "repository": repository,
+        "pull_request": pull_request,
+        "material_head_sha": material_head_sha,
+        "scope": scope,
+        "authorize_integration": True,
+    }
 
 
 def actions_permissions_enabled(payload: object) -> bool:
@@ -1222,6 +1297,133 @@ class Audit:
             if len(payload) < 100:
                 return items
             page += 1
+
+    def control_plane_owner_authorization(
+        self,
+        repository: str,
+        pull_request: int,
+        material_head_sha: str,
+        scope: str,
+    ) -> dict:
+        """Read one current GS-5 owner decision directly from GitHub.
+
+        This is deliberately a read-only coordinator/auditor check.  It stores
+        no receipt and emits no status: GitHub's current PR, top-level comment,
+        and collaborator-permission records remain the authority.
+        """
+        unknown = _unknown_control_plane_owner_authorization(
+            repository, pull_request, material_head_sha, scope
+        )
+        if (
+            not isinstance(repository, str)
+            or not repository
+            or not isinstance(pull_request, int)
+            or isinstance(pull_request, bool)
+            or pull_request <= 0
+            or not isinstance(material_head_sha, str)
+            or SHA_RE.fullmatch(material_head_sha) is None
+            or not isinstance(scope, str)
+            or not scope.strip()
+        ):
+            return unknown
+        try:
+            current_pr = self.api(f"/repos/{repository}/pulls/{pull_request}")
+            comments = self.api_list(f"/repos/{repository}/issues/{pull_request}/comments")
+        except (RuntimeError, ValueError, TypeError):
+            return unknown
+        head = current_pr.get("head") if isinstance(current_pr, dict) else None
+        base = current_pr.get("base") if isinstance(current_pr, dict) else None
+        head_repo = head.get("repo") if isinstance(head, dict) else None
+        base_repo = base.get("repo") if isinstance(base, dict) else None
+        if (
+            not isinstance(current_pr, dict)
+            or current_pr.get("number") != pull_request
+            or current_pr.get("state") != "open"
+            or current_pr.get("draft") is not False
+            or not isinstance(head, dict)
+            or head.get("sha") != material_head_sha
+            or not isinstance(head_repo, dict)
+            or head_repo.get("full_name") != repository
+            or not isinstance(base, dict)
+            or base.get("ref") != "main"
+            or not isinstance(base_repo, dict)
+            or base_repo.get("full_name") != repository
+        ):
+            return unknown
+        candidates = [
+            evidence
+            for comment in comments
+            if (evidence := _matching_control_plane_owner_authorization_comment(
+                comment,
+                repository=repository,
+                pull_request=pull_request,
+                material_head_sha=material_head_sha,
+                scope=scope,
+            )) is not None
+        ]
+        if len(candidates) != 1:
+            return unknown
+        evidence = candidates[0]
+        try:
+            permission = self.api(
+                f"/repos/{repository}/collaborators/"
+                f"{urllib.parse.quote(evidence['author_login'], safe='')}/permission",
+                allow_404=True,
+            )
+        except (RuntimeError, ValueError, TypeError):
+            return unknown
+        permission_user = permission.get("user") if isinstance(permission, dict) else None
+        if (
+            not isinstance(permission, dict)
+            or permission.get("permission") != "admin"
+            or (
+                isinstance(permission_user, dict)
+                and (
+                    permission_user.get("login") != evidence["author_login"]
+                    or permission_user.get("type") != "User"
+                )
+            )
+        ):
+            return unknown
+        return {"status": "VERIFIED", **evidence, "owner_role": "admin"}
+
+    def control_plane_integration_permitted(
+        self,
+        paths: object,
+        *,
+        repository: str,
+        pull_request: int,
+        material_head_sha: str,
+        scope: str,
+        candidate_ci_passed: bool,
+        independent_deep_review: bool,
+        merge_queue_required: bool,
+        merge_queue_validated: bool,
+    ) -> bool:
+        """Apply GS-5 without accepting caller-supplied owner-verification state."""
+        if not all(
+            isinstance(value, bool)
+            for value in (
+                candidate_ci_passed,
+                independent_deep_review,
+                merge_queue_required,
+                merge_queue_validated,
+            )
+        ):
+            return False
+        if not candidate_ci_passed:
+            return False
+        if not is_control_plane_r2(paths):
+            return True
+        if not independent_deep_review:
+            return False
+        if merge_queue_required and not merge_queue_validated:
+            return False
+        return (
+            self.control_plane_owner_authorization(
+                repository, pull_request, material_head_sha, scope
+            ).get("status") == "VERIFIED"
+        )
 
     def classify_rollout_readback(self, wanted: dict, live_state: object, *, now: object) -> str:
         """Classify direct settings readback against the canonical Issue lifecycle records.
@@ -2186,12 +2388,21 @@ def main() -> int:
         action="store_true",
         help="reject V2 closeout unless every permanent repository has reached its target",
     )
+    parser.add_argument(
+        "--verify-control-plane-owner-authorization",
+        action="store_true",
+        help="read the current PR, owner comment, and owner role for one GS-5 decision",
+    )
+    parser.add_argument("--repository", help="repository for --verify-control-plane-owner-authorization")
+    parser.add_argument("--pull-request", type=int, help="pull request for --verify-control-plane-owner-authorization")
+    parser.add_argument("--material-head-sha", help="current head for --verify-control-plane-owner-authorization")
+    parser.add_argument("--control-plane-scope", help="exact owner-approved scope for --verify-control-plane-owner-authorization")
     args = parser.parse_args()
-    desired = load_desired()
     if args.offline:
-        if args.terminal_closeout:
-            print("UNKNOWN: terminal closeout requires direct GitHub lifecycle and settings readback", file=sys.stderr)
+        if args.terminal_closeout or args.verify_control_plane_owner_authorization:
+            print("UNKNOWN: requested verification requires direct GitHub readback", file=sys.stderr)
             return 2
+        desired = load_desired()
         print(f"offline desired-state validation PASS: {len(desired['permanent_repositories'])} permanent repositories")
         return 0
     token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
@@ -2199,6 +2410,27 @@ def main() -> int:
         print("UNKNOWN: live audit requires GH_TOKEN or GITHUB_TOKEN", file=sys.stderr)
         return 2
     audit = Audit(token)
+    if args.verify_control_plane_owner_authorization:
+        required = {
+            "--repository": args.repository,
+            "--pull-request": args.pull_request,
+            "--material-head-sha": args.material_head_sha,
+            "--control-plane-scope": args.control_plane_scope,
+        }
+        missing = [flag for flag, value in required.items() if value is None or value == ""]
+        if missing:
+            parser.error(
+                "--verify-control-plane-owner-authorization requires " + ", ".join(missing)
+            )
+        evidence = audit.control_plane_owner_authorization(
+            args.repository,
+            args.pull_request,
+            args.material_head_sha,
+            args.control_plane_scope,
+        )
+        print(json.dumps(evidence, sort_keys=True))
+        return 0 if evidence.get("status") == "VERIFIED" else 2
+    desired = load_desired()
     try:
         for repo in desired["permanent_repositories"]:
             audit.audit_repo(repo)

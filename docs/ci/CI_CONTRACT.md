@@ -54,3 +54,18 @@ A compatible ecosystem release may reference successful provider evidence by imm
 `main` is protected with pull requests required, zero mandatory human approvals and no required CODEOWNER approval for the one-maintainer model, `meta-gate` as its only external required status, administrator enforcement, linear history, conversation resolution, and force-push/deletion disabled. After the moving-base Merge Queue canary, Merge Queue owns integration freshness and strict required-status freshness is removed. AI review remains risk-based R1/R2 evidence for deliberate integration decisions, not an independent required status; provider/internal security and validation outcomes belong in the aggregate gate rather than adding external contexts.
 
 Changing branch/ruleset settings is an administrative GitHub operation, not something this workflow attempts to perform with `GITHUB_TOKEN`.
+
+## CONTROL_PLANE_R2 owner confirmation
+
+For an R2 control-plane integration, the owner decision is one new, unedited top-level comment on the current non-draft PR. Its body is a compact JSON object with exactly `record_type` (`CONTROL_PLANE_R2_OWNER_AUTHORIZATION`), `repository`, `pull_request`, `material_head_sha`, `scope`, and `authorize_integration: true`. This is direct GitHub evidence, not a required status, review-envelope, or persistent proof store.
+
+Before integration, the coordinator reads it with:
+
+```text
+python3 tools/governance/audit_github_readonly.py \
+  --verify-control-plane-owner-authorization \
+  --repository <owner/repo> --pull-request <number> \
+  --material-head-sha <40-hex-sha> --control-plane-scope <exact-scope>
+```
+
+The read-only command verifies the current open same-repository PR/head, the unedited human comment, and that author's current `admin` repository role. Anything missing, edited, stale, duplicated, non-human, non-owner, or unreadable returns `UNKNOWN`; a new material head needs a new comment.

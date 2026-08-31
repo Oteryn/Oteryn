@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import base64
+import os
 import tempfile
 import urllib.error
 from pathlib import Path
@@ -96,6 +97,44 @@ def lifecycle_comment(
     if in_reply_to_id is not None:
         comment["in_reply_to_id"] = in_reply_to_id
     return comment
+
+
+def control_plane_owner_authorization_comment(
+    comment_id: int,
+    *,
+    repository: str,
+    pull_request: int,
+    material_head_sha: str,
+    scope: str,
+    login: str = "blakinio",
+    actor_type: str = "User",
+    created_at: str = "2026-08-31T12:00:00Z",
+    updated_at: str | None = None,
+) -> dict:
+    return {
+        "id": comment_id,
+        "body": json.dumps({
+            "record_type": "CONTROL_PLANE_R2_OWNER_AUTHORIZATION",
+            "repository": repository,
+            "pull_request": pull_request,
+            "material_head_sha": material_head_sha,
+            "scope": scope,
+            "authorize_integration": True,
+        }),
+        "created_at": created_at,
+        "updated_at": created_at if updated_at is None else updated_at,
+        "user": {"login": login, "type": actor_type},
+    }
+
+
+def current_pull_request(repository: str, pull_request: int, head_sha: str) -> dict:
+    return {
+        "number": pull_request,
+        "state": "open",
+        "draft": False,
+        "head": {"sha": head_sha, "repo": {"full_name": repository}},
+        "base": {"ref": "main", "repo": {"full_name": repository}},
+    }
 
 
 def pending_baseline(wanted: dict) -> dict:
@@ -976,26 +1015,183 @@ def test_latest_rollback_does_not_reverify_stale_success_evidence() -> None:
     assert verification_calls == []
 
 
-def test_control_plane_candidates_cannot_self_authorize_from_candidate_ci() -> None:
-    assert not m.core.is_control_plane_r2(["docs/architecture/adr/0002-organization-governance-operating-model.md"])
-    assert m.core.is_control_plane_r2(["ecosystem/governance-desired-state.json"])
-    assert m.core.is_control_plane_r2([".github/workflows/ci.yml"])
-    assert not m.core.control_plane_integration_permitted(
-        [".github/workflows/ci.yml"],
+def test_control_plane_classifier_conservatively_covers_authority_and_gate_implementation() -> None:
+    for path in (
+        ".github/workflows/meta-gate.yml",
+        ".github/actions/meta-gate/action.yml",
+        "AGENTS.md",
+        "docs/architecture/adr/0002-organization-governance-operating-model.md",
+        "docs/ci/CI_CONTRACT.md",
+        "docs/governance/AI_REVIEW_POLICY.md",
+        "ecosystem/governance-desired-state.json",
+        "ecosystem/ai-review-policy.json",
+        "ecosystem/agent-execution-routing-policy.json",
+        "tools/governance/audit_github_readonly_core.py",
+    ):
+        assert m.core.is_control_plane_r2([path]), path
+    assert not m.core.is_control_plane_r2(["docs/evidence/2026-08-31-historical-snapshot.md"])
+
+
+def test_control_plane_owner_authorization_is_directly_verified_against_current_pr_and_role() -> None:
+    repository = "Oteryn/Oteryn"
+    pull_request = 124
+    material_head_sha = "a" * 40
+    scope = "META Task 1 V2 authority integration"
+    comment = control_plane_owner_authorization_comment(
+        77,
+        repository=repository,
+        pull_request=pull_request,
+        material_head_sha=material_head_sha,
+        scope=scope,
+    )
+    audit = FakeAudit({
+        f"/repos/{repository}/pulls/{pull_request}": current_pull_request(
+            repository, pull_request, material_head_sha
+        ),
+        f"/repos/{repository}/issues/{pull_request}/comments": [comment],
+        f"/repos/{repository}/collaborators/blakinio/permission": {
+            "permission": "admin", "user": {"login": "blakinio", "type": "User"},
+        },
+    })
+    evidence = audit.control_plane_owner_authorization(
+        repository, pull_request, material_head_sha, scope
+    )
+    assert evidence == {
+        "status": "VERIFIED",
+        "comment_id": 77,
+        "author_login": "blakinio",
+        "actor_type": "User",
+        "owner_role": "admin",
+        "repository": repository,
+        "pull_request": pull_request,
+        "material_head_sha": material_head_sha,
+        "scope": scope,
+        "authorize_integration": True,
+    }
+    assert audit.control_plane_integration_permitted(
+        [".github/actions/meta-gate/action.yml"],
+        repository=repository,
+        pull_request=pull_request,
+        material_head_sha=material_head_sha,
+        scope=scope,
         candidate_ci_passed=True,
         independent_deep_review=True,
-        owner_authorization_verified=False,
         merge_queue_required=False,
         merge_queue_validated=False,
     )
-    assert m.core.control_plane_integration_permitted(
-        ["ecosystem/governance-desired-state.json"],
+
+
+def test_control_plane_owner_authorization_fails_closed_for_edited_bot_stale_or_non_owner_evidence() -> None:
+    repository = "Oteryn/Oteryn"
+    pull_request = 124
+    material_head_sha = "a" * 40
+    scope = "META Task 1 V2 authority integration"
+
+    def result_for(comment: dict, permission: object, current_head: str = material_head_sha) -> dict:
+        return FakeAudit({
+            f"/repos/{repository}/pulls/{pull_request}": current_pull_request(
+                repository, pull_request, current_head
+            ),
+            f"/repos/{repository}/issues/{pull_request}/comments": [comment],
+            f"/repos/{repository}/collaborators/blakinio/permission": permission,
+        }).control_plane_owner_authorization(repository, pull_request, material_head_sha, scope)
+
+    valid = control_plane_owner_authorization_comment(
+        77,
+        repository=repository,
+        pull_request=pull_request,
+        material_head_sha=material_head_sha,
+        scope=scope,
+    )
+    admin = {"permission": "admin", "user": {"login": "blakinio", "type": "User"}}
+    assert result_for({**valid, "updated_at": "2026-08-31T12:01:00Z"}, admin)["status"] == "UNKNOWN"
+    bot = json.loads(json.dumps(valid))
+    bot["user"]["type"] = "Bot"
+    assert result_for(bot, admin)["status"] == "UNKNOWN"
+    assert result_for(valid, {"permission": "write"})["status"] == "UNKNOWN"
+    assert result_for(valid, admin, current_head="b" * 40)["status"] == "UNKNOWN"
+    draft = current_pull_request(repository, pull_request, material_head_sha)
+    draft["draft"] = True
+    assert FakeAudit({
+        f"/repos/{repository}/pulls/{pull_request}": draft,
+        f"/repos/{repository}/issues/{pull_request}/comments": [valid],
+        f"/repos/{repository}/collaborators/blakinio/permission": admin,
+    }).control_plane_owner_authorization(repository, pull_request, material_head_sha, scope)["status"] == "UNKNOWN"
+
+
+def test_control_plane_candidate_cannot_self_authorize_from_candidate_ci() -> None:
+    repository = "Oteryn/Oteryn"
+    pull_request = 124
+    material_head_sha = "a" * 40
+    scope = "META Task 1 V2 authority integration"
+    unauthorised = FakeAudit({
+        f"/repos/{repository}/pulls/{pull_request}": current_pull_request(
+            repository, pull_request, material_head_sha
+        ),
+        f"/repos/{repository}/issues/{pull_request}/comments": [],
+    })
+    assert not unauthorised.control_plane_integration_permitted(
+        [".github/workflows/ci.yml"],
+        repository=repository,
+        pull_request=pull_request,
+        material_head_sha=material_head_sha,
+        scope=scope,
         candidate_ci_passed=True,
         independent_deep_review=True,
-        owner_authorization_verified=True,
-        merge_queue_required=True,
-        merge_queue_validated=True,
+        merge_queue_required=False,
+        merge_queue_validated=False,
     )
+
+
+def test_control_plane_owner_authorization_cli_reads_direct_evidence() -> None:
+    repository = "Oteryn/Oteryn"
+    pull_request = 124
+    material_head_sha = "a" * 40
+    scope = "META Task 1 V2 authority integration"
+    responses = {
+        f"/repos/{repository}/pulls/{pull_request}": current_pull_request(
+            repository, pull_request, material_head_sha
+        ),
+        f"/repos/{repository}/issues/{pull_request}/comments": [
+            control_plane_owner_authorization_comment(
+                77,
+                repository=repository,
+                pull_request=pull_request,
+                material_head_sha=material_head_sha,
+                scope=scope,
+            ),
+        ],
+        f"/repos/{repository}/collaborators/blakinio/permission": {
+            "permission": "admin", "user": {"login": "blakinio", "type": "User"},
+        },
+    }
+    original_audit = m.core.Audit
+    original_load_desired = m.core.load_desired
+    original_argv = m.core.sys.argv
+    original_token = os.environ.get("GH_TOKEN")
+    m.core.Audit = lambda token: FakeAudit(responses)
+    m.core.load_desired = lambda: (_ for _ in ()).throw(
+        AssertionError("owner-authorization readback must not load candidate desired state")
+    )
+    m.core.sys.argv = [
+        "audit_github_readonly.py",
+        "--verify-control-plane-owner-authorization",
+        "--repository", repository,
+        "--pull-request", str(pull_request),
+        "--material-head-sha", material_head_sha,
+        "--control-plane-scope", scope,
+    ]
+    os.environ["GH_TOKEN"] = "test"
+    try:
+        assert m.main() == 0
+    finally:
+        m.core.Audit = original_audit
+        m.core.load_desired = original_load_desired
+        m.core.sys.argv = original_argv
+        if original_token is None:
+            del os.environ["GH_TOKEN"]
+        else:
+            os.environ["GH_TOKEN"] = original_token
 
 
 def test_pull_request_target_is_read_from_current_candidate_commit() -> None:
