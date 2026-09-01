@@ -410,6 +410,39 @@ def _malformed_lifecycle_evidence_is_relevant(
     return False
 
 
+def _global_rollout_transitions_are_serial(records: list[dict]) -> bool:
+    """Require every provider cutover on the shared canonical Issue to be serial."""
+    pre_by_id: dict[int, dict] = {}
+    for record in records:
+        body = record.get("body")
+        if (
+            isinstance(body, dict)
+            and body.get("record_type") == "PRE_TRANSITION"
+            and body.get("repository") in V2_REQUIRED_CONTEXTS
+            and isinstance(body.get("transition_id"), str)
+            and body["transition_id"]
+        ):
+            pre_by_id[record["id"]] = record
+    terminals_by_pre: dict[int, list[dict]] = {}
+    for record in records:
+        body = record.get("body")
+        if not isinstance(body, dict) or body.get("record_type") != "TERMINAL":
+            continue
+        linked = body.get("pre_transition_comment_id")
+        pre = pre_by_id.get(linked)
+        if pre is None:
+            continue
+        if body.get("transition_id") != pre["body"].get("transition_id"):
+            return False
+        terminals_by_pre.setdefault(linked, []).append(record)
+    ordered = sorted(pre_by_id.values(), key=lambda record: (record["created_at"], record["id"]))
+    for previous, current in zip(ordered, ordered[1:]):
+        previous_terminals = terminals_by_pre.get(previous["id"], [])
+        if len(previous_terminals) != 1 or previous_terminals[0]["created_at"] >= current["created_at"]:
+            return False
+    return True
+
+
 def _valid_pending_record(record: dict, wanted: dict) -> dict | None:
     body = record["body"]
     if (
@@ -587,6 +620,14 @@ def classify_rollout_state(
         if pre is None or pre["transition_id"] in transitions:
             return "DRIFT"
         transitions[pre["transition_id"]] = record
+    for record in all_pre_records:
+        body = record["body"]
+        if (
+            body.get("transition_id") in transitions
+            and body.get("repository") != wanted.get("repository")
+            and not isinstance(body.get("repository"), str)
+        ):
+            return "DRIFT"
 
     pre_records_by_id = {record["id"]: record for record in all_pre_records}
     terminals_by_transition: dict[str, list[dict]] = {}
@@ -647,6 +688,8 @@ def classify_rollout_state(
             key=lambda value: (value[2]["created_at"], value[2]["id"]),
         )
         if status == "SUCCESS":
+            if not _global_rollout_transitions_are_serial(records):
+                return "DRIFT"
             if not _rollout_states_match(live, post_state):
                 return "DRIFT"
             if success_receipt_verifier is None:

@@ -631,6 +631,30 @@ def test_schema_invalid_terminal_for_current_repository_cannot_be_ignored() -> N
     ) == "DRIFT"
 
 
+def test_schema_invalid_pre_and_cross_repository_overlap_cannot_reach_success() -> None:
+    wanted = v2_wanted()
+    other = v2_wanted("Oteryn/Oteryn-Game")
+    baseline = pending_baseline(wanted)
+    other_baseline = pending_baseline(other)
+    target = m.core.target_rollout_state(wanted)
+    valid_pre = transition_record(wanted, baseline)
+    valid_terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+    incomplete_duplicate = {"record_type": "PRE_TRANSITION", "transition_id": valid_pre["transition_id"]}
+    assert m.core.classify_rollout_state(
+        wanted, target,
+        [lifecycle_comment(1, pending_record(wanted, baseline)), lifecycle_comment(2, valid_pre, created_at="2026-08-31T10:05:00Z"), lifecycle_comment(3, valid_terminal, created_at="2026-08-31T11:00:00Z"), lifecycle_comment(4, incomplete_duplicate)],
+        now="2026-08-31T13:00:00Z", success_receipt_verifier=lambda *_: "SUCCESS",
+    ) == "DRIFT"
+
+    other_pre = transition_record(other, other_baseline, transition_id="game-v2-cutover-1")
+    other_terminal = terminal_record(other, m.core.target_rollout_state(other), terminal_status="SUCCESS", transition_id="game-v2-cutover-1", pre_transition_comment_id=6)
+    assert m.core.classify_rollout_state(
+        wanted, target,
+        [lifecycle_comment(1, pending_record(wanted, baseline)), lifecycle_comment(2, valid_pre, created_at="2026-08-31T10:05:00Z"), lifecycle_comment(5, pending_record(other, other_baseline)), lifecycle_comment(6, other_pre, created_at="2026-08-31T10:10:00Z"), lifecycle_comment(3, valid_terminal, created_at="2026-08-31T11:00:00Z"), lifecycle_comment(7, other_terminal, created_at="2026-08-31T11:10:00Z")],
+        now="2026-08-31T13:00:00Z", success_receipt_verifier=lambda *_: "SUCCESS",
+    ) == "DRIFT"
+
+
 def test_active_transition_expires_and_late_terminal_records_stay_drift() -> None:
     wanted = v2_wanted()
     baseline = pending_baseline(wanted)
