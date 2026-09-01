@@ -366,6 +366,72 @@ def test_pending_requires_one_unedited_matching_direct_readback_baseline() -> No
     ) == "UNKNOWN"
 
 
+def test_pending_duplicate_identified_by_readback_repository_is_drift() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    valid = lifecycle_comment(1, pending_record(wanted, baseline))
+
+    incomplete = pending_record(wanted, baseline)
+    del incomplete["repository"]
+    duplicate = lifecycle_comment(2, incomplete, created_at="2026-08-31T10:01:00Z")
+    assert m.core.classify_rollout_state(
+        wanted, baseline, [valid, duplicate], now="2026-08-31T10:30:00Z"
+    ) == "DRIFT"
+
+    other = v2_wanted("Oteryn/Oteryn-Game")
+    other_baseline = pending_baseline(other)
+    foreign = pending_record(other, other_baseline)
+    del foreign["repository"]
+    assert m.core.classify_rollout_state(
+        wanted,
+        baseline,
+        [valid, lifecycle_comment(3, foreign, created_at="2026-08-31T10:01:00Z")],
+        now="2026-08-31T10:30:00Z",
+    ) == "PENDING"
+
+
+def test_pending_baseline_comment_must_predate_first_pre_transition() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+
+    late_baseline_records = [
+        lifecycle_comment(
+            1,
+            pending_record(wanted, baseline),
+            created_at="2026-08-31T11:05:00Z",
+        ),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
+    ]
+    assert m.core.classify_rollout_state(
+        wanted,
+        target,
+        late_baseline_records,
+        now="2026-08-31T13:00:00Z",
+        success_receipt_verifier=lambda *_: "SUCCESS",
+    ) == "DRIFT"
+
+    valid_records = [
+        lifecycle_comment(
+            1,
+            pending_record(wanted, baseline),
+            created_at="2026-08-31T10:00:00Z",
+        ),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
+    ]
+    assert m.core.classify_rollout_state(
+        wanted,
+        target,
+        valid_records,
+        now="2026-08-31T13:00:00Z",
+        success_receipt_verifier=lambda *_: "SUCCESS",
+    ) == "SUCCESS"
+
+
 def test_auditor_reads_canonical_top_level_lifecycle_comments_before_classification() -> None:
     wanted = v2_wanted()
     baseline = pending_baseline(wanted)
@@ -1671,7 +1737,6 @@ def test_pull_request_target_for_other_pr_does_not_prove_gate() -> None:
     assert not m.expected_sources_satisfied(
         observed, {"meta-gate", "ai-review-gate"}, ACTIONS_APP_ID
     )
-
 
 
 def test_stale_pull_request_target_generation_does_not_prove_current_head() -> None:
