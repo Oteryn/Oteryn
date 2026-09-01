@@ -57,7 +57,7 @@
 - Consumes: stable PR #125 candidate.
 - Produces: merged authority reset without live settings changes.
 
-- [ ] **Step 1:** Verify the exact changed-file list contains only the reset spec/plan/ADR/policy/prompt and no workflow, Python, JSON desired-state, AGENTS, or live-settings mutation.
+- [x] **Step 1:** Verify the exact changed-file list contains only the reset spec/plan/ADR/policy/prompt and no workflow, Python, JSON desired-state, AGENTS, or live-settings mutation.
 - [ ] **Step 2:** Verify `meta-gate` on the exact final head.
 - [ ] **Step 3:** Mark the PR Ready only after the candidate is stable; satisfy the currently configured legacy review path at most once for that stable candidate.
 - [ ] **Step 4:** Resolve only concrete material findings; do not start a review-fix loop for theoretical hardening.
