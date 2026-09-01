@@ -6,7 +6,7 @@ Do not execute the former Work/Terra rollout procedure in this file.
 
 The original prompt was part of the PR #123 implementation packet and accumulated lifecycle/comment-proof requirements that are superseded by:
 
-- `docs/architecture/adr/0003-solo-maintainer-governance-v2-simplification-reset.md`;
+- `docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md`;
 - `docs/superpowers/specs/2026-09-01-solo-maintainer-governance-v2-simplification-reset-design.md`;
 - `docs/superpowers/plans/2026-09-01-solo-maintainer-governance-v2-simplification-reset.md`.
 

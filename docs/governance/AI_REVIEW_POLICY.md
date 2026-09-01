@@ -54,4 +54,4 @@ Do not build a JSON authorization parser, duplicate-comment proof engine, second
 
 ## Precedence
 
-This policy implements ADR 0003 and supersedes the formal R0/R1/R2 target policy and `ai-review-gate`-as-permanent-authority model previously documented by PR #123 and earlier governance bootstrap work. Historical documents remain evidence of how the legacy mechanism was built, not current target authority.
+This policy implements ADR 0005 and supersedes the formal R0/R1/R2 target policy and `ai-review-gate`-as-permanent-authority model previously documented by PR #123 and earlier governance bootstrap work. Historical documents remain evidence of how the legacy mechanism was built, not current target authority.

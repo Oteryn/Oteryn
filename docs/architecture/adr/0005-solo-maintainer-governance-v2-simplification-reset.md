@@ -1,4 +1,4 @@
-# ADR 0003 — Solo-Maintainer Governance V2 simplification reset
+# ADR 0005 — Solo-Maintainer Governance V2 simplification reset
 
 ## Status
 

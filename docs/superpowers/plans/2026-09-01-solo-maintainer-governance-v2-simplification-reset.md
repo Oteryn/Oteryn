@@ -14,19 +14,21 @@
 - PR #125 makes no live branch-protection, ruleset, Merge Queue, provider, production, or break-glass mutation.
 - No lifecycle database, comment-proof parser, attestation subsystem, second required status, or second-human dependency.
 - Current `meta-gate` + legacy `ai-review-gate` enforcement remains unchanged until the follow-up META implementation proves the replacement path.
-- At most one useful deep external review for the final stable PR #125 candidate.
+- At most one useful deep external review for the final stable PR #125 candidate, plus a re-review only if a concrete material finding requires a material repair.
 - No Work handoff; execution is chat-led.
 
 ## PR #125
 
-- [x] ADR 0003 defines the native-GitHub merge contract and explicitly supersedes the over-specified PR #123 lifecycle/proof model.
+- [x] ADR 0005 defines the native-GitHub merge contract and explicitly supersedes the over-specified PR #123 lifecycle/proof model.
 - [x] AI review policy is default-no-review / Spark-when-useful / one-deep-review-for-high-risk, with legacy machine enforcement transition-only.
 - [x] The old Work/Terra rollout prompt is superseded by short chat-led guidance.
 - [x] Diff scope is spec/plan/ADR/policy/prompt only: no workflow, Python, JSON desired-state, `AGENTS.md`, or live-settings mutation.
-- [ ] Exact-head `meta-gate` passes.
-- [ ] PR is Ready and the currently configured legacy review path is satisfied once on the stable candidate.
-- [ ] Only concrete material findings are addressed; no theoretical hardening loop.
-- [ ] PR is merged through the currently permitted protected path and ADR 0003 is confirmed on protected `main`.
+- [x] Exact-head `meta-gate` passed on the pre-review stable candidate.
+- [x] PR is Ready and one Codex deep review was performed on that candidate.
+- [x] The single concrete review finding was addressed by assigning the reset ADR the next unused number (`0005`) and updating references.
+- [ ] Final exact-head legacy checks pass after the material review fix.
+- [ ] The material review fix is re-reviewed once under the still-active legacy enforcement path.
+- [ ] PR is merged through the currently permitted protected path and ADR 0005 is confirmed on protected `main`.
 
 ## Follow-up minimal META PR
 
