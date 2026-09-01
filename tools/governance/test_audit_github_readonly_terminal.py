@@ -321,6 +321,11 @@ def direct_moving_base_responses(wanted: dict, receipt: dict) -> dict[str, objec
                 b"on: [pull_request, pull_request_target, merge_group]\n"
             ).decode("ascii"),
         },
+        f"/repos/{repo}/contents/.github/workflows/gate.yml?ref={receipt['main_after_a']}": {
+            "content": base64.b64encode(
+                b"on: [pull_request, pull_request_target, merge_group]\n"
+            ).decode("ascii"),
+        },
         f"/repos/{repo}/commits/{receipt['main_after_b']}": {
             "sha": receipt["main_after_b"],
             "parents": [{"sha": receipt["main_before_b"]}],
@@ -833,6 +838,50 @@ def test_cross_repository_overlap_is_drift_after_rollback() -> None:
     ) == "DRIFT"
 
 
+def test_next_provider_requires_prior_provider_success_not_rollback() -> None:
+    meta = v2_wanted()
+    meta_baseline = pending_baseline(meta)
+    game = v2_wanted("Oteryn/Oteryn-Game")
+    game_baseline = pending_baseline(game)
+
+    def game_classification(meta_terminal_status: str) -> str:
+        meta_post = (
+            m.core.target_rollout_state(meta)
+            if meta_terminal_status == "SUCCESS"
+            else meta_baseline
+        )
+        records = [
+            lifecycle_comment(1, pending_record(meta, meta_baseline)),
+            lifecycle_comment(10, pending_record(game, game_baseline)),
+            lifecycle_comment(
+                2,
+                transition_record(meta, meta_baseline),
+                created_at="2026-08-31T10:05:00Z",
+            ),
+            lifecycle_comment(
+                3,
+                terminal_record(
+                    meta,
+                    meta_post,
+                    terminal_status=meta_terminal_status,
+                    pre_transition_comment_id=2,
+                ),
+                created_at="2026-08-31T10:20:00Z",
+            ),
+            lifecycle_comment(
+                11,
+                transition_record(game, game_baseline),
+                created_at="2026-08-31T10:30:00Z",
+            ),
+        ]
+        return m.core.classify_rollout_state(
+            game, game_baseline, records, now="2026-08-31T10:45:00Z"
+        )
+
+    assert game_classification("ROLLED_BACK") == "DRIFT"
+    assert game_classification("SUCCESS") == "TRANSITION"
+
+
 def test_rollout_cannot_start_with_game_before_meta() -> None:
     wanted = v2_wanted("Oteryn/Oteryn-Game")
     baseline = pending_baseline(wanted)
@@ -999,7 +1048,6 @@ def test_auditor_binds_success_to_direct_github_moving_base_evidence() -> None:
 
 
 def test_dequeued_candidate_then_direct_admin_merge_is_drift() -> None:
-
     wanted = v2_wanted()
     baseline = pending_baseline(wanted)
     target = m.core.target_rollout_state(wanted)
@@ -1030,7 +1078,7 @@ def test_dequeued_candidate_then_direct_admin_merge_is_drift() -> None:
 
 
 def test_moving_base_success_requires_queue_bot_final_integration() -> None:
-    """A completed merge-group run cannot substitute for the queue integration."""
+    """A completed merge-group run cannot substitute for queue integration."""
     wanted = v2_wanted()
     baseline = pending_baseline(wanted)
     target = m.core.target_rollout_state(wanted)
@@ -1084,6 +1132,36 @@ def test_merge_group_success_from_disabled_workflow_is_drift() -> None:
     responses[
         f"/repos/{wanted['repository']}/actions/runs/{receipt['aggregate_gate_run']['run_id']}"
     ]["workflow_id"] = 2
+
+    assert FakeAudit(responses).classify_rollout_readback(
+        wanted, target, now="2026-08-31T13:00:00Z"
+    ) == "DRIFT"
+
+
+def test_merge_group_trigger_must_remain_on_current_protected_main() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+    receipt = terminal["moving_base_receipt"]
+    comments = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
+    ]
+    responses = {
+        "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+        **direct_moving_base_responses(wanted, receipt),
+    }
+    responses[
+        f"/repos/{wanted['repository']}/contents/.github/workflows/gate.yml"
+        f"?ref={receipt['main_after_a']}"
+    ] = {
+        "content": base64.b64encode(b"on: [pull_request, pull_request_target]\n").decode(
+            "ascii"
+        ),
+    }
 
     assert FakeAudit(responses).classify_rollout_readback(
         wanted, target, now="2026-08-31T13:00:00Z"

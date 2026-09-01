@@ -448,6 +448,11 @@ def _global_rollout_transitions_are_serial(records: list[dict]) -> bool:
         previous_terminals = terminals_by_pre.get(previous["id"], [])
         if len(previous_terminals) != 1 or previous_terminals[0]["created_at"] >= current["created_at"]:
             return False
+        if (
+            previous["body"]["repository"] != current["body"]["repository"]
+            and previous_terminals[0]["body"].get("terminal_status") != "SUCCESS"
+        ):
+            return False
     return True
 
 
@@ -2069,6 +2074,18 @@ class Audit:
         ):
             return False
         main_head = protected_main_commit["sha"]
+        try:
+            current_merge_group_sources = self._protected_flow_sources(
+                repository,
+                {"check_runs": [merge_group_check]},
+                event="merge_group",
+                allowed_head_shas={receipt["merge_group_sha"]},
+                workflow_ref=main_head,
+            )
+        except (RuntimeError, ValueError):
+            return None
+        if current_merge_group_sources.get(expected_context) != {expected_app_id}:
+            return False
         if main_head == receipt["main_after_a"]:
             return True
         try:
