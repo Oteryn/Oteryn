@@ -19,14 +19,14 @@
 
 ## PR #125
 
-- [x] Add ADR 0003 with the native-GitHub merge contract and explicit supersession of the over-specified PR #123 lifecycle/proof model.
-- [x] Replace the long AI-review policy with default-no-review / Spark-when-useful / one-deep-review-for-high-risk guidance, leaving legacy machine enforcement transition-only.
-- [x] Replace the Work/Terra rollout prompt with a short superseded chat-led notice.
-- [x] Keep the diff limited to spec/plan/ADR/policy/prompt documentation: no workflow, Python, JSON desired-state, `AGENTS.md`, or live-settings mutation.
-- [ ] Verify exact-head `meta-gate`.
-- [ ] Mark Ready and satisfy the currently configured legacy review path once on the stable candidate.
-- [ ] Resolve only concrete material findings; do not start another theoretical hardening loop.
-- [ ] Merge through the currently permitted protected path and confirm ADR 0003 on protected `main`.
+- [x] ADR 0003 defines the native-GitHub merge contract and explicitly supersedes the over-specified PR #123 lifecycle/proof model.
+- [x] AI review policy is default-no-review / Spark-when-useful / one-deep-review-for-high-risk, with legacy machine enforcement transition-only.
+- [x] The old Work/Terra rollout prompt is superseded by short chat-led guidance.
+- [x] Diff scope is spec/plan/ADR/policy/prompt only: no workflow, Python, JSON desired-state, `AGENTS.md`, or live-settings mutation.
+- [ ] Exact-head `meta-gate` passes.
+- [ ] PR is Ready and the currently configured legacy review path is satisfied once on the stable candidate.
+- [ ] Only concrete material findings are addressed; no theoretical hardening loop.
+- [ ] PR is merged through the currently permitted protected path and ADR 0003 is confirmed on protected `main`.
 
 ## Follow-up minimal META PR
 
