@@ -500,6 +500,96 @@ def test_terminal_lifecycle_is_scoped_by_exact_pre_transition_comment_link() -> 
         ),
     ]) == "DRIFT"
 
+    edited_mislinked_meta_terminal = terminal_record(
+        wanted,
+        baseline,
+        terminal_status="ROLLED_BACK",
+        transition_id=shared_transition_id,
+        pre_transition_comment_id=999,
+    )
+    assert classify(common_records + [
+        lifecycle_comment(
+            25,
+            edited_mislinked_meta_terminal,
+            created_at="2026-08-31T10:30:00Z",
+            updated_at="2026-08-31T10:31:00Z",
+        ),
+    ]) == "DRIFT"
+
+
+def test_closed_rollout_transitions_must_not_overlap() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    first = transition_record(wanted, baseline, transition_id="meta-v2-cutover-1")
+    second = transition_record(wanted, baseline, transition_id="meta-v2-cutover-2")
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, first, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, second, created_at="2026-08-31T10:10:00Z"),
+        lifecycle_comment(
+            4,
+            terminal_record(
+                wanted,
+                baseline,
+                terminal_status="ROLLED_BACK",
+                transition_id="meta-v2-cutover-1",
+                pre_transition_comment_id=2,
+            ),
+            created_at="2026-08-31T10:30:00Z",
+        ),
+        lifecycle_comment(
+            5,
+            terminal_record(
+                wanted,
+                target,
+                terminal_status="SUCCESS",
+                transition_id="meta-v2-cutover-2",
+                pre_transition_comment_id=3,
+            ),
+            created_at="2026-08-31T11:00:00Z",
+        ),
+    ]
+    assert m.core.classify_rollout_state(
+        wanted,
+        target,
+        records,
+        now="2026-08-31T13:00:00Z",
+        success_receipt_verifier=lambda _wanted, _pre, _terminal: "SUCCESS",
+    ) == "DRIFT"
+
+
+def test_malformed_json_lifecycle_evidence_for_current_repository_is_drift() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(
+            3,
+            terminal_record(wanted, target, terminal_status="SUCCESS"),
+            created_at="2026-08-31T11:00:00Z",
+        ),
+        {
+            "id": 4,
+            "body": (
+                '{"record_type":"TERMINAL","repository":"Oteryn/Oteryn",'
+                '"transition_id":"meta-v2-cutover-1","pre_transition_comment_id":2'
+            ),
+            "created_at": "2026-08-31T11:01:00Z",
+            "updated_at": "2026-08-31T11:01:00Z",
+        },
+    ]
+    assert m.core.classify_rollout_state(
+        wanted,
+        target,
+        records,
+        now="2026-08-31T13:00:00Z",
+        success_receipt_verifier=lambda _wanted, _pre, _terminal: "SUCCESS",
+    ) == "DRIFT"
+
 
 def test_active_transition_expires_and_late_terminal_records_stay_drift() -> None:
     wanted = v2_wanted()

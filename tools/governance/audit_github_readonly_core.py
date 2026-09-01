@@ -271,6 +271,43 @@ def _decode_lifecycle_body(body: object) -> dict | None:
     return _decode_json_comment_body(body)
 
 
+def _malformed_lifecycle_hints(body: object) -> dict | None:
+    """Extract only identity hints from an invalid JSON lifecycle candidate.
+
+    A lifecycle record is intended to be a standalone JSON object.  We must not
+    treat arbitrary prose as governance evidence, but an unparseable JSON object
+    carrying lifecycle identity fields cannot be silently ignored either.
+    """
+    if not isinstance(body, str):
+        return None
+    candidate = body.strip()
+    if candidate.startswith("```json"):
+        candidate = candidate[len("```json"):].strip()
+    if not candidate.startswith("{"):
+        return None
+
+    lifecycle_keys = (
+        "record_type",
+        "repository",
+        "transition_id",
+        "pre_transition_comment_id",
+        "pre_state_fingerprint",
+        "post_state_fingerprint",
+    )
+    if not any(re.search(rf'"{key}"\s*:', candidate) for key in lifecycle_keys):
+        return None
+
+    hints: dict[str, object] = {}
+    for key in ("record_type", "repository", "transition_id"):
+        match = re.search(rf'"{key}"\s*:\s*"([^"\\]*)"', candidate)
+        if match is not None:
+            hints[key] = match.group(1)
+    pre_match = re.search(r'"pre_transition_comment_id"\s*:\s*(\d+)', candidate)
+    if pre_match is not None:
+        hints["pre_transition_comment_id"] = int(pre_match.group(1))
+    return hints
+
+
 def _is_lifecycle_candidate(body: dict) -> bool:
     return body.get("record_type") in LIFECYCLE_RECORD_TYPES or any(
         key in body for key in ("transition_id", "pre_state_fingerprint", "post_state_fingerprint")
@@ -289,8 +326,12 @@ def _read_lifecycle_records(records: object) -> tuple[list[dict] | None, list[di
     for comment in records:
         if not isinstance(comment, dict):
             return None, []
-        body = _decode_lifecycle_body(comment.get("body"))
+        raw_body = comment.get("body")
+        body = _decode_lifecycle_body(raw_body)
         if body is None:
+            hints = _malformed_lifecycle_hints(raw_body)
+            if hints is not None:
+                malformed.append({"id": comment.get("id"), "hints": hints})
             continue
         if not _is_lifecycle_candidate(body):
             continue
@@ -326,7 +367,8 @@ def _malformed_lifecycle_evidence_is_relevant(
     """
     repository = wanted.get("repository")
     pre_repository_by_comment_id: dict[int, str] = {}
-    for record in [*records, *malformed_records]:
+    transition_ids: set[str] = set()
+    for record in records:
         body = record.get("body")
         if not isinstance(body, dict) or body.get("record_type") != "PRE_TRANSITION":
             continue
@@ -334,8 +376,11 @@ def _malformed_lifecycle_evidence_is_relevant(
         comment_id = record.get("id")
         if isinstance(record_repository, str) and isinstance(comment_id, int):
             pre_repository_by_comment_id[comment_id] = record_repository
+        transition_id = body.get("transition_id")
+        if record_repository == repository and isinstance(transition_id, str):
+            transition_ids.add(transition_id)
     for record in malformed_records:
-        body = record.get("body")
+        body = record.get("body", record.get("hints"))
         if not isinstance(body, dict):
             continue
         terminal_shaped = (
@@ -343,9 +388,23 @@ def _malformed_lifecycle_evidence_is_relevant(
             or "pre_transition_comment_id" in body
             or "terminal_status" in body
         )
-        if not terminal_shaped and body.get("repository") == repository:
-            return True
-        if pre_repository_by_comment_id.get(body.get("pre_transition_comment_id")) == repository:
+        linked_repository = pre_repository_by_comment_id.get(
+            body.get("pre_transition_comment_id")
+        )
+        if terminal_shaped:
+            if linked_repository is not None:
+                if linked_repository == repository:
+                    return True
+                continue
+            if (
+                body.get("repository") == repository
+                or body.get("transition_id") in transition_ids
+            ):
+                return True
+        elif (
+            body.get("repository") == repository
+            or body.get("transition_id") in transition_ids
+        ):
             return True
     return False
 
@@ -556,6 +615,17 @@ def classify_rollout_state(
             return "DRIFT"
         status, post_state = result
         terminal_results[transition_id] = (status, post_state, terminal_record)
+
+    ordered_pre_records = sorted(
+        transitions.values(), key=lambda record: (record["created_at"], record["id"])
+    )
+    for previous, current in zip(ordered_pre_records, ordered_pre_records[1:]):
+        previous_terminal = terminal_results.get(previous["body"]["transition_id"])
+        if (
+            previous_terminal is None
+            or previous_terminal[2]["created_at"] >= current["created_at"]
+        ):
+            return "DRIFT"
 
     active = [record for transition_id, record in transitions.items() if transition_id not in terminal_results]
     if len(active) > 1:
