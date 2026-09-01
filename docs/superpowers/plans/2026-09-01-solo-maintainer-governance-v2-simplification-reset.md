@@ -8,13 +8,13 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-01-solo-maintainer-governance-v2-simplification-reset-design.md`
 
-## Global Constraints
+## Constraints
 
 - GitHub live state is the only authority for current enforcement.
-- No live branch-protection, ruleset, Merge Queue, provider, production, or break-glass mutation in PR #125.
+- PR #125 makes no live branch-protection, ruleset, Merge Queue, provider, production, or break-glass mutation.
 - No lifecycle database, comment-proof parser, attestation subsystem, second required status, or second-human dependency.
 - Current `meta-gate` + legacy `ai-review-gate` enforcement remains unchanged until the follow-up META implementation proves the replacement path.
-- At most one useful deep external review for the final stable PR #125 candidate, because current protected `main` still requires the legacy review path.
+- At most one useful deep external review for the final stable PR #125 candidate.
 - No Work handoff; execution is chat-led.
 
 ## PR #125
