@@ -61,6 +61,7 @@ ROLLOUT_PROTECTION_FIELDS = {
     "required_approving_review_count",
     "require_code_owner_review",
     "require_conversation_resolution",
+    "required_linear_history",
 }
 LIFECYCLE_RECORD_TYPES = {"PENDING_BASELINE", "PRE_TRANSITION", "TERMINAL"}
 CONTROL_PLANE_R2_NON_AUTHORITY_PREFIXES = (
@@ -165,7 +166,7 @@ def _normalized_rollout_state(value: object) -> dict | None:
     if not all(isinstance(protection.get(field), bool) for field in (
         "pull_requests", "force_pushes", "deletions", "broad_bypass",
         "strict_required_status_checks", "require_code_owner_review",
-        "require_conversation_resolution",
+        "require_conversation_resolution", "required_linear_history",
     )):
         return None
     if not isinstance(protection.get("required_approving_review_count"), int) or isinstance(
@@ -595,7 +596,7 @@ def classify_rollout_state(
             continue
         linked_pre = pre_records_by_id.get(body.get("pre_transition_comment_id"))
         if linked_pre is None:
-            if body.get("transition_id") in transitions:
+            if body.get("repository") == wanted.get("repository") or body.get("transition_id") in transitions:
                 return "DRIFT"
             continue
         if linked_pre["body"].get("repository") != wanted.get("repository"):
@@ -1310,6 +1311,7 @@ def load_desired() -> dict:
             "required_approving_review_count": 0,
             "require_code_owner_review": False,
             "require_conversation_resolution": True,
+            "required_linear_history": True,
         }
         if protection != required_protection:
             raise SystemExit(f"repository has incomplete or weakened protection contract: {item}")
@@ -1740,6 +1742,29 @@ class Audit:
         )
         if a_check is None:
             return False
+        try:
+            protected_a_sources = merge_sources(
+                self._protected_flow_sources(
+                    repository,
+                    {"check_runs": [a_check]},
+                    event="pull_request",
+                    allowed_head_shas={receipt["a_head"]},
+                    workflow_ref=receipt["a_head"],
+                    pr_number=pr_a,
+                ),
+                self._protected_flow_sources(
+                    repository,
+                    {"check_runs": [a_check]},
+                    event="pull_request_target",
+                    allowed_head_shas={receipt["a_head"]},
+                    workflow_ref=receipt["main_before_b"],
+                    pr_number=pr_a,
+                ),
+            )
+        except (RuntimeError, ValueError):
+            return None
+        if protected_a_sources.get(expected_context) != {expected_app_id}:
+            return False
         after_b_parents = after_b.get("parents") if isinstance(after_b, dict) else None
         if (
             not isinstance(after_b, dict)
@@ -2046,6 +2071,7 @@ class Audit:
             "required_approving_review_count": review_count,
             "require_code_owner_review": codeowner_review,
             "require_conversation_resolution": conversation_resolution,
+            "required_linear_history": "required_linear_history" in rule_types,
             "merge_queue": "merge_queue" in rule_types,
         }
 
@@ -2058,7 +2084,8 @@ class Audit:
             return {key: None for key in (
                 "pull_requests", "force_pushes", "deletions", "broad_bypass",
                 "strict_required_status_checks", "required_approving_review_count",
-                "require_code_owner_review", "require_conversation_resolution", "merge_queue",
+                "require_code_owner_review", "require_conversation_resolution",
+                "required_linear_history", "merge_queue",
             )}
         reviews = protection.get("required_pull_request_reviews")
         if reviews is None:
@@ -2101,6 +2128,14 @@ class Audit:
             require_conversation_resolution = enabled if isinstance(enabled, bool) else None
         else:
             require_conversation_resolution = None
+        linear_history = protection.get("required_linear_history")
+        if linear_history is None:
+            required_linear_history = False
+        elif isinstance(linear_history, dict):
+            enabled = linear_history.get("enabled")
+            required_linear_history = enabled if isinstance(enabled, bool) else None
+        else:
+            required_linear_history = None
         return {
             "pull_requests": pull_requests,
             "force_pushes": allow_force_pushes if isinstance(allow_force_pushes, bool) else None,
@@ -2110,6 +2145,7 @@ class Audit:
             "required_approving_review_count": review_count,
             "require_code_owner_review": codeowner_review,
             "require_conversation_resolution": require_conversation_resolution,
+            "required_linear_history": required_linear_history,
             # Classic branch protection cannot require Merge Queue; that control
             # is expressed only by an applicable repository ruleset.
             "merge_queue": False,
@@ -2130,6 +2166,7 @@ class Audit:
             "required_approving_review_count": None,
             "require_code_owner_review": None,
             "require_conversation_resolution": None,
+            "required_linear_history": None,
             "merge_queue": None,
         }
         if ruleset is None and classic is None:
@@ -2167,6 +2204,10 @@ class Audit:
             "require_conversation_resolution": either(
                 ruleset.get("require_conversation_resolution"),
                 classic.get("require_conversation_resolution"),
+            ),
+            "required_linear_history": either(
+                ruleset.get("required_linear_history"),
+                classic.get("required_linear_history"),
             ),
             "merge_queue": either(ruleset.get("merge_queue"), classic.get("merge_queue")),
         }
@@ -2260,6 +2301,7 @@ class Audit:
                 "required_approving_review_count": controls["required_approving_review_count"],
                 "require_code_owner_review": controls["require_code_owner_review"],
                 "require_conversation_resolution": controls["require_conversation_resolution"],
+                "required_linear_history": controls["required_linear_history"],
             },
         }
         return _normalized_rollout_state(state)

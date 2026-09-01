@@ -256,8 +256,26 @@ def direct_moving_base_responses(wanted: dict, receipt: dict) -> dict[str, objec
                 "head_sha": receipt["a_head"],
                 "conclusion": "success",
                 "completed_at": "2026-08-31T10:10:00Z",
+                "details_url": f"https://github.com/Oteryn/Oteryn/actions/runs/76/job/100",
                 "pull_requests": [{"number": pr_a}],
             }],
+        },
+        f"/repos/{repo}/actions/runs/76": {
+            "id": 76,
+            "event": "pull_request",
+            "head_sha": receipt["a_head"],
+            "workflow_id": 1,
+        },
+        f"/repos/{repo}/actions/workflows/1": {
+            "id": 1,
+            "state": "active",
+            "path": ".github/workflows/gate.yml",
+        },
+        f"/repos/{repo}/contents/.github/workflows/gate.yml?ref={receipt['a_head']}": {
+            "content": base64.b64encode(b"on: [pull_request, pull_request_target]\n").decode("ascii"),
+        },
+        f"/repos/{repo}/contents/.github/workflows/gate.yml?ref={receipt['main_before_b']}": {
+            "content": base64.b64encode(b"on: [pull_request, pull_request_target]\n").decode("ascii"),
         },
         f"/repos/{repo}/commits/{receipt['main_after_b']}": {
             "sha": receipt["main_after_b"],
@@ -591,6 +609,28 @@ def test_malformed_json_lifecycle_evidence_for_current_repository_is_drift() -> 
     ) == "DRIFT"
 
 
+def test_schema_invalid_terminal_for_current_repository_cannot_be_ignored() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition_record(wanted, baseline), created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(
+            3, terminal_record(wanted, target, terminal_status="SUCCESS"),
+            created_at="2026-08-31T11:00:00Z",
+        ),
+        lifecycle_comment(4, {"record_type": "TERMINAL", "repository": wanted["repository"]}),
+    ]
+    assert m.core.classify_rollout_state(
+        wanted,
+        target,
+        records,
+        now="2026-08-31T13:00:00Z",
+        success_receipt_verifier=lambda _wanted, _pre, _terminal: "SUCCESS",
+    ) == "DRIFT"
+
+
 def test_active_transition_expires_and_late_terminal_records_stay_drift() -> None:
     wanted = v2_wanted()
     baseline = pending_baseline(wanted)
@@ -845,6 +885,9 @@ def test_auditor_rejects_each_forged_or_mismatched_success_receipt_binding() -> 
     )) == "DRIFT"
     assert result_with(lambda responses: responses[f"/repos/{repo}/commits/{receipt['a_head']}/check-runs?per_page=100"]["check_runs"][0].update(
         {"completed_at": "2026-08-31T10:45:00Z"}
+    )) == "DRIFT"
+    assert result_with(lambda responses: responses["/repos/Oteryn/Oteryn/actions/runs/76"].update(
+        {"event": "workflow_dispatch"}
     )) == "DRIFT"
     assert result_with(lambda responses: responses[f"/repos/{repo}/pulls/{receipt['pr_b']}"].update(
         {"merge_commit_sha": "0" * 40}

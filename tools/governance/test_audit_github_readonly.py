@@ -480,6 +480,28 @@ def test_conversation_resolution_is_read_from_each_protection_surface() -> None:
     assert m.Audit._classic_rollout_controls(classic)["require_conversation_resolution"] is False
 
 
+def test_linear_history_is_read_from_each_protection_surface() -> None:
+    ruleset = m.Audit._ruleset_rollout_controls([{
+        "rules": [{"type": "required_linear_history"}],
+        "bypass_actors": [],
+    }])
+    assert ruleset["required_linear_history"] is True
+    assert m.Audit._ruleset_rollout_controls([{"rules": [], "bypass_actors": []}])["required_linear_history"] is False
+
+    classic = {
+        "allow_force_pushes": {"enabled": False},
+        "allow_deletions": {"enabled": False},
+        "enforce_admins": {"enabled": True},
+        "required_pull_request_reviews": {},
+        "required_linear_history": {"enabled": True},
+    }
+    assert m.Audit._classic_rollout_controls(classic)["required_linear_history"] is True
+    classic["required_linear_history"]["enabled"] = False
+    assert m.Audit._classic_rollout_controls(classic)["required_linear_history"] is False
+    classic["required_linear_history"]["enabled"] = "true"
+    assert m.Audit._classic_rollout_controls(classic)["required_linear_history"] is None
+
+
 def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> None:
     repo = "Oteryn/Test"
     ruleset = {
@@ -492,6 +514,7 @@ def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> 
                 "required_review_thread_resolution": True,
             }},
             {"type": "merge_queue"},
+            {"type": "required_linear_history"},
             {"type": "deletion"},
             {"type": "non_fast_forward"},
             {"type": "required_status_checks", "parameters": {
@@ -524,6 +547,7 @@ def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> 
         "required_approving_review_count": 1,
         "require_code_owner_review": True,
         "require_conversation_resolution": True,
+        "required_linear_history": True,
         "merge_queue": True,
     }
     assert f"/repos/{repo}/branches/main/protection" in audit.calls
@@ -961,6 +985,16 @@ def test_v2_rollout_fingerprint_requires_conversation_resolution() -> None:
         without_resolution = json.loads(json.dumps(target))
         without_resolution["protection"]["require_conversation_resolution"] = False
         assert m.core.rollout_state_fingerprint(without_resolution) != m.core.rollout_state_fingerprint(target)
+
+
+def test_v2_rollout_fingerprint_requires_linear_history() -> None:
+    desired = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    for item in desired["permanent_repositories"]:
+        assert item["protection"]["required_linear_history"] is True
+        target = m.core.target_rollout_state(item)
+        without_linear_history = json.loads(json.dumps(target))
+        without_linear_history["protection"]["required_linear_history"] = False
+        assert m.core.rollout_state_fingerprint(without_linear_history) != m.core.rollout_state_fingerprint(target)
 
 
 def test_v2_desired_state_validator_rejects_extra_gate_and_solo_approval_requirements() -> None:

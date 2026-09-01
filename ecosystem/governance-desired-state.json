@@ -30,7 +30,8 @@
         "strict_required_status_checks": false,
         "required_approving_review_count": 0,
         "require_code_owner_review": false,
-        "require_conversation_resolution": true
+        "require_conversation_resolution": true,
+        "required_linear_history": true
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",
@@ -66,7 +67,8 @@
         "strict_required_status_checks": false,
         "required_approving_review_count": 0,
         "require_code_owner_review": false,
-        "require_conversation_resolution": true
+        "require_conversation_resolution": true,
+        "required_linear_history": true
       },
       "codeowners_required_paths": [
         ".github/workflows/merge-gate.yml",
@@ -102,7 +104,8 @@
         "strict_required_status_checks": false,
         "required_approving_review_count": 0,
         "require_code_owner_review": false,
-        "require_conversation_resolution": true
+        "require_conversation_resolution": true,
+        "required_linear_history": true
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",
@@ -138,7 +141,8 @@
         "strict_required_status_checks": false,
         "required_approving_review_count": 0,
         "require_code_owner_review": false,
-        "require_conversation_resolution": true
+        "require_conversation_resolution": true,
+        "required_linear_history": true
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",
