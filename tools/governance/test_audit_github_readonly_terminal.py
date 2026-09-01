@@ -44,6 +44,20 @@ class FakeAudit(m.Audit):
             return None
         raise AssertionError(f"unexpected API call: {path}")
 
+    def graphql(self, query: str, variables: dict):
+        owner = variables["owner"]
+        name = variables["name"]
+        number = variables["number"]
+        cursor = variables.get("after") or "first"
+        path = f"/graphql/repos/{owner}/{name}/pulls/{number}/queue-timeline/{cursor}"
+        self.calls.append(path)
+        if path not in self.responses:
+            return {"repository": {"pullRequest": None}}
+        response = self.responses[path]
+        if isinstance(response, BaseException):
+            raise response
+        return response
+
 
 def check_run(name: str, run_id: int, pr_number: int, *, head_sha: str | None = None) -> dict:
     value = {
@@ -248,6 +262,31 @@ def direct_moving_base_responses(wanted: dict, receipt: dict) -> dict[str, objec
             "merged": True,
             "merged_at": "2026-08-31T10:30:00Z",
             "merge_commit_sha": receipt["main_after_b"],
+        },
+        f"/graphql/repos/{repo}/pulls/{pr_a}/queue-timeline/first": {
+            "repository": {
+                "pullRequest": {
+                    "timelineItems": {
+                        "nodes": [
+                            {
+                                "__typename": "AddedToMergeQueueEvent",
+                                "createdAt": "2026-08-31T10:35:00Z",
+                            },
+                            {
+                                "__typename": "MergedEvent",
+                                "createdAt": "2026-08-31T11:00:00Z",
+                                "commit": {"oid": receipt["main_after_a"]},
+                            },
+                            {
+                                "__typename": "RemovedFromMergeQueueEvent",
+                                "createdAt": "2026-08-31T11:00:01Z",
+                                "beforeCommit": {"oid": receipt["main_after_a"]},
+                            },
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                },
+            },
         },
         f"/repos/{repo}/commits/{receipt['a_head']}/check-runs?per_page=100": {
             "check_runs": [{
@@ -956,6 +995,36 @@ def test_auditor_binds_success_to_direct_github_moving_base_evidence() -> None:
     assert f"/repos/{wanted['repository']}/actions/runs/{receipt['aggregate_gate_run']['run_id']}" in audit.calls
     assert f"/repos/{wanted['repository']}/commits/{receipt['main_after_a']}" in audit.calls
     assert f"/repos/{wanted['repository']}/commits/{receipt['merge_group_sha']}" in audit.calls
+
+
+def test_dequeued_candidate_then_direct_admin_merge_is_drift() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+    receipt = terminal["moving_base_receipt"]
+    comments = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
+    ]
+    responses = {
+        "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+        **direct_moving_base_responses(wanted, receipt),
+    }
+    timeline = responses[
+        f"/graphql/repos/{wanted['repository']}/pulls/{receipt['pr_a']}/queue-timeline/first"
+    ]["repository"]["pullRequest"]["timelineItems"]["nodes"]
+    timeline[1:1] = [{
+        "__typename": "RemovedFromMergeQueueEvent",
+        "createdAt": "2026-08-31T10:55:00Z",
+        "beforeCommit": {"oid": receipt["merge_group_sha"]},
+    }]
+
+    assert FakeAudit(responses).classify_rollout_readback(
+        wanted, target, now="2026-08-31T13:00:00Z"
+    ) == "DRIFT"
 
 
 def test_merge_group_success_from_disabled_workflow_is_drift() -> None:
@@ -1739,6 +1808,7 @@ def test_pull_request_target_for_other_pr_does_not_prove_gate() -> None:
     )
 
 
+
 def test_stale_pull_request_target_generation_does_not_prove_current_head() -> None:
     main = "a" * 40
     old_head = "b" * 40
@@ -2014,6 +2084,25 @@ def test_transport_failure_becomes_runtime_unknown_signal() -> None:
             assert "transport unavailable" in str(exc)
         else:
             raise AssertionError("transport failure must be wrapped as RuntimeError")
+    finally:
+        m.urllib.request.urlopen = original
+
+
+def test_graphql_transport_failure_becomes_runtime_unknown_signal() -> None:
+    original = m.urllib.request.urlopen
+
+    def fail(*args, **kwargs):
+        raise urllib.error.URLError("dns unavailable")
+
+    m.urllib.request.urlopen = fail
+    try:
+        audit = m.Audit("test")
+        try:
+            audit.graphql("query { viewer { login } }", {})
+        except RuntimeError as exc:
+            assert "transport unavailable" in str(exc)
+        else:
+            raise AssertionError("GraphQL transport failure must be wrapped as RuntimeError")
     finally:
         m.urllib.request.urlopen = original
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Read-only Oteryn governance drift audit.
 
-Offline mode validates the desired-state contract. Live mode reads GitHub REST only;
-it never mutates settings. A caller must provide GH_TOKEN or GITHUB_TOKEN.
+Offline mode validates the desired-state contract. Live mode reads GitHub's REST
+and GraphQL APIs only; it never mutates settings. A caller must provide GH_TOKEN
+or GITHUB_TOKEN.
 """
 from __future__ import annotations
 
@@ -1533,6 +1534,99 @@ class Audit:
                 return items
             page += 1
 
+    def graphql(self, query: str, variables: dict):
+        request_body = json.dumps({"query": query, "variables": variables}).encode("utf-8")
+        req = urllib.request.Request(
+            f"{API}/graphql",
+            data=request_body,
+            method="POST",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {self.token}",
+                "Content-Type": "application/json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "oteryn-governance-readonly-audit",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                raw = response.read()
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(f"POST /graphql -> HTTP {exc.code}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(
+                f"POST /graphql -> transport unavailable: {exc.reason}"
+            ) from exc
+        payload = json.loads(raw)
+        if (
+            not isinstance(payload, dict)
+            or payload.get("errors")
+            or not isinstance(payload.get("data"), dict)
+        ):
+            raise RuntimeError("POST /graphql -> incomplete response")
+        return payload["data"]
+
+    def _pull_request_queue_timeline(self, repository: str, pull_request: int) -> list[dict]:
+        """Read the queue/merge lifecycle needed to bind GS-7 integration."""
+        parts = repository.split("/", 1)
+        if len(parts) != 2 or not all(parts):
+            raise RuntimeError("invalid repository coordinate")
+        owner, name = parts
+        query = """
+        query($owner: String!, $name: String!, $number: Int!, $after: String) {
+          repository(owner: $owner, name: $name) {
+            pullRequest(number: $number) {
+              timelineItems(
+                first: 100,
+                after: $after,
+                itemTypes: [
+                  ADDED_TO_MERGE_QUEUE_EVENT,
+                  REMOVED_FROM_MERGE_QUEUE_EVENT,
+                  MERGED_EVENT
+                ]
+              ) {
+                nodes {
+                  __typename
+                  ... on AddedToMergeQueueEvent { createdAt }
+                  ... on RemovedFromMergeQueueEvent {
+                    createdAt
+                    beforeCommit { oid }
+                  }
+                  ... on MergedEvent {
+                    createdAt
+                    commit { oid }
+                  }
+                }
+                pageInfo { hasNextPage endCursor }
+              }
+            }
+          }
+        }
+        """
+        events: list[dict] = []
+        cursor: str | None = None
+        while True:
+            data = self.graphql(
+                query,
+                {"owner": owner, "name": name, "number": pull_request, "after": cursor},
+            )
+            repo_payload = data.get("repository") if isinstance(data, dict) else None
+            pr_payload = repo_payload.get("pullRequest") if isinstance(repo_payload, dict) else None
+            timeline = pr_payload.get("timelineItems") if isinstance(pr_payload, dict) else None
+            nodes = timeline.get("nodes") if isinstance(timeline, dict) else None
+            page_info = timeline.get("pageInfo") if isinstance(timeline, dict) else None
+            if not isinstance(nodes, list) or not isinstance(page_info, dict):
+                return []
+            if not all(isinstance(node, dict) for node in nodes):
+                return []
+            events.extend(nodes)
+            if page_info.get("hasNextPage") is not True:
+                return events
+            next_cursor = page_info.get("endCursor")
+            if not isinstance(next_cursor, str) or not next_cursor or next_cursor == cursor:
+                return []
+            cursor = next_cursor
+
     def control_plane_owner_authorization(
         self,
         repository: str,
@@ -1805,6 +1899,7 @@ class Audit:
                 f"/repos/{repository}/commits/{receipt['merge_group_sha']}/check-runs?per_page=100",
                 allow_404=True,
             )
+            queue_timeline = self._pull_request_queue_timeline(repository, pr_a)
             protected_main = self.api(f"/repos/{repository}/branches/main", allow_404=True)
         except (RuntimeError, ValueError):
             return None
@@ -1927,6 +2022,37 @@ class Audit:
             or merge_group_started_at > merge_group_completed_at
             or merge_group_completed_at > a_merged_at
             or a_merged_at > transition_closed_at
+        ):
+            return False
+        merged_event_indexes: list[int] = []
+        added_event_indexes: list[int] = []
+        for index, event in enumerate(queue_timeline):
+            event_type = event.get("__typename")
+            event_at = _parse_timestamp(event.get("createdAt"))
+            if event_type == "MergedEvent":
+                commit = event.get("commit")
+                if (
+                    event_at == a_merged_at
+                    and isinstance(commit, dict)
+                    and commit.get("oid") == receipt["main_after_a"]
+                ):
+                    merged_event_indexes.append(index)
+            elif (
+                event_type == "AddedToMergeQueueEvent"
+                and event_at is not None
+                and b_merged_at <= event_at <= merge_group_started_at
+            ):
+                added_event_indexes.append(index)
+        if len(merged_event_indexes) != 1:
+            return False
+        merged_event_index = merged_event_indexes[0]
+        eligible_additions = [index for index in added_event_indexes if index < merged_event_index]
+        if not eligible_additions:
+            return False
+        queue_entry_index = max(eligible_additions)
+        if any(
+            event.get("__typename") == "RemovedFromMergeQueueEvent"
+            for event in queue_timeline[queue_entry_index + 1:merged_event_index]
         ):
             return False
         protected_main_commit = (
