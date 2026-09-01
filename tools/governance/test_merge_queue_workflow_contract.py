@@ -38,39 +38,20 @@ def test_meta_gate_qualifies_pull_requests_and_exact_merge_group_candidates() ->
     assert '[[ "$MERGE_GROUP_BASE_REF" == "refs/heads/main" ]]' in gate
 
 
-def test_merge_group_adapter_is_inert_and_fail_closed() -> None:
-    workflow = MERGE_GROUP_ADAPTER.read_text(encoding="utf-8")
-
-    assert "  merge_group:\n    types: [checks_requested]" in workflow
-    assert "permissions: {}" in workflow
-    assert len(re.findall(r"(?m)^  ai-review-gate:\n", workflow)) == 1
-
-    gate = _job_body(workflow, "ai-review-gate")
-    assert not re.search(r"(?m)^    if:", gate)
-    assert '[[ "$EVENT_NAME" == "merge_group" ]]' in gate
-    assert '[[ "$EVENT_ACTION" == "checks_requested" ]]' in gate
-    assert '[[ "$MERGE_GROUP_BASE_REF" == "refs/heads/main" ]]' in gate
-    assert '[[ "$GITHUB_SHA" == "$MERGE_GROUP_HEAD_SHA" ]]' in gate
-
-    for forbidden in (
-        "pull_request",
-        "push:",
-        "workflow_dispatch",
-        "workflow_call",
-        "actions/checkout",
-        "secrets.",
-        "github.event.pull_request",
-    ):
-        assert forbidden not in workflow, forbidden
+def test_legacy_ai_merge_group_adapter_is_retired() -> None:
+    assert not MERGE_GROUP_ADAPTER.exists()
 
 
-def test_ci_keeps_pr_review_authority_outside_meta_gate() -> None:
+def test_ci_has_one_external_gate_only() -> None:
     workflow = CI_WORKFLOW.read_text(encoding="utf-8")
     assert "\n  ai-review-gate:\n" not in workflow
+    assert "ai_review_policy.py" not in workflow
+    assert "trusted_review_attestation.py" not in workflow
+    assert "verify_ai_review_evidence.py" not in workflow
 
 
 if __name__ == "__main__":
     test_meta_gate_qualifies_pull_requests_and_exact_merge_group_candidates()
-    test_merge_group_adapter_is_inert_and_fail_closed()
-    test_ci_keeps_pr_review_authority_outside_meta_gate()
+    test_legacy_ai_merge_group_adapter_is_retired()
+    test_ci_has_one_external_gate_only()
     print("merge queue workflow contract PASS")
