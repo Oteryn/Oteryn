@@ -31,8 +31,7 @@
 - Consumes: approved reset design.
 - Produces: explicit later authority that supersedes conflicting lifecycle/comment-proof, formal R0/R1/R2, `ai-review-gate`-as-target-authority, and Work-specific clauses from PR #123 while retaining non-conflicting safety invariants.
 
-- [x] **Step 1:** Add ADR 0003 with the native-GitHub permanent merge contract.
-- [x] **Step 2:** State exact supersession scope and retain the moving-base canary, fail-closed aggregate gate, rollback, no-second-human, no-bypass, and direct-readback invariants.
+- [x] Add ADR 0003 with the native-GitHub permanent merge contract and exact supersession scope while retaining the moving-base canary, fail-closed aggregate gate, rollback, no-second-human, no-bypass, and direct-readback invariants.
 
 ### Task 2: Simplify active review/execution guidance without breaking current protection
 
@@ -44,9 +43,8 @@
 - Consumes: reset AI-routing rule.
 - Produces: concise target policy while explicitly leaving legacy machine enforcement untouched until the follow-up META PR.
 
-- [x] **Step 1:** Replace the long AI-review policy with default-no-review / Spark-when-useful / one-deep-review-for-high-risk guidance.
-- [x] **Step 2:** Mark `ai-review-gate`, R0/R1/R2 machine configuration, fingerprints/envelopes and attestations as transition-only legacy rather than target architecture.
-- [x] **Step 3:** Replace the old Work rollout prompt with a superseded chat-led rollout notice.
+- [x] Replace the long AI-review policy with default-no-review / Spark-when-useful / one-deep-review-for-high-risk guidance and mark the old R0/R1/R2, fingerprint/envelope/attestation machinery transition-only.
+- [x] Replace the old Work rollout prompt with a superseded chat-led rollout notice.
 
 ### Task 3: Verify and integrate PR #125 under current protection
 
@@ -57,11 +55,11 @@
 - Consumes: stable PR #125 candidate.
 - Produces: merged authority reset without live settings changes.
 
-- [x] **Step 1:** Verify the exact changed-file list contains only the reset spec/plan/ADR/policy/prompt and no workflow, Python, JSON desired-state, AGENTS, or live-settings mutation.
-- [ ] **Step 2:** Verify `meta-gate` on the exact final head.
-- [ ] **Step 3:** Mark the PR Ready only after the candidate is stable; satisfy the currently configured legacy review path at most once for that stable candidate.
-- [ ] **Step 4:** Resolve only concrete material findings; do not start a review-fix loop for theoretical hardening.
-- [ ] **Step 5:** Merge through the currently permitted protected path and confirm the reset authority on protected `main`.
+- [x] Exact changed-file list is limited to the reset spec/plan/ADR/policy/prompt and contains no workflow, Python, JSON desired-state, AGENTS, or live-settings mutation.
+- [ ] Verify `meta-gate` on the exact final head.
+- [ ] Mark the PR Ready only after the candidate is stable; satisfy the currently configured legacy review path at most once for that stable candidate.
+- [ ] Resolve only concrete material findings; do not start a review-fix loop for theoretical hardening.
+- [ ] Merge through the currently permitted protected path and confirm the reset authority on protected `main`.
 
 ### Task 4: Follow-up minimal META implementation
 
@@ -72,10 +70,10 @@
 - Consumes: canonical reset authority.
 - Produces: META with one required `meta-gate`, Merge Queue integration freshness, zero required approvals/CODEOWNER approval, conversation resolution and linear history retained, strict freshness off only after moving-base canary.
 
-- [ ] **Step 1:** Create a fresh branch/PR from protected `main` after PR #125 merges.
-- [ ] **Step 2:** Remove the legacy R0/R1/R2 and `ai-review-gate` machine/agent enforcement while preserving only the simple advisory routing rule.
-- [ ] **Step 3:** Make the smallest workflow/desired-state diff that makes `meta-gate` the only target required status and validates `pull_request` plus `merge_group` candidates.
-- [ ] **Step 4:** Run focused deterministic tests and exact-head `meta-gate`.
-- [ ] **Step 5:** Capture current live protection as rollback state and run the real moving-base PR A / PR B Merge Queue canary without changing PR A head.
-- [ ] **Step 6:** Only after canary success, make `meta-gate` the required external status and disable strict freshness while preserving the other baseline protections.
-- [ ] **Step 7:** Re-read live protection, resulting `main`, checks and queue integration directly from GitHub; rollback if the canary or final readback fails.
+- [ ] Create a fresh branch/PR from protected `main` after PR #125 merges.
+- [ ] Remove the legacy R0/R1/R2 and `ai-review-gate` machine/agent enforcement while preserving only the simple advisory routing rule.
+- [ ] Make the smallest workflow/desired-state diff that makes `meta-gate` the only target required status and validates `pull_request` plus `merge_group` candidates.
+- [ ] Run focused deterministic tests and exact-head `meta-gate`.
+- [ ] Capture current live protection as rollback state and run the real moving-base PR A / PR B Merge Queue canary without changing PR A head.
+- [ ] Only after canary success, make `meta-gate` the required external status and disable strict freshness while preserving the other baseline protections.
+- [ ] Re-read live protection, resulting `main`, checks and queue integration directly from GitHub; rollback if the canary or final readback fails.
