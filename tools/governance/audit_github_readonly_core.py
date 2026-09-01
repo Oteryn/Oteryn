@@ -2042,7 +2042,14 @@ class Audit:
             for context in protection.get("contexts", []):
                 if context not in bound_contexts:
                     self._add_source(sources, context, None)
-        return sources
+        # An unbound occurrence adds no App constraint.  When another
+        # applicable surface binds the same context to one or more concrete
+        # Apps, retain only those concrete constraints; distinct concrete App
+        # IDs remain visible as a conflict.
+        return {
+            context: ({app_id for app_id in app_ids if app_id is not None} or {None})
+            for context, app_ids in sources.items()
+        }
 
     def _applicable_rulesets(
         self, repo: str, *, branch: str, default_branch: str
@@ -2075,11 +2082,30 @@ class Audit:
             parameters = rule.get("parameters")
             count = parameters.get("required_approving_review_count") if isinstance(parameters, dict) else None
             codeowner = parameters.get("require_code_owner_review") if isinstance(parameters, dict) else None
+            last_push = parameters.get("require_last_push_approval") if isinstance(parameters, dict) else None
+            required_reviewers = parameters.get("required_reviewers", []) if isinstance(parameters, dict) else None
             conversation_resolution = (
                 parameters.get("required_review_thread_resolution")
                 if isinstance(parameters, dict) else None
             )
-            if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            reviewer_minimums = [
+                reviewer.get("minimum_approvals")
+                for reviewer in required_reviewers
+                if isinstance(reviewer, dict)
+            ] if isinstance(required_reviewers, list) else []
+            reviewers_valid = (
+                isinstance(required_reviewers, list)
+                and len(reviewer_minimums) == len(required_reviewers)
+                and all(
+                    isinstance(minimum, int) and not isinstance(minimum, bool) and minimum >= 0
+                    for minimum in reviewer_minimums
+                )
+            )
+            if (
+                not isinstance(count, int) or isinstance(count, bool) or count < 0
+                or not isinstance(last_push, bool)
+                or not reviewers_valid
+            ):
                 counts = []
                 codeowner_flags = []
                 break
@@ -2087,7 +2113,7 @@ class Audit:
                 counts = []
                 codeowner_flags = []
                 break
-            counts.append(count)
+            counts.append(max([count, int(last_push), *reviewer_minimums]))
             codeowner_flags.append(codeowner)
             if isinstance(conversation_resolution, bool):
                 conversation_resolution_flags.append(conversation_resolution)
@@ -2111,6 +2137,12 @@ class Audit:
         for rule in status_rules:
             parameters = rule.get("parameters")
             strict = parameters.get("strict_required_status_checks_policy") if isinstance(parameters, dict) else None
+            checks = parameters.get("required_status_checks") if isinstance(parameters, dict) else None
+            if not isinstance(checks, list):
+                strict_values = []
+                break
+            if not checks:
+                continue
             if not isinstance(strict, bool):
                 strict_values = []
                 break
@@ -2118,10 +2150,18 @@ class Audit:
         strict: bool | None
         if not status_rules:
             strict = False
-        elif len(strict_values) != len(status_rules):
+        elif any(
+            not isinstance(rule.get("parameters"), dict)
+            or not isinstance(rule["parameters"].get("required_status_checks"), list)
+            or (
+                bool(rule["parameters"]["required_status_checks"])
+                and not isinstance(rule["parameters"].get("strict_required_status_checks_policy"), bool)
+            )
+            for rule in status_rules
+        ):
             strict = None
         else:
-            strict = any(strict_values)
+            strict = any(strict_values) if strict_values else False
         return {
             "pull_requests": "pull_request" in rule_types,
             "force_pushes": "non_fast_forward" not in rule_types,
@@ -2156,10 +2196,14 @@ class Audit:
         elif isinstance(reviews, dict):
             count = reviews.get("required_approving_review_count")
             codeowner = reviews.get("require_code_owner_reviews")
+            last_push = reviews.get("require_last_push_approval")
             bypass_allowances = reviews.get("bypass_pull_request_allowances") or {}
             pull_requests = True
             review_count = (
-                count if isinstance(count, int) and not isinstance(count, bool) and count >= 0 else None
+                max(count, int(last_push))
+                if isinstance(count, int) and not isinstance(count, bool) and count >= 0
+                and isinstance(last_push, bool)
+                else None
             )
             codeowner_review = codeowner if isinstance(codeowner, bool) else None
             has_pr_bypass = (
@@ -2209,10 +2253,26 @@ class Audit:
             "require_code_owner_review": codeowner_review,
             "require_conversation_resolution": require_conversation_resolution,
             "required_linear_history": required_linear_history,
-            # Classic branch protection cannot require Merge Queue; that control
-            # is expressed only by an applicable repository ruleset.
-            "merge_queue": False,
+            # The classic protection payload does not expose this setting.
+            # Read it from the effective branch-rule surface instead.
+            "merge_queue": None,
         }
+
+    def _effective_branch_merge_queue(self, repo: str, *, branch: str) -> bool | None:
+        """Read the effective Merge Queue rule for a branch, including classic protection."""
+        path = f"/repos/{repo}/rules/branches/{urllib.parse.quote(branch, safe='')}"
+        page = 1
+        found = False
+        while True:
+            payload = self.api(f"{path}?per_page=100&page={page}", allow_404=True)
+            if payload is None:
+                return None
+            if not isinstance(payload, list) or any(not isinstance(rule, dict) for rule in payload):
+                return None
+            found = found or any(rule.get("type") == "merge_queue" for rule in payload)
+            if len(payload) < 100:
+                return found
+            page += 1
 
     @staticmethod
     def _compose_rollout_protection_controls(
@@ -2283,10 +2343,23 @@ class Audit:
             f"/repos/{repo}/branches/{urllib.parse.quote(branch, safe='')}/protection",
             allow_404=True,
         )
-        return self._compose_rollout_protection_controls(
-            self._ruleset_rollout_controls(applicable) if applicable else None,
+        ruleset_controls = self._ruleset_rollout_controls(applicable) if applicable else None
+        controls = self._compose_rollout_protection_controls(
+            ruleset_controls,
             self._classic_rollout_controls(protection),
         )
+        effective_merge_queue = self._effective_branch_merge_queue(repo, branch=branch)
+        ruleset_merge_queue = (
+            ruleset_controls.get("merge_queue") if ruleset_controls is not None else False
+        )
+        controls["merge_queue"] = (
+            True
+            if ruleset_merge_queue is True or effective_merge_queue is True
+            else False
+            if ruleset_merge_queue is False and effective_merge_queue is False
+            else None
+        )
+        return controls
 
     def main_protection_controls(
         self, repo: str, *, branch: str = "main", default_branch: str = "main"

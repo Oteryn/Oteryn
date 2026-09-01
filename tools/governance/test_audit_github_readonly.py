@@ -42,6 +42,8 @@ class FakeAudit(m.Audit):
             return {"id": 1, "state": "active", "path": ".github/workflows/gate.yml"}
         if path.startswith("/repos/Oteryn/Test/contents/.github/workflows/gate.yml"):
             return {"content": base64.b64encode(b"on: [pull_request, pull_request_target]\n").decode("ascii")}
+        if path == "/repos/Oteryn/Test/rules/branches/main":
+            return []
         if allow_404:
             return None
         raise AssertionError(f"unexpected API call: {path}")
@@ -166,6 +168,43 @@ def test_required_context_sources_reject_wrong_or_unbound_app() -> None:
     sources = audit.required_context_sources("Oteryn/Test")
     assert sources["gate"] == {999, ACTIONS_APP_ID}
     assert not m.expected_sources_satisfied(sources, {"gate"}, ACTIONS_APP_ID)
+
+
+def test_required_context_sources_treat_unbound_as_absence_of_app_constraint() -> None:
+    repo = "Oteryn/Test"
+    ruleset = {
+        "target": "branch", "enforcement": "active",
+        "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
+        "rules": [{"type": "required_status_checks", "parameters": {
+            "required_status_checks": [{"context": "gate", "integration_id": ACTIONS_APP_ID}],
+        }}],
+    }
+    for ruleset_check, classic_check in (
+        ({"context": "gate", "integration_id": ACTIONS_APP_ID}, {"context": "gate", "app_id": None}),
+        ({"context": "gate", "integration_id": None}, {"context": "gate", "app_id": ACTIONS_APP_ID}),
+    ):
+        ruleset["rules"][0]["parameters"]["required_status_checks"] = [ruleset_check]
+        audit = FakeAudit({
+            f"/repos/{repo}/rulesets": [{"id": 1, "enforcement": "active"}],
+            f"/repos/{repo}/rulesets/1": ruleset,
+            f"/repos/{repo}/branches/main/protection/required_status_checks": {
+                "contexts": ["gate"], "checks": [classic_check],
+            },
+        })
+        assert audit.required_context_sources(repo) == {"gate": {ACTIONS_APP_ID}}
+
+    ruleset["rules"][0]["parameters"]["required_status_checks"] = [
+        {"context": "gate", "integration_id": 999}
+    ]
+    audit = FakeAudit({
+        f"/repos/{repo}/rulesets": [{"id": 1, "enforcement": "active"}],
+        f"/repos/{repo}/rulesets/1": ruleset,
+        f"/repos/{repo}/branches/main/protection/required_status_checks": {
+            "contexts": ["gate"],
+            "checks": [{"context": "gate", "app_id": ACTIONS_APP_ID}],
+        },
+    })
+    assert audit.required_context_sources(repo) == {"gate": {999, ACTIONS_APP_ID}}
 
 
 def test_current_main_push_alone_does_not_prove_pr_gate_emission() -> None:
@@ -337,8 +376,17 @@ def test_ruleset_protection_controls_require_no_bypass_force_or_delete() -> None
         "rules": [
             {"type": "deletion"},
             {"type": "non_fast_forward"},
-            {"type": "pull_request"},
-            {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": True}},
+            {"type": "pull_request", "parameters": {
+                "required_approving_review_count": 0,
+                "require_code_owner_review": False,
+                "require_last_push_approval": False,
+                "required_reviewers": [],
+                "required_review_thread_resolution": False,
+            }},
+            {"type": "required_status_checks", "parameters": {
+                "required_status_checks": [{"context": "gate"}],
+                "strict_required_status_checks_policy": True,
+            }},
         ],
     }
     audit = FakeAudit({
@@ -366,8 +414,18 @@ def test_ruleset_protection_controls_require_strict_status_checks() -> None:
         "target": "branch", "enforcement": "active", "bypass_actors": [],
         "conditions": {"ref_name": {"include": ["~DEFAULT_BRANCH"], "exclude": []}},
         "rules": [
-            {"type": "deletion"}, {"type": "non_fast_forward"}, {"type": "pull_request"},
-            {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": False}},
+            {"type": "deletion"}, {"type": "non_fast_forward"},
+            {"type": "pull_request", "parameters": {
+                "required_approving_review_count": 0,
+                "require_code_owner_review": False,
+                "require_last_push_approval": False,
+                "required_reviewers": [],
+                "required_review_thread_resolution": False,
+            }},
+            {"type": "required_status_checks", "parameters": {
+                "required_status_checks": [{"context": "gate"}],
+                "strict_required_status_checks_policy": False,
+            }},
         ],
     }
     audit = FakeAudit({
@@ -445,6 +503,8 @@ def test_conversation_resolution_is_read_from_each_protection_surface() -> None:
         "parameters": {
             "required_approving_review_count": 0,
             "require_code_owner_review": False,
+            "require_last_push_approval": False,
+            "required_reviewers": [],
             "required_review_thread_resolution": True,
         },
     }
@@ -502,6 +562,103 @@ def test_linear_history_is_read_from_each_protection_surface() -> None:
     assert m.Audit._classic_rollout_controls(classic)["required_linear_history"] is None
 
 
+def test_last_push_and_required_reviewers_contribute_to_effective_review_count() -> None:
+    base_parameters = {
+        "required_approving_review_count": 0,
+        "require_code_owner_review": False,
+        "required_review_thread_resolution": True,
+        "require_last_push_approval": False,
+        "required_reviewers": [],
+    }
+    pull_rule = {"type": "pull_request", "parameters": dict(base_parameters)}
+    controls = m.Audit._ruleset_rollout_controls([{
+        "rules": [pull_rule], "bypass_actors": [],
+    }])
+    assert controls["required_approving_review_count"] == 0
+
+    pull_rule["parameters"]["require_last_push_approval"] = True
+    controls = m.Audit._ruleset_rollout_controls([{
+        "rules": [pull_rule], "bypass_actors": [],
+    }])
+    assert controls["required_approving_review_count"] == 1
+
+    pull_rule["parameters"].update({
+        "require_last_push_approval": False,
+        "required_reviewers": [{"minimum_approvals": 2}],
+    })
+    controls = m.Audit._ruleset_rollout_controls([{
+        "rules": [pull_rule], "bypass_actors": [],
+    }])
+    assert controls["required_approving_review_count"] == 2
+
+    pull_rule["parameters"]["required_reviewers"] = [{"minimum_approvals": "2"}]
+    assert m.Audit._ruleset_rollout_controls([{
+        "rules": [pull_rule], "bypass_actors": [],
+    }])["required_approving_review_count"] is None
+
+    classic = {
+        "allow_force_pushes": {"enabled": False},
+        "allow_deletions": {"enabled": False},
+        "enforce_admins": {"enabled": True},
+        "required_pull_request_reviews": {
+            "required_approving_review_count": 0,
+            "require_code_owner_reviews": False,
+            "require_last_push_approval": True,
+        },
+    }
+    assert m.Audit._classic_rollout_controls(classic)["required_approving_review_count"] == 1
+    classic["required_pull_request_reviews"]["require_last_push_approval"] = "true"
+    assert m.Audit._classic_rollout_controls(classic)["required_approving_review_count"] is None
+
+
+def test_ruleset_strictness_only_applies_when_status_checks_exist() -> None:
+    def controls(checks: object, strict: object) -> dict[str, bool | int | None]:
+        return m.Audit._ruleset_rollout_controls([{
+            "rules": [{"type": "required_status_checks", "parameters": {
+                "required_status_checks": checks,
+                "strict_required_status_checks_policy": strict,
+            }}],
+            "bypass_actors": [],
+        }])
+
+    assert controls([], True)["strict_required_status_checks"] is False
+    assert controls([{"context": "gate"}], True)["strict_required_status_checks"] is True
+    assert controls([{"context": "gate"}], False)["strict_required_status_checks"] is False
+    assert controls([{"context": "gate"}], "true")["strict_required_status_checks"] is None
+
+
+def test_merge_queue_uses_effective_branch_rule_readback() -> None:
+    repo = "Oteryn/Test"
+    base = {
+        f"/repos/{repo}/rulesets": [],
+        f"/repos/{repo}/branches/main/protection": {
+            "allow_force_pushes": {"enabled": False},
+            "allow_deletions": {"enabled": False},
+            "enforce_admins": {"enabled": True},
+            "required_pull_request_reviews": {},
+        },
+    }
+    required = FakeAudit({
+        **base,
+        f"/repos/{repo}/rules/branches/main": [{"type": "merge_queue"}],
+    })
+    assert required.rollout_protection_controls(repo)["merge_queue"] is True
+
+    optional = FakeAudit({
+        **base,
+        f"/repos/{repo}/rules/branches/main": [],
+    })
+    assert optional.rollout_protection_controls(repo)["merge_queue"] is False
+
+    class UnreadableMergeQueueAudit(FakeAudit):
+        def api(self, path: str, *, allow_404: bool = False):
+            if path.startswith(f"/repos/{repo}/rules/branches/main?"):
+                raise RuntimeError("effective branch rules unreadable")
+            return super().api(path, allow_404=allow_404)
+
+    assert UnreadableMergeQueueAudit(base).rollout_protection_controls(repo)["merge_queue"] is None
+
+
 def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> None:
     repo = "Oteryn/Test"
     ruleset = {
@@ -511,6 +668,8 @@ def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> 
             {"type": "pull_request", "parameters": {
                 "required_approving_review_count": 0,
                 "require_code_owner_review": False,
+                "require_last_push_approval": False,
+                "required_reviewers": [],
                 "required_review_thread_resolution": True,
             }},
             {"type": "merge_queue"},
@@ -518,6 +677,7 @@ def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> 
             {"type": "deletion"},
             {"type": "non_fast_forward"},
             {"type": "required_status_checks", "parameters": {
+                "required_status_checks": [{"context": "gate"}],
                 "strict_required_status_checks_policy": False,
             }},
         ],
@@ -534,6 +694,7 @@ def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> 
             "required_pull_request_reviews": {
                 "required_approving_review_count": 1,
                 "require_code_owner_reviews": True,
+                "require_last_push_approval": False,
                 "bypass_pull_request_allowances": {"users": [], "teams": [], "apps": []},
             },
         },
@@ -570,6 +731,8 @@ def test_rollout_protection_is_unknown_when_classic_overlay_is_unreadable() -> N
             "rules": [{"type": "pull_request", "parameters": {
                 "required_approving_review_count": 0,
                 "require_code_owner_review": False,
+                "require_last_push_approval": False,
+                "required_reviewers": [],
             }}],
         },
     })
