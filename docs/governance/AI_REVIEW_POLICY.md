@@ -2,17 +2,15 @@
 
 ## Status
 
-Active target policy upon merge of PR #125. The legacy `ai-review-gate` and machine review-tier implementation may remain temporarily only until the minimal META follow-up removes them from protected merge enforcement.
+Active. Implements ADR 0005.
 
 ## Purpose
 
-AI review is optional engineering assistance. It is not a GitHub merge authority and must not become a second required status, second-human dependency, review-envelope system, or source of governance loops.
+AI review is optional engineering assistance. It is not GitHub merge authority and is never a required status check.
 
-The objective is simple: use external review when it adds meaningful value, avoid spending review capacity on trivial changes, and prefer the lightest capable reviewer.
+Use external review only when it adds meaningful value, and use the lightest capable reviewer.
 
 ## Routing
-
-Use these rules:
 
 - **Default:** no external AI review.
 - **Ordinary code change with clear review value:** prefer Codex Spark when available.
@@ -27,15 +25,13 @@ If Spark is unavailable for low-risk work, do not automatically escalate to deep
 
 - Run deterministic validation first.
 - Review only a stable material candidate.
-- Do not repeatedly invoke a reviewer merely because a head changed cosmetically or because governance needs a retrigger.
+- Do not invoke a reviewer merely because a head changed cosmetically or to retrigger governance.
 - Re-review only when a material risk-bearing change makes the previous review no longer representative.
 - One useful independent deep review is enough for a stable high-risk/control-plane candidate unless a concrete finding requires a material repair.
 
 ## Enforcement boundary
 
-No external AI result belongs in the permanent required-status map.
-
-Permanent required statuses are only the repository aggregate gates:
+No external AI result belongs in the required-status map. Permanent required statuses are only the repository aggregate gates:
 
 ```text
 Oteryn/Oteryn          -> meta-gate
@@ -44,14 +40,14 @@ Oteryn/Oteryn-Platform -> platform-gate
 Oteryn/Oteryn-Atlas    -> atlas-gate
 ```
 
-The existing `ai-review-gate`, R0/R1/R2 classifier, review fingerprint/reuse rules, structured review evidence, request/result parsers, envelopes and attestations are legacy transition machinery. They may continue only as needed to pass the currently configured protected path while the simplification reset is integrated. They are not target architecture and must be retired by the minimal META follow-up after the replacement path is proven.
+Formal R0/R1/R2 classification, `ai-review-gate`, review fingerprints, request/result parsers, review envelopes and attestations are retired from active governance.
 
 ## Control-plane owner decision
 
-A candidate-controlled mechanism must not be the sole authority for integrating its own material control-plane change. For such changes use deterministic validation, one independent deep review, explicit human-owner authorization, Merge Queue validation where already canonical, and post-change GitHub readback.
+A candidate-controlled mechanism must not be the sole authority for integrating its own material control-plane change. For such changes use deterministic validation, one independent deep review, explicit human-owner authorization, Merge Queue validation where canonical, and post-change GitHub readback.
 
 Do not build a JSON authorization parser, duplicate-comment proof engine, second required status, or new attestation subsystem for this decision.
 
 ## Precedence
 
-This policy implements ADR 0005 and supersedes the formal R0/R1/R2 target policy and `ai-review-gate`-as-permanent-authority model previously documented by PR #123 and earlier governance bootstrap work. Historical documents remain evidence of how the legacy mechanism was built, not current target authority.
+This policy implements ADR 0005 and supersedes the former formal R0/R1/R2 target policy and `ai-review-gate` authority model. Historical documents remain evidence only.
