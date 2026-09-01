@@ -436,6 +436,13 @@ def _global_rollout_transitions_are_serial(records: list[dict]) -> bool:
             return False
         terminals_by_pre.setdefault(linked, []).append(record)
     ordered = sorted(pre_by_id.values(), key=lambda record: (record["created_at"], record["id"]))
+    rollout_order = tuple(V2_REQUIRED_CONTEXTS)
+    phase = -1
+    for record in ordered:
+        position = rollout_order.index(record["body"]["repository"])
+        if position < phase or position > phase + 1:
+            return False
+        phase = max(phase, position)
     for previous, current in zip(ordered, ordered[1:]):
         previous_terminals = terminals_by_pre.get(previous["id"], [])
         if len(previous_terminals) != 1 or previous_terminals[0]["created_at"] >= current["created_at"]:
@@ -1857,6 +1864,18 @@ class Audit:
             require_run=gate["run_id"],
         )
         if merge_group_check is None:
+            return False
+        try:
+            protected_merge_group_sources = self._protected_flow_sources(
+                repository,
+                {"check_runs": [merge_group_check]},
+                event="merge_group",
+                allowed_head_shas={receipt["merge_group_sha"]},
+                workflow_ref=receipt["base_sha"],
+            )
+        except (RuntimeError, ValueError):
+            return None
+        if protected_merge_group_sources.get(expected_context) != {expected_app_id}:
             return False
         a_green_at = _parse_timestamp(a_check.get("completed_at"))
         b_merged_at = _parse_timestamp(pull_b.get("merged_at")) if isinstance(pull_b, dict) else None

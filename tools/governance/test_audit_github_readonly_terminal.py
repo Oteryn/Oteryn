@@ -277,6 +277,11 @@ def direct_moving_base_responses(wanted: dict, receipt: dict) -> dict[str, objec
         f"/repos/{repo}/contents/.github/workflows/gate.yml?ref={receipt['main_before_b']}": {
             "content": base64.b64encode(b"on: [pull_request, pull_request_target]\n").decode("ascii"),
         },
+        f"/repos/{repo}/contents/.github/workflows/gate.yml?ref={receipt['base_sha']}": {
+            "content": base64.b64encode(
+                b"on: [pull_request, pull_request_target, merge_group]\n"
+            ).decode("ascii"),
+        },
         f"/repos/{repo}/commits/{receipt['main_after_b']}": {
             "sha": receipt["main_after_b"],
             "parents": [{"sha": receipt["main_before_b"]}],
@@ -295,6 +300,7 @@ def direct_moving_base_responses(wanted: dict, receipt: dict) -> dict[str, objec
             "status": "completed",
             "conclusion": "success",
             "run_started_at": "2026-08-31T10:40:00Z",
+            "workflow_id": 1,
         },
         f"/repos/{repo}/commits/{receipt['merge_group_sha']}": {
             "sha": receipt["merge_group_sha"],
@@ -444,9 +450,9 @@ def test_malformed_lifecycle_evidence_is_scoped_to_its_repository() -> None:
 
 
 def test_terminal_lifecycle_is_scoped_by_exact_pre_transition_comment_link() -> None:
-    wanted = v2_wanted()
+    wanted = v2_wanted("Oteryn/Oteryn-Game")
     baseline = pending_baseline(wanted)
-    other_wanted = v2_wanted("Oteryn/Oteryn-Game")
+    other_wanted = v2_wanted()
     other_baseline = pending_baseline(other_wanted)
     shared_transition_id = "shared-cutover"
     meta_pre = transition_record(wanted, baseline, transition_id=shared_transition_id)
@@ -721,6 +727,30 @@ def test_cross_repository_overlap_is_drift_after_rollback() -> None:
     ) == "DRIFT"
 
 
+def test_rollout_cannot_start_with_game_before_meta() -> None:
+    wanted = v2_wanted("Oteryn/Oteryn-Game")
+    baseline = pending_baseline(wanted)
+    active = json.loads(json.dumps(baseline))
+    active["required_checks"] = ["game-gate"]
+    active["required_check_sources"] = {"game-gate": [ACTIONS_APP_ID]}
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(
+            2,
+            transition_record(
+                wanted,
+                baseline,
+                transition_id="game-v2-cutover-1",
+            ),
+            created_at="2026-08-31T10:05:00Z",
+        ),
+    ]
+
+    assert m.core.classify_rollout_state(
+        wanted, active, records, now="2026-08-31T11:00:00Z"
+    ) == "DRIFT"
+
+
 def test_active_transition_expires_and_late_terminal_records_stay_drift() -> None:
     wanted = v2_wanted()
     baseline = pending_baseline(wanted)
@@ -860,6 +890,36 @@ def test_auditor_binds_success_to_direct_github_moving_base_evidence() -> None:
     assert f"/repos/{wanted['repository']}/actions/runs/{receipt['aggregate_gate_run']['run_id']}" in audit.calls
     assert f"/repos/{wanted['repository']}/commits/{receipt['main_after_a']}" in audit.calls
     assert f"/repos/{wanted['repository']}/commits/{receipt['merge_group_sha']}" in audit.calls
+
+
+def test_merge_group_success_from_disabled_workflow_is_drift() -> None:
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+    receipt = terminal["moving_base_receipt"]
+    comments = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
+    ]
+    responses = {
+        "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+        **direct_moving_base_responses(wanted, receipt),
+        f"/repos/{wanted['repository']}/actions/workflows/2": {
+            "id": 2,
+            "state": "disabled_manually",
+            "path": ".github/workflows/merge-group-gate.yml",
+        },
+    }
+    responses[
+        f"/repos/{wanted['repository']}/actions/runs/{receipt['aggregate_gate_run']['run_id']}"
+    ]["workflow_id"] = 2
+
+    assert FakeAudit(responses).classify_rollout_readback(
+        wanted, target, now="2026-08-31T13:00:00Z"
+    ) == "DRIFT"
 
 
 def test_moving_base_canary_events_must_fit_the_current_transition_window() -> None:
