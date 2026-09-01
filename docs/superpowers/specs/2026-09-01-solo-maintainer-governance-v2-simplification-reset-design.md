@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposed replacement authority for the over-specified lifecycle and AI-review machinery introduced by the V2 authority packet merged in PR #123.
+Approved by the repository owner for implementation in PR #125 on 2026-09-01; canonical upon merge to protected `main`.
+
+This design replaces the over-specified lifecycle and AI-review machinery introduced by the V2 authority packet merged in PR #123.
 
 This design deliberately returns governance enforcement to native GitHub surfaces. It does not authorize live branch-protection, ruleset, Merge Queue, provider, production, or break-glass mutations by itself.
 
@@ -117,19 +119,10 @@ A normal read-only governance audit may still compare desired target settings wi
 
 Agents and automation may not self-authorize a change to the mechanism that governs their own integration.
 
-A material change is control-plane/high-risk when it changes any of these surfaces:
-
-- `.github/workflows/**` or aggregate-gate fan-in;
-- branch protection, repository rulesets, or Merge Queue configuration;
-- GitHub Actions permissions or token trust boundaries;
-- authentication, authorization, security, deployment, or production control planes;
-- recovery/break-glass machinery;
-- the canonical governance authority or desired merge contract.
-
-For such a change, require exactly these decision inputs:
+For a material control-plane or high-risk change, require:
 
 - deterministic CI/validation;
-- one independent Codex deep review of the stable material candidate;
+- one independent deep review when materially useful;
 - explicit human owner authorization before integration or live control-plane mutation;
 - Merge Queue validation where already canonical;
 - post-change live readback.
@@ -146,7 +139,7 @@ Use this simple routing rule:
 
 - default: no external AI review;
 - ordinary code change where an independent review has clear value: prefer Codex Spark when available;
-- control-plane/high-risk change as defined above: one Codex deep review on a stable material candidate;
+- security, authentication, permissions, deployment, recovery, workflow, branch-protection, Merge Queue, or governance/control-plane change: one Codex deep review on a stable material candidate;
 - trivial docs, formatting, generated evidence, metadata, and other low-risk changes: no external AI review;
 - if Spark is unavailable for a low-risk change, do not automatically escalate to deep Codex;
 - do not repeatedly re-run review for an unchanged or cosmetically changed candidate; re-review only when a material risk-bearing change justifies it.
