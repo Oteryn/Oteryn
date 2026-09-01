@@ -117,10 +117,19 @@ A normal read-only governance audit may still compare desired target settings wi
 
 Agents and automation may not self-authorize a change to the mechanism that governs their own integration.
 
-For a material control-plane or high-risk change, require:
+A material change is control-plane/high-risk when it changes any of these surfaces:
+
+- `.github/workflows/**` or aggregate-gate fan-in;
+- branch protection, repository rulesets, or Merge Queue configuration;
+- GitHub Actions permissions or token trust boundaries;
+- authentication, authorization, security, deployment, or production control planes;
+- recovery/break-glass machinery;
+- the canonical governance authority or desired merge contract.
+
+For such a change, require exactly these decision inputs:
 
 - deterministic CI/validation;
-- one independent deep review when materially useful;
+- one independent Codex deep review of the stable material candidate;
 - explicit human owner authorization before integration or live control-plane mutation;
 - Merge Queue validation where already canonical;
 - post-change live readback.
@@ -137,7 +146,7 @@ Use this simple routing rule:
 
 - default: no external AI review;
 - ordinary code change where an independent review has clear value: prefer Codex Spark when available;
-- security, authentication, permissions, deployment, recovery, workflow, branch-protection, Merge Queue, or governance/control-plane change: one Codex deep review on a stable material candidate;
+- control-plane/high-risk change as defined above: one Codex deep review on a stable material candidate;
 - trivial docs, formatting, generated evidence, metadata, and other low-risk changes: no external AI review;
 - if Spark is unavailable for a low-risk change, do not automatically escalate to deep Codex;
 - do not repeatedly re-run review for an unchanged or cosmetically changed candidate; re-review only when a material risk-bearing change justifies it.
