@@ -781,15 +781,62 @@ def _matches_control_plane_owner_authorization_identity(
     if not isinstance(comment, dict):
         return False
     body = _decode_json_comment_body(comment.get("body"))
+    if isinstance(body, dict):
+        return (
+            body.get("record_type") == CONTROL_PLANE_OWNER_AUTHORIZATION_RECORD_TYPE
+            and body.get("repository") == repository
+            and isinstance(body.get("pull_request"), int)
+            and not isinstance(body.get("pull_request"), bool)
+            and body.get("pull_request") == pull_request
+            and body.get("material_head_sha") == material_head_sha
+            and body.get("scope") == scope
+        )
+    return _malformed_control_plane_owner_authorization_identity_matches(
+        comment.get("body"),
+        repository=repository,
+        pull_request=pull_request,
+        material_head_sha=material_head_sha,
+        scope=scope,
+    )
+
+
+def _malformed_control_plane_owner_authorization_identity_matches(
+    body: object,
+    *,
+    repository: str,
+    pull_request: int,
+    material_head_sha: str,
+    scope: str,
+) -> bool:
+    """Fail closed for an invalid JSON comment that names this authorization.
+
+    The exactly-one owner-authorization invariant applies before an individual
+    comment is accepted as valid evidence.  A JSON-looking duplicate therefore
+    remains relevant when its identity fields are recoverable even if its JSON
+    document is truncated or otherwise malformed.
+    """
+    if not isinstance(body, str):
+        return False
+    candidate = body.strip()
+    if candidate.startswith("```json"):
+        candidate = candidate[len("```json"):].strip()
+    if not candidate.startswith("{"):
+        return False
+
+    string_fields = {
+        "record_type": CONTROL_PLANE_OWNER_AUTHORIZATION_RECORD_TYPE,
+        "repository": repository,
+        "material_head_sha": material_head_sha,
+        "scope": scope,
+    }
+    for field, expected in string_fields.items():
+        match = re.search(rf'"{field}"\s*:\s*"([^"\\]*)"', candidate)
+        if match is None or match.group(1) != expected:
+            return False
+    pull_request_match = re.search(r'"pull_request"\s*:\s*(\d+)', candidate)
     return (
-        isinstance(body, dict)
-        and body.get("record_type") == CONTROL_PLANE_OWNER_AUTHORIZATION_RECORD_TYPE
-        and body.get("repository") == repository
-        and isinstance(body.get("pull_request"), int)
-        and not isinstance(body.get("pull_request"), bool)
-        and body.get("pull_request") == pull_request
-        and body.get("material_head_sha") == material_head_sha
-        and body.get("scope") == scope
+        pull_request_match is not None
+        and int(pull_request_match.group(1)) == pull_request
     )
 
 

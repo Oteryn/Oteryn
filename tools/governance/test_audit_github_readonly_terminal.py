@@ -1259,6 +1259,23 @@ def test_control_plane_owner_authorization_fails_closed_for_edited_bot_stale_or_
         f"/repos/{repository}/issues/{pull_request}/comments": [valid, edited_duplicate],
         f"/repos/{repository}/collaborators/blakinio/permission": admin,
     }).control_plane_owner_authorization(repository, pull_request, material_head_sha, scope)["status"] == "UNKNOWN"
+    malformed_duplicate = {
+        **valid,
+        "id": 79,
+        "body": (
+            '{"record_type":"CONTROL_PLANE_R2_OWNER_AUTHORIZATION",'
+            f'"repository":"{repository}","pull_request":{pull_request},'
+            f'"material_head_sha":"{material_head_sha}","scope":"{scope}",'
+            '"authorize_integration":'
+        ),
+    }
+    assert FakeAudit({
+        f"/repos/{repository}/pulls/{pull_request}": current_pull_request(
+            repository, pull_request, material_head_sha
+        ),
+        f"/repos/{repository}/issues/{pull_request}/comments": [valid, malformed_duplicate],
+        f"/repos/{repository}/collaborators/blakinio/permission": admin,
+    }).control_plane_owner_authorization(repository, pull_request, material_head_sha, scope)["status"] == "UNKNOWN"
     assert result_for({**valid, "updated_at": "2026-08-31T12:01:00Z"}, admin)["status"] == "UNKNOWN"
     bot = json.loads(json.dumps(valid))
     bot["user"]["type"] = "Bot"
