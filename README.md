@@ -25,7 +25,7 @@ Provider-owned schemas, generated product artifacts and runtime implementation r
 - `docs/testing/ECOSYSTEM_TEST_STRATEGY.md` defines ecosystem metadata and compatibility proof layers.
 - `docs/release/RELEASE_COORDINATION.md` defines release-manifest ownership and immutable identity rules.
 - `ecosystem/compatibility.schema.json` defines the machine-readable shape for future compatible release sets.
-- `ecosystem/governance-desired-state.json` and `tools/governance/audit_github_readonly.py` define the read-only desired-state/drift validation surface.
+- `ecosystem/governance-desired-state.json` records the small ADR 0005 target merge contract; current enforcement is read directly from GitHub live state.
 
 META CI deliberately validates coordination metadata only. Product builds and product-specific tests remain in Game, Platform and Atlas.
 
