@@ -144,18 +144,18 @@ Absence of CI in this bootstrap repository is not equivalent to a CI pass; recor
 - Deny by default when authorization is ambiguous.
 - Production or destructive external mutations require separate explicit owner authority even if META documentation describes them.
 
-## Owner-funded AI and review economy
+## AI review economy
 
-External AI review is governed by `docs/governance/AI_REVIEW_POLICY.md` and `ecosystem/ai-review-policy.json`. Do not spend Codex/Spark quota on every PR. Classify the final diff deterministically first.
+External AI review is advisory and governed by `docs/governance/AI_REVIEW_POLICY.md`. It is not a required GitHub status.
 
-- `R0` requires deterministic validation and exact-diff self-review only; do not invoke external AI review.
-- `R1` uses one fast reviewer invocation per stable review fingerprint after required CI is green.
-- `R2` uses one deep reviewer invocation per stable review fingerprint after required CI is green.
-- Never invoke an external reviewer for Draft/WIP state or repeatedly poll/re-run a reviewer for an unchanged fingerprint.
-- A prior review may be reused only under the policy's exact fingerprint/ancestor/review-neutral rules.
-- Issue #12 and its bootstrap PR are the one-time no-external-review bootstrap for this policy. After bootstrap, changes to the review policy/classifier/authority mapping are `R2`.
+- Default to no external AI review.
+- For an ordinary code change where independent review clearly adds value, prefer Codex Spark when available.
+- For a material high-risk/control-plane change, use one Codex deep review on a stable material candidate.
+- Trivial docs, formatting, generated evidence and metadata do not need external AI review.
+- If Spark is unavailable for low-risk work, do not automatically escalate to deep Codex.
+- Re-review only after a material risk-bearing change, not for cosmetic changes or governance retriggers.
 
-The repository owner has standing authorization for external AI consumption only when the merged risk policy requires `R1` or `R2` review and its invocation budget is respected. Other owner-funded AI/API use still requires explicit authorization for that task.
+Do not recreate formal R0/R1/R2 classification, review fingerprints, `ai-review-gate`, review envelopes, attestation bridges, or review-result parsers as merge authority.
 
 ## Architecture handover
 
