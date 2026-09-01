@@ -28,7 +28,9 @@ GitHub live state is the source of truth for enforcement. Repository documentati
 
 ## Moving-base canary
 
-Before strict freshness is disabled for a repository:
+Before strict freshness is disabled for a repository, first prove the replacement aggregate gate on a representative PR. If a currently required legacy context cannot emit on `merge_group`, capture the exact rollback state and make only that incompatible context non-required before enqueueing the canary, while keeping strict required-status freshness enabled. Do not remove compatible required contexts or disable strict freshness at this stage. If the canary fails, restore the exact pre-change required-context/settings state.
+
+Then prove the moving-base scenario:
 
 1. PR A reaches a stable green head X.
 2. PR B advances protected `main`.

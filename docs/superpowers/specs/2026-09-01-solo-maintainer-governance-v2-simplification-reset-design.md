@@ -75,7 +75,9 @@ No second externally required status is added merely to represent an internal va
 
 ## Moving-base Merge Queue canary
 
-Before strict freshness is disabled for a repository, prove the failure mode that Merge Queue is intended to replace:
+Before strict freshness is disabled for a repository, first prove the replacement aggregate gate on a representative PR. If a currently required legacy context cannot emit on `merge_group`, capture the exact rollback state and make only that incompatible context non-required before enqueueing the canary, while keeping strict required-status freshness enabled. Do not remove compatible required contexts or disable strict freshness at this stage. If the canary fails, restore the exact pre-change required-context/settings state.
+
+Then prove the failure mode that Merge Queue is intended to replace:
 
 1. PR A reaches a stable green head X.
 2. A separate PR B advances protected `main`.
@@ -166,7 +168,9 @@ After PR 1 is canonical:
 - ensure `meta-gate` is correct for both PR and merge-group candidates;
 - retain only small deterministic tests for the permanent merge contract;
 - remove legacy AI-review merge authority from META;
+- if the legacy required context cannot emit on `merge_group`, prove `meta-gate` replacement coverage, make only that incompatible legacy context non-required while strict freshness remains enabled, and retain exact rollback state;
 - perform the real META moving-base Merge Queue canary;
+- if the canary fails, restore the exact pre-canary required-context/settings state;
 - after success, make Merge Queue the freshness authority and disable strict freshness;
 - verify final live META enforcement directly.
 
@@ -194,4 +198,4 @@ The reset is successful when:
 3. the custom lifecycle/receipt state machine is no longer mandatory governance authority;
 4. PR #124 remains closed and unmerged as historical evidence;
 5. the next META implementation is materially smaller and contains only controls required for the permanent merge contract and canary;
-6. no live protection is weakened before its replacement path is proven.
+6. no live protection is weakened before replacement PR coverage is proven, and any pre-canary removal is limited to a legacy context that cannot run on `merge_group`, with strict freshness retained and exact rollback available.

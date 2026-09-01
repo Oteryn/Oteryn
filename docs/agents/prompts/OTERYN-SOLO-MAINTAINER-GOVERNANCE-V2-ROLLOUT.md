@@ -25,12 +25,14 @@ For each repository:
 1. verify current protected-main settings and exact candidate state from GitHub;
 2. make the smallest repository change needed for one aggregate gate on `pull_request` and `merge_group`;
 3. keep zero required human/CODEOWNER approvals in solo-maintainer mode;
-4. perform deterministic validation;
+4. perform deterministic validation and prove the replacement aggregate gate on a representative PR;
 5. for a material high-risk/control-plane candidate, use one useful Codex deep review and explicit human-owner authorization;
-6. capture rollback state;
-7. run the real moving-base Merge Queue canary without changing PR A head;
-8. only after success, make the single aggregate gate the required external status and disable strict freshness;
-9. read back final enforcement directly from GitHub; rollback on failure.
+6. capture the exact live settings rollback state;
+7. if a currently required legacy context cannot emit on `merge_group`, make only that incompatible context non-required before enqueueing the canary, while keeping strict required-status freshness enabled; do not remove compatible contexts or disable strict freshness yet;
+8. run the real moving-base Merge Queue canary without changing PR A head;
+9. if the canary fails, immediately restore the exact pre-canary required-context/settings state;
+10. only after canary success, ensure the final required-status map contains only the aggregate gate and disable strict freshness;
+11. read back final enforcement directly from GitHub.
 
 Do not create or revive:
 
