@@ -450,6 +450,22 @@ def _global_rollout_transitions_are_serial(records: list[dict]) -> bool:
     return True
 
 
+def _pending_record_identifies_repository(record: dict, repository: object) -> bool:
+    """Keep schema-invalid pending duplicates in the exactly-one decision when scoped."""
+    body = record.get("body")
+    if (
+        not isinstance(repository, str)
+        or not repository
+        or not isinstance(body, dict)
+        or body.get("record_type") != "PENDING_BASELINE"
+    ):
+        return False
+    if body.get("repository") == repository:
+        return True
+    readback = _normalized_rollout_state(body.get("pre_state_readback"))
+    return readback is not None and readback["repository"] == repository
+
+
 def _valid_pending_record(record: dict, wanted: dict) -> dict | None:
     body = record["body"]
     if (
@@ -606,7 +622,11 @@ def classify_rollout_state(
     if _malformed_lifecycle_evidence_is_relevant(malformed_records, records, wanted):
         return "DRIFT"
 
-    pending_candidates = [record for record in records if record["body"].get("record_type") == "PENDING_BASELINE" and record["body"].get("repository") == wanted.get("repository")]
+    repository = wanted.get("repository")
+    pending_candidates = [
+        record for record in records
+        if _pending_record_identifies_repository(record, repository)
+    ]
     if len(pending_candidates) != 1:
         return "DRIFT"
     baseline = _valid_pending_record(pending_candidates[0], wanted)
@@ -619,8 +639,15 @@ def classify_rollout_state(
     ]
     pre_records = [
         record for record in all_pre_records
-        if record["body"].get("repository") == wanted.get("repository")
+        if record["body"].get("repository") == repository
     ]
+    if pre_records:
+        first_pre = min(pre_records, key=lambda record: (record["created_at"], record["id"]))
+        pending_record = pending_candidates[0]
+        if (pending_record["created_at"], pending_record["id"]) >= (
+            first_pre["created_at"], first_pre["id"]
+        ):
+            return "DRIFT"
     transitions: dict[str, dict] = {}
     for record in pre_records:
         pre = _valid_pre_transition_record(record, wanted, baseline)
@@ -631,7 +658,7 @@ def classify_rollout_state(
         body = record["body"]
         if (
             body.get("transition_id") in transitions
-            and body.get("repository") != wanted.get("repository")
+            and body.get("repository") != repository
             and not isinstance(body.get("repository"), str)
         ):
             return "DRIFT"
@@ -644,10 +671,10 @@ def classify_rollout_state(
             continue
         linked_pre = pre_records_by_id.get(body.get("pre_transition_comment_id"))
         if linked_pre is None:
-            if body.get("repository") == wanted.get("repository") or body.get("transition_id") in transitions:
+            if body.get("repository") == repository or body.get("transition_id") in transitions:
                 return "DRIFT"
             continue
-        if linked_pre["body"].get("repository") != wanted.get("repository"):
+        if linked_pre["body"].get("repository") != repository:
             continue
         transition_id = body.get("transition_id")
         pre = transitions.get(transition_id)
