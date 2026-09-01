@@ -455,7 +455,7 @@ def test_terminal_lifecycle_is_scoped_by_exact_pre_transition_comment_link() -> 
         lifecycle_comment(1, pending_record(wanted, baseline)),
         lifecycle_comment(10, pending_record(other_wanted, other_baseline)),
         lifecycle_comment(2, meta_pre, created_at="2026-08-31T10:05:00Z"),
-        lifecycle_comment(20, game_pre, created_at="2026-08-31T10:06:00Z"),
+        lifecycle_comment(20, game_pre, created_at="2026-08-31T09:00:00Z"),
     ]
 
     def classify(records: list[dict]) -> str:
@@ -471,14 +471,14 @@ def test_terminal_lifecycle_is_scoped_by_exact_pre_transition_comment_link() -> 
         pre_transition_comment_id=20,
     )
     assert classify(common_records + [
-        lifecycle_comment(21, game_terminal, created_at="2026-08-31T10:30:00Z"),
+        lifecycle_comment(21, game_terminal, created_at="2026-08-31T09:30:00Z"),
     ]) == "TRANSITION"
 
     assert classify(common_records + [
         lifecycle_comment(
-            22, game_terminal, created_at="2026-08-31T10:30:00Z", updated_at="2026-08-31T10:31:00Z",
+            22, game_terminal, created_at="2026-08-31T09:30:00Z", updated_at="2026-08-31T09:31:00Z",
         ),
-    ]) == "TRANSITION"
+    ]) == "DRIFT"
 
     terminal_shaped_game_record = {
         "record_type": "NOT_A_LIFECYCLE_RECORD",
@@ -488,8 +488,8 @@ def test_terminal_lifecycle_is_scoped_by_exact_pre_transition_comment_link() -> 
         "terminal_status": "SUCCESS",
     }
     assert classify(common_records + [
-        lifecycle_comment(221, terminal_shaped_game_record, created_at="2026-08-31T10:30:00Z"),
-    ]) == "TRANSITION"
+        lifecycle_comment(221, terminal_shaped_game_record, created_at="2026-08-31T09:30:00Z"),
+    ]) == "DRIFT"
 
     unlinked_terminal = terminal_record(
         wanted,
@@ -652,6 +652,72 @@ def test_schema_invalid_pre_and_cross_repository_overlap_cannot_reach_success() 
         wanted, target,
         [lifecycle_comment(1, pending_record(wanted, baseline)), lifecycle_comment(2, valid_pre, created_at="2026-08-31T10:05:00Z"), lifecycle_comment(5, pending_record(other, other_baseline)), lifecycle_comment(6, other_pre, created_at="2026-08-31T10:10:00Z"), lifecycle_comment(3, valid_terminal, created_at="2026-08-31T11:00:00Z"), lifecycle_comment(7, other_terminal, created_at="2026-08-31T11:10:00Z")],
         now="2026-08-31T13:00:00Z", success_receipt_verifier=lambda *_: "SUCCESS",
+    ) == "DRIFT"
+
+
+def test_cross_repository_overlap_is_drift_while_transition_is_active() -> None:
+    wanted = v2_wanted()
+    other = v2_wanted("Oteryn/Oteryn-Game")
+    baseline = pending_baseline(wanted)
+    other_baseline = pending_baseline(other)
+    active = json.loads(json.dumps(baseline))
+    active["required_checks"] = ["meta-gate"]
+    active["required_check_sources"] = {"meta-gate": [ACTIONS_APP_ID]}
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(
+            2,
+            transition_record(wanted, baseline),
+            created_at="2026-08-31T10:05:00Z",
+        ),
+        lifecycle_comment(3, pending_record(other, other_baseline)),
+        lifecycle_comment(
+            4,
+            transition_record(
+                other,
+                other_baseline,
+                transition_id="game-v2-cutover-1",
+            ),
+            created_at="2026-08-31T10:10:00Z",
+        ),
+    ]
+
+    assert m.core.classify_rollout_state(
+        wanted, active, records, now="2026-08-31T11:00:00Z"
+    ) == "DRIFT"
+
+
+def test_cross_repository_overlap_is_drift_after_rollback() -> None:
+    wanted = v2_wanted()
+    other = v2_wanted("Oteryn/Oteryn-Game")
+    baseline = pending_baseline(wanted)
+    other_baseline = pending_baseline(other)
+    records = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(
+            2,
+            transition_record(wanted, baseline),
+            created_at="2026-08-31T10:05:00Z",
+        ),
+        lifecycle_comment(3, pending_record(other, other_baseline)),
+        lifecycle_comment(
+            4,
+            transition_record(
+                other,
+                other_baseline,
+                transition_id="game-v2-cutover-1",
+            ),
+            created_at="2026-08-31T10:10:00Z",
+        ),
+        lifecycle_comment(
+            5,
+            terminal_record(wanted, baseline, terminal_status="ROLLED_BACK"),
+            created_at="2026-08-31T10:30:00Z",
+        ),
+    ]
+
+    assert m.core.classify_rollout_state(
+        wanted, baseline, records, now="2026-08-31T11:00:00Z"
     ) == "DRIFT"
 
 

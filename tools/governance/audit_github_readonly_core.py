@@ -669,6 +669,9 @@ def classify_rollout_state(
         ):
             return "DRIFT"
 
+    if transitions and not _global_rollout_transitions_are_serial(records):
+        return "DRIFT"
+
     active = [record for transition_id, record in transitions.items() if transition_id not in terminal_results]
     if len(active) > 1:
         return "DRIFT"
@@ -688,8 +691,6 @@ def classify_rollout_state(
             key=lambda value: (value[2]["created_at"], value[2]["id"]),
         )
         if status == "SUCCESS":
-            if not _global_rollout_transitions_are_serial(records):
-                return "DRIFT"
             if not _rollout_states_match(live, post_state):
                 return "DRIFT"
             if success_receipt_verifier is None:
