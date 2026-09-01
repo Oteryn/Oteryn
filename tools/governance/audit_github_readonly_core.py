@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 32644)
+Total output lines: 2995
+
 #!/usr/bin/env python3
 """Read-only Oteryn governance drift audit.
 
@@ -1508,272 +1511,7 @@ class Audit:
                 "X-GitHub-Api-Version": "2022-11-28",
                 "User-Agent": "oteryn-governance-readonly-audit",
             },
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                raw = response.read()
-                status = response.status
-        except urllib.error.HTTPError as exc:
-            if allow_404 and exc.code == 404:
-                return None
-            raise RuntimeError(f"GET {path} -> HTTP {exc.code}") from exc
-        if not raw:
-            return {"_http_status": status}
-        return json.loads(raw)
-
-    def api_list(self, path: str) -> list[dict]:
-        items: list[dict] = []
-        page = 1
-        separator = "&" if "?" in path else "?"
-        while True:
-            payload = self.api(f"{path}{separator}per_page=100&page={page}")
-            if not isinstance(payload, list):
-                raise RuntimeError(f"GET {path} -> expected list payload")
-            items.extend(item for item in payload if isinstance(item, dict))
-            if len(payload) < 100:
-                return items
-            page += 1
-
-    def graphql(self, query: str, variables: dict):
-        request_body = json.dumps({"query": query, "variables": variables}).encode("utf-8")
-        req = urllib.request.Request(
-            f"{API}/graphql",
-            data=request_body,
-            method="POST",
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {self.token}",
-                "Content-Type": "application/json",
-                "X-GitHub-Api-Version": "2022-11-28",
-                "User-Agent": "oteryn-governance-readonly-audit",
-            },
-        )
-        try:
-            with urllib.request.urlopen(req, timeout=30) as response:
-                raw = response.read()
-        except urllib.error.HTTPError as exc:
-            raise RuntimeError(f"POST /graphql -> HTTP {exc.code}") from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(
-                f"POST /graphql -> transport unavailable: {exc.reason}"
-            ) from exc
-        payload = json.loads(raw)
-        if (
-            not isinstance(payload, dict)
-            or payload.get("errors")
-            or not isinstance(payload.get("data"), dict)
-        ):
-            raise RuntimeError("POST /graphql -> incomplete response")
-        return payload["data"]
-
-    def _pull_request_queue_timeline(self, repository: str, pull_request: int) -> list[dict]:
-        """Read the queue/merge lifecycle needed to bind GS-7 integration."""
-        parts = repository.split("/", 1)
-        if len(parts) != 2 or not all(parts):
-            raise RuntimeError("invalid repository coordinate")
-        owner, name = parts
-        query = """
-        query($owner: String!, $name: String!, $number: Int!, $after: String) {
-          repository(owner: $owner, name: $name) {
-            pullRequest(number: $number) {
-              timelineItems(
-                first: 100,
-                after: $after,
-                itemTypes: [
-                  ADDED_TO_MERGE_QUEUE_EVENT,
-                  REMOVED_FROM_MERGE_QUEUE_EVENT,
-                  MERGED_EVENT
-                ]
-              ) {
-                nodes {
-                  __typename
-                  ... on AddedToMergeQueueEvent { createdAt }
-                  ... on RemovedFromMergeQueueEvent {
-                    createdAt
-                    beforeCommit { oid }
-                  }
-                  ... on MergedEvent {
-                    createdAt
-                    commit { oid }
-                  }
-                }
-                pageInfo { hasNextPage endCursor }
-              }
-            }
-          }
-        }
-        """
-        events: list[dict] = []
-        cursor: str | None = None
-        while True:
-            data = self.graphql(
-                query,
-                {"owner": owner, "name": name, "number": pull_request, "after": cursor},
-            )
-            repo_payload = data.get("repository") if isinstance(data, dict) else None
-            pr_payload = repo_payload.get("pullRequest") if isinstance(repo_payload, dict) else None
-            timeline = pr_payload.get("timelineItems") if isinstance(pr_payload, dict) else None
-            nodes = timeline.get("nodes") if isinstance(timeline, dict) else None
-            page_info = timeline.get("pageInfo") if isinstance(timeline, dict) else None
-            if not isinstance(nodes, list) or not isinstance(page_info, dict):
-                return []
-            if not all(isinstance(node, dict) for node in nodes):
-                return []
-            events.extend(nodes)
-            if page_info.get("hasNextPage") is not True:
-                return events
-            next_cursor = page_info.get("endCursor")
-            if not isinstance(next_cursor, str) or not next_cursor or next_cursor == cursor:
-                return []
-            cursor = next_cursor
-
-    def control_plane_owner_authorization(
-        self,
-        repository: str,
-        pull_request: int,
-        material_head_sha: str,
-        scope: str,
-    ) -> dict:
-        """Read one current GS-5 owner decision directly from GitHub.
-
-        This is deliberately a read-only coordinator/auditor check.  It stores
-        no receipt and emits no status: GitHub's current PR, top-level comment,
-        and collaborator-permission records remain the authority.
-        """
-        unknown = _unknown_control_plane_owner_authorization(
-            repository, pull_request, material_head_sha, scope
-        )
-        if (
-            not isinstance(repository, str)
-            or not repository
-            or not isinstance(pull_request, int)
-            or isinstance(pull_request, bool)
-            or pull_request <= 0
-            or not isinstance(material_head_sha, str)
-            or SHA_RE.fullmatch(material_head_sha) is None
-            or not isinstance(scope, str)
-            or not scope.strip()
-        ):
-            return unknown
-        try:
-            current_pr = self.api(f"/repos/{repository}/pulls/{pull_request}")
-            comments = self.api_list(f"/repos/{repository}/issues/{pull_request}/comments")
-        except (RuntimeError, ValueError, TypeError):
-            return unknown
-        head = current_pr.get("head") if isinstance(current_pr, dict) else None
-        base = current_pr.get("base") if isinstance(current_pr, dict) else None
-        head_repo = head.get("repo") if isinstance(head, dict) else None
-        base_repo = base.get("repo") if isinstance(base, dict) else None
-        if (
-            not isinstance(current_pr, dict)
-            or current_pr.get("number") != pull_request
-            or current_pr.get("state") != "open"
-            or current_pr.get("draft") is not False
-            or not isinstance(head, dict)
-            or head.get("sha") != material_head_sha
-            or not isinstance(head_repo, dict)
-            or head_repo.get("full_name") != repository
-            or not isinstance(base, dict)
-            or base.get("ref") != "main"
-            or not isinstance(base_repo, dict)
-            or base_repo.get("full_name") != repository
-        ):
-            return unknown
-        identity_matches = [
-            comment
-            for comment in comments
-            if _matches_control_plane_owner_authorization_identity(
-                comment,
-                repository=repository,
-                pull_request=pull_request,
-                material_head_sha=material_head_sha,
-                scope=scope,
-            )
-        ]
-        if len(identity_matches) != 1:
-            return unknown
-        evidence = _matching_control_plane_owner_authorization_comment(
-            identity_matches[0],
-            repository=repository,
-            pull_request=pull_request,
-            material_head_sha=material_head_sha,
-            scope=scope,
-        )
-        if evidence is None:
-            return unknown
-        try:
-            permission = self.api(
-                f"/repos/{repository}/collaborators/"
-                f"{urllib.parse.quote(evidence['author_login'], safe='')}/permission",
-                allow_404=True,
-            )
-        except (RuntimeError, ValueError, TypeError):
-            return unknown
-        permission_user = permission.get("user") if isinstance(permission, dict) else None
-        if (
-            not isinstance(permission, dict)
-            or permission.get("permission") != "admin"
-            or (
-                isinstance(permission_user, dict)
-                and (
-                    permission_user.get("login") != evidence["author_login"]
-                    or permission_user.get("type") != "User"
-                )
-            )
-        ):
-            return unknown
-        return {"status": "VERIFIED", **evidence, "owner_role": "admin"}
-
-    def control_plane_integration_permitted(
-        self,
-        paths: object,
-        *,
-        repository: str,
-        pull_request: int,
-        material_head_sha: str,
-        scope: str,
-        candidate_ci_passed: bool,
-        independent_deep_review: bool,
-        merge_queue_required: bool,
-        merge_queue_validated: bool,
-    ) -> bool:
-        """Apply GS-5 without accepting caller-supplied owner-verification state."""
-        if not all(
-            isinstance(value, bool)
-            for value in (
-                candidate_ci_passed,
-                independent_deep_review,
-                merge_queue_required,
-                merge_queue_validated,
-            )
-        ):
-            return False
-        if not candidate_ci_passed:
-            return False
-        if not is_control_plane_r2(paths):
-            return True
-        if not independent_deep_review:
-            return False
-        if merge_queue_required and not merge_queue_validated:
-            return False
-        return (
-            self.control_plane_owner_authorization(
-                repository, pull_request, material_head_sha, scope
-            ).get("status") == "VERIFIED"
-        )
-
-    def classify_rollout_readback(self, wanted: dict, live_state: object, *, now: object) -> str:
-        """Classify direct settings readback against the canonical Issue lifecycle records.
-
-        The Issue comments endpoint returns top-level GitHub comments. No audit-log,
-        attestation, writer, or auxiliary state store participates in this decision.
-        """
-        try:
-            comments = self.api_list(
-                f"/repos/{CANONICAL_V2_ROLLOUT_REPOSITORY}/issues/{CANONICAL_V2_ROLLOUT_ISSUE}/comments"
-            )
-        except (RuntimeError, ValueError):
-            return "UNKNOWN"
+      …2644 tokens truncated…eturn "UNKNOWN"
         return classify_rollout_state(
             wanted,
             live_state,
@@ -1951,6 +1689,7 @@ class Audit:
         ):
             return False
         after_a_parents = after_a.get("parents") if isinstance(after_a, dict) else None
+        after_a_committer = after_a.get("committer") if isinstance(after_a, dict) else None
         if (
             not isinstance(after_a, dict)
             or after_a.get("sha") != receipt["main_after_a"]
@@ -1958,6 +1697,8 @@ class Audit:
             or receipt["main_after_b"] not in {
                 parent.get("sha") for parent in after_a_parents if isinstance(parent, dict)
             }
+            or not isinstance(after_a_committer, dict)
+            or after_a_committer.get("login") != "github-merge-queue[bot]"
         ):
             return False
         if (

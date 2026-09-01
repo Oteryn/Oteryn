@@ -328,6 +328,7 @@ def direct_moving_base_responses(wanted: dict, receipt: dict) -> dict[str, objec
         f"/repos/{repo}/commits/{receipt['main_after_a']}": {
             "sha": receipt["main_after_a"],
             "parents": [{"sha": receipt["main_after_b"]}],
+            "committer": {"login": "github-merge-queue[bot]"},
         },
         f"/repos/{repo}/compare/{receipt['main_before_b']}...{receipt['main_after_b']}": {
             "status": "ahead",
@@ -998,6 +999,7 @@ def test_auditor_binds_success_to_direct_github_moving_base_evidence() -> None:
 
 
 def test_dequeued_candidate_then_direct_admin_merge_is_drift() -> None:
+
     wanted = v2_wanted()
     baseline = pending_baseline(wanted)
     target = m.core.target_rollout_state(wanted)
@@ -1025,6 +1027,37 @@ def test_dequeued_candidate_then_direct_admin_merge_is_drift() -> None:
     assert FakeAudit(responses).classify_rollout_readback(
         wanted, target, now="2026-08-31T13:00:00Z"
     ) == "DRIFT"
+
+
+def test_moving_base_success_requires_queue_bot_final_integration() -> None:
+    """A completed merge-group run cannot substitute for the queue integration."""
+    wanted = v2_wanted()
+    baseline = pending_baseline(wanted)
+    target = m.core.target_rollout_state(wanted)
+    transition = transition_record(wanted, baseline)
+    terminal = terminal_record(wanted, target, terminal_status="SUCCESS")
+    receipt = terminal["moving_base_receipt"]
+    comments = [
+        lifecycle_comment(1, pending_record(wanted, baseline)),
+        lifecycle_comment(2, transition, created_at="2026-08-31T10:05:00Z"),
+        lifecycle_comment(3, terminal, created_at="2026-08-31T11:00:00Z"),
+    ]
+    commit_path = f"/repos/{wanted['repository']}/commits/{receipt['main_after_a']}"
+
+    def classification_with(committer: object) -> str:
+        responses = {
+            "/repos/Oteryn/Oteryn/issues/102/comments": comments,
+            **direct_moving_base_responses(wanted, receipt),
+        }
+        responses[commit_path]["committer"] = committer
+        return FakeAudit(responses).classify_rollout_readback(
+            wanted, target, now="2026-08-31T13:00:00Z"
+        )
+
+    assert classification_with({"login": "github-merge-queue[bot]"}) == "SUCCESS"
+    assert classification_with({"login": "admin"}) == "DRIFT"
+    assert classification_with({}) == "DRIFT"
+    assert classification_with("malformed") == "DRIFT"
 
 
 def test_merge_group_success_from_disabled_workflow_is_drift() -> None:
