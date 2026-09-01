@@ -439,6 +439,47 @@ def test_classic_protection_controls_require_strict_status_checks() -> None:
     assert audit.main_protection_controls("Oteryn/Test")["strict_required_status_checks"] is False
 
 
+def test_conversation_resolution_is_read_from_each_protection_surface() -> None:
+    pull_rule = {
+        "type": "pull_request",
+        "parameters": {
+            "required_approving_review_count": 0,
+            "require_code_owner_review": False,
+            "required_review_thread_resolution": True,
+        },
+    }
+    ruleset = m.Audit._ruleset_rollout_controls([{
+        "rules": [pull_rule],
+        "bypass_actors": [],
+    }])
+    assert ruleset["require_conversation_resolution"] is True
+    pull_rule["parameters"]["required_review_thread_resolution"] = False
+    assert m.Audit._ruleset_rollout_controls([{
+        "rules": [pull_rule],
+        "bypass_actors": [],
+    }])["require_conversation_resolution"] is False
+    pull_rule["parameters"]["required_review_thread_resolution"] = "true"
+    assert m.Audit._ruleset_rollout_controls([{
+        "rules": [pull_rule],
+        "bypass_actors": [],
+    }])["require_conversation_resolution"] is None
+
+    classic = {
+        "allow_force_pushes": {"enabled": False},
+        "allow_deletions": {"enabled": False},
+        "enforce_admins": {"enabled": True},
+        "required_pull_request_reviews": {},
+        "required_conversation_resolution": {"enabled": True},
+    }
+    assert m.Audit._classic_rollout_controls(classic)["require_conversation_resolution"] is True
+    classic["required_conversation_resolution"]["enabled"] = False
+    assert m.Audit._classic_rollout_controls(classic)["require_conversation_resolution"] is False
+    classic["required_conversation_resolution"]["enabled"] = "true"
+    assert m.Audit._classic_rollout_controls(classic)["require_conversation_resolution"] is None
+    del classic["required_conversation_resolution"]
+    assert m.Audit._classic_rollout_controls(classic)["require_conversation_resolution"] is False
+
+
 def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> None:
     repo = "Oteryn/Test"
     ruleset = {
@@ -448,6 +489,7 @@ def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> 
             {"type": "pull_request", "parameters": {
                 "required_approving_review_count": 0,
                 "require_code_owner_review": False,
+                "required_review_thread_resolution": True,
             }},
             {"type": "merge_queue"},
             {"type": "deletion"},
@@ -464,6 +506,7 @@ def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> 
             "allow_force_pushes": {"enabled": False},
             "allow_deletions": {"enabled": False},
             "enforce_admins": {"enabled": True},
+            "required_conversation_resolution": {"enabled": False},
             "required_status_checks": {"strict": True},
             "required_pull_request_reviews": {
                 "required_approving_review_count": 1,
@@ -480,6 +523,7 @@ def test_rollout_protection_composes_ruleset_and_classic_branch_protection() -> 
         "strict_required_status_checks": True,
         "required_approving_review_count": 1,
         "require_code_owner_review": True,
+        "require_conversation_resolution": True,
         "merge_queue": True,
     }
     assert f"/repos/{repo}/branches/main/protection" in audit.calls
@@ -907,6 +951,16 @@ def test_v2_desired_state_has_no_solo_maintainer_human_or_codeowner_requirement(
         protection = item["protection"]
         assert protection["required_approving_review_count"] == 0
         assert protection["require_code_owner_review"] is False
+
+
+def test_v2_rollout_fingerprint_requires_conversation_resolution() -> None:
+    desired = json.loads(m.DESIRED_PATH.read_text(encoding="utf-8"))
+    for item in desired["permanent_repositories"]:
+        assert item["protection"]["require_conversation_resolution"] is True
+        target = m.core.target_rollout_state(item)
+        without_resolution = json.loads(json.dumps(target))
+        without_resolution["protection"]["require_conversation_resolution"] = False
+        assert m.core.rollout_state_fingerprint(without_resolution) != m.core.rollout_state_fingerprint(target)
 
 
 def test_v2_desired_state_validator_rejects_extra_gate_and_solo_approval_requirements() -> None:

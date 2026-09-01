@@ -29,7 +29,8 @@
         "broad_bypass": false,
         "strict_required_status_checks": false,
         "required_approving_review_count": 0,
-        "require_code_owner_review": false
+        "require_code_owner_review": false,
+        "require_conversation_resolution": true
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",
@@ -64,7 +65,8 @@
         "broad_bypass": false,
         "strict_required_status_checks": false,
         "required_approving_review_count": 0,
-        "require_code_owner_review": false
+        "require_code_owner_review": false,
+        "require_conversation_resolution": true
       },
       "codeowners_required_paths": [
         ".github/workflows/merge-gate.yml",
@@ -99,7 +101,8 @@
         "broad_bypass": false,
         "strict_required_status_checks": false,
         "required_approving_review_count": 0,
-        "require_code_owner_review": false
+        "require_code_owner_review": false,
+        "require_conversation_resolution": true
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",
@@ -134,7 +137,8 @@
         "broad_bypass": false,
         "strict_required_status_checks": false,
         "required_approving_review_count": 0,
-        "require_code_owner_review": false
+        "require_code_owner_review": false,
+        "require_conversation_resolution": true
       },
       "codeowners_required_paths": [
         ".github/workflows/ci.yml",

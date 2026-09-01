@@ -60,6 +60,7 @@ ROLLOUT_PROTECTION_FIELDS = {
     "strict_required_status_checks",
     "required_approving_review_count",
     "require_code_owner_review",
+    "require_conversation_resolution",
 }
 LIFECYCLE_RECORD_TYPES = {"PENDING_BASELINE", "PRE_TRANSITION", "TERMINAL"}
 CONTROL_PLANE_R2_NON_AUTHORITY_PREFIXES = (
@@ -164,6 +165,7 @@ def _normalized_rollout_state(value: object) -> dict | None:
     if not all(isinstance(protection.get(field), bool) for field in (
         "pull_requests", "force_pushes", "deletions", "broad_bypass",
         "strict_required_status_checks", "require_code_owner_review",
+        "require_conversation_resolution",
     )):
         return None
     if not isinstance(protection.get("required_approving_review_count"), int) or isinstance(
@@ -1190,6 +1192,7 @@ def load_desired() -> dict:
             "strict_required_status_checks": False,
             "required_approving_review_count": 0,
             "require_code_owner_review": False,
+            "require_conversation_resolution": True,
         }
         if protection != required_protection:
             raise SystemExit(f"repository has incomplete or weakened protection contract: {item}")
@@ -1862,10 +1865,15 @@ class Audit:
 
         counts: list[int] = []
         codeowner_flags: list[bool] = []
+        conversation_resolution_flags: list[bool] = []
         for rule in pull_rules:
             parameters = rule.get("parameters")
             count = parameters.get("required_approving_review_count") if isinstance(parameters, dict) else None
             codeowner = parameters.get("require_code_owner_review") if isinstance(parameters, dict) else None
+            conversation_resolution = (
+                parameters.get("required_review_thread_resolution")
+                if isinstance(parameters, dict) else None
+            )
             if not isinstance(count, int) or isinstance(count, bool) or count < 0:
                 counts = []
                 codeowner_flags = []
@@ -1876,6 +1884,8 @@ class Audit:
                 break
             counts.append(count)
             codeowner_flags.append(codeowner)
+            if isinstance(conversation_resolution, bool):
+                conversation_resolution_flags.append(conversation_resolution)
         review_count: int | None
         codeowner_review: bool | None
         if not pull_rules:
@@ -1884,6 +1894,13 @@ class Audit:
             review_count, codeowner_review = None, None
         else:
             review_count, codeowner_review = max(counts), any(codeowner_flags)
+        conversation_resolution: bool | None
+        if not pull_rules:
+            conversation_resolution = False
+        elif len(conversation_resolution_flags) != len(pull_rules):
+            conversation_resolution = None
+        else:
+            conversation_resolution = any(conversation_resolution_flags)
 
         strict_values: list[bool] = []
         for rule in status_rules:
@@ -1911,6 +1928,7 @@ class Audit:
             "strict_required_status_checks": strict,
             "required_approving_review_count": review_count,
             "require_code_owner_review": codeowner_review,
+            "require_conversation_resolution": conversation_resolution,
             "merge_queue": "merge_queue" in rule_types,
         }
 
@@ -1923,7 +1941,7 @@ class Audit:
             return {key: None for key in (
                 "pull_requests", "force_pushes", "deletions", "broad_bypass",
                 "strict_required_status_checks", "required_approving_review_count",
-                "require_code_owner_review", "merge_queue",
+                "require_code_owner_review", "require_conversation_resolution", "merge_queue",
             )}
         reviews = protection.get("required_pull_request_reviews")
         if reviews is None:
@@ -1958,6 +1976,14 @@ class Audit:
             (not enforce_admins) or has_pr_bypass
             if isinstance(enforce_admins, bool) and isinstance(has_pr_bypass, bool) else None
         )
+        conversation_resolution = protection.get("required_conversation_resolution")
+        if conversation_resolution is None:
+            require_conversation_resolution = False
+        elif isinstance(conversation_resolution, dict):
+            enabled = conversation_resolution.get("enabled")
+            require_conversation_resolution = enabled if isinstance(enabled, bool) else None
+        else:
+            require_conversation_resolution = None
         return {
             "pull_requests": pull_requests,
             "force_pushes": allow_force_pushes if isinstance(allow_force_pushes, bool) else None,
@@ -1966,6 +1992,7 @@ class Audit:
             "strict_required_status_checks": strict,
             "required_approving_review_count": review_count,
             "require_code_owner_review": codeowner_review,
+            "require_conversation_resolution": require_conversation_resolution,
             # Classic branch protection cannot require Merge Queue; that control
             # is expressed only by an applicable repository ruleset.
             "merge_queue": False,
@@ -1985,6 +2012,7 @@ class Audit:
             "strict_required_status_checks": None,
             "required_approving_review_count": None,
             "require_code_owner_review": None,
+            "require_conversation_resolution": None,
             "merge_queue": None,
         }
         if ruleset is None and classic is None:
@@ -2018,6 +2046,10 @@ class Audit:
             ),
             "require_code_owner_review": either(
                 ruleset.get("require_code_owner_review"), classic.get("require_code_owner_review")
+            ),
+            "require_conversation_resolution": either(
+                ruleset.get("require_conversation_resolution"),
+                classic.get("require_conversation_resolution"),
             ),
             "merge_queue": either(ruleset.get("merge_queue"), classic.get("merge_queue")),
         }
@@ -2088,7 +2120,7 @@ class Audit:
             live.get("allow_rebase_merge"), live.get("delete_branch_on_merge"), controls.get("merge_queue"),
             controls.get("pull_requests"), controls.get("force_pushes"), controls.get("deletions"),
             controls.get("broad_bypass"), controls.get("strict_required_status_checks"),
-            controls.get("require_code_owner_review"),
+            controls.get("require_code_owner_review"), controls.get("require_conversation_resolution"),
         )):
             return None
         state = {
@@ -2110,6 +2142,7 @@ class Audit:
                 "strict_required_status_checks": controls["strict_required_status_checks"],
                 "required_approving_review_count": controls["required_approving_review_count"],
                 "require_code_owner_review": controls["require_code_owner_review"],
+                "require_conversation_resolution": controls["require_conversation_resolution"],
             },
         }
         return _normalized_rollout_state(state)
