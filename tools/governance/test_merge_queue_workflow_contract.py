@@ -17,6 +17,7 @@ MERGE_GROUP_ADAPTER = ROOT / ".github/workflows/merge-group-ai-review-adapter.ym
 ENFORCEMENT_FIELDS = (
     "required_gate",
     "merge_queue",
+    "allow_auto_merge",
     "strict_required_status_checks",
     "required_approvals",
     "codeowner_review_required",
@@ -90,6 +91,14 @@ def test_ci_has_one_external_gate_only() -> None:
     assert "verify_ai_review_evidence.py" not in workflow
 
 
+def test_desired_state_requires_auto_merge_for_every_permanent_repo() -> None:
+    desired = _desired_state()
+    rows = desired["permanent_repositories"]
+
+    assert len(rows) == 4
+    assert all(row.get("allow_auto_merge") is True for row in rows)
+
+
 def test_drift_audit_accepts_exact_target_snapshot() -> None:
     report = audit_snapshot(_desired_state(), _matching_live_state())
 
@@ -113,6 +122,25 @@ def test_drift_audit_reports_known_mismatch_as_drift() -> None:
             "field": "strict_required_status_checks",
             "expected": False,
             "actual": True,
+        }
+    ]
+
+
+def test_drift_audit_reports_auto_merge_mismatch_as_drift() -> None:
+    live = _matching_live_state()
+    meta = next(row for row in live["repositories"] if row["repository"] == "Oteryn/Oteryn")
+    meta["allow_auto_merge"] = False
+
+    report = audit_snapshot(_desired_state(), live)
+    row = next(item for item in report["repositories"] if item["repository"] == "Oteryn/Oteryn")
+
+    assert report["status"] == "DRIFT"
+    assert row["status"] == "DRIFT"
+    assert row["drift"] == [
+        {
+            "field": "allow_auto_merge",
+            "expected": True,
+            "actual": False,
         }
     ]
 
@@ -148,8 +176,10 @@ if __name__ == "__main__":
     test_meta_gate_executes_bounded_execution_guard_regressions()
     test_legacy_ai_merge_group_adapter_is_retired()
     test_ci_has_one_external_gate_only()
+    test_desired_state_requires_auto_merge_for_every_permanent_repo()
     test_drift_audit_accepts_exact_target_snapshot()
     test_drift_audit_reports_known_mismatch_as_drift()
+    test_drift_audit_reports_auto_merge_mismatch_as_drift()
     test_drift_audit_preserves_unobservable_field_as_unknown()
     test_drift_audit_rejects_duplicate_repository_snapshot()
     print("merge queue workflow contract PASS")
