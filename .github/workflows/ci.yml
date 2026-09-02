@@ -202,9 +202,9 @@ jobs:
 
           expected = {
               'Oteryn/Oteryn': ('META', 'meta-gate', 'COMPLETE'),
-              'Oteryn/Oteryn-Game': ('GAME', 'game-gate', 'PENDING'),
-              'Oteryn/Oteryn-Platform': ('PLATFORM', 'platform-gate', 'PENDING'),
-              'Oteryn/Oteryn-Atlas': ('ATLAS', 'atlas-gate', 'PENDING'),
+              'Oteryn/Oteryn-Game': ('GAME', 'game-gate', 'COMPLETE'),
+              'Oteryn/Oteryn-Platform': ('PLATFORM', 'platform-gate', 'COMPLETE'),
+              'Oteryn/Oteryn-Atlas': ('ATLAS', 'atlas-gate', 'COMPLETE'),
           }
           rows = state.get('permanent_repositories')
           if not isinstance(rows, list) or len(rows) != len(expected):
