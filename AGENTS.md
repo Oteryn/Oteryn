@@ -10,6 +10,8 @@ It does **not** own Game, Platform or Atlas runtime implementation.
 
 Agents MUST follow `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`.
 
+Agents MUST also follow `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md`: do not mutate an unchanged candidate to retrigger evidence, respect its bounded local retries, and release active ownership in waiting, blocked or stalled states until a material fact changes.
+
 Agents MAY use the `synology oteryn` developer MCP when it is available and the current task authorizes the relevant operation. They MUST follow `docs/agents/contracts/SYNOLOGY_MCP_EXECUTION_POLICY.md`: Synology MCP is an additional runtime/local evidence and execution path, not a replacement for GitHub. GitHub live state remains authoritative for repository, branch, commit, PR, issue, review, CI/check and release facts, and required GitHub verification/workflows MUST NOT be skipped because MCP access exists.
 
 Before declaring a task blocked because of access limitations, agents must discover available capabilities, distinguish tool absence from permission/policy restrictions, and continue useful work when any safe execution path remains.
