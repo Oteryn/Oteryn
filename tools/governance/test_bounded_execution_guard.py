@@ -1,323 +1,157 @@
+#!/usr/bin/env python3
+"""Regression tests for the narrow bounded-execution contract."""
+
+from __future__ import annotations
+
 import copy
 import json
-import sys
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-
-from bounded_execution_guard import (  # noqa: E402
-    GuardError,
-    progress_fingerprint,
-)
-from bounded_execution_test_support import decide  # noqa: E402
+from bounded_execution_guard import GuardError, decide, failure_fingerprint, progress_fingerprint
 
 
 ROOT = Path(__file__).resolve().parents[2]
-POLICY = json.loads(
-    (ROOT / "ecosystem/bounded-autonomous-execution-policy.json").read_text(encoding="utf-8")
-)
-RISK_CLASSES = tuple(POLICY["loop_breaker"]["risk_classes"])
+POLICY_PATH = ROOT / "ecosystem/bounded-autonomous-execution-policy.json"
+POLICY = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
 
 
-def risk_ledger():
-    return {
-        name: {"status": "AUDITED_PASS", "reason": "focused unit coverage"}
-        for name in RISK_CLASSES
-    }
-
-
-def snapshot(**overrides):
-    value = {
+def snapshot(**changes: object) -> dict[str, object]:
+    value: dict[str, object] = {
         "repository": "Oteryn/Oteryn",
-        "task_id": "OTERYN-STALL-GUARD-001",
-        "state": "RUNNING",
-        "phase": "validate",
+        "task_id": "69",
         "task_head_sha": "a" * 40,
-        "candidate_frozen": False,
+        "phase": "implementation",
         "blocking_dependency": "",
-        "dependency_kind": "",
+        "dependency_kind": "none",
         "gate_state": "pending",
-        "review_generation": "review-1",
-        "review_fingerprint": "f" * 64,
-        "evidence_generation": "evidence-1",
         "first_material_failure": "",
+        "state": "RUNNING",
+        "candidate_frozen": False,
+        "material_reason": "",
         "identical_failure_cycles": 0,
-        "heavy_validation_runs": 0,
-        "external_review_invocations": 0,
-        "same_head_gate_rechecks": 0,
+        "heavy_validation_attempts": 0,
         "completion_verified": False,
-        "material_change": False,
-        "material_change_reason": "",
-        "material_change_evidence": "",
-        "material_fact_id": "",
-        "material_fact_head": "",
-        "material_fact_verified": False,
-        "repair_generation_id": "",
-        "repair_base_head": "",
-        "late_material_findings": 0,
-        "post_freeze_material_head_changes": 0,
-        "audited_late_material_findings": 0,
-        "audited_post_freeze_material_head_changes": 0,
-        "final_qualification_runs_since_audit": 0,
-        "risk_ledger": risk_ledger(),
-        "updated_at": "2026-08-25T14:00:00Z",
-        "narration": "first observation",
     }
-    value.update(overrides)
+    value.update(changes)
     return value
 
 
-class ProgressFingerprintTests(unittest.TestCase):
-    def test_fingerprint_ignores_timestamp_and_narration(self):
-        first = snapshot()
-        second = copy.deepcopy(first)
-        second["updated_at"] = "2026-08-25T15:00:00Z"
-        second["narration"] = "different chat text"
+class NarrowBoundedExecutionTests(unittest.TestCase):
+    def test_policy_has_closed_narrow_schema(self) -> None:
         self.assertEqual(
-            progress_fingerprint(first, POLICY),
-            progress_fingerprint(second, POLICY),
+            set(POLICY),
+            {
+                "schema_version", "policy_id", "lifecycle_authority", "states",
+                "progress_fingerprint_fields", "retry_budgets", "candidate_freeze",
+                "dependency_semantics", "session_release_states",
+            },
         )
+        self.assertEqual(len(POLICY["retry_budgets"]), 2)
 
-    def test_fingerprint_changes_when_material_gate_state_changes(self):
-        first = snapshot(gate_state="failure")
-        second = snapshot(gate_state="success")
-        self.assertNotEqual(
-            progress_fingerprint(first, POLICY),
-            progress_fingerprint(second, POLICY),
-        )
+    def test_narration_and_timestamp_are_not_progress(self) -> None:
+        before = snapshot(narration="first", updated_at="yesterday")
+        after = snapshot(narration="different", updated_at="today")
+        self.assertEqual(progress_fingerprint(before, POLICY), progress_fingerprint(after, POLICY))
 
-    def test_policy_rejects_noncanonical_progress_fingerprint_fields(self):
-        variants = []
-        appended = copy.deepcopy(POLICY)
-        appended["progress_fingerprint_fields"].append("updated_at")
-        variants.append(appended)
-        omitted = copy.deepcopy(POLICY)
-        omitted["progress_fingerprint_fields"].remove("gate_state")
-        variants.append(omitted)
+    def test_fingerprints_are_deterministic_and_material(self) -> None:
+        before = snapshot()
+        after = snapshot(task_head_sha="b" * 40)
+        self.assertNotEqual(progress_fingerprint(before, POLICY), progress_fingerprint(after, POLICY))
+        self.assertEqual(failure_fingerprint(before), failure_fingerprint(copy.deepcopy(before)))
 
-        for weakened in variants:
-            with self.subTest(fields=weakened["progress_fingerprint_fields"]):
-                with self.assertRaises(GuardError):
-                    decide(None, snapshot(), "observe", weakened)
+    def test_unchanged_retry_exhaustion_stalls_and_releases(self) -> None:
+        current = snapshot(first_material_failure="unit:test_x", identical_failure_cycles=2)
+        decision = decide(POLICY, current, "retry", previous=copy.deepcopy(current))
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.state, "STALLED")
+        self.assertTrue(decision.release_session)
 
+    def test_zero_retry_denies_after_initial_failure(self) -> None:
+        policy = copy.deepcopy(POLICY)
+        policy["retry_budgets"]["identical_failure_cycles"] = 0
+        current = snapshot(first_material_failure="unit:test_x")
+        self.assertFalse(decide(policy, current, "retry", previous=current).allowed)
 
-class DecisionTests(unittest.TestCase):
-    def test_completion_requires_a_frozen_candidate_in_every_phase(self):
-        for phase, candidate_frozen in (
-            ("validate", False),
-            ("validate", True),
-            ("repair", False),
-            ("repair", True),
-            ("final_qualification", False),
-        ):
-            with self.subTest(phase=phase, candidate_frozen=candidate_frozen):
-                current = snapshot(
-                    phase=phase,
-                    candidate_frozen=candidate_frozen,
-                    completion_verified=True,
-                )
-                result = decide(None, current, "complete", POLICY)
-                self.assertFalse(result.allowed)
-                self.assertNotEqual(result.state, "DONE")
-                self.assertIn("frozen", result.reason.lower())
+    def test_heavy_validation_exhaustion_stalls(self) -> None:
+        current = snapshot(heavy_validation_attempts=2)
+        decision = decide(POLICY, current, "run_heavy_validation", previous=current)
+        self.assertEqual((decision.allowed, decision.state, decision.release_session), (False, "STALLED", True))
 
-    def test_policy_cannot_omit_canonical_frozen_actions(self):
-        for omitted_action in ("mutate", "retrigger"):
-            with self.subTest(omitted_action=omitted_action):
-                weakened = copy.deepcopy(POLICY)
-                weakened["candidate_freeze"]["forbidden_actions_without_material_change"].remove(omitted_action)
-                with self.assertRaisesRegex(GuardError, "forbidden action"):
-                    decide(None, snapshot(), "observe", weakened)
+    def test_retry_and_validation_increment_their_bounded_counters(self) -> None:
+        failed = snapshot(first_material_failure="unit:test_x")
+        retry = decide(POLICY, failed, "retry", previous=failed)
+        heavy = decide(POLICY, snapshot(), "run_heavy_validation", previous=snapshot())
+        self.assertEqual(retry.snapshot["identical_failure_cycles"], 1)
+        self.assertEqual(heavy.snapshot["heavy_validation_attempts"], 1)
 
-    def test_policy_requires_unique_external_dependency_kind(self):
-        for kinds in (["local"], ["external", "external"]):
-            with self.subTest(kinds=kinds):
-                weakened = copy.deepcopy(POLICY)
-                weakened["dependency_kinds"] = kinds
-                with self.assertRaisesRegex(GuardError, "dependency_kinds"):
-                    decide(None, snapshot(), "observe", weakened)
+    def test_external_and_owner_dependencies_release(self) -> None:
+        external = snapshot(blocking_dependency="ci:123", dependency_kind="external")
+        owner = snapshot(blocking_dependency="owner decision", dependency_kind="owner")
+        ext = decide(POLICY, external, "mutate")
+        blocked = decide(POLICY, owner, "retry")
+        self.assertEqual((ext.allowed, ext.state, ext.release_session), (False, "WAITING_EXTERNAL", True))
+        self.assertEqual((blocked.allowed, blocked.state, blocked.release_session), (False, "BLOCKED", True))
 
-    def test_frozen_candidate_denies_retrigger_without_material_change(self):
-        current = snapshot(candidate_frozen=True, state="READY")
-        result = decide(None, current, "retrigger", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertEqual(result.state, "READY")
-        self.assertIn("frozen", result.reason.lower())
-
-    def test_frozen_denial_releases_blocked_and_stalled_sessions(self):
-        for state in ("BLOCKED", "STALLED"):
-            with self.subTest(state=state):
-                current = snapshot(candidate_frozen=True, state=state)
-                result = decide(None, current, "retrigger", POLICY)
-                self.assertFalse(result.allowed)
-                self.assertEqual(result.state, state)
-                self.assertTrue(result.release_session)
-
-    def test_external_dependency_becomes_waiting_and_releases_session(self):
-        previous = snapshot(
-            candidate_frozen=True,
-            state="WAITING_EXTERNAL",
-            blocking_dependency="external_review",
-            dependency_kind="external",
-            gate_state="failure",
-            first_material_failure="review evidence not ready",
-        )
-        current = copy.deepcopy(previous)
-        current["updated_at"] = "2026-08-25T14:05:00Z"
-        result = decide(previous, current, "observe", POLICY)
-        self.assertTrue(result.allowed)
-        self.assertEqual(result.state, "WAITING_EXTERNAL")
-        self.assertTrue(result.release_session)
-
-    def test_external_dependency_denies_operational_actions_until_fact_changes(self):
-        current = snapshot(
-            state="WAITING_EXTERNAL",
-            blocking_dependency="external_review",
-            dependency_kind="external",
-            gate_state="failure",
-            first_material_failure="review evidence not ready",
-        )
-        for action in (
-            "mutate",
-            "retry",
-            "retrigger",
-            "run_heavy_validation",
-            "request_external_review",
-            "same_head_gate_recheck",
-        ):
-            with self.subTest(action=action):
-                result = decide(current, copy.deepcopy(current), action, POLICY)
-                self.assertFalse(result.allowed)
-                self.assertEqual(result.state, "WAITING_EXTERNAL")
-                self.assertTrue(result.release_session)
-
-    def test_second_identical_local_failure_stalls_instead_of_retrying_again(self):
-        previous = snapshot(
-            gate_state="failure",
-            first_material_failure="same deterministic failure",
-            identical_failure_cycles=1,
-        )
-        current = copy.deepcopy(previous)
-        current["identical_failure_cycles"] = 2
-        result = decide(previous, current, "retry", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertEqual(result.state, "STALLED")
-        self.assertTrue(result.release_session)
-
-    def test_retry_counters_cannot_regress_without_material_progress(self):
-        counter_names = (
-            "identical_failure_cycles",
-            "heavy_validation_runs",
-            "external_review_invocations",
-            "same_head_gate_rechecks",
-        )
-        for counter in counter_names:
-            with self.subTest(counter=counter):
-                previous = snapshot(**{counter: 1})
-                current = snapshot(**{counter: 0})
-                with self.assertRaises(GuardError):
-                    decide(previous, current, "observe", POLICY)
-
-    def test_head_scoped_counters_may_restart_after_material_head_progress(self):
-        previous = snapshot(
-            task_head_sha="a" * 40,
-            identical_failure_cycles=2,
-            heavy_validation_runs=2,
-            same_head_gate_rechecks=1,
-        )
-        current = snapshot(task_head_sha="b" * 40)
-        result = decide(previous, current, "mutate", POLICY)
-        self.assertTrue(result.allowed)
-
-    def test_review_budget_cannot_reset_after_sha_only_head_progress(self):
-        previous = snapshot(
-            task_head_sha="a" * 40,
-            external_review_invocations=1,
-            review_fingerprint="f" * 64,
-        )
-        current = snapshot(
-            task_head_sha="b" * 40,
-            external_review_invocations=0,
-            review_fingerprint="f" * 64,
-        )
-        with self.assertRaises(GuardError):
-            decide(previous, current, "observe", POLICY)
-
-    def test_review_budget_may_reset_after_trusted_risk_binding_changes(self):
-        previous = snapshot(
-            external_review_invocations=1,
-            review_fingerprint="f" * 64,
-        )
-        current = snapshot(
-            external_review_invocations=0,
-            review_fingerprint="e" * 64,
-        )
-        result = decide(previous, current, "mutate", POLICY)
-        self.assertTrue(result.allowed)
-
-    def test_unverified_done_snapshot_is_invalid_for_every_action(self):
-        current = snapshot(state="DONE", completion_verified=False)
-        with self.assertRaises(GuardError):
-            decide(None, current, "observe", POLICY)
-
-    def test_done_requires_verified_completion(self):
-        current = snapshot(state="READY", completion_verified=False)
-        result = decide(None, current, "complete", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertNotEqual(result.state, "DONE")
-
-        previous = snapshot(
-            state="READY",
-            phase="final_qualification",
-            candidate_frozen=True,
-            completion_verified=False,
-        )
-        verified = copy.deepcopy(previous)
-        verified["completion_verified"] = True
-        result = decide(previous, verified, "complete", POLICY)
-        self.assertTrue(result.allowed)
-        self.assertEqual(result.state, "DONE")
-
-    def test_rejected_completion_preserves_release_states(self):
+    def test_observe_remains_allowed_in_released_states(self) -> None:
         for state in ("WAITING_EXTERNAL", "BLOCKED", "STALLED"):
-            with self.subTest(state=state):
-                current = snapshot(state=state, completion_verified=False)
-                result = decide(None, current, "complete", POLICY)
-                self.assertFalse(result.allowed)
-                self.assertEqual(result.state, state)
-                self.assertTrue(result.release_session)
+            decision = decide(POLICY, snapshot(state=state), "observe")
+            self.assertTrue(decision.allowed)
+            self.assertTrue(decision.release_session)
 
-    def test_unchanged_blocked_or_stalled_task_cannot_resume_operational_work(self):
-        for state in ("BLOCKED", "STALLED"):
-            previous = snapshot(state=state, first_material_failure="unchanged failure")
-            current = snapshot(
-                state="RUNNING",
-                first_material_failure="unchanged failure",
+    def test_unchanged_released_task_cannot_resume_operational_work(self) -> None:
+        previous = snapshot(state="STALLED")
+        current = snapshot(state="RUNNING")
+        decision = decide(POLICY, current, "mutate", previous=previous)
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.state, "STALLED")
+
+    def test_actual_material_change_resumes_work(self) -> None:
+        previous = snapshot(state="WAITING_EXTERNAL", blocking_dependency="ci:1", dependency_kind="external")
+        current = snapshot(task_head_sha="b" * 40, gate_state="passed")
+        decision = decide(POLICY, current, "mutate", previous=previous)
+        self.assertTrue(decision.allowed)
+        self.assertEqual(decision.state, "RUNNING")
+
+    def test_frozen_mutate_and_retrigger_fail_without_real_reason(self) -> None:
+        previous = snapshot(candidate_frozen=True)
+        for action in ("mutate", "retrigger"):
+            self.assertFalse(decide(POLICY, copy.deepcopy(previous), action, previous=previous).allowed)
+        changed = snapshot(candidate_frozen=True, task_head_sha="b" * 40, material_reason="failing_required_test")
+        self.assertTrue(decide(POLICY, changed, "mutate", previous=previous).allowed)
+
+    def test_unfrozen_noop_mutation_and_retrigger_are_denied(self) -> None:
+        previous = snapshot()
+        for action in ("mutate", "retrigger"):
+            decision = decide(POLICY, copy.deepcopy(previous), action, previous=previous)
+            self.assertFalse(decision.allowed)
+            self.assertIn("unchanged", decision.reason)
+
+    def test_main_only_change_is_not_a_snapshot_coordinate(self) -> None:
+        self.assertNotIn("main_sha", POLICY["progress_fingerprint_fields"])
+
+    def test_done_requires_verified_fact_and_is_terminal(self) -> None:
+        with self.assertRaises(GuardError):
+            decide(POLICY, snapshot(state="DONE"), "observe")
+        completed = snapshot(state="READY", completion_verified=True)
+        done = decide(POLICY, completed, "complete", previous=snapshot(state="READY"))
+        self.assertEqual((done.allowed, done.state), (True, "DONE"))
+        terminal = copy.deepcopy(done.snapshot)
+        self.assertFalse(decide(POLICY, terminal, "mutate", previous=terminal).allowed)
+        self.assertTrue(decide(POLICY, terminal, "observe", previous=terminal).allowed)
+
+    def test_cli_emits_deterministic_json(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "snapshot.json"
+            path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            result = subprocess.run(
+                ["python3", str(ROOT / "tools/governance/bounded_execution_guard.py"),
+                 "--policy", str(POLICY_PATH), "--snapshot", str(path), "--action", "observe"],
+                check=True, capture_output=True, text=True,
             )
-            for action in ("mutate", "retry", "run_heavy_validation"):
-                with self.subTest(state=state, action=action):
-                    result = decide(previous, current, action, POLICY)
-                    self.assertFalse(result.allowed)
-                    self.assertEqual(result.state, state)
-                    self.assertTrue(result.release_session)
-
-    def test_external_review_budget_prevents_duplicate_invocation(self):
-        current = snapshot(external_review_invocations=1)
-        result = decide(None, current, "request_external_review", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertEqual(result.state, "WAITING_EXTERNAL")
-        self.assertTrue(result.release_session)
-
-    def test_heavy_validation_budget_prevents_third_full_run(self):
-        current = snapshot(
-            gate_state="failure",
-            first_material_failure="full suite still fails",
-            heavy_validation_runs=2,
-        )
-        result = decide(None, current, "run_heavy_validation", POLICY)
-        self.assertFalse(result.allowed)
-        self.assertEqual(result.state, "STALLED")
+        self.assertTrue(json.loads(result.stdout)["allowed"])
 
 
 if __name__ == "__main__":

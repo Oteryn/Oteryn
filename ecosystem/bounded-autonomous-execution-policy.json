@@ -18,84 +18,26 @@
     "blocking_dependency",
     "dependency_kind",
     "gate_state",
-    "review_binding_scope",
-    "first_material_failure",
-    "material_fact_envelope_id"
+    "first_material_failure"
   ],
   "retry_budgets": {
     "identical_failure_cycles": 2,
-    "heavy_validation_attempts": 2,
-    "external_review_invocations_per_fingerprint": 1,
-    "same_head_gate_rechecks_per_evidence_generation": 1
-  },
-  "retry_counter_scopes": {
-    "identical_failure_cycles": [
-      "task_head_sha",
-      "failure_fingerprint"
-    ],
-    "heavy_validation_runs": [
-      "task_head_sha"
-    ],
-    "external_review_invocations": [
-      "review_binding_scope"
-    ],
-    "same_head_gate_rechecks": [
-      "task_head_sha",
-      "review_binding_scope"
-    ]
+    "heavy_validation_attempts": 2
   },
   "candidate_freeze": {
-    "forbidden_actions_without_material_change": [
-      "mutate",
-      "retrigger"
-    ],
-    "material_change_reasons": [
+    "forbidden_unchanged_actions": ["mutate", "retrigger"],
+    "material_reasons": [
       "review_finding",
       "failing_required_test",
       "semantic_reconciliation",
       "changed_governing_authority"
     ]
   },
-  "loop_breaker": {
-    "late_material_finding_threshold": 2,
-    "post_freeze_material_head_change_threshold": 2,
-    "material_finding_severities": [
-      "P0",
-      "P1",
-      "P2"
-    ],
-    "risk_classes": [
-      "identity_binding",
-      "authority_relay",
-      "epoch_deadline",
-      "retry_budget",
-      "concurrency_replay",
-      "transaction_persistence",
-      "negative_paths",
-      "ci_governance"
-    ],
-    "ledger_statuses": [
-      "PENDING",
-      "AUDITED_PASS",
-      "NOT_APPLICABLE"
-    ],
-    "ledger_terminal_statuses": [
-      "AUDITED_PASS",
-      "NOT_APPLICABLE"
-    ],
-    "final_qualification_generations_per_audit": 1
+  "dependency_semantics": {
+    "external": "WAITING_EXTERNAL",
+    "owner": "BLOCKED",
+    "permission": "BLOCKED",
+    "policy": "BLOCKED"
   },
-  "dependency_kinds": [
-    "external",
-    "local",
-    "owner",
-    "permission",
-    "policy"
-  ],
-  "session_release_states": [
-    "WAITING_EXTERNAL",
-    "BLOCKED",
-    "STALLED",
-    "DONE"
-  ]
+  "session_release_states": ["WAITING_EXTERNAL", "BLOCKED", "STALLED", "DONE"]
 }
