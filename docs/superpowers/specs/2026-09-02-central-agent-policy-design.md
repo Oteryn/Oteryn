@@ -53,24 +53,24 @@ Organization-wide concerns owned only by META include:
 
 ### 2. Immutable provider binding
 
-Each provider stores one small machine-readable binding, for example:
+Each provider stores one small machine-readable binding at:
 
 `docs/agents/META_AGENT_POLICY_BINDING.json`
 
-with this shape:
+The binding schema is closed. Required values are:
 
-```json
-{
-  "schema_version": 1,
-  "policy_id": "OTERYN_ORGANIZATION_AGENT_POLICY",
-  "policy_version": "3.0.0",
-  "authority_repository": "Oteryn/Oteryn",
-  "authority_commit": "<full merged META commit SHA>",
-  "organization_policy_path": "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md",
-  "prompting_standard_path": "docs/agents/policy/PROMPTING_STANDARD.md",
-  "prompt_eval_standard_path": "docs/agents/policy/PROMPT_EVAL_STANDARD.md"
-}
+```text
+schema_version = 1
+policy_id = OTERYN_ORGANIZATION_AGENT_POLICY
+policy_version = 3.0.0
+authority_repository = Oteryn/Oteryn
+authority_commit = exactly 40 lowercase hexadecimal characters
+organization_policy_path = docs/agents/policy/ORGANIZATION_AGENT_POLICY.md
+prompting_standard_path = docs/agents/policy/PROMPTING_STANDARD.md
+prompt_eval_standard_path = docs/agents/policy/PROMPT_EVAL_STANDARD.md
 ```
+
+`authority_commit` must resolve to the exact merged META commit selected during that provider's adoption. Mutable refs (`main`, tags), abbreviated SHAs and unmerged candidate commits are invalid.
 
 The binding pins an immutable merged META commit. Provider adoption therefore changes only when a provider deliberately adopts a newer central policy. This prevents a moving META `main` from silently changing execution semantics inside an already-admitted provider task.
 
