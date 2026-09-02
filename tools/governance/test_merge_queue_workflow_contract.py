@@ -15,7 +15,11 @@ CI_WORKFLOW = ROOT / ".github/workflows/ci.yml"
 DESIRED_STATE = ROOT / "ecosystem/governance-desired-state.json"
 ADR_0005 = ROOT / "docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md"
 MERGE_GROUP_ADAPTER = ROOT / ".github/workflows/merge-group-ai-review-adapter.yml"
+CONTINUATION_POLICY = ROOT / "ecosystem/agent-continuation-policy.json"
+CONTINUATION_MODULE = ROOT / "tools/governance/agent_continuation_policy.py"
 CONTINUATION_TEST = ROOT / "tools/governance/test_agent_continuation_policy.py"
+CONTINUATION_CONTRACT = ROOT / "docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md"
+AGENTS = ROOT / "AGENTS.md"
 ENFORCEMENT_FIELDS = (
     "required_gate",
     "merge_queue",
@@ -88,6 +92,34 @@ def test_meta_gate_executes_persistent_continuation_regressions() -> None:
     assert CONTINUATION_TEST.is_file()
     assert "python3 tools/governance/test_agent_continuation_policy.py" in gate
     assert workflow.count("python3 tools/governance/test_agent_continuation_policy.py") == 1
+
+
+def test_meta_gate_requires_and_agents_discovers_persistent_continuation_contract() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    required_paths = (
+        "ecosystem/agent-continuation-policy.json",
+        "tools/governance/agent_continuation_policy.py",
+        "tools/governance/test_agent_continuation_policy.py",
+        "docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md",
+    )
+    for relative in required_paths:
+        assert f"Path('{relative}')" in workflow
+
+    assert CONTINUATION_POLICY.is_file()
+    assert CONTINUATION_MODULE.is_file()
+    assert CONTINUATION_TEST.is_file()
+    assert CONTINUATION_CONTRACT.is_file()
+
+    agents = AGENTS.read_text(encoding="utf-8")
+    assert "docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md" in agents
+    assert "ecosystem/agent-continuation-policy.json" in agents
+
+    contract = CONTINUATION_CONTRACT.read_text(encoding="utf-8")
+    assert "Oteryn/Oteryn#108" in contract
+    assert "Oteryn/Oteryn#69" in contract
+    assert "STALLED" in contract and "nonterminal" in contract
+    assert "CheckpointTransitionAuthority" in contract
+    assert "BLOCKED_CAPABILITY_UNAVAILABLE" in contract
 
 
 def test_legacy_ai_merge_group_adapter_is_retired() -> None:
@@ -193,6 +225,7 @@ if __name__ == "__main__":
     test_meta_gate_qualifies_pull_requests_and_exact_merge_group_candidates()
     test_meta_gate_executes_bounded_execution_guard_regressions()
     test_meta_gate_executes_persistent_continuation_regressions()
+    test_meta_gate_requires_and_agents_discovers_persistent_continuation_contract()
     test_legacy_ai_merge_group_adapter_is_retired()
     test_ci_has_one_external_gate_only()
     test_adr0005_keeps_auto_merge_subordinate_to_merge_queue()
