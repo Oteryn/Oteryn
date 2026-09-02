@@ -471,8 +471,8 @@ def validate_continuation_snapshot(
     fresh_state = bounded_authority.current_state(trusted_task)
     if not transition_authority.proves_transition(snapshot, trusted_task, fresh_state):
         raise ContinuationPolicyError("historical-to-fresh task/lifecycle transition is not authoritative")
-    if not bounded_authority.preserves_retry_and_evidence_continuity(snapshot, snapshot, trusted_task):
-        raise ContinuationPolicyError("fresh bounded retry/evidence continuity is not confirmed")
+    if not bounded_authority.matches_current_retry_and_evidence_state(snapshot, trusted_task):
+        raise ContinuationPolicyError("fresh bounded retry/evidence state does not match current authority")
     bounded_authority.releases_worker_ownership(fresh_state, trusted_task)
     bounded_authority.is_terminal(fresh_state, trusted_task)
 
