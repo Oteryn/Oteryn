@@ -136,6 +136,13 @@ class NarrowBoundedExecutionTests(unittest.TestCase):
             self.assertFalse(decision.allowed, action)
             self.assertIn("previous", decision.reason, action)
 
+    def test_previous_must_match_stable_task_identity(self) -> None:
+        previous = snapshot()
+        with self.assertRaises(GuardError):
+            decide(POLICY, snapshot(task_id="70"), "observe", previous=previous)
+        with self.assertRaises(GuardError):
+            decide(POLICY, snapshot(repository="Oteryn/Other"), "observe", previous=previous)
+
     def test_retry_counters_cannot_regress_within_their_scope(self) -> None:
         retry_previous = snapshot(first_material_failure="unit:test_x", identical_failure_cycles=1)
         retry_reset = snapshot(first_material_failure="unit:test_x", identical_failure_cycles=0)
@@ -160,12 +167,22 @@ class NarrowBoundedExecutionTests(unittest.TestCase):
             previous=heavy_previous,
         ).allowed)
 
-    def test_previous_frozen_same_head_cannot_be_unfrozen_to_mutate(self) -> None:
+    def test_previous_freeze_remains_authoritative_for_same_head(self) -> None:
         previous = snapshot(candidate_frozen=True)
-        current = snapshot(candidate_frozen=False, gate_state="failed", material_reason="failing_required_test")
-        decision = decide(POLICY, current, "mutate", previous=previous)
+        bypass = snapshot(candidate_frozen=False, gate_state="failed")
+        decision = decide(POLICY, bypass, "mutate", previous=previous)
         self.assertFalse(decision.allowed)
         self.assertIn("frozen", decision.reason)
+        self.assertTrue(decision.snapshot["candidate_frozen"])
+
+        legitimate = snapshot(
+            candidate_frozen=False,
+            gate_state="failed",
+            material_reason="failing_required_test",
+        )
+        admitted = decide(POLICY, legitimate, "mutate", previous=previous)
+        self.assertTrue(admitted.allowed)
+        self.assertTrue(admitted.snapshot["candidate_frozen"])
 
         new_head = snapshot(
             candidate_frozen=False,
