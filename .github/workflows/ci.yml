@@ -75,12 +75,16 @@ jobs:
               Path('docs/testing/ECOSYSTEM_TEST_STRATEGY.md'),
               Path('docs/release/RELEASE_COORDINATION.md'),
               Path('docs/governance/AI_REVIEW_POLICY.md'),
+              Path('docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md'),
               Path('ecosystem/repositories.json'),
               Path('ecosystem/governance-desired-state.json'),
               Path('ecosystem/compatibility.schema.json'),
               Path('ecosystem/agent-execution-routing-policy.json'),
+              Path('ecosystem/bounded-autonomous-execution-policy.json'),
               Path('tools/governance/agent_execution_routing.py'),
+              Path('tools/governance/bounded_execution_guard.py'),
               Path('tools/governance/test_agent_execution_routing.py'),
+              Path('tools/governance/test_bounded_execution_guard.py'),
               Path('tools/governance/test_remote_desktop_action_gate.py'),
               Path('tools/governance/test_merge_queue_workflow_contract.py'),
           ]
@@ -241,6 +245,7 @@ jobs:
           python3 tools/governance/test_agent_execution_routing.py
           python3 tools/governance/test_remote_desktop_action_gate.py
           python3 tools/governance/test_merge_queue_workflow_contract.py
+          python3 tools/governance/test_bounded_execution_guard.py
 
       - name: Verify META boundary markers
         shell: bash
