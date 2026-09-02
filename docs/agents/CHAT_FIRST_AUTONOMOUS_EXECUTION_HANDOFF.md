@@ -26,6 +26,8 @@ Current authority boundaries are:
 - `#108`: persistent continuation only;
 - Game/Platform/Atlas: provider-owned implementation, writable only with explicit owner authorization for that exact provider and current task.
 
+Under the current bounded contract, `WAITING_EXTERNAL`, `BLOCKED` and `STALLED` release active worker ownership but remain nonterminal. Only the bounded authority determines terminality, and currently only `DONE` is terminal.
+
 ## Problem being solved
 
 Oteryn must not conflate:
@@ -65,6 +67,8 @@ Resume mechanisms:
 
 If a replacement worker will be needed and no real automatic mechanism exists, record `stop_reinvoke_required` and report that truthfully.
 
+`STALLED` never maps to continuation `terminal` merely because the unchanged retry budget was exhausted. It may resume only after the bounded authority accepts a material progress-fingerprint change.
+
 ## Durable lineage
 
 Stable continuation lineage is keyed by:
@@ -77,7 +81,7 @@ checkpoint_lineage_token
 
 Branch, PR, exact head and next action are mutable execution coordinates. They must not be used to create a new lineage merely because normal task progress advanced them.
 
-A durable checkpoint must preserve enough trusted state to reconstruct exactly one next safe action without replaying the full chat. It must delegate bounded retry/evidence continuity to the bounded lifecycle authority rather than defining a competing counter schema.
+A durable checkpoint must preserve enough trusted state to reconstruct exactly one next safe action without replaying the full chat. It must include the semantic minimum required by the canonical #108 design and delegate bounded retry/evidence continuity to the bounded lifecycle authority rather than defining a competing counter schema.
 
 Checkpointing is control-plane state, not justification for a no-op/retrigger commit.
 
@@ -89,7 +93,9 @@ Checkpointing is control-plane state, not justification for a no-op/retrigger co
 - use Codex when its software-development loop materially reduces implementation/testing cost or risk;
 - do not route to Work/Codex merely because effort is high.
 
-If no authorized surface can perform a required capability, fail closed instead of pretending continuation exists.
+Surface decisions must use trusted **current-session** capability evidence: exposed tool/connector registration, supported operation schemas, observable repository permissions/authentication, surface compatibility/availability/authorization and evaluation of safe fallbacks. Stale handoffs or caller-supplied booleans are not capability authority.
+
+If no authorized compatible surface can perform a required capability, fail closed only after trusted evidence proves safe fallbacks are exhausted. Do not report `BLOCKED_CAPABILITY_UNAVAILABLE` while a safe authorized fallback remains untested.
 
 ## Context handling
 
@@ -105,7 +111,7 @@ Keep owner-facing noise low. Notify for:
 
 - verified terminal completion;
 - a real owner/permission/safety decision;
-- terminal bounded stall with no materially new safe path;
+- bounded recovery reaching `STALLED` only when no verified automatic mechanism can wait for a material progress-fingerprint change and resume; `STALLED` remains nonterminal;
 - truthful owner re-invocation requirement when automatic continuation is unavailable.
 
 Do not claim background work when none is configured.
@@ -114,7 +120,7 @@ Do not claim background work when none is configured.
 
 META design/issues/PRs never confer Game, Platform or Atlas write authority. Before provider mutation, require explicit owner authorization naming the exact repository and current adoption task. Without it, read-only preflight is allowed and mutation fails closed.
 
-Programme closeout needs each provider either adopted on protected main or explicitly deferred/excluded by a durable owner decision.
+Programme closeout needs each provider either adopted on protected main or covered by a fail-closed GitHub-authoritative scope decision. A defer/exclusion counts only when canonical `Oteryn/Oteryn#108` (or its explicitly named successor Issue) contains an `OTERYN_PROVIDER_SCOPE_DECISION_V1` comment naming the exact provider repository, exact current adoption task, `DEFER|EXCLUDE`, non-empty reason, META main SHA and provider main SHA. Closeout must re-read the exact comment, verify the author currently has sufficient repository-admin/owner authority, confirm exact provider/task binding and that no later owner decision supersedes it. Missing authorization, generic handoffs or unverifiable permission are not implicit defer.
 
 ## Continuation order
 

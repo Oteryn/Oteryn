@@ -31,6 +31,8 @@ Do **not** recreate retired governance machinery such as formal R0/R1/R2 merge s
 
 GitHub protected-branch enforcement, the repository aggregate gate and GitHub Merge Queue own integration freshness/enforcement.
 
+Under the current bounded contract, `WAITING_EXTERNAL`, `BLOCKED` and `STALLED` release worker ownership but remain nonterminal. Only the bounded authority determines terminality, and currently only `DONE` is terminal.
+
 ### Objective
 
 Implement the smallest organization continuation layer that preserves one owner-visible task across worker/session/tool/wait/context boundaries without weakening the existing bounded lifecycle.
@@ -86,6 +88,8 @@ Fail closed on invalid pairs.
 
 If another worker will be needed and no worker-launching/preserving automatic mechanism exists, use `stop_reinvoke_required`; do not imply background continuation.
 
+`STALLED` is released bounded-retry exhaustion, not terminal completion. Never map `STALLED` to the continuation `terminal` disposition unless a newer bounded authority explicitly changes canonical terminality.
+
 ### Stable lineage
 
 Durable predecessor lookup must use only immutable lineage identity:
@@ -102,7 +106,7 @@ Branch, PR, exact head and next action are mutable execution coordinates. Reconc
 
 Checkpoint after material milestones or before release/wait/rotation, not after every tool call.
 
-A checkpoint must make one concrete next safe action reconstructible from durable state. It references current bounded lifecycle/retry evidence but must not create a competing bounded counter schema.
+A checkpoint must make one concrete next safe action reconstructible from durable state. It must include the semantic minimum from the canonical #108 design, reference current bounded lifecycle/retry evidence and must not create a competing bounded counter schema.
 
 Checkpoint state is not justification for an empty/no-op/retrigger commit.
 
@@ -113,7 +117,10 @@ Checkpoint state is not justification for an empty/no-op/retrigger commit.
 - Use Work only for a material Work-only capability.
 - Use Codex when its repository development loop materially improves safety/cost.
 - High effort alone never requires Work/Codex.
-- If no safe authorized surface exists for a required capability, fail closed as `BLOCKED_CAPABILITY_UNAVAILABLE`.
+
+Do not select a surface or report a capability blocker from stale handoffs or caller-supplied booleans. Resolve a trusted current-session capability snapshot from actual exposed tools/connectors, supported operation schemas, observable repository authentication/permission, surface compatibility/availability/authorization and safe fallback discovery.
+
+If no safe authorized compatible surface exists for a required capability, fail closed as `BLOCKED_CAPABILITY_UNAVAILABLE` **only after** trusted current evidence proves the safe fallback set exhausted.
 
 Remote Desktop/Desktop Commander remains subject to the exact current protected-main exception policy. Availability is not authorization.
 
@@ -132,7 +139,7 @@ META authority does not grant Game/Platform/Atlas writes.
 
 Before mutating a provider repository, require explicit owner authorization naming that exact repository and the current adoption task. Without it, perform only read-only preflight and record the permission blocker.
 
-Final programme closeout requires every provider either protected-main adopted or explicitly deferred/excluded by a durable owner decision.
+Final programme closeout requires every provider either protected-main adopted or covered by a currently verified GitHub-authoritative scope-decision record. A defer/exclusion counts only when canonical `#108` (or an explicitly named successor Issue) contains an `OTERYN_PROVIDER_SCOPE_DECISION_V1` comment naming the exact provider repository, exact current adoption task, `DEFER|EXCLUDE`, non-empty reason, META main SHA and provider main SHA. Re-read the exact comment at closeout, verify the author currently has sufficient repository-admin/owner authority, confirm provider/task binding and reject a record superseded by a later owner decision. Missing write authorization, generic handoffs or unknown permission are not implicit defer.
 
 ### Validation discipline
 
@@ -160,7 +167,7 @@ Notify only for:
 
 - verified terminal completion;
 - a concrete owner/permission/safety decision;
-- terminal bounded stall with no materially new safe path;
+- bounded recovery reaching `STALLED` when no verified automatic mechanism can wait for a material progress-fingerprint change and resume; `STALLED` remains nonterminal;
 - truthful owner re-invocation requirement because no automatic continuation exists;
 - an unavoidable tool capability gap that blocks the required protected integration operation after all safe alternatives are exhausted.
 

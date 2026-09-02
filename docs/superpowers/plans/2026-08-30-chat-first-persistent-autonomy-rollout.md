@@ -8,7 +8,7 @@
 
 - GitHub live state is authoritative; refresh before every material mutation/integration decision.
 - Current protected-main `AGENTS.md` and ADR 0005 outrank historical plan text.
-- The bounded lifecycle from `#69` is referenced, not copied.
+- The bounded lifecycle from `#69` is referenced, not copied. Under the current bounded contract `STALLED` is a released **nonterminal** state; only the bounded authority may declare terminality, and currently only `DONE` is terminal.
 - `#107` may own routing/RDC/provider convergence only; no second bounded lifecycle.
 - GitHub protected branch + aggregate gate + Merge Queue own integration enforcement.
 - Do not recreate retired R0/R1/R2, review-fingerprint, `ai-review-gate`, attestation, outbox, custom merge-proof or `LOOP_BREAKER_AUDIT` machinery.
@@ -149,19 +149,43 @@ class TrustedTaskIdentity:
     task_head_sha: str
     expected_next_action: str
 
+@dataclass(frozen=True)
+class TrustedCapabilitySnapshot:
+    observed_at: str
+    required_capability: str | None
+    compatible_surfaces: tuple[str, ...]
+    available_surfaces: tuple[str, ...]
+    authorized_surfaces: tuple[str, ...]
+    safe_fallbacks_exhausted: bool
+    evidence_refs: tuple[str, ...]
+
 class CheckpointLineageAuthority(Protocol): ...
 class CheckpointTransitionAuthority(Protocol): ...
 class BoundedLifecycleAuthority(Protocol): ...
 class ResumeMechanismVerifier(Protocol): ...
 class RemainingWorkAuthority(Protocol): ...
+class ExecutionCapabilityAuthority(Protocol):
+    def current_snapshot(
+        self,
+        trusted_task: TrustedTaskIdentity,
+        required_capability: str | None,
+    ) -> TrustedCapabilitySnapshot: ...
 
 class ExecutionSurfaceUnavailable(RuntimeError): ...
 
 def load_policy(path: Path) -> dict: ...
 def validate_policy(policy: dict) -> None: ...
 def validate_continuation_snapshot(..., validation_mode: str) -> None: ...
-def select_execution_surface(policy: dict, facts: dict) -> str: ...
+def select_execution_surface(
+    policy: dict,
+    *,
+    trusted_task: TrustedTaskIdentity,
+    required_capability: str | None,
+    capability_authority: ExecutionCapabilityAuthority,
+) -> str: ...
 ```
+
+`TrustedCapabilitySnapshot` is produced by the trusted authority from current-session/control-plane evidence. The caller cannot manufacture support/availability/authorization booleans and pass them as selection authority. Unknown/stale/unverifiable discovery fails closed. `BLOCKED_CAPABILITY_UNAVAILABLE` is valid only when the authority has evaluated the safe compatible fallback set and reports it exhausted.
 
 Interfaces are trust boundaries, not permission to duplicate provider/control-plane storage.
 
@@ -184,6 +208,46 @@ Required invariants:
 - branch/PR/head/next action may advance without changing lineage;
 - immutable lineage mismatch fails closed.
 
+### Checkpoint semantic minimum
+
+Define one baseline valid checkpoint fixture containing at least:
+
+```text
+repository
+task_id
+checkpoint_lineage_token
+task_branch
+pr_applicable
+pr_id                         # required iff pr_applicable=true
+task_head_sha
+phase
+bounded_lifecycle_state
+last_material_progress
+completed_work
+evidence_refs
+bounded_continuity_ref
+blockers
+context_pressure              # may be null only when genuinely not relevant
+worker_disposition
+resume_mechanism
+resume_locator                # required for mechanisms that require a locator
+next_action
+```
+
+Before implementation, add parameterized RED tests that delete **each** always-required field one at a time and require rejection. Add malformed/type-shape tests proving at minimum:
+
+- repository/task/lineage/branch/phase/lifecycle/next-action are non-empty strings;
+- `pr_applicable` is an exact JSON/Python boolean, never an integer alias;
+- `pr_id` is non-empty exactly when `pr_applicable=true`, and must not be fabricated for a non-PR checkpoint;
+- `task_head_sha` is an exact lowercase 40-hex SHA;
+- completed work, evidence references and blockers use deterministic list/tuple shapes with valid members;
+- bounded continuity reference is present and non-empty but its internal retry schema remains owned by `#69`;
+- exactly one concrete `next_action` exists;
+- locator-dependent mechanisms reject missing/empty locators;
+- context-pressure shape is validated when present and cannot invent an exact runtime token count the platform does not expose.
+
+The same semantic-minimum validation applies to `checkpoint_write` and to authenticated historical checkpoints during `resume_read`.
+
 ### Checkpoint write
 
 - latest predecessor is resolved by trusted lineage;
@@ -191,11 +255,12 @@ Required invariants:
 - first continuation checkpoint must match already-consumed current bounded state;
 - existing predecessor continuity is delegated to bounded lifecycle authority;
 - mutable checkpoint coordinates must match current `TrustedTaskIdentity`;
+- semantic-minimum fields and conditional fields must already be valid before a release/rotation checkpoint is persisted;
 - unknown/unavailable bounded authority fails closed.
 
 ### Resume read
 
-- historical checkpoint integrity is verified before reconciliation;
+- historical checkpoint integrity and semantic-minimum shape are verified before reconciliation;
 - historical mutable coordinates are not rewritten to look current;
 - automatic resume authenticates the actual historical mechanism/locator/event;
 - owner re-invocation uses owner-authorized re-entry evidence, never fabricated automatic-event evidence;
@@ -209,6 +274,7 @@ Required invariants:
 - `rotate_resumable` ↔ only `scheduled_task|work_event_trigger|work_persistent` with non-empty verified locator;
 - `stop_reinvoke_required` ↔ `owner_reinvoke`;
 - `terminal` ↔ `none_terminal` plus independent bounded terminal state;
+- under the current `#69` contract, `STALLED` + `terminal|none_terminal` is rejected because `STALLED` is released but nonterminal; only the bounded authority may report terminality;
 - invalid pairings fail closed.
 
 ### GitHub-native waiting
@@ -226,11 +292,18 @@ Worker/session/context/surface changes must never reset or enlarge bounded retry
 
 ### Execution surface
 
-- Chat is default when capabilities suffice;
-- GitHub-native is preferred for deterministic compute/waiting;
-- Work selection requires a verified material Work-only capability and authorization;
-- Codex selection requires the software-development capability case;
-- unavailable/unauthorized required capability with no safe fallback raises/returns `BLOCKED_CAPABILITY_UNAVAILABLE`.
+All selector tests obtain capability facts through `ExecutionCapabilityAuthority`; raw caller dictionaries are not accepted as authority.
+
+Required RED/GREEN coverage:
+
+- Chat is selected when current trusted capability evidence proves it can safely perform the required work;
+- GitHub-native is preferred for deterministic compute/waiting when compatible and available;
+- Work is selected only when the required capability is Work-compatible **and** current trusted evidence proves Work available and authorized;
+- Codex is selected only for its compatible software-development capability case with current availability/authorization evidence;
+- a surface that is available/authorized but incompatible with the required capability is rejected;
+- stale, self-asserted, empty or unverifiable capability evidence is rejected;
+- an unavailable/unauthorized preferred surface must cause evaluation of every safe compatible fallback before blocker classification;
+- `BLOCKED_CAPABILITY_UNAVAILABLE` is raised/returned only when trusted evidence proves the safe compatible fallback set is exhausted.
 
 Run focused tests after every material fix, then the full continuation suite.
 
@@ -300,7 +373,21 @@ Absent exact provider authorization:
 - record `OWNER_PERMISSION_REQUIRED` in the programme evidence;
 - continue other authorized lanes.
 
-Missing authorization is not implicit final defer. Final exclusion/defer requires an explicit durable owner decision.
+Missing authorization is not implicit final defer.
+
+A final provider defer/exclusion is valid only through this GitHub-authoritative record on `Oteryn/Oteryn#108` (or a canonical successor Issue explicitly named by `#108`):
+
+```text
+OTERYN_PROVIDER_SCOPE_DECISION_V1
+provider_repository: Oteryn/<exact-provider-repo>
+adoption_task: <exact current provider adoption Issue/task locator>
+decision: DEFER|EXCLUDE
+reason: <non-empty owner rationale>
+meta_main_sha: <current protected META main SHA>
+provider_main_sha: <current protected/default provider main SHA>
+```
+
+The decision comment is a durable locator, not self-authenticating authority. At closeout the coordinator must re-read that exact GitHub comment and verify its author currently has repository-admin/owner authority for the scoped decision, the provider/adoption-task coordinates still match live state, the recorded repository identities/SHA context remain coherent provenance, and no later owner decision supersedes it. Unknown permission, generic/stale handoffs, missing fields or a decision for a different provider/task fail closed.
 
 ---
 
@@ -316,10 +403,20 @@ For every in-scope repository verify:
 - provider-local stronger controls were preserved;
 - no retired ADR0005 machinery was reintroduced by this rollout.
 
+For every provider not adopted, validate the `OTERYN_PROVIDER_SCOPE_DECISION_V1` record fail-closed:
+
+1. fetch the exact comment from canonical `#108`/successor Issue;
+2. verify marker and all required fields;
+3. verify the author currently has admin/owner authority sufficient for the scope decision;
+4. verify exact provider repository and current adoption-task binding;
+5. refresh current META/provider main and confirm the record is provenance for the intended repository/task rather than a stale generic decision;
+6. search later owner decisions for the same provider/task and reject a superseded record;
+7. classify unknown/unverifiable proof as `OWNER_PERMISSION_REQUIRED`/not-terminal, never as an implicit defer.
+
 Terminal programme result requires:
 
 - META implementation merged and read back from protected main;
-- each provider either merged/read back or explicitly deferred/excluded by a durable owner decision;
+- each provider either merged/read back or has a currently verified GitHub-authoritative defer/exclusion record as defined above;
 - all required checks/threads/queue integration terminal;
 - no unaccounted writer/PR remains for the same continuation authority.
 

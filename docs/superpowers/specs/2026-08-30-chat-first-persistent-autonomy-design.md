@@ -68,7 +68,7 @@ Continuation uses an orthogonal worker disposition, never a second task-state en
 - `release_waiting` — no justified active mutating worker should remain while an external/control-plane mechanism progresses;
 - `rotate_resumable` — another worker execution can really resume from durable state;
 - `stop_reinvoke_required` — no automatic worker continuation exists; owner re-invocation is required;
-- `terminal` — the bounded lifecycle is independently terminal.
+- `terminal` — the bounded lifecycle is independently terminal. Under the current `#69` contract only `DONE` is terminal; `WAITING_EXTERNAL`, `BLOCKED` and `STALLED` release ownership but remain nonterminal.
 
 ## Resume mechanisms
 
@@ -96,6 +96,8 @@ Compatibility is fail-closed:
 `rotate_resumable` is invalid with `same_session` or `github_native`: neither creates/preserves a replacement agent worker.
 
 `release_waiting + github_native` is intentionally strict. GitHub Actions or Merge Queue may advance repository state, but they do not by themselves create the next Chat worker. If any later agent reasoning/action might still be required, use a worker-capable mechanism or `stop_reinvoke_required`.
+
+`STALLED` must never be translated into the continuation `terminal` disposition merely because its current retry budget is exhausted. It remains a released nonterminal bounded state and may resume only after the bounded authority accepts a material progress-fingerprint change.
 
 ## Stable task lineage versus mutable execution context
 
@@ -154,9 +156,10 @@ When writing a checkpoint:
 3. if a predecessor exists, require the bounded authority to verify retry/evidence continuity rather than reimplementing its counters here;
 4. if no continuation predecessor exists, require authoritative proof that none exists and verify that the first continuation checkpoint matches the already-consumed current bounded state;
 5. require mutable coordinates in the proposed checkpoint to match current trusted task context;
-6. require the disposition/mechanism pair to be valid;
-7. for an automatic future worker mechanism, verify current liveness, authorization, task binding and locator before release;
-8. for `release_waiting + github_native`, require authoritative proof that no later agent worker action remains anywhere in the task.
+6. require every semantic-minimum checkpoint field to be present with its required type/shape and conditional fields to be present when applicable;
+7. require the disposition/mechanism pair to be valid;
+8. for an automatic future worker mechanism, verify current liveness, authorization, task binding and locator before release;
+9. for `release_waiting + github_native`, require authoritative proof that no later agent worker action remains anywhere in the task.
 
 Unknown, unavailable or contradictory authority fails closed.
 
@@ -167,7 +170,7 @@ Historical checkpoints must not be rewritten to look current.
 On resume:
 
 1. resolve the latest historical checkpoint by immutable lineage key;
-2. verify its durable integrity;
+2. verify its durable integrity and semantic-minimum shape;
 3. authenticate the real resumption event against the historical mechanism, locator, task and historical next action;
 4. for `owner_reinvoke`, authenticate the owner-authorized re-entry instead of inventing automatic-event evidence;
 5. fetch fresh GitHub/task state independently;
@@ -181,6 +184,10 @@ A consumed one-shot mechanism need not still be live after it has fired. If the 
 
 Execution effort and execution surface are separate decisions.
 
+Surface selection must consume a **trusted current capability snapshot**, not arbitrary caller assertions. The snapshot is resolved through a current-session capability authority (or equivalent trusted adapter) that verifies exposed tool/connector registration, repository-native operation support, current authentication/permission where observable, surface compatibility, availability/authorization and the safe fallback set. Stale, self-asserted, ambiguous or unverifiable capability facts fail closed.
+
+A positive surface choice requires trusted evidence that the surface both supports the required capability and is currently available/authorized where authorization applies. `BLOCKED_CAPABILITY_UNAVAILABLE` is valid only after the same trusted authority proves that no safe compatible authorized fallback remains; an untried safe fallback must be evaluated instead of being reported as a blocker.
+
 ### Chat
 
 Default supervising/execution surface when currently available tools can perform the work safely. High effort alone never requires Work.
@@ -191,11 +198,11 @@ Prefer GitHub Actions or repository-approved runners for deterministic compute a
 
 ### Work
 
-Use only when a material capability requires it, such as supported cloud-browser use, event-triggered connected-app continuation or genuine persistent cloud execution.
+Use only when a material capability requires it, such as supported cloud-browser use, event-triggered connected-app continuation or genuine persistent cloud execution, and current trusted capability evidence proves that Work supports the capability and is available/authorized.
 
 ### Codex
 
-Use when a software-development repository loop materially improves implementation/testing compared with Chat plus GitHub-native execution.
+Use when a software-development repository loop materially improves implementation/testing compared with Chat plus GitHub-native execution and current trusted capability evidence proves the Codex surface is supported, available and authorized.
 
 If a required capability is unavailable or unauthorized and no safe alternative surface exists, fail closed as `BLOCKED_CAPABILITY_UNAVAILABLE`.
 
@@ -222,7 +229,7 @@ Notify the owner when:
 
 - the task is independently verified `DONE`;
 - a concrete owner/permission/safety decision is required;
-- bounded recovery reaches terminal `STALLED` with no materially new safe action;
+- bounded recovery reaches `STALLED` **and** no verified automatic mechanism can wait for a material progress-fingerprint change and resume; `STALLED` itself remains nonterminal and does not authorize the `terminal` disposition;
 - automatic continuation is unavailable and owner re-invocation is genuinely required.
 
 Never imply background continuation when no mechanism exists.
@@ -238,7 +245,7 @@ Provider adoption must:
 - let Platform map the semantic minimum into its existing Control Room/checkpoint model;
 - fail closed before mutation when exact provider authorization is absent.
 
-Programme closeout may count a provider as intentionally excluded only through an explicit durable owner scope/defer decision. Missing authorization by itself is not an implicit defer.
+Programme closeout may count a provider as intentionally deferred/excluded only through a GitHub-authoritative scope-decision record on `Oteryn/Oteryn#108` (or a canonical successor Issue explicitly named by `#108`). The record uses marker `OTERYN_PROVIDER_SCOPE_DECISION_V1` and names the exact provider repository, exact current adoption task/Issue, decision (`DEFER` or `EXCLUDE`), reason, current META protected-main SHA and current provider protected/default-main SHA at decision time. At closeout the coordinator must re-read that exact GitHub comment, verify that its author currently has repository-admin/owner authority for the scoped decision, confirm the record still matches the provider/current adoption task and live repository identity, and confirm it has not been superseded by a later owner decision. Unknown permission, stale/generic handoffs, missing fields, a decision for another task, or missing write authorization alone do not qualify and fail closed.
 
 ## Acceptance criteria
 
@@ -247,12 +254,14 @@ The design is satisfied only when:
 - the continuation machine policy references rather than duplicates bounded lifecycle authority;
 - the six coordinates remain independent;
 - stable lineage identity is separated from mutable branch/PR/head/action context;
-- invalid disposition/mechanism combinations fail closed;
+- invalid disposition/mechanism combinations fail closed and `STALLED` remains nonterminal under the current bounded contract;
 - automatic resume claims are verified both at release and at resumption;
 - `github_native` cannot masquerade as a replacement agent worker;
+- every checkpoint semantic-minimum field is deterministically validated;
 - bounded retry/evidence state survives worker/session/context changes;
-- execution-surface selection is capability-driven;
+- execution-surface selection is capability-driven from trusted current-session/control-plane evidence and blocker classification requires safe-fallback exhaustion;
 - CI deterministically executes the continuation regression suite;
 - no retired ADR0005 review/proof/merge machinery is recreated;
 - provider writes remain explicitly authorization-gated;
+- provider defer/exclusion is accepted only through the fail-closed GitHub-authoritative owner decision record above;
 - final completion is based on live protected-main/provider evidence, not narrative.
