@@ -87,9 +87,9 @@ Compatibility is fail-closed:
 | Worker disposition | Allowed mechanism | Requirement |
 | --- | --- | --- |
 | `continue_current` | `same_session` | The bounded authority reports nonreleased + nonterminal state, so the current worker continues now. |
-| `release_waiting` | `github_native` | The bounded authority reports released + nonterminal state, and repository-native progression can complete **all remaining task work through terminal state** without any later agent-worker action. |
-| `release_waiting` | `scheduled_task`, `work_event_trigger`, `work_persistent` | The bounded authority reports released + nonterminal state, and the mechanism is live, authorized, task-bound and has a concrete locator. |
-| `rotate_resumable` | `scheduled_task`, `work_event_trigger`, `work_persistent` | The bounded authority reports nonreleased + nonterminal state, and a replacement/persistent worker execution is genuinely configured with a concrete locator. |
+| `release_waiting` | `github_native` | The bounded authority reports released + nonterminal state, a concrete GitHub workflow/queue/control-plane locator is recorded, and repository-native progression can complete **all remaining task work through terminal state** without any later agent-worker action. |
+| `release_waiting` | `scheduled_task`, `work_event_trigger`, `work_persistent` | The bounded authority reports released + nonterminal state, and the mechanism is live, authorized, bound to the same stable task lineage, bound to the current authoritative `next_action`, and has a concrete locator. |
+| `rotate_resumable` | `scheduled_task`, `work_event_trigger`, `work_persistent` | The bounded authority reports nonreleased + nonterminal state, and a replacement/persistent worker execution is genuinely configured with a concrete live/authorized locator bound to the same stable task lineage and current authoritative `next_action`. |
 | `stop_reinvoke_required` | `owner_reinvoke` | The bounded authority reports released + nonterminal state, and no automatic continuation exists. |
 | `terminal` | `none_terminal` | The bounded authority reports terminal state. |
 
@@ -144,7 +144,7 @@ A release/rotation checkpoint must make the next safe action reconstructible wit
 - context-pressure classification when relevant;
 - worker disposition;
 - resume mechanism;
-- concrete mechanism locator when required;
+- concrete mechanism locator for every automatic waiting/rotation mechanism, including `github_native`;
 - exactly one concrete `next_action`.
 
 Checkpoint state belongs in an authorized durable task/control-plane surface. A checkpoint is never justification for an empty/no-op/retrigger commit.
@@ -160,8 +160,8 @@ When writing a checkpoint:
 5. require mutable coordinates in the proposed checkpoint to match current trusted task context;
 6. require every semantic-minimum checkpoint field to be present with its required type/shape and conditional fields to be present when applicable;
 7. require the disposition/mechanism pair to be valid;
-8. for an automatic future worker mechanism, verify current liveness, authorization, task binding and locator before release;
-9. for `release_waiting + github_native`, require authoritative proof that no later agent worker action remains anywhere in the task.
+8. for an automatic scheduled/Work future-worker mechanism, verify before release that the concrete locator is live/enabled, authorized, bound to the same stable task lineage, and bound to the current authoritative `next_action`;
+9. for `release_waiting + github_native`, require before release both a concrete GitHub workflow/queue/control-plane locator and authoritative proof that no later agent worker action remains anywhere in the task.
 
 Unknown, unavailable or contradictory authority fails closed.
 
@@ -175,10 +175,12 @@ On resume:
 2. verify its durable integrity and semantic-minimum shape;
 3. authenticate the real resumption event against the historical mechanism, locator, task and historical next action;
 4. for `owner_reinvoke`, authenticate the owner-authorized re-entry instead of inventing automatic-event evidence;
-5. fetch fresh GitHub/task state independently;
-6. require a trusted transition authority to reconcile the historical mutable coordinates with the fresh task context;
+5. fetch fresh GitHub/task state and fresh bounded lifecycle/ownership/terminality independently;
+6. require a trusted transition authority to prove every legitimate historical-to-fresh change in branch, PR applicability/id, head, next action, lifecycle and disposition semantics before fresh state is used;
 7. require the bounded lifecycle authority to confirm current lifecycle and retry/evidence continuity;
-8. only then choose the next worker disposition/action.
+8. only then apply current bounded disposition predicates and choose the next worker disposition/action.
+
+A historical `WAITING_EXTERNAL + release_waiting` checkpoint may reconcile to fresh `READY` or terminal `DONE` when the trusted transition authority proves that lifecycle/disposition advance; historical values remain authenticated evidence and are never rewritten to manufacture equality.
 
 A consumed one-shot mechanism need not still be live after it has fired. If the new checkpoint claims another future automatic continuation, that new mechanism must be freshly verified.
 
