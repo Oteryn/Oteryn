@@ -71,6 +71,13 @@ def test_meta_gate_qualifies_pull_requests_and_exact_merge_group_candidates() ->
     assert '[[ "$MERGE_GROUP_BASE_REF" == "refs/heads/main" ]]' in gate
 
 
+def test_meta_gate_executes_bounded_execution_guard_regressions() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    gate = _job_body(workflow, "meta-gate")
+
+    assert "python3 tools/governance/test_bounded_execution_guard.py" in gate
+
+
 def test_legacy_ai_merge_group_adapter_is_retired() -> None:
     assert not MERGE_GROUP_ADAPTER.exists()
 
@@ -138,6 +145,7 @@ def test_drift_audit_rejects_duplicate_repository_snapshot() -> None:
 
 if __name__ == "__main__":
     test_meta_gate_qualifies_pull_requests_and_exact_merge_group_candidates()
+    test_meta_gate_executes_bounded_execution_guard_regressions()
     test_legacy_ai_merge_group_adapter_is_retired()
     test_ci_has_one_external_gate_only()
     test_drift_audit_accepts_exact_target_snapshot()
