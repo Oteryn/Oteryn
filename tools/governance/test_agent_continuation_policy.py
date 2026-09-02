@@ -569,6 +569,43 @@ class PersistentContinuationTests(unittest.TestCase):
             mode="resume_read",
         )
 
+    def test_resume_read_requires_current_bounded_retry_evidence_truth(self) -> None:
+        historical = snapshot(
+            bounded_lifecycle_state="WAITING_EXTERNAL",
+            worker_disposition="release_waiting",
+            resume_mechanism="scheduled_task",
+            resume_locator="resume://scheduled/108",
+            task_head_sha="a" * 40,
+            next_action="wait for CI",
+        )
+        current = trusted_task(task_head_sha="b" * 40, expected_next_action="read back protected main")
+        common = {
+            "task": current,
+            "lineage_authority": FakeLineageAuthority(predecessor=historical, proves_none=False),
+            "transition_authority": FakeTransitionAuthority(allowed=True),
+            "mechanism_verifier": FakeMechanismVerifier(historical_event=True),
+            "mode": "resume_read",
+        }
+
+        self.assertRejected(
+            historical,
+            bounded_authority=FakeBoundedAuthority(
+                "READY",
+                matches_current=False,
+                preserves_continuity=True,
+            ),
+            **common,
+        )
+        self.validate(
+            historical,
+            bounded_authority=FakeBoundedAuthority(
+                "READY",
+                matches_current=True,
+                preserves_continuity=False,
+            ),
+            **common,
+        )
+
     def test_resume_read_rejects_rewritten_historical_checkpoint(self) -> None:
         historical = snapshot(
             bounded_lifecycle_state="WAITING_EXTERNAL",
