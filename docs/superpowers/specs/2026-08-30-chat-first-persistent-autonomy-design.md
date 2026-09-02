@@ -86,16 +86,18 @@ Compatibility is fail-closed:
 
 | Worker disposition | Allowed mechanism | Requirement |
 | --- | --- | --- |
-| `continue_current` | `same_session` | Current worker continues now. |
-| `release_waiting` | `github_native` | Repository-native progression can complete **all remaining task work through terminal state** without any later agent-worker action. |
-| `release_waiting` | `scheduled_task`, `work_event_trigger`, `work_persistent` | Mechanism is live, authorized, task-bound and has a concrete locator. |
-| `rotate_resumable` | `scheduled_task`, `work_event_trigger`, `work_persistent` | A replacement/persistent worker execution is genuinely configured and has a concrete locator. |
-| `stop_reinvoke_required` | `owner_reinvoke` | No automatic continuation exists. |
-| `terminal` | `none_terminal` | Independent bounded lifecycle is terminal. |
+| `continue_current` | `same_session` | The bounded authority reports nonreleased + nonterminal state, so the current worker continues now. |
+| `release_waiting` | `github_native` | The bounded authority reports released + nonterminal state, and repository-native progression can complete **all remaining task work through terminal state** without any later agent-worker action. |
+| `release_waiting` | `scheduled_task`, `work_event_trigger`, `work_persistent` | The bounded authority reports released + nonterminal state, and the mechanism is live, authorized, task-bound and has a concrete locator. |
+| `rotate_resumable` | `scheduled_task`, `work_event_trigger`, `work_persistent` | The bounded authority reports nonreleased + nonterminal state, and a replacement/persistent worker execution is genuinely configured with a concrete locator. |
+| `stop_reinvoke_required` | `owner_reinvoke` | The bounded authority reports released + nonterminal state, and no automatic continuation exists. |
+| `terminal` | `none_terminal` | The bounded authority reports terminal state. |
 
 `rotate_resumable` is invalid with `same_session` or `github_native`: neither creates/preserves a replacement agent worker.
 
 `release_waiting + github_native` is intentionally strict. GitHub Actions or Merge Queue may advance repository state, but they do not by themselves create the next Chat worker. If any later agent reasoning/action might still be required, use a worker-capable mechanism or `stop_reinvoke_required`.
+
+These ownership and terminality predicates come from `BoundedLifecycleAuthority`, which consumes the canonical `#69` bounded state rather than redefining its enum or retry semantics here. `READY` cannot be reinterpreted as released merely because an external operation is next: before `release_waiting` is valid, the bounded authority must record a real transition/classification to a released nonterminal state, such as `WAITING_EXTERNAL` when the facts justify it. Every nonterminal disposition is invalid when the bounded authority reports terminal.
 
 `STALLED` must never be translated into the continuation `terminal` disposition merely because its current retry budget is exhausted. It remains a released nonterminal bounded state and may resume only after the bounded authority accepts a material progress-fingerprint change.
 

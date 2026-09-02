@@ -327,11 +327,12 @@ Required compatibility:
 - `release_waiting` ↔ `github_native`: bounded state **releases ownership and is nonterminal**, plus a concrete GitHub locator and authoritative whole-task proof that no later agent worker is required;
 - `release_waiting` ↔ `scheduled_task|work_event_trigger|work_persistent`: bounded state **releases ownership and is nonterminal**, plus a non-empty live/authorized/task-bound verified locator; these are valid waiting continuations and must not be misclassified as rotation;
 - `rotate_resumable` ↔ only `scheduled_task|work_event_trigger|work_persistent`: bounded state is **nonterminal and does not release ownership**, plus a non-empty live/authorized/task-bound verified locator and genuine replacement/persistent worker execution;
-- `stop_reinvoke_required` ↔ `owner_reinvoke`: no automatic mechanism exists; if the current bounded state still owns an active worker, callers must first classify the real owner/permission/policy dependency through the bounded authority rather than using #108 to fabricate a release;
+- `stop_reinvoke_required` ↔ `owner_reinvoke`: bounded state **releases ownership and is nonterminal**, and no automatic mechanism exists; if the current bounded state still owns an active worker, callers must first classify the real owner/permission/policy dependency through the bounded authority rather than using #108 to fabricate a release;
 - `terminal` ↔ `none_terminal`: independent bounded authority reports terminal;
 - under the current `#69` contract, `STALLED + terminal|none_terminal` is rejected because `STALLED` is released but nonterminal;
 - reject `release_waiting` when bounded ownership is not released (`RUNNING`/`READY` in the current contract) even if the mechanism/locator is otherwise valid;
 - reject `release_waiting` for terminal `DONE`; terminal work uses `terminal + none_terminal`;
+- reject every nonterminal disposition when bounded authority reports terminal; under the current contract, RED cases must cover terminal `DONE` paired in turn with `continue_current`, `release_waiting`, `rotate_resumable`, and `stop_reinvoke_required`;
 - reject `rotate_resumable` when bounded ownership is already released (`WAITING_EXTERNAL`/`BLOCKED`/`STALLED` in the current contract), because those states use waiting/released semantics rather than replacement-worker rotation;
 - add positive tests for all four legal `release_waiting` mechanism classes against an authoritative released nonterminal state, positive rotation tests against an authoritative active nonterminal state, and negative cross-class tests for every current bounded-state category;
 - all other pairings fail closed.
