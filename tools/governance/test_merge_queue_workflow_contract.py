@@ -15,6 +15,7 @@ CI_WORKFLOW = ROOT / ".github/workflows/ci.yml"
 DESIRED_STATE = ROOT / "ecosystem/governance-desired-state.json"
 ADR_0005 = ROOT / "docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md"
 MERGE_GROUP_ADAPTER = ROOT / ".github/workflows/merge-group-ai-review-adapter.yml"
+CONTINUATION_TEST = ROOT / "tools/governance/test_agent_continuation_policy.py"
 ENFORCEMENT_FIELDS = (
     "required_gate",
     "merge_queue",
@@ -78,6 +79,15 @@ def test_meta_gate_executes_bounded_execution_guard_regressions() -> None:
     gate = _job_body(workflow, "meta-gate")
 
     assert "python3 tools/governance/test_bounded_execution_guard.py" in gate
+
+
+def test_meta_gate_executes_persistent_continuation_regressions() -> None:
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    gate = _job_body(workflow, "meta-gate")
+
+    assert CONTINUATION_TEST.is_file()
+    assert "python3 tools/governance/test_agent_continuation_policy.py" in gate
+    assert workflow.count("python3 tools/governance/test_agent_continuation_policy.py") == 1
 
 
 def test_legacy_ai_merge_group_adapter_is_retired() -> None:
@@ -182,6 +192,7 @@ def test_drift_audit_rejects_duplicate_repository_snapshot() -> None:
 if __name__ == "__main__":
     test_meta_gate_qualifies_pull_requests_and_exact_merge_group_candidates()
     test_meta_gate_executes_bounded_execution_guard_regressions()
+    test_meta_gate_executes_persistent_continuation_regressions()
     test_legacy_ai_merge_group_adapter_is_retired()
     test_ci_has_one_external_gate_only()
     test_adr0005_keeps_auto_merge_subordinate_to_merge_queue()
