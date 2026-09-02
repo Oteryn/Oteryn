@@ -46,7 +46,8 @@ def _call_gate_config(policy: dict[str, object]) -> tuple[set[str], list[str]]:
     if not isinstance(config, dict):
         return set(), ["policy remote_desktop_call_gate must be an object"]
     errors: list[str] = []
-    if config.get("schema_version") != 1:
+    schema_version = config.get("schema_version")
+    if type(schema_version) is not int or schema_version != 1:
         errors.append("policy remote_desktop_call_gate.schema_version must be 1")
     if config.get("argument_binding") != "exact_after_nonsemantic_filter":
         errors.append(
