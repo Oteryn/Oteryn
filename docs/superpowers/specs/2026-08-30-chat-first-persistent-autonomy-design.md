@@ -1,0 +1,271 @@
+# Chat-first Persistent Autonomy Design
+
+**Status:** owner-approved design for `Oteryn/Oteryn#108`; documentation only until merged to protected `main`.
+
+**Operating principle:**
+
+> **Chat-first, GitHub-native async, Work-by-exception.**
+
+## Purpose
+
+Define one small continuation layer that lets an owner-visible Oteryn task survive worker/session boundaries, command timeouts, external waiting and context pressure without creating another task lifecycle, another merge authority or another provider orchestration system.
+
+The continuation layer answers only these questions:
+
+- can the current worker continue safely;
+- if not, is there a real mechanism that can resume the same task;
+- what durable checkpoint is required to make that resume truthful;
+- which execution surface is justified by current capability needs;
+- when must the owner be told that automatic continuation is not real.
+
+## Current authority and precedence
+
+Always refresh protected `main` before implementation. Historical Issue, PR and SHA references are locators only.
+
+The current protected-main `AGENTS.md` and ADR 0005 (`docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md`) take precedence over older design assumptions.
+
+The authority split is deliberately small:
+
+- `Oteryn/Oteryn#69` and its surviving protected-main implementation own bounded task lifecycle semantics such as `RUNNING`, `WAITING_EXTERNAL`, `BLOCKED`, `STALLED`, `READY`, `DONE`, bounded retries, material progress and candidate freeze. This design references that authority; it does not copy its budgets or state machine.
+- `Oteryn/Oteryn#104` / PR `#107` owns effort-aware execution routing, Remote Desktop exact-call/exception controls and provider execution-policy convergence. It must not own a second bounded lifecycle.
+- GitHub protected-branch enforcement, the repository aggregate gate and GitHub Merge Queue are the integration authority under ADR 0005. This design must not recreate review fingerprints, AI-review gates, attestation bridges, same-head review-recheck state machines or custom merge proof ledgers.
+- `Oteryn/Oteryn#108` owns only persistent continuation semantics defined here.
+- Game, Platform and Atlas retain provider implementation authority. META coordination never implies provider write permission.
+
+External AI review is advisory under ADR 0005. It is not a continuation state or merge authority.
+
+## Non-goals
+
+This design does not:
+
+- define a second task lifecycle or retry budget;
+- recreate retired `LOOP_BREAKER_AUDIT`, review-fingerprint, R0/R1/R2, `ai-review-gate`, attestation, outbox or custom merge-proof machinery;
+- change branch protection, required checks or Merge Queue settings;
+- establish a universal Chat, Work or Codex wall-clock timeout;
+- make Work/Codex mandatory for high-effort work;
+- create a second Platform Control Room/checkpoint schema;
+- grant cross-repository write authority;
+- authorize production, deployment, secrets, credentials or live-data mutation.
+
+## Six independent execution coordinates
+
+Every substantial continuation decision treats these independently:
+
+1. **task lifetime** — the owner-visible objective;
+2. **worker/session lifetime** — one active agent execution;
+3. **tool/command timeout** — one command, build, test or network operation;
+4. **external wait** — CI, dependency, queue or other externally changing state;
+5. **retry/no-progress** — bounded anti-loop state owned by the bounded lifecycle;
+6. **context pressure** — whether the current session can still reason safely and economically.
+
+A limit in one coordinate must not silently terminate another. In particular, worker/session end, tool timeout, context rotation and phase completion are not task completion.
+
+## Worker dispositions
+
+Continuation uses an orthogonal worker disposition, never a second task-state enum:
+
+- `continue_current` — current worker can continue useful authorized work;
+- `release_waiting` — no justified active mutating worker should remain while an external/control-plane mechanism progresses;
+- `rotate_resumable` — another worker execution can really resume from durable state;
+- `stop_reinvoke_required` — no automatic worker continuation exists; owner re-invocation is required;
+- `terminal` — the bounded lifecycle is independently terminal. Under the current `#69` contract only `DONE` is terminal; `WAITING_EXTERNAL`, `BLOCKED` and `STALLED` release ownership but remain nonterminal.
+
+## Resume mechanisms
+
+The closed mechanism set is:
+
+- `same_session`
+- `github_native`
+- `scheduled_task`
+- `work_event_trigger`
+- `work_persistent`
+- `owner_reinvoke`
+- `none_terminal`
+
+Compatibility is fail-closed:
+
+| Worker disposition | Allowed mechanism | Requirement |
+| --- | --- | --- |
+| `continue_current` | `same_session` | The bounded authority reports nonreleased + nonterminal state, so the current worker continues now. |
+| `release_waiting` | `github_native` | The bounded authority reports released + nonterminal state, a concrete GitHub workflow/queue/control-plane locator is recorded, and repository-native progression can complete **all remaining task work through terminal state** without any later agent-worker action. |
+| `release_waiting` | `scheduled_task`, `work_event_trigger`, `work_persistent` | The bounded authority reports released + nonterminal state, and the mechanism is live, authorized, bound to the same stable task lineage, bound to the current authoritative `next_action`, and has a concrete locator. |
+| `rotate_resumable` | `scheduled_task`, `work_event_trigger`, `work_persistent` | The bounded authority reports nonreleased + nonterminal state, and a replacement/persistent worker execution is genuinely configured with a concrete live/authorized locator bound to the same stable task lineage and current authoritative `next_action`. |
+| `stop_reinvoke_required` | `owner_reinvoke` | The bounded authority reports released + nonterminal state, and no automatic continuation exists. |
+| `terminal` | `none_terminal` | The bounded authority reports terminal state. |
+
+`rotate_resumable` is invalid with `same_session` or `github_native`: neither creates/preserves a replacement agent worker.
+
+`release_waiting + github_native` is intentionally strict. GitHub Actions or Merge Queue may advance repository state, but they do not by themselves create the next Chat worker. If any later agent reasoning/action might still be required, use a worker-capable mechanism or `stop_reinvoke_required`.
+
+These ownership and terminality predicates come from `BoundedLifecycleAuthority`, which consumes the canonical `#69` bounded state rather than redefining its enum or retry semantics here. `READY` cannot be reinterpreted as released merely because an external operation is next: before `release_waiting` is valid, the bounded authority must record a real transition/classification to a released nonterminal state, such as `WAITING_EXTERNAL` when the facts justify it. Every nonterminal disposition is invalid when the bounded authority reports terminal.
+
+`STALLED` must never be translated into the continuation `terminal` disposition merely because its current retry budget is exhausted. It remains a released nonterminal bounded state and may resume only after the bounded authority accepts a material progress-fingerprint change.
+
+## Stable task lineage versus mutable execution context
+
+Durable continuation history is keyed only by immutable lineage identity:
+
+```text
+repository
+task_id
+checkpoint_lineage_token
+```
+
+The following are mutable execution coordinates and must not be part of predecessor lookup identity:
+
+```text
+task_branch
+pr_id
+task_head_sha
+next_action
+```
+
+A branch, PR, head or next action may legitimately change while the same owner-visible task continues. A separate trusted transition authority reconciles the historical checkpoint with fresh GitHub state.
+
+Changing an immutable lineage field creates a different lineage and fails closed rather than being interpreted as progress.
+
+## Durable checkpoint semantic minimum
+
+The organization standard is semantic, not one universal file/database format. Providers may map it into an existing control-plane/checkpoint system.
+
+A release/rotation checkpoint must make the next safe action reconstructible without replaying the whole chat. It contains at least:
+
+- repository;
+- task id and checkpoint lineage token;
+- task branch;
+- PR applicability and PR id when applicable;
+- exact task-head SHA;
+- coherent phase;
+- bounded lifecycle state obtained from the bounded authority;
+- last material progress and relevant completed work;
+- validation/evidence references;
+- bounded retry/evidence continuity reference without redefining its schema;
+- blockers;
+- context-pressure classification when relevant;
+- worker disposition;
+- resume mechanism;
+- concrete mechanism locator for every automatic waiting/rotation mechanism, including `github_native`;
+- exactly one concrete `next_action`.
+
+Checkpoint state belongs in an authorized durable task/control-plane surface. A checkpoint is never justification for an empty/no-op/retrigger commit.
+
+## Checkpoint-write trust boundary
+
+When writing a checkpoint:
+
+1. obtain independently authenticated trusted task identity from the current control plane;
+2. resolve the latest durable predecessor by the immutable lineage key;
+3. if a predecessor exists, require the bounded authority to verify retry/evidence continuity rather than reimplementing its counters here;
+4. if no continuation predecessor exists, require authoritative proof that none exists and verify that the first continuation checkpoint matches the already-consumed current bounded state;
+5. require mutable coordinates in the proposed checkpoint to match current trusted task context;
+6. require every semantic-minimum checkpoint field to be present with its required type/shape and conditional fields to be present when applicable;
+7. require the disposition/mechanism pair to be valid;
+8. for an automatic scheduled/Work future-worker mechanism, verify before release that the concrete locator is live/enabled, authorized, bound to the same stable task lineage, and bound to the current authoritative `next_action`;
+9. for `release_waiting + github_native`, require before release both a concrete GitHub workflow/queue/control-plane locator and authoritative proof that no later agent worker action remains anywhere in the task.
+
+Unknown, unavailable or contradictory authority fails closed.
+
+## Resume-read trust boundary
+
+Historical checkpoints must not be rewritten to look current.
+
+On resume:
+
+1. resolve the latest historical checkpoint by immutable lineage key;
+2. verify its durable integrity and semantic-minimum shape;
+3. authenticate the real resumption event against the historical mechanism, locator, task and historical next action;
+4. for `owner_reinvoke`, authenticate the owner-authorized re-entry instead of inventing automatic-event evidence;
+5. fetch fresh GitHub/task state and fresh bounded lifecycle/ownership/terminality independently;
+6. require a trusted transition authority to prove every legitimate historical-to-fresh change in branch, PR applicability/id, head, next action, lifecycle and disposition semantics before fresh state is used;
+7. require the bounded lifecycle authority to confirm current lifecycle and retry/evidence continuity;
+8. only then apply current bounded disposition predicates and choose the next worker disposition/action.
+
+A historical `WAITING_EXTERNAL + release_waiting` checkpoint may reconcile to fresh `READY` or terminal `DONE` when the trusted transition authority proves that lifecycle/disposition advance; historical values remain authenticated evidence and are never rewritten to manufacture equality.
+
+A consumed one-shot mechanism need not still be live after it has fired. If the new checkpoint claims another future automatic continuation, that new mechanism must be freshly verified.
+
+## Execution-surface selection
+
+Execution effort and execution surface are separate decisions.
+
+Surface selection must consume a **trusted current capability snapshot**, not arbitrary caller assertions. The snapshot is resolved through a current-session capability authority (or equivalent trusted adapter) that verifies exposed tool/connector registration, repository-native operation support, current authentication/permission where observable, surface compatibility, availability/authorization and the safe fallback set. Stale, self-asserted, ambiguous or unverifiable capability facts fail closed.
+
+A positive surface choice requires trusted evidence that the surface both supports the required capability and is currently available/authorized where authorization applies. `BLOCKED_CAPABILITY_UNAVAILABLE` is valid only after the same trusted authority proves that no safe compatible authorized fallback remains; an untried safe fallback must be evaluated instead of being reported as a blocker.
+
+### Chat
+
+Default supervising/execution surface when currently available tools can perform the work safely. High effort alone never requires Work.
+
+### GitHub-native
+
+Prefer GitHub Actions or repository-approved runners for deterministic compute and waiting: builds, full tests, static analysis, E2E and merge-group qualification. The worker consumes evidence rather than staying active to watch compute.
+
+### Work
+
+Use only when a material capability requires it, such as supported cloud-browser use, event-triggered connected-app continuation or genuine persistent cloud execution, and current trusted capability evidence proves that Work supports the capability and is available/authorized.
+
+### Codex
+
+Use when a software-development repository loop materially improves implementation/testing compared with Chat plus GitHub-native execution and current trusted capability evidence proves the Codex surface is supported, available and authorized.
+
+If a required capability is unavailable or unauthorized and no safe alternative surface exists, fail closed as `BLOCKED_CAPABILITY_UNAVAILABLE`.
+
+## Context pressure
+
+Use **minimal active context + durable external state**.
+
+When context pressure grows:
+
+1. externalize large logs/evidence;
+2. keep only material facts and the next coherent phase active;
+3. write a durable checkpoint when crossing a continuation boundary;
+4. continue in the same session if safe;
+5. rotate only if a real resumable mechanism exists;
+6. otherwise report `stop_reinvoke_required` truthfully.
+
+Do not invent exact remaining token counts when the runtime does not expose them.
+
+## User notification
+
+Normally do not interrupt solely for a phase completion, ordinary checkpoint, recoverable command timeout, context compaction or a real automatic worker rotation.
+
+Notify the owner when:
+
+- the task is independently verified `DONE`;
+- a concrete owner/permission/safety decision is required;
+- bounded recovery reaches `STALLED` **and** no verified automatic mechanism can wait for a material progress-fingerprint change and resume; `STALLED` itself remains nonterminal and does not authorize the `terminal` disposition;
+- automatic continuation is unavailable and owner re-invocation is genuinely required.
+
+Never imply background continuation when no mechanism exists.
+
+## Provider adoption boundary
+
+Game, Platform and Atlas are read-only from a META task unless the owner explicitly authorizes writes to the exact provider repository for the current adoption task.
+
+Provider adoption must:
+
+- preserve stronger provider-local safety/session controls;
+- reference the organization continuation semantics without creating a competing bounded lifecycle;
+- let Platform map the semantic minimum into its existing Control Room/checkpoint model;
+- fail closed before mutation when exact provider authorization is absent.
+
+Programme closeout may count a provider as intentionally deferred/excluded only through a GitHub-authoritative scope-decision record on `Oteryn/Oteryn#108` (or a canonical successor Issue explicitly named by `#108`). The record uses marker `OTERYN_PROVIDER_SCOPE_DECISION_V1` and names the exact provider repository, exact current adoption task/Issue, decision (`DEFER` or `EXCLUDE`), reason, current META protected-main SHA and current provider protected/default-main SHA at decision time. At closeout the coordinator must re-read that exact GitHub comment, verify that its author currently has repository-admin/owner authority for the scoped decision, confirm the record still matches the provider/current adoption task and live repository identity, and confirm it has not been superseded by a later owner decision. Unknown permission, stale/generic handoffs, missing fields, a decision for another task, or missing write authorization alone do not qualify and fail closed.
+
+## Acceptance criteria
+
+The design is satisfied only when:
+
+- the continuation machine policy references rather than duplicates bounded lifecycle authority;
+- the six coordinates remain independent;
+- stable lineage identity is separated from mutable branch/PR/head/action context;
+- invalid disposition/mechanism combinations fail closed and `STALLED` remains nonterminal under the current bounded contract;
+- automatic resume claims are verified both at release and at resumption;
+- `github_native` cannot masquerade as a replacement agent worker;
+- every checkpoint semantic-minimum field is deterministically validated;
+- bounded retry/evidence state survives worker/session/context changes;
+- execution-surface selection is capability-driven from trusted current-session/control-plane evidence and blocker classification requires safe-fallback exhaustion;
+- CI deterministically executes the continuation regression suite;
+- no retired ADR0005 review/proof/merge machinery is recreated;
+- provider writes remain explicitly authorization-gated;
+- provider defer/exclusion is accepted only through the fail-closed GitHub-authoritative owner decision record above;
+- final completion is based on live protected-main/provider evidence, not narrative.

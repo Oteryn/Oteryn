@@ -1,0 +1,488 @@
+# Chat-first Persistent Autonomy Implementation Plan
+
+**Goal:** deliver the smallest deterministic continuation layer for `Oteryn/Oteryn#108` while preserving the bounded lifecycle, ADR 0005 GitHub-native integration model and provider ownership.
+
+**Spec:** `docs/superpowers/specs/2026-08-30-chat-first-persistent-autonomy-design.md`
+
+## Global constraints
+
+- GitHub live state is authoritative; refresh before every material mutation/integration decision.
+- Current protected-main `AGENTS.md` and ADR 0005 outrank historical plan text.
+- The bounded lifecycle from `#69` is referenced, not copied. Under the current bounded contract `STALLED` is a released **nonterminal** state; only the bounded authority may declare terminality, and currently only `DONE` is terminal.
+- `#107` may own routing/RDC/provider convergence only; no second bounded lifecycle.
+- GitHub protected branch + aggregate gate + Merge Queue own integration enforcement.
+- Do not recreate retired R0/R1/R2, review-fingerprint, `ai-review-gate`, attestation, outbox, custom merge-proof or `LOOP_BREAKER_AUDIT` machinery.
+- One writer per branch/lane. Parallelize only independent repositories/read-only review.
+- No no-op/checkpoint/retrigger commits.
+- Provider writes require explicit owner authorization for the exact provider repository and current adoption task.
+- No product runtime, production, secret, credential or live-data mutation is part of this rollout.
+- Canonical implementation must use a fresh branch from then-current protected `main`; the design branch never becomes the implementation writer.
+
+---
+
+## Phase 0 — Terminalize prerequisites
+
+### 0.1 Refresh live authority
+
+Read:
+
+- protected META `main` + `AGENTS.md` + ADR 0005;
+- `#69` bounded survivor and its current delivery state;
+- `#104/#107`;
+- `#108/#110`;
+- current required `meta-gate`, review threads and Merge Queue enforcement.
+
+### 0.2 Bounded prerequisite
+
+Require the surviving bounded contract to be canonical on protected main before the continuation implementation branch is created.
+
+Do not copy a PR-only bounded implementation into the continuation branch.
+
+### 0.3 Reconcile `#107`
+
+After the bounded survivor is canonical:
+
+- reconcile `#107` with current protected main;
+- retain only effort-aware routing, Remote Desktop exception/exact-call binding and provider execution-policy convergence;
+- delete/revert any duplicate bounded lifecycle, old review gate, outbox/attestation or retired ADR0005 machinery from its final diff;
+- run its deterministic tests and required exact-head `meta-gate`;
+- resolve all material review findings;
+- integrate through current Merge Queue rules.
+
+### 0.4 Terminalize design packet
+
+Reconcile `#110` against current protected main. Final #110 must be documentation-only and describe the ADR0005-compatible continuation model. Run `meta-gate`, inspect exact diff/threads and integrate through Merge Queue.
+
+---
+
+## Phase 1 — Create the fresh #108 implementation branch
+
+After Phase 0 is terminal:
+
+1. refresh protected `main` and verify its exact SHA;
+2. create one dedicated branch from that exact SHA;
+3. open one PR tracking `#108`;
+4. record the exact initial base/head and narrow intended paths.
+
+Initial intended files:
+
+```text
+ecosystem/agent-continuation-policy.json
+tools/governance/agent_continuation_policy.py
+tools/governance/test_agent_continuation_policy.py
+docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md
+AGENTS.md
+.github/workflows/ci.yml
+tools/governance/test_merge_queue_workflow_contract.py   # only if needed to prove CI wiring
+```
+
+Do not broaden scope unless a failing regression proves the need.
+
+---
+
+## Phase 2 — Machine policy with strict TDD
+
+### 2.1 RED: policy/schema does not exist
+
+Create focused tests first. They require closed vocabularies:
+
+```python
+WORKER_DISPOSITIONS = {
+    "continue_current",
+    "release_waiting",
+    "rotate_resumable",
+    "stop_reinvoke_required",
+    "terminal",
+}
+
+RESUME_MECHANISMS = {
+    "same_session",
+    "github_native",
+    "scheduled_task",
+    "work_event_trigger",
+    "work_persistent",
+    "owner_reinvoke",
+    "none_terminal",
+}
+
+EXECUTION_SURFACES = {
+    "chat",
+    "github_native",
+    "work",
+    "codex",
+}
+```
+
+The machine policy must include:
+
+- `policy_id = oteryn-agent-continuation-v1`;
+- continuation authority `Oteryn/Oteryn#108`;
+- reference to the current bounded execution authority from protected main;
+- six independent coordinates: task, worker/session, tool/command, external wait, retry/no-progress, context pressure;
+- the closed vocabularies above;
+- fail-closed disposition/mechanism compatibility;
+- automatic-resume release verification + task binding requirements;
+- execution-surface capability mapping;
+- no-safe-surface result `BLOCKED_CAPABILITY_UNAVAILABLE`.
+
+Do not embed bounded retry counts or bounded lifecycle definitions in this JSON.
+
+Prove RED before implementation.
+
+### 2.2 Minimal implementation
+
+Implement in `agent_continuation_policy.py` only the APIs needed to enforce the design:
+
+```python
+@dataclass(frozen=True)
+class StableTaskLineageKey:
+    repository: str
+    task_id: str
+    checkpoint_lineage_token: str
+
+@dataclass(frozen=True)
+class TrustedTaskIdentity:
+    lineage_key: StableTaskLineageKey
+    task_branch: str
+    pr_applicable: bool
+    pr_id: str | None
+    task_head_sha: str
+    expected_next_action: str
+
+@dataclass(frozen=True)
+class TrustedCapabilitySnapshot:
+    observed_at: str
+    required_capability: str | None
+    compatible_surfaces: tuple[str, ...]
+    available_surfaces: tuple[str, ...]
+    authorized_surfaces: tuple[str, ...]
+    safe_fallbacks_exhausted: bool
+    evidence_refs: tuple[str, ...]
+
+class CheckpointLineageAuthority(Protocol): ...
+class CheckpointTransitionAuthority(Protocol): ...
+
+class BoundedLifecycleAuthority(Protocol):
+    def current_state(self, trusted_task: TrustedTaskIdentity) -> str: ...
+    def releases_worker_ownership(
+        self,
+        state: str,
+        trusted_task: TrustedTaskIdentity,
+    ) -> bool: ...
+    def is_terminal(
+        self,
+        state: str,
+        trusted_task: TrustedTaskIdentity,
+    ) -> bool: ...
+    # Retry/evidence continuity methods remain bounded-authority owned.
+    ...
+
+class ResumeMechanismVerifier(Protocol): ...
+class RemainingWorkAuthority(Protocol): ...
+class ExecutionCapabilityAuthority(Protocol):
+    def current_snapshot(
+        self,
+        trusted_task: TrustedTaskIdentity,
+        required_capability: str | None,
+    ) -> TrustedCapabilitySnapshot: ...
+
+class ExecutionSurfaceUnavailable(RuntimeError): ...
+
+def load_policy(path: Path) -> dict: ...
+def validate_policy(policy: dict) -> None: ...
+def validate_continuation_snapshot(..., validation_mode: str) -> None: ...
+def select_execution_surface(
+    policy: dict,
+    *,
+    trusted_task: TrustedTaskIdentity,
+    required_capability: str | None,
+    capability_authority: ExecutionCapabilityAuthority,
+) -> str: ...
+```
+
+`releases_worker_ownership` and `is_terminal` are delegated queries into `#69`; #108 must not hard-code or redefine the bounded state enum. Under the current protected-main contract the expected readback is: `WAITING_EXTERNAL`, `BLOCKED`, and `STALLED` release ownership while remaining nonterminal; `RUNNING` and `READY` do not release ownership; `DONE` releases ownership and is terminal. Tests may assert this current integration contract while the continuation implementation itself consumes the authority methods rather than owning the list.
+
+`TrustedCapabilitySnapshot` is produced by the trusted authority from current-session/control-plane evidence. The caller cannot manufacture support/availability/authorization booleans and pass them as selection authority. Unknown/stale/unverifiable discovery fails closed. `BLOCKED_CAPABILITY_UNAVAILABLE` is valid only when the authority has evaluated the safe compatible fallback set and reports it exhausted.
+
+Interfaces are trust boundaries, not permission to duplicate provider/control-plane storage.
+
+### 2.3 GREEN
+
+Run the focused suite and require deterministic PASS before expanding tests.
+
+---
+
+## Phase 3 — Continuation safety regressions
+
+Add one failing regression at a time, then implement the smallest fix.
+
+Required invariants:
+
+### Stable lineage
+
+- predecessor/no-predecessor lookup uses only `repository + task_id + checkpoint_lineage_token`;
+- snapshot cannot self-select trusted task identity;
+- branch/PR/head/next action may advance without changing lineage;
+- immutable lineage mismatch fails closed.
+
+### Checkpoint semantic minimum
+
+Define one baseline valid checkpoint fixture with this closed top-level field set and literal accepted shapes:
+
+```text
+repository                non-empty repository coordinate string: owner/name
+ task_id                    non-empty string
+ checkpoint_lineage_token   non-empty opaque string
+ task_branch                non-empty string
+ pr_applicable              exact boolean
+ pr_id                      non-empty string iff pr_applicable=true; otherwise null
+ task_head_sha               lowercase 40-hex string
+ phase                       non-empty string
+ bounded_lifecycle_state     non-empty string supplied by the bounded lifecycle authority at checkpoint-write time; historical value is preserved on resume
+ last_material_progress      non-empty string summarizing the latest material change/evidence event
+ completed_work              JSON list of unique non-empty strings; empty list allowed
+ evidence_refs               JSON list of unique non-empty strings; empty list allowed
+ bounded_continuity_ref      non-empty opaque string locator/digest; internal retry schema remains #69-owned
+ blockers                    JSON list of unique non-empty strings; empty list allowed
+ context_pressure            exact enum string: not_applicable|normal|elevated|rotate_required
+ worker_disposition          exact member of WORKER_DISPOSITIONS
+ resume_mechanism            exact member of RESUME_MECHANISMS
+ resume_locator              non-empty string when the chosen mechanism requires a locator; otherwise null
+ next_action                 exactly one non-empty string field describing the next safe action
+```
+
+The leading spaces above are presentation only; actual JSON keys are exactly the names shown without whitespace prefixes.
+
+The continuation policy must not accept unknown top-level checkpoint fields as a way to smuggle a second lifecycle/retry schema. Provider-specific storage may retain provider-owned metadata outside this normalized continuation snapshot, but the normalized object passed into `validate_continuation_snapshot` uses the closed field set above.
+
+Before implementation, add parameterized RED tests that delete **each** always-required key one at a time and require rejection. `pr_id` and `resume_locator` remain present in the normalized object even when their value is `null`; applicability is determined by the rules above, not by omitting keys.
+
+Add explicit malformed/type-shape RED cases proving:
+
+- `repository` rejects empty strings, non-strings and coordinates that are not exactly `owner/name`;
+- `task_id`, `checkpoint_lineage_token`, `task_branch`, `phase`, `bounded_lifecycle_state`, `last_material_progress`, `bounded_continuity_ref` and `next_action` reject empty/whitespace-only strings and all non-string values;
+- `pr_applicable` rejects `0`, `1`, strings and all non-boolean values;
+- `pr_id` rejects empty/non-string values when `pr_applicable=true`, and rejects any non-null value when `pr_applicable=false`;
+- `task_head_sha` rejects uppercase, short/long, non-hex and non-string values;
+- `completed_work`, `evidence_refs` and `blockers` each reject non-list values, duplicate members, empty/whitespace-only members and non-string members; an empty list is valid;
+- `context_pressure` rejects `null`, booleans, numbers, objects/lists and every string outside `not_applicable|normal|elevated|rotate_required`; `not_applicable` is the explicit truthful value when no context-pressure signal is relevant, so applicability is never inferred from an unprovable `null`;
+- `worker_disposition` and `resume_mechanism` reject unknown/non-string values;
+- `resume_locator` rejects empty/whitespace-only and non-string values whenever the mechanism requires a locator; it must be `null` for mechanisms that do not use one;
+- `last_material_progress`, list members and `next_action` are reconstruction summaries/locators only and must not encode secrets or raw large logs;
+- no semantic-minimum field may accept an arbitrary object merely because it is JSON-serializable;
+- in `checkpoint_write` mode, `bounded_lifecycle_state` must equal the current bounded-authority state; syntactically valid but stale/different state fails closed before persistence;
+- in `resume_read` mode, the historical `bounded_lifecycle_state` is validated only for authenticated historical integrity and shape at the semantic-minimum stage; it must **not** be compared directly with the fresh bounded-authority state before transition reconciliation;
+- after historical integrity/event authentication, `CheckpointTransitionAuthority` must prove any lifecycle advance from the historical state to fresh task state, and `BoundedLifecycleAuthority` must independently confirm the resulting current lifecycle/terminality;
+- a historical `WAITING_EXTERNAL` checkpoint may reconcile to current `READY` or `DONE` only when those authorities prove the transition; direct pre-transition fresh equality would be a regression and must have a negative test;
+- `bounded_continuity_ref` is mandatory but opaque to #108; tests must not parse it to duplicate #69 retry counters;
+- no field representing context pressure may contain or require an invented exact runtime token count.
+
+The same closed **shape/type** semantic-minimum validation applies to `checkpoint_write` and authenticated historical checkpoints during `resume_read`. Fresh-state equality is mode-specific: it is required for new checkpoint writes, while historical resume values remain immutable evidence until transition reconciliation proves the move to current state.
+
+### Checkpoint write
+
+- latest predecessor is resolved by trusted lineage;
+- missing predecessor is accepted only when the lineage authority independently proves none exists;
+- first continuation checkpoint must match already-consumed current bounded state;
+- existing predecessor continuity is delegated to bounded lifecycle authority;
+- mutable checkpoint coordinates must match current `TrustedTaskIdentity`;
+- semantic-minimum fields and conditional fields must already be valid before a release/rotation checkpoint is persisted;
+- the proposed lifecycle state must match current `BoundedLifecycleAuthority` before persistence;
+- before accepting any worker disposition, derive ownership/terminality from `BoundedLifecycleAuthority.current_state(...)`, `releases_worker_ownership(...)`, and `is_terminal(...)`;
+- `release_waiting` is valid only when the bounded authority reports **released ownership + nonterminal** for the current state;
+- `rotate_resumable` is valid only when the bounded authority reports **ownership not released + nonterminal**, because it transfers an otherwise-active worker slot to a genuine replacement/persistent worker execution;
+- `terminal` is valid only when the bounded authority independently reports terminal;
+- unknown/unavailable/contradictory bounded ownership or terminality fails closed.
+
+### Resume read
+
+- historical checkpoint integrity and semantic-minimum shape are verified before reconciliation;
+- historical lifecycle/disposition and mutable coordinates remain immutable evidence and are not rewritten or forced equal to fresh state before transition proof;
+- automatic resume authenticates the actual historical mechanism/locator/event;
+- owner re-invocation uses owner-authorized re-entry evidence, never fabricated automatic-event evidence;
+- a trusted transition authority reconciles historical lifecycle/disposition plus historical mutable coordinates to fresh GitHub/task context;
+- bounded authority independently confirms the fresh current lifecycle/terminality and retry/evidence continuity after that transition proof;
+- historical `WAITING_EXTERNAL + release_waiting` can legitimately resume into fresh `READY` or terminal `DONE` when the transition is proven;
+- a consumed one-shot mechanism need not remain live after firing;
+- a successor checkpoint claiming future automatic resume must freshly verify that new mechanism.
+
+### Disposition/mechanism matrix
+
+Before pair-specific mechanism checks, query the bounded authority for the current state, whether that state releases active worker ownership, and whether it is terminal. The continuation layer must not infer these facts from disposition labels or maintain a competing lifecycle table.
+
+Current protected-main integration expectations are test fixtures, not #108-owned definitions:
+
+```text
+RUNNING           releases=false  terminal=false
+READY             releases=false  terminal=false
+WAITING_EXTERNAL  releases=true   terminal=false
+BLOCKED           releases=true   terminal=false
+STALLED           releases=true   terminal=false
+DONE              releases=true   terminal=true
+```
+
+Required compatibility:
+
+- `continue_current` ↔ `same_session`: bounded state is nonterminal and does not release ownership;
+- `release_waiting` ↔ `github_native`: bounded state **releases ownership and is nonterminal**, plus a concrete GitHub locator and authoritative whole-task proof that no later agent worker is required;
+- `release_waiting` ↔ `scheduled_task|work_event_trigger|work_persistent`: bounded state **releases ownership and is nonterminal**, plus a non-empty live/authorized/task-bound verified locator; these are valid waiting continuations and must not be misclassified as rotation;
+- `rotate_resumable` ↔ only `scheduled_task|work_event_trigger|work_persistent`: bounded state is **nonterminal and does not release ownership**, plus a non-empty live/authorized/task-bound verified locator and genuine replacement/persistent worker execution;
+- `stop_reinvoke_required` ↔ `owner_reinvoke`: bounded state **releases ownership and is nonterminal**, and no automatic mechanism exists; if the current bounded state still owns an active worker, callers must first classify the real owner/permission/policy dependency through the bounded authority rather than using #108 to fabricate a release;
+- `terminal` ↔ `none_terminal`: independent bounded authority reports terminal;
+- under the current `#69` contract, `STALLED + terminal|none_terminal` is rejected because `STALLED` is released but nonterminal;
+- reject `release_waiting` when bounded ownership is not released (`RUNNING`/`READY` in the current contract) even if the mechanism/locator is otherwise valid;
+- reject `release_waiting` for terminal `DONE`; terminal work uses `terminal + none_terminal`;
+- reject every nonterminal disposition when bounded authority reports terminal; under the current contract, RED cases must cover terminal `DONE` paired in turn with `continue_current`, `release_waiting`, `rotate_resumable`, and `stop_reinvoke_required`;
+- reject `rotate_resumable` when bounded ownership is already released (`WAITING_EXTERNAL`/`BLOCKED`/`STALLED` in the current contract), because those states use waiting/released semantics rather than replacement-worker rotation;
+- add positive tests for all four legal `release_waiting` mechanism classes against an authoritative released nonterminal state, positive rotation tests against an authoritative active nonterminal state, and negative cross-class tests for every current bounded-state category;
+- all other pairings fail closed.
+
+If a candidate is `READY` and GitHub Merge Queue becomes the external dependency, the continuation layer must not silently reinterpret `READY` as released. The caller must first obtain the appropriate bounded-authority transition/classification (for example to `WAITING_EXTERNAL` when an external dependency genuinely exists) before persisting `release_waiting`, or else keep/transfer active ownership using the applicable nonreleased disposition.
+
+### GitHub-native waiting
+
+`release_waiting + github_native` requires:
+
+- authoritative bounded readback that current ownership is released and the state is nonterminal;
+- concrete GitHub workflow/queue/control-plane locator;
+- authoritative proof, before release, that all remaining task work can reach terminal state without any later agent worker.
+
+If later worker action may be required, fail closed to a worker-capable mechanism or `stop_reinvoke_required`; do not fabricate a released bounded state inside #108.
+
+For `release_waiting + scheduled_task|work_event_trigger|work_persistent`, GitHub-only whole-task proof is not the qualifier; instead bounded ownership must already be authoritatively released/nonterminal and the mechanism must be live, authorized, task-bound, action-bound as required by the canonical design, with the concrete locator needed to launch/preserve the later worker.
+
+### Bounded continuity
+
+Worker/session/context/surface changes must never reset or enlarge bounded retry/evidence state. The continuation layer delegates this decision to the bounded lifecycle authority.
+
+### Execution surface
+
+All selector tests obtain capability facts through `ExecutionCapabilityAuthority`; raw caller dictionaries are not accepted as authority.
+
+Required RED/GREEN coverage:
+
+- Chat is selected when current trusted capability evidence proves it can safely perform the required work;
+- GitHub-native is preferred for deterministic compute/waiting when compatible and available;
+- Work is selected only when the required capability is Work-compatible **and** current trusted evidence proves Work available and authorized;
+- Codex is selected only for its compatible software-development capability case with current availability/authorization evidence;
+- a surface that is available/authorized but incompatible with the required capability is rejected;
+- stale, self-asserted, empty or unverifiable capability evidence is rejected;
+- an unavailable/unauthorized preferred surface must cause evaluation of every safe compatible fallback before blocker classification;
+- `BLOCKED_CAPABILITY_UNAVAILABLE` is raised/returned only when trusted evidence proves the safe compatible fallback set is exhausted.
+
+Run focused tests after every material fix, then the full continuation suite.
+
+---
+
+## Phase 4 — Human contract and required-gate wiring
+
+Create `PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` describing the same semantics in human-readable form.
+
+Update `AGENTS.md` only with the minimum pointer/requirements needed to make the continuation contract discoverable.
+
+Wire the continuation regression suite into the existing required `meta-gate`.
+
+Add/extend a deterministic CI-contract regression that proves `meta-gate` actually invokes `test_agent_continuation_policy.py`. This prevents a false green where tests exist but are not executed.
+
+TDD order for wiring:
+
+1. contract test fails because CI does not invoke continuation tests;
+2. add the invocation;
+3. hosted `meta-gate` proves GREEN.
+
+Do not create a second required status.
+
+---
+
+## Phase 5 — META qualification and integration
+
+On one stable material candidate:
+
+1. refresh protected main and PR exact head;
+2. confirm intended changed-file set only;
+3. inspect full exact diff;
+4. run required exact-head `meta-gate` and confirm the continuation tests actually executed;
+5. run broader governance regression suite where applicable;
+6. inspect all review threads/comments;
+7. use optional external AI review only if current `AGENTS.md` says its independent value justifies the cost; it remains advisory;
+8. repair material findings with strict TDD;
+9. require zero unresolved material threads;
+10. integrate through current GitHub Merge Queue/protected-branch rules;
+11. read back protected main and confirm the merged policy/contract exact state.
+
+Do not chase moving main with no-op/retrigger commits.
+
+---
+
+## Phase 6 — Provider adoption
+
+Provider work may proceed independently only after META continuation is canonical and only with explicit current-task write authorization for that exact provider.
+
+### Game
+
+Read-only preflight first. If authorized, add the minimum provider reference/adoption compatible with Game's existing controls and required `game-gate`.
+
+### Platform
+
+Read-only preflight first. If authorized, map organization continuation semantics into the existing Control Room/checkpoint/anti-stall model. Do not create a second Platform checkpoint schema or orchestration database.
+
+### Atlas
+
+Read-only preflight first. If authorized, add the minimum provider reference/adoption compatible with Atlas's existing controls and required `atlas-gate`.
+
+Each provider lane owns its own branch/PR and may run in parallel with other provider lanes when there are no shared writable surfaces.
+
+Absent exact provider authorization:
+
+- do not mutate;
+- record `OWNER_PERMISSION_REQUIRED` in the programme evidence;
+- continue other authorized lanes.
+
+Missing authorization is not implicit final defer.
+
+A final provider defer/exclusion is valid only through this GitHub-authoritative record on `Oteryn/Oteryn#108` (or a canonical successor Issue explicitly named by `#108`):
+
+```text
+OTERYN_PROVIDER_SCOPE_DECISION_V1
+provider_repository: Oteryn/<exact-provider-repo>
+adoption_task: <exact current provider adoption Issue/task locator>
+decision: DEFER|EXCLUDE
+reason: <non-empty owner rationale>
+meta_main_sha: <current protected META main SHA>
+provider_main_sha: <current protected/default provider main SHA>
+```
+
+The decision comment is a durable locator, not self-authenticating authority. At closeout the coordinator must re-read that exact GitHub comment and verify its author currently has repository-admin/owner authority for the scoped decision, the provider/adoption-task coordinates still match live state, the recorded repository identities/SHA context remain coherent provenance, and no later owner decision supersedes it. Unknown permission, generic/stale handoffs, missing fields or a decision for a different provider/task fail closed.
+
+---
+
+## Phase 7 — Final drift and closeout
+
+Refresh live GitHub state for META, Game, Platform and Atlas.
+
+For every in-scope repository verify:
+
+- expected protected-main adoption state;
+- current required aggregate gate and relevant branch enforcement;
+- no duplicate/competing continuation lifecycle;
+- provider-local stronger controls were preserved;
+- no retired ADR0005 machinery was reintroduced by this rollout.
+
+For every provider not adopted, validate the `OTERYN_PROVIDER_SCOPE_DECISION_V1` record fail-closed:
+
+1. fetch the exact comment from canonical `#108`/successor Issue;
+2. verify marker and all required fields;
+3. verify the author currently has admin/owner authority sufficient for the scope decision;
+4. verify exact provider repository and current adoption-task binding;
+5. refresh current META/provider main and confirm the record is provenance for the intended repository/task rather than a stale generic decision;
+6. search later owner decisions for the same provider/task and reject a superseded record;
+7. classify unknown/unverifiable proof as `OWNER_PERMISSION_REQUIRED`/not-terminal, never as an implicit defer.
+
+Terminal programme result requires:
+
+- META implementation merged and read back from protected main;
+- each provider either merged/read back or has a currently verified GitHub-authoritative defer/exclusion record as defined above;
+- all required checks/threads/queue integration terminal;
+- no unaccounted writer/PR remains for the same continuation authority.
+
+Only then close `#108` as complete and dispose of task branches according to current repository policy.
