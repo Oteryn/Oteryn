@@ -155,6 +155,22 @@ def test_policy_schema_version_must_be_exactly_two() -> None:
         assert "policy schema_version must be 2" in errors
 
 
+def test_call_gate_schema_version_rejects_json_boolean() -> None:
+    malformed = policy()
+    config = malformed["remote_desktop_call_gate"]
+    assert isinstance(config, dict)
+    config["schema_version"] = True
+    errors = call_gate.validate_remote_desktop_call(
+        "diagnose_self_hosted_runner",
+        "Remote_Desktop_Commander.start_process",
+        {"command": "docker ps --format {{.ID}}", "timeout_ms": 5000},
+        packet=start_process_exception_packet(),
+        live_state=live_state(),
+        policy=malformed,
+    )
+    assert "policy remote_desktop_call_gate.schema_version must be 1" in errors
+
+
 def test_canonical_instructions_gate_every_direct_remote_desktop_call() -> None:
     agents_text = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
     contract_text = (
@@ -387,16 +403,33 @@ def test_exact_call_arguments_are_required_for_remote_desktop() -> None:
     assert errors == ["remote desktop call arguments do not match routing packet"]
 
 
-def test_nonsemantic_device_id_does_not_change_call_authorization() -> None:
+def test_device_id_is_bound_to_exact_call() -> None:
     packet = exception_packet("lan_or_hardware")
+    execution = packet["execution_routing"]
+    assert isinstance(execution, dict)
+    execution["requested_remote_desktop_calls"] = [
+        {
+            "tool": "Remote_Desktop_Commander.ping",
+            "arguments": {"deviceId": "approved-host"},
+        }
+    ]
     assert call_gate.validate_remote_desktop_call(
         "perform_lan_or_hardware_acceptance",
         "Remote_Desktop_Commander.ping",
-        {"deviceId": "runtime-selected-device"},
+        {"deviceId": "approved-host"},
         packet=packet,
         live_state=live_state(),
         policy=policy(),
     ) == []
+    errors = call_gate.validate_remote_desktop_call(
+        "perform_lan_or_hardware_acceptance",
+        "Remote_Desktop_Commander.ping",
+        {"deviceId": "other-host"},
+        packet=packet,
+        live_state=live_state(),
+        policy=policy(),
+    )
+    assert errors == ["remote desktop call arguments do not match routing packet"]
 
 
 def test_provider_policy_adoption_rejects_historical_parallel_first_contract() -> None:
@@ -408,6 +441,16 @@ def test_provider_policy_adoption_rejects_historical_parallel_first_contract() -
     errors = adoption.validate_provider_agents_text("Game", stale)
     assert "historical META execution-policy pin is forbidden" in errors
     assert "parallel-first execution wording is forbidden" in errors
+
+
+def test_provider_policy_adoption_rejects_lowercase_historical_pin() -> None:
+    stale = (
+        "The current protected META execution policy is "
+        "oteryn/oteryn@8fac1d55805fc3372351ea0a55ad7728b3570ebc:ecosystem/agent-execution-routing-policy.json. "
+        "Use `single_agent` by default and `parallel_when_beneficial` when useful."
+    )
+    errors = adoption.validate_provider_agents_text("Platform", stale)
+    assert "historical META execution-policy pin is forbidden" in errors
 
 
 def test_provider_policy_adoption_accepts_live_effort_aware_contract() -> None:
