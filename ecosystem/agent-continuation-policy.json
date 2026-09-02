@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "policy_id": "oteryn-agent-continuation-v1",
+  "continuation_authority": "Oteryn/Oteryn#108",
+  "bounded_execution_authority": "Oteryn/Oteryn#69",
+  "coordinates": [
+    "task",
+    "worker_session",
+    "tool_command",
+    "external_wait",
+    "retry_no_progress",
+    "context_pressure"
+  ],
+  "worker_dispositions": [
+    "continue_current",
+    "release_waiting",
+    "rotate_resumable",
+    "stop_reinvoke_required",
+    "terminal"
+  ],
+  "resume_mechanisms": [
+    "same_session",
+    "github_native",
+    "scheduled_task",
+    "work_event_trigger",
+    "work_persistent",
+    "owner_reinvoke",
+    "none_terminal"
+  ],
+  "automatic_resume_mechanisms": [
+    "github_native",
+    "scheduled_task",
+    "work_event_trigger",
+    "work_persistent"
+  ],
+  "disposition_mechanism_compatibility": {
+    "continue_current": ["same_session"],
+    "release_waiting": ["github_native", "scheduled_task", "work_event_trigger", "work_persistent"],
+    "rotate_resumable": ["scheduled_task", "work_event_trigger", "work_persistent"],
+    "stop_reinvoke_required": ["owner_reinvoke"],
+    "terminal": ["none_terminal"]
+  },
+  "execution_surfaces": ["chat", "github_native", "work", "codex"],
+  "capability_surface_compatibility": {
+    "chat_tools": ["chat"],
+    "github_deterministic": ["github_native"],
+    "event_triggered_connected_app": ["work"],
+    "persistent_cloud_execution": ["work"],
+    "software_development_loop": ["codex"]
+  },
+  "context_pressure_values": ["not_applicable", "normal", "elevated", "rotate_required"],
+  "blocked_result": "BLOCKED_CAPABILITY_UNAVAILABLE"
+}
