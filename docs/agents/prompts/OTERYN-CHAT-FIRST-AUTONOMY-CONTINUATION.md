@@ -92,15 +92,17 @@ The continuation layer must consume `BoundedLifecycleAuthority` ownership-releas
 
 When the bounded authority reports terminal state — currently `DONE` — reject every nonterminal disposition. `READY` is not released merely because the next step is external; require a real bounded transition/classification to a released nonterminal state before persisting `release_waiting`.
 
-`rotate_resumable` is valid only with `scheduled_task`, `work_event_trigger` or `work_persistent` plus a concrete verified locator.
+For `release_waiting + scheduled_task|work_event_trigger|work_persistent`, require a concrete non-empty locator and trusted `ResumeMechanismVerifier` evidence **before releasing ownership** that the mechanism is live/enabled, authorized, bound to the same stable task lineage, and bound to the current authoritative `next_action`. Missing, stale, disabled, paused, inaccessible, cross-task or action-mismatched proof fails closed rather than releasing the worker.
 
-`github_native` does not create a replacement Chat worker. `release_waiting + github_native` is valid only when an authoritative remaining-work check proves that all remaining work through terminal state can complete without later agent-worker action.
+`rotate_resumable` is valid only with `scheduled_task`, `work_event_trigger` or `work_persistent` plus a concrete verified locator that satisfies the same live/authorized/task/action binding and genuinely launches or preserves replacement worker execution.
+
+`github_native` does not create a replacement Chat worker. `release_waiting + github_native` requires a concrete GitHub control-plane locator and is valid only when an authoritative `RemainingWorkAuthority` check proves that all remaining work through terminal state can complete without later agent-worker action.
 
 If another worker will be needed and no worker-launching/preserving automatic mechanism exists, use `stop_reinvoke_required`; do not imply background continuation.
 
 `STALLED` is released bounded-retry exhaustion, not terminal completion. Never map `STALLED` to the continuation `terminal` disposition unless a newer bounded authority explicitly changes canonical terminality.
 
-### Stable lineage
+### Stable lineage and resume reconciliation
 
 Durable predecessor lookup must use only immutable lineage identity:
 
@@ -110,7 +112,19 @@ task_id
 checkpoint_lineage_token
 ```
 
-Branch, PR, exact head and next action are mutable execution coordinates. Reconcile them to fresh trusted GitHub state; do not use them to split normal continuation into a new lineage.
+Branch, PR, exact head and next action are mutable execution coordinates. Do not use them to split normal continuation into a new lineage.
+
+For `checkpoint_write`, current snapshot lifecycle/disposition and mutable coordinates must match the current trusted task context and current `BoundedLifecycleAuthority` before persistence/release.
+
+For `resume_read`, keep the durable checkpoint immutable and treat its branch/PR/head/action/lifecycle/disposition as authenticated **historical evidence**, not as values that must already equal fresh state. Follow this order:
+
+1. authenticate the historical checkpoint/digest and validate its closed semantic-minimum shape without rewriting it to look current;
+2. authenticate the actual historical resume cause against the historical task/action: automatic mechanisms verify the historical trigger/completion event and locator binding; `owner_reinvoke` instead verifies the current owner-authorized re-entry bound to the exact historical lineage/action;
+3. resolve a fresh trusted GitHub/control-plane task context and fresh current bounded lifecycle/ownership/terminality;
+4. require `CheckpointTransitionAuthority` to prove every legitimate historical-to-fresh change in branch, PR applicability/ID, head, next action, lifecycle and disposition semantics before using the fresh state;
+5. only after that transition proof apply the current `BoundedLifecycleAuthority` disposition predicates to the **fresh** state or any successor `checkpoint_write`.
+
+A historical `WAITING_EXTERNAL + release_waiting` checkpoint may therefore reconcile to fresh `READY` or terminal `DONE` when the trusted transition authority proves the advance; never reject that solely because historical lifecycle differs from fresh lifecycle, and never rewrite authenticated history to manufacture equality. A consumed one-shot trigger need not remain live after it has been authenticated as the cause of the resume; fresh liveness is required again only if a successor checkpoint claims future automatic continuation.
 
 ### Checkpoints
 
