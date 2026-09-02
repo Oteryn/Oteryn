@@ -61,9 +61,19 @@ Resume mechanisms:
 - `owner_reinvoke`
 - `none_terminal`
 
-`rotate_resumable` requires a real worker-launching/preserving mechanism: `scheduled_task`, `work_event_trigger` or `work_persistent`, with a concrete locator.
+All disposition decisions consume current `BoundedLifecycleAuthority` facts rather than inferring ownership or terminality from the continuation mechanism itself:
 
-`github_native` can advance Actions/Merge Queue/control-plane state but does not itself create a replacement Chat worker. `release_waiting + github_native` is valid only when authoritative remaining-work evidence proves that no later agent-worker action will be required before terminal completion.
+- `continue_current + same_session` requires nonreleased + nonterminal bounded state;
+- every `release_waiting` class requires released + nonterminal bounded state;
+- `rotate_resumable` requires nonreleased + nonterminal bounded state plus genuine replacement/persistent worker execution;
+- `stop_reinvoke_required + owner_reinvoke` requires released + nonterminal bounded state;
+- `terminal + none_terminal` requires bounded terminality.
+
+`READY` is not released merely because the next step is external, and terminal `DONE` rejects every nonterminal disposition.
+
+For `release_waiting` or `rotate_resumable` through `scheduled_task`, `work_event_trigger` or `work_persistent`, require before release/rotation a concrete locator plus trusted proof that the mechanism is live/enabled, authorized, bound to the same stable task lineage and bound to the current authoritative `next_action`. `rotate_resumable` additionally requires that the mechanism genuinely launches or preserves replacement worker execution.
+
+`github_native` can advance Actions/Merge Queue/control-plane state but does not itself create a replacement Chat worker. `release_waiting + github_native` requires a concrete GitHub workflow/queue/control-plane locator and is valid only when authoritative remaining-work evidence proves that no later agent-worker action will be required before terminal completion.
 
 If a replacement worker will be needed and no real automatic mechanism exists, record `stop_reinvoke_required` and report that truthfully.
 
@@ -81,7 +91,9 @@ checkpoint_lineage_token
 
 Branch, PR, exact head and next action are mutable execution coordinates. They must not be used to create a new lineage merely because normal task progress advanced them.
 
-A durable checkpoint must preserve enough trusted state to reconstruct exactly one next safe action without replaying the full chat. It must include the semantic minimum required by the canonical #108 design and delegate bounded retry/evidence continuity to the bounded lifecycle authority rather than defining a competing counter schema.
+A durable checkpoint must preserve enough trusted state to reconstruct exactly one next safe action without replaying the full chat. It must include the semantic minimum required by the canonical #108 design and delegate bounded retry/evidence continuity to the bounded lifecycle authority rather than defining a competing counter schema. Every automatic waiting/rotation checkpoint carries the concrete mechanism locator required by the canonical design.
+
+For `checkpoint_write`, lifecycle/disposition and mutable coordinates must match fresh trusted task/bounded state. For `resume_read`, preserve the checkpoint as authenticated historical evidence: authenticate its historical mechanism/event (or owner-authorized re-entry), fetch fresh GitHub/task and bounded state, require `CheckpointTransitionAuthority` to prove any historical-to-fresh changes in branch/PR/head/action **and lifecycle/disposition semantics**, and only then apply current bounded predicates. A proven historical `WAITING_EXTERNAL + release_waiting` may therefore advance to fresh `READY` or terminal `DONE` without rewriting history.
 
 Checkpointing is control-plane state, not justification for a no-op/retrigger commit.
 
