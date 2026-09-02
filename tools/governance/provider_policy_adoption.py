@@ -7,7 +7,8 @@ from pathlib import Path
 import re
 
 _HISTORICAL_POLICY_PIN = re.compile(
-    r"Oteryn/Oteryn@[0-9a-fA-F]{40}:ecosystem/agent-execution-routing-policy\.json"
+    r"Oteryn/Oteryn@[0-9a-fA-F]{40}:ecosystem/agent-execution-routing-policy\.json",
+    re.IGNORECASE,
 )
 _PARALLEL_FIRST = re.compile(r"\bparallel[-_]first\b", re.IGNORECASE)
 _SERIAL_EXCEPTION = re.compile(
