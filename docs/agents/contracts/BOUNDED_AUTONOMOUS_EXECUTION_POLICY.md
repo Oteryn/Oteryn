@@ -11,8 +11,7 @@ Machine policy: `ecosystem/bounded-autonomous-execution-policy.json`.
 Autonomous work must continue while useful authorized progress is possible, without
 repeating an unchanged action chain. This is a deterministic coordination policy,
 not an external service or repository lifecycle authority. GitHub and the repository's
-current governance remain
-authoritative for repository lifecycle facts.
+current governance remain authoritative for repository lifecycle facts.
 
 ## Lifecycle
 
@@ -29,6 +28,14 @@ The canonical states are:
 Observation remains allowed. Operational work may resume from a released nonterminal
 state only after the material progress fingerprint changes. `DONE` is terminal.
 
+## Durable predecessor binding
+
+Every operational action (`mutate`, `retrigger`, `retry`, `run_heavy_validation` or
+`complete`) requires a durable previous snapshot. The predecessor must belong to the
+same stable task identity: repository plus task id. A missing predecessor cannot be
+interpreted as material progress. Observation and fail-closed dependency
+classification may still occur without a predecessor.
+
 ## Material fingerprints
 
 The progress fingerprint is the deterministic digest of repository, task, exact
@@ -42,10 +49,14 @@ coordinate. Late integration is governed by the current canonical integration po
 ## Candidate freeze
 
 A candidate freezes when final qualification begins. An unchanged frozen candidate
-must not be mutated or retriggered. `mutate` may proceed only when the material
-fingerprint actually changes and a permitted material reason is recorded, such as a
-review finding, failing required test, semantic reconciliation or changed authority.
-`retrigger` is never justified by empty, no-op, checkpoint or narration-only churn.
+must not be mutated or retriggered. Freeze remains authoritative for the same exact
+technical head: a caller cannot thaw a candidate by setting `candidate_frozen` to
+false in a later snapshot. `mutate` may proceed only when the material fingerprint
+actually changes and a permitted material reason is recorded, such as a review
+finding, failing required test, semantic reconciliation or changed authority. Such an
+admitted same-head mutation remains frozen. A new technical head may establish a new
+freeze coordinate. `retrigger` is never justified by empty, no-op, checkpoint or
+narration-only churn.
 
 ## Bounded local retries
 
@@ -56,9 +67,16 @@ The organization defaults are:
 
 Exhaustion produces `STALLED` and releases ownership. A configured zero retry budget
 allows no retry after the initial failed attempt. Counters are durable caller facts;
-they cannot be negative, boolean, or reset by narration or timestamps.
+they cannot be negative, boolean, or reset by narration or timestamps. The identical
+failure counter cannot decrease while the failure fingerprint is unchanged. The heavy
+validation counter cannot decrease while the exact technical head is unchanged. A
+counter may reset only when its defining scope changes.
 
 ## Dependencies and completion
+
+`dependency_kind` is a closed coordinate: `none`, `external`, `owner`, `permission`
+or `policy`. Unsupported values fail closed rather than falling through to operational
+work. A non-empty blocking dependency also requires a blocking dependency kind.
 
 An external dependency produces `WAITING_EXTERNAL`. An owner, permission or policy
 dependency produces `BLOCKED`. Only observation is allowed while the unchanged
