@@ -1,102 +1,90 @@
 # Chat-first Persistent Autonomy Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
-**Goal:** Implement a thin organization continuation layer that keeps owner-visible tasks durable across worker/session/tool/context boundaries while preserving `#69/#71` bounded-execution authority, `#102/#103` merge-integration authority, provider-owned orchestration and explicit provider write-authority boundaries.
-
-**Architecture:** META will publish one versioned continuation policy plus deterministic validation for task/session/tool/wait/retry/context separation, executor selection, truthful resume mechanisms and checkpoint semantics. Game and Atlas may adopt the minimum by reference only after explicit current-task owner authorization for that provider; Platform may map it into its existing Control Room/checkpoint model under the same authorization rule rather than creating a second schema.
-
-**Tech Stack:** Markdown governance contracts, JSON machine policy, Python deterministic validators/tests, GitHub Actions, provider root agent instructions and existing Platform agent tooling.
+**Goal:** deliver the smallest deterministic continuation layer for `Oteryn/Oteryn#108` while preserving the bounded lifecycle, ADR 0005 GitHub-native integration model and provider ownership.
 
 **Spec:** `docs/superpowers/specs/2026-08-30-chat-first-persistent-autonomy-design.md`
 
-## Global Constraints
+## Global constraints
 
-- `Oteryn/Oteryn#69` / PR `#71` remains the sole bounded-autonomous-execution lifecycle authority.
-- `Oteryn/Oteryn#104` / PR `#107` remains scoped to effort-aware routing, Remote Desktop exact-call binding and provider execution-policy drift; it must not establish a second bounded lifecycle.
-- `Oteryn/Oteryn#102` / PR `#103` remains the sole candidate/integration-head, review-fingerprint and Merge Queue authority.
-- Do not copy `RUNNING`, `WAITING_EXTERNAL`, `BLOCKED`, `STALLED`, `READY`, `DONE`, retry budgets, candidate-freeze rules or `LOOP_BREAKER_AUDIT` into a second lifecycle schema.
-- Do not create a second Platform Control Room/checkpoint schema; broader Platform schema-first migration remains owned by `Oteryn/Oteryn-Platform#1009`.
-- Effort and execution surface are independent; `high` effort alone must never require Work/Codex.
-- Automatic continuation may be claimed only when a real configured mechanism and concrete locator exist. At checkpoint/release the mechanism must be live and bound to the same trusted task identity and expected next action. At resumption, the triggering/completion event must authenticate against that historical checkpoint/action; a completed one-shot mechanism need not remain live. Fresh liveness/binding is required again only when a new checkpoint claims that mechanism for future continuation.
-- `rotate_resumable` is valid only with a worker-launching/preserving mechanism: `scheduled_task`, `work_event_trigger` or `work_persistent`; `same_session`, `github_native`, `owner_reinvoke` and `none_terminal` must fail closed for that disposition.
-- Worker/session, command, wait or context exhaustion alone must not terminate the owner-visible task.
-- Continuation must never reset canonical bounded-execution retry/evidence counters; the validator resolves the latest durable predecessor against an independently trusted task identity inside the control-plane boundary and never accepts snapshot-selected task identity or predecessor history as authority.
-- `release_waiting + github_native` requires authoritative remaining-work proof keyed to that same trusted task identity; the snapshot cannot self-attest that no later agent-worker action remains.
-- `terminal + none_terminal` is legal only when the canonical bounded-lifecycle authority independently reports a terminal task state; a trusted terminal lifecycle state must not be paired with a nonterminal worker disposition.
-- Work/Codex selection requires a capability reason plus current verified availability and authorization; an unavailable/unauthorized surface must fail closed as `BLOCKED_CAPABILITY_UNAVAILABLE`.
-- Frozen candidates must not receive empty/no-op/checkpoint/retrigger commits.
-- META write authority does not extend to Game, Platform or Atlas. Provider Issue/PR/design references do not confer write authority. Before any provider mutation in Tasks 5-7, the owner must explicitly authorize writes to that exact provider repository for the current task; absent authorization, only read-only preflight/reconciliation analysis is allowed.
-- No product runtime, deployment, production, credential, secret or live-data mutation is part of this rollout.
-- GitHub live state must be refreshed before every task; historical Issue/PR/SHA references in this plan are locators only.
+- GitHub live state is authoritative; refresh before every material mutation/integration decision.
+- Current protected-main `AGENTS.md` and ADR 0005 outrank historical plan text.
+- The bounded lifecycle from `#69` is referenced, not copied.
+- `#107` may own routing/RDC/provider convergence only; no second bounded lifecycle.
+- GitHub protected branch + aggregate gate + Merge Queue own integration enforcement.
+- Do not recreate retired R0/R1/R2, review-fingerprint, `ai-review-gate`, attestation, outbox, custom merge-proof or `LOOP_BREAKER_AUDIT` machinery.
+- One writer per branch/lane. Parallelize only independent repositories/read-only review.
+- No no-op/checkpoint/retrigger commits.
+- Provider writes require explicit owner authorization for the exact provider repository and current adoption task.
+- No product runtime, production, secret, credential or live-data mutation is part of this rollout.
+- Canonical implementation must use a fresh branch from then-current protected `main`; the design branch never becomes the implementation writer.
 
 ---
 
-### Task 1: Freeze the authority split before implementation
+## Phase 0 — Terminalize prerequisites
 
-**Files:**
-- No repository code changes.
-- Durable control-plane updates: `Oteryn/Oteryn#69`, `#104`, `#108` and the relevant PR conversations.
+### 0.1 Refresh live authority
 
-**Interfaces:**
-- Consumes: owner-approved design in `docs/superpowers/specs/2026-08-30-chat-first-persistent-autonomy-design.md`.
-- Produces: unambiguous live ownership record: `#69/#71 = bounded lifecycle`, `#104/#107 = routing/RDC/provider-drift`, `#102/#103 = merge integration`, `#108 = persistent continuation`.
+Read:
 
-- [ ] **Step 1: Refresh the four authority lifecycles**
+- protected META `main` + `AGENTS.md` + ADR 0005;
+- `#69` bounded survivor and its current delivery state;
+- `#104/#107`;
+- `#108/#110`;
+- current required `meta-gate`, review threads and Merge Queue enforcement.
 
-Read current protected META `main`, Issues `#69`, `#104`, `#108`, `#102`, PRs `#71`, `#107`, `#110`, `#103`, their exact heads, draft/readiness state, review threads and required checks. Treat closed PR `#109` as transport-only predecessor provenance for `#110`.
+### 0.2 Bounded prerequisite
 
-Expected: no hidden successor Issue/PR has taken ownership of the same semantics.
+Require the surviving bounded contract to be canonical on protected main before the continuation implementation branch is created.
 
-- [ ] **Step 2: Record the approved ownership split**
+Do not copy a PR-only bounded implementation into the continuation branch.
 
-Add one concise durable comment to `#108` and, if live overlap still exists, cross-reference it from `#69/#71` and `#104/#107`:
+### 0.3 Reconcile `#107`
 
-```text
-OWNER-APPROVED AUTHORITY SPLIT — 2026-08-30
-- #69/#71: sole bounded autonomous lifecycle / retries / freeze / LOOP_BREAKER_AUDIT
-- #104/#107: effort-aware routing, Remote Desktop exact-call binding, provider execution-policy drift only
-- #102/#103: candidate/integration head, review fingerprint, Merge Queue only
-- #108/#110: task-vs-worker/tool/wait/retry/context continuation, executor selection, checkpoint/resume/user-notification semantics only
-No lineage may silently absorb another authority surface.
-```
+After the bounded survivor is canonical:
 
-- [ ] **Step 3: Verify no conflicting writer is allowed to merge as a second authority**
+- reconcile `#107` with current protected main;
+- retain only effort-aware routing, Remote Desktop exception/exact-call binding and provider execution-policy convergence;
+- delete/revert any duplicate bounded lifecycle, old review gate, outbox/attestation or retired ADR0005 machinery from its final diff;
+- run its deterministic tests and required exact-head `meta-gate`;
+- resolve all material review findings;
+- integrate through current Merge Queue rules.
 
-If PR `#107` still contains bounded-execution contract/workflow files, classify that as `RECONCILIATION_REQUIRED`, not as permission for `#108` to edit `#107`'s branch.
+### 0.4 Terminalize design packet
 
-Expected next state: the `#107` owner must either drop the duplicate bounded-execution material or reconcile it into the sole `#69/#71` lineage before protected-main admission.
-
-- [ ] **Step 4: Persist the dependency gate**
-
-Record on `#108`:
-
-```text
-Implementation of the canonical continuation contract may begin only after the live META overlap between #71 and #107 is terminally reconciled and protected-main authority is unambiguous. Documentation/design work may continue meanwhile; no competing AGENTS/CI/policy writer is allowed.
-```
-
-- [ ] **Step 5: Commit**
-
-No Git commit is created for control-plane-only comments.
+Reconcile `#110` against current protected main. Final #110 must be documentation-only and describe the ADR0005-compatible continuation model. Run `meta-gate`, inspect exact diff/threads and integrate through Merge Queue.
 
 ---
 
-### Task 2: Add the thin META continuation machine policy with TDD
+## Phase 1 — Create the fresh #108 implementation branch
 
-**Prerequisite:** Task 1 is terminal and the live META bounded/routing ownership conflict is resolved. Refresh `main` before branching.
+After Phase 0 is terminal:
 
-**Files:**
-- Create: `ecosystem/agent-continuation-policy.json`
-- Create: `tools/governance/agent_continuation_policy.py`
-- Create: `tools/governance/test_agent_continuation_policy.py`
+1. refresh protected `main` and verify its exact SHA;
+2. create one dedicated branch from that exact SHA;
+3. open one PR tracking `#108`;
+4. record the exact initial base/head and narrow intended paths.
 
-**Interfaces:**
-- Consumes: canonical bounded policy identity from the eventual protected-main `#69/#71` merge; current `ecosystem/agent-execution-routing-policy.json` from protected `main`; independently trusted task identity; authoritative checkpoint-lineage lookup; authoritative bounded-lifecycle and retry/evidence continuity authority; authoritative remaining-work lookup; live/bound release verification plus historical resume-event authentication; current execution-surface capability/authorization facts.
-- Produces: `load_policy(path) -> dict`, `validate_policy(policy) -> None`, `validate_continuation_snapshot(policy, snapshot, *, trusted_task, lineage_authority, transition_authority, bounded_lifecycle_authority, mechanism_verifier, remaining_work_authority, validation_mode) -> None`, `select_execution_surface(policy, facts) -> str`; typed `ExecutionSurfaceUnavailable` for no safe execution surface.
+Initial intended files:
 
-- [ ] **Step 1: Write failing policy-schema tests**
+```text
+ecosystem/agent-continuation-policy.json
+tools/governance/agent_continuation_policy.py
+tools/governance/test_agent_continuation_policy.py
+docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md
+AGENTS.md
+.github/workflows/ci.yml
+tools/governance/test_merge_queue_workflow_contract.py   # only if needed to prove CI wiring
+```
 
-Add tests that require exactly these closed vocabularies:
+Do not broaden scope unless a failing regression proves the need.
+
+---
+
+## Phase 2 — Machine policy with strict TDD
+
+### 2.1 RED: policy/schema does not exist
+
+Create focused tests first. They require closed vocabularies:
 
 ```python
 WORKER_DISPOSITIONS = {
@@ -125,57 +113,27 @@ EXECUTION_SURFACES = {
 }
 ```
 
-Also assert that the JSON policy references, rather than duplicates, the canonical bounded policy ID and merge-integration authority, declares live/bound verification mandatory when an automatic continuation is released/claimed and historical event authentication mandatory when it resumes, and declares `BLOCKED_CAPABILITY_UNAVAILABLE` as the fail-closed no-surface result.
+The machine policy must include:
 
-- [ ] **Step 2: Run the focused tests and prove RED**
+- `policy_id = oteryn-agent-continuation-v1`;
+- continuation authority `Oteryn/Oteryn#108`;
+- reference to the current bounded execution authority from protected main;
+- six independent coordinates: task, worker/session, tool/command, external wait, retry/no-progress, context pressure;
+- the closed vocabularies above;
+- fail-closed disposition/mechanism compatibility;
+- automatic-resume release verification + task binding requirements;
+- execution-surface capability mapping;
+- no-safe-surface result `BLOCKED_CAPABILITY_UNAVAILABLE`.
 
-Run:
+Do not embed bounded retry counts or bounded lifecycle definitions in this JSON.
 
-```bash
-python3 -m unittest tools.governance.test_agent_continuation_policy -v
-```
+Prove RED before implementation.
 
-Expected: FAIL because `agent_continuation_policy.py` and `agent-continuation-policy.json` do not exist.
+### 2.2 Minimal implementation
 
-- [ ] **Step 3: Create the minimal JSON policy**
-
-The machine policy must contain:
-
-```json
-{
-  "schema_version": 1,
-  "policy_id": "oteryn-agent-continuation-v1",
-  "lifecycle_authority": "Oteryn/Oteryn#108",
-  "bounded_execution_authority": "Oteryn/Oteryn#69",
-  "merge_integration_authority": "Oteryn/Oteryn#102",
-  "coordinates": ["task", "worker_session", "tool_command", "external_wait", "retry_no_progress", "context_pressure"],
-  "worker_dispositions": ["continue_current", "release_waiting", "rotate_resumable", "stop_reinvoke_required", "terminal"],
-  "resume_mechanisms": ["same_session", "github_native", "scheduled_task", "work_event_trigger", "work_persistent", "owner_reinvoke", "none_terminal"],
-  "execution_surfaces": ["chat", "github_native", "work", "codex"],
-  "automatic_resume_requires_live_verification": true,
-  "automatic_resume_requires_task_binding": true,
-  "capability_surface_compatibility": {
-    "event_triggered_connected_app": ["work"],
-    "cloud_browser": ["work"],
-    "persistent_background_execution": ["work"],
-    "software_development_repo_loop": ["codex"]
-  },
-  "no_execution_surface_result": "BLOCKED_CAPABILITY_UNAVAILABLE"
-}
-```
-
-Add machine-readable disposition/mechanism compatibility and the invariants for the tests below; do not copy bounded retry numbers or bounded lifecycle state definitions into this file.
-
-- [ ] **Step 4: Implement fail-closed policy loading and validation**
-
-In `tools/governance/agent_continuation_policy.py`, implement:
+Implement in `agent_continuation_policy.py` only the APIs needed to enforce the design:
 
 ```python
-from dataclasses import dataclass
-from typing import Protocol
-
-class ExecutionSurfaceUnavailable(RuntimeError): ...
-
 @dataclass(frozen=True)
 class StableTaskLineageKey:
     repository: str
@@ -191,705 +149,178 @@ class TrustedTaskIdentity:
     task_head_sha: str
     expected_next_action: str
 
-class CheckpointLineageAuthority(Protocol):
-    def latest_predecessor(self, lineage_key: StableTaskLineageKey) -> dict | None: ...
-    def proves_no_predecessor(self, lineage_key: StableTaskLineageKey) -> bool: ...
-    def checkpoint_digest(self, checkpoint: dict) -> str: ...
+class CheckpointLineageAuthority(Protocol): ...
+class CheckpointTransitionAuthority(Protocol): ...
+class BoundedLifecycleAuthority(Protocol): ...
+class ResumeMechanismVerifier(Protocol): ...
+class RemainingWorkAuthority(Protocol): ...
 
-class CheckpointTransitionAuthority(Protocol):
-    def is_authorized_transition(
-        self,
-        historical_checkpoint: dict,
-        current_trusted_task: TrustedTaskIdentity,
-        current_bounded_lifecycle_state: str,
-    ) -> bool: ...
-
-class BoundedLifecycleAuthority(Protocol):
-    def canonical_state(self, trusted_task: TrustedTaskIdentity) -> str: ...
-    def is_terminal(self, trusted_task: TrustedTaskIdentity) -> bool: ...
-    def preserves_retry_and_evidence_continuity(
-        self,
-        previous_checkpoint: dict,
-        proposed_checkpoint: dict,
-        trusted_task: TrustedTaskIdentity,
-    ) -> bool: ...
-    def matches_current_retry_and_evidence_state(
-        self,
-        proposed_checkpoint: dict,
-        trusted_task: TrustedTaskIdentity,
-    ) -> bool: ...
-
-class ResumeMechanismVerifier(Protocol):
-    def is_live_and_bound(
-        self,
-        mechanism: str,
-        locator: str,
-        trusted_task: TrustedTaskIdentity,
-        expected_next_action: str,
-    ) -> bool: ...
-    def verify_historical_resume_event(
-        self,
-        mechanism: str,
-        locator: str,
-        historical_checkpoint: dict,
-    ) -> bool: ...
-    def verify_owner_reinvocation(
-        self,
-        historical_checkpoint: dict,
-        current_trusted_task: TrustedTaskIdentity,
-    ) -> bool: ...
-
-class RemainingWorkAuthority(Protocol):
-    def all_remaining_work_can_complete_without_agent_worker(
-        self,
-        trusted_task: TrustedTaskIdentity,
-    ) -> bool: ...
+class ExecutionSurfaceUnavailable(RuntimeError): ...
 
 def load_policy(path: Path) -> dict: ...
 def validate_policy(policy: dict) -> None: ...
-def validate_continuation_snapshot(
-    policy: dict,
-    snapshot: dict,
-    *,
-    trusted_task: TrustedTaskIdentity,
-    lineage_authority: CheckpointLineageAuthority,
-    transition_authority: CheckpointTransitionAuthority,
-    bounded_lifecycle_authority: BoundedLifecycleAuthority,
-    mechanism_verifier: ResumeMechanismVerifier,
-    remaining_work_authority: RemainingWorkAuthority,
-    validation_mode: str,  # "checkpoint_write" | "resume_read"
-) -> None: ...
+def validate_continuation_snapshot(..., validation_mode: str) -> None: ...
 def select_execution_surface(policy: dict, facts: dict) -> str: ...
 ```
 
-Reject unknown schema versions, missing authority references, duplicate vocabulary values, unknown dispositions/mechanisms/surfaces, invalid disposition/mechanism pairings, missing mandatory checkpoint semantics, malformed exact-head identities, empty/multiple `next_action` values and malformed booleans/integers where the schema expects another type.
+Interfaces are trust boundaries, not permission to duplicate provider/control-plane storage.
 
-Treat stable task identity and mutable execution coordinates differently. These stable fields MUST always match the independently authenticated task context before any lineage, resume or lifecycle decision:
+### 2.3 GREEN
 
-```python
-snapshot["repository"] == trusted_task.lineage_key.repository
-snapshot["task_id"] == trusted_task.lineage_key.task_id
-snapshot["checkpoint_lineage_token"] == trusted_task.lineage_key.checkpoint_lineage_token
-```
-
-`trusted_task` and its `lineage_key` MUST be supplied by an independently authenticated control-plane/task context and MUST NOT be constructed from snapshot fields inside `validate_continuation_snapshot`. `StableTaskLineageKey` is the only key permitted for durable predecessor/no-predecessor lookup. It is immutable across branch, PR, head and `next_action` advances; those mutable coordinates belong only to the fresh execution context in `TrustedTaskIdentity`.
-
-For `validation_mode="checkpoint_write"`, first resolve `previous = lineage_authority.latest_predecessor(trusted_task.lineage_key)`. If a predecessor exists, authenticate it as the latest durable checkpoint and require `bounded_lifecycle_authority.preserves_retry_and_evidence_continuity(previous, snapshot, trusted_task)` to approve every canonical bounded generation/counter transition. This delegates reset/scope semantics entirely to `#69/#71`; the continuation layer never invents counter names, budgets, or reset rules. If the authority rejects, omits, cannot verify, or cannot load expected predecessor continuity, fail closed. If no continuation predecessor exists, first require `lineage_authority.proves_no_predecessor(trusted_task.lineage_key)` independently, **then** require `bounded_lifecycle_authority.matches_current_retry_and_evidence_state(snapshot, trusted_task)` so the first continuation checkpoint inherits any canonical bounded generations/counters already consumed before continuation tracking began. Absence of a continuation predecessor never implies a fresh bounded retry/evidence budget; unknown/unavailable/mismatched current bounded state fails closed.
-
-The proposed checkpoint is current control-plane state, so its mutable coordinates MUST also equal the current trusted context before it can be persisted:
-
-```python
-snapshot["task_branch"] == trusted_task.task_branch
-snapshot["pr_applicable"] == trusted_task.pr_applicable
-snapshot.get("pr_id") == trusted_task.pr_id
-snapshot["task_head_sha"] == trusted_task.task_head_sha
-snapshot["next_action"] == trusted_task.expected_next_action
-```
-
-For `validation_mode="resume_read"`, **do not rewrite or directly compare historical mutable coordinates or lifecycle/disposition to fresh control-plane state**. Instead:
-
-1. resolve `historical = lineage_authority.latest_predecessor(trusted_task.lineage_key)` from the durable lineage using **only** the immutable `StableTaskLineageKey`; branch, PR, head and `next_action` MUST NOT participate in predecessor selection;
-2. require the supplied checkpoint to be that exact authenticated historical record (same durable checkpoint digest and stable identity); a caller-selected older checkpoint, edited branch/PR/head/action, fabricated digest, or rewritten copy fails closed;
-3. preserve `historical["task_branch"]`, `pr_applicable`, `pr_id`, `task_head_sha`, `next_action`, `bounded_lifecycle_state`, `worker_disposition`, `resume_mechanism`, and `resume_locator` as historical evidence;
-4. resolve a **fresh** `trusted_task` from GitHub/control-plane state and independently resolve `fresh_lifecycle = bounded_lifecycle_authority.canonical_state(trusted_task)`;
-5. if any historical mutable execution coordinate differs from fresh trusted coordinates, or `historical["bounded_lifecycle_state"] != fresh_lifecycle`, require `transition_authority.is_authorized_transition(historical, trusted_task, fresh_lifecycle)` to prove the exact history-to-fresh branch/PR/head/next-action/lifecycle transition from authoritative evidence;
-6. after successful reconciliation, all **new** checkout/action/PR/lifecycle authority comes from the fresh trusted authorities, never from rewritten snapshot fields. Historical disposition/resume fields remain evidence of why the prior worker released; they are not required to equal the disposition that a resumed worker will write next.
-
-An unchanged resume may pass when the authenticated historical mutable coordinates and lifecycle already equal the fresh trusted context. A legitimate GitHub head/action/lifecycle advance may pass only through the transition authority. False/unknown/stale/ambiguous transition proof fails closed. This preserves immutable checkpoint history while allowing authorized live-state progress such as `WAITING_EXTERNAL -> READY` or `WAITING_EXTERNAL -> DONE`.
-
-`resume_read` with no authenticated predecessor always fails closed. For both modes, lookup failure, stale/ambiguous lineage, unverifiable absence, unverifiable bounded retry/evidence continuity, and unknown `validation_mode` all fail closed.
-
-For `checkpoint_write`, the snapshot's `bounded_lifecycle_state` is current-state evidence and MUST equal `bounded_lifecycle_authority.canonical_state(trusted_task)`. `worker_disposition="terminal"` and `resume_mechanism="none_terminal"` are valid only when `bounded_lifecycle_authority.is_terminal(trusted_task)` is true; conversely a currently terminal trusted lifecycle rejects any nonterminal disposition/resume pairing. For `resume_read`, do **not** apply current terminality rules directly to the historical disposition: authenticate the historical lifecycle/disposition first, reconcile any lifecycle advance through `CheckpointTransitionAuthority`, and evaluate current terminality only against the fresh canonical lifecycle. A historical `release_waiting` checkpoint may therefore reconcile to fresh terminal `DONE` without being rewritten; any subsequent checkpoint write must use the fresh terminal disposition. The continuation layer does not decide which bounded states are terminal; that remains entirely delegated to `#69/#71`.
-
-For automatic waiting/rotation mechanisms during `checkpoint_write`, require `snapshot["next_action"] == trusted_task.expected_next_action` and then `mechanism_verifier.is_live_and_bound(mechanism, locator, trusted_task, trusted_task.expected_next_action)`. **Before persisting or releasing `release_waiting + github_native`,** also ignore/reject any caller-supplied completion boolean and require `remaining_work_authority.all_remaining_work_can_complete_without_agent_worker(trusted_task)` against the current trusted state. False, unknown, stale, unavailable, or proof for another task identity fails closed before worker release; use a worker-launching/preserving mechanism or `stop_reinvoke_required` instead.
-
-During `resume_read`, first authenticate the historical checkpoint, then select the resume-authentication path by the **historical** mechanism:
-
-- for `github_native`, `scheduled_task`, `work_event_trigger`, or `work_persistent`, require `mechanism_verifier.verify_historical_resume_event(...)` to prove that the observed trigger/completion belongs to the historical task, locator and historical `next_action`; a consumed one-shot mechanism need not remain live or bind to the fresh successor action;
-- for `owner_reinvoke`, do **not** require or fabricate an automatic event or locator. Require `mechanism_verifier.verify_owner_reinvocation(historical, trusted_task)` to prove that the current invocation is an authenticated owner-authorized re-entry for the exact historical repository/task/lineage and action before reconciling to fresh state;
-- `same_session` is not a resume boundary because the worker was never released, and `none_terminal` is terminal; either appearing in `resume_read` fails closed as an invalid validation path.
-
-Fresh `is_live_and_bound(...)` verification is required again only if a successor `checkpoint_write` claims the same or another automatic mechanism for future continuation. Automatic-path authentication fails closed when historical trigger evidence is absent, fabricated, inaccessible, ambiguous, belongs to another task/lineage, or is bound to another historical action. Manual owner re-entry fails closed when current owner authority cannot be authenticated or does not bind to the historical task/action. For `release_waiting + github_native`, ignore/reject any caller-supplied completion boolean and require `remaining_work_authority.all_remaining_work_can_complete_without_agent_worker(trusted_task)` against the fresh trusted state to prove the whole remaining task can reach a canonical terminal state without any later agent worker.
-
-- [ ] **Step 5: Add fail-closed disposition/resume compatibility and checkpoint-minimum tests**
-
-Test these exact failures:
-
-```python
-# rotate_resumable requires a worker-launching/preserving automatic mechanism plus non-empty locator
-{"worker_disposition": "rotate_resumable", "resume_mechanism": "owner_reinvoke", "resume_locator": None}
-{"worker_disposition": "rotate_resumable", "resume_mechanism": "owner_reinvoke", "resume_locator": "owner"}
-{"worker_disposition": "rotate_resumable", "resume_mechanism": "same_session", "resume_locator": "current"}
-{"worker_disposition": "rotate_resumable", "resume_mechanism": "github_native", "resume_locator": "workflow:ci"}
-
-# release_waiting with a configured automatic mechanism must remain locatable
-{"worker_disposition": "release_waiting", "resume_mechanism": "scheduled_task", "resume_locator": None}
-{"worker_disposition": "release_waiting", "resume_mechanism": "scheduled_task", "resume_locator": ""}
-{"worker_disposition": "release_waiting", "resume_mechanism": "work_event_trigger", "resume_locator": None}
-{"worker_disposition": "release_waiting", "resume_mechanism": "work_event_trigger", "resume_locator": ""}
-{"worker_disposition": "release_waiting", "resume_mechanism": "work_persistent", "resume_locator": None}
-{"worker_disposition": "release_waiting", "resume_mechanism": "work_persistent", "resume_locator": ""}
-{"worker_disposition": "release_waiting", "resume_mechanism": "github_native", "resume_locator": None}
-{"worker_disposition": "release_waiting", "resume_mechanism": "github_native", "resume_locator": ""}
-
-# terminal task cannot advertise scheduled continuation
-{"worker_disposition": "terminal", "resume_mechanism": "scheduled_task", "resume_locator": "task-1"}
-```
-
-Test these exact structurally valid pairings before trusted-authority checks:
-
-```python
-{"worker_disposition": "continue_current", "resume_mechanism": "same_session", "resume_locator": None}
-{"worker_disposition": "release_waiting", "resume_mechanism": "github_native", "resume_locator": "merge-queue:pr-123"}
-{"worker_disposition": "release_waiting", "resume_mechanism": "scheduled_task", "resume_locator": "scheduled-task:abc"}
-{"worker_disposition": "release_waiting", "resume_mechanism": "work_event_trigger", "resume_locator": "work-trigger:def"}
-{"worker_disposition": "release_waiting", "resume_mechanism": "work_persistent", "resume_locator": "work-task:ghi"}
-{"worker_disposition": "rotate_resumable", "resume_mechanism": "scheduled_task", "resume_locator": "scheduled-task:abc"}
-{"worker_disposition": "rotate_resumable", "resume_mechanism": "work_event_trigger", "resume_locator": "work-trigger:def"}
-{"worker_disposition": "rotate_resumable", "resume_mechanism": "work_persistent", "resume_locator": "work-task:ghi"}
-{"worker_disposition": "stop_reinvoke_required", "resume_mechanism": "owner_reinvoke", "resume_locator": None}
-{"worker_disposition": "terminal", "resume_mechanism": "none_terminal", "resume_locator": None}
-```
-
-Create the trusted context outside the snapshot fixture:
-
-```python
-lineage_key = StableTaskLineageKey(
-    repository="Oteryn/Oteryn",
-    task_id="Oteryn/Oteryn#108",
-    checkpoint_lineage_token="checkpoint-lineage:Oteryn/Oteryn#108",
-)
-trusted_task = TrustedTaskIdentity(
-    lineage_key=lineage_key,
-    task_branch="governance/example",
-    pr_applicable=True,
-    pr_id="110",
-    task_head_sha="0123456789abcdef0123456789abcdef01234567",
-    expected_next_action="run exact-head qualification",
-)
-```
-
-Add negative tests where the snapshot changes stable repository/task/lineage identity; these always fail before lineage/resume dispatch. Build one immutable `StableTaskLineageKey` and two fresh `TrustedTaskIdentity` values for the same lineage (head/action A and head/action B); prove both lineage lookups receive the exact same stable key while branch/PR/head/action differences are reconciled separately. Also prove that changing any immutable key field selects no predecessor/fails closed rather than being treated as mutable progress. In `checkpoint_write` mode, reject any snapshot branch/PR/head/`next_action` mismatch against the current trusted context. Add a fake lineage authority containing an unrelated checkpoint-free task and prove that changing all snapshot identity fields together still cannot make `proves_no_predecessor` authorize it. For `resume_read`, add a trusted historical checkpoint at head A/action A and a fresh trusted GitHub context at head B/action B: require the supplied checkpoint digest to match the authoritative historical record, then allow use of B/action B only when `CheckpointTransitionAuthority` verifies exactly A→B/action A→B. Reject an edited historical checkpoint, caller-selected older checkpoint, snapshot rewritten to B before history authentication, transition proof for another PR/task, and false/unknown/stale transition proof. Also prove unchanged A→A resumes without manufacturing a transition.
-
-At `checkpoint_write`, every automatic continuation claim requires `is_live_and_bound(...)` to return true for the exact trusted task and current `next_action`. Add parameterized negative cases where the locator is syntactically non-empty but the verifier reports deleted, disabled, paused, unknown, inaccessible, mismatched task/lineage, or mismatched next action. Explicitly prove that a live scheduled/Work task belonging to `OTHER-TASK` does not satisfy a checkpoint for `Oteryn/Oteryn#108`, and that the same locator bound to `next_action="other action"` fails.
-
-At `resume_read`, test both authentication boundaries. For automatic historical mechanisms, `verify_historical_resume_event(...)` must authenticate the trigger/completion against the immutable historical mechanism, locator, task identity and historical `next_action`; add negative cases for another task/action, fabricated/ambiguous evidence and a locator that never fired, plus positive completed/disabled one-shot cases. For `stop_reinvoke_required + owner_reinvoke`, require `verify_owner_reinvocation(historical, trusted_task)` and prove a legitimate authenticated owner invocation resumes with `resume_locator=None` and **no** automatic-event evidence; reject an invocation bound to another owner/task/lineage/action. Also reject `same_session` or `none_terminal` under `resume_read`. If the resumed worker later claims automatic continuation again, prove that its successor `checkpoint_write` performs a fresh live/bound check for the new action.
-
-For `release_waiting + github_native`, the snapshot MUST NOT be trusted to assert that no future worker is needed. Add a fake `RemainingWorkAuthority` keyed by `TrustedTaskIdentity` and exercise **both boundaries**: during `checkpoint_write`, whole-task proof must already be true before the worker can release; false, unknown, stale, unavailable, or proof for another task identity rejects the proposed checkpoint and requires a worker-capable mechanism or `stop_reinvoke_required`. During `resume_read`, re-evaluate the same authority against fresh trusted state before treating GitHub-only progression as sufficient. Prove that a checkpoint cannot defer this first proof until resume.
-
-Build one valid baseline snapshot containing at least these always-required checkpoint fields:
-
-```python
-{
-    "repository": "Oteryn/Oteryn",
-    "task_id": "Oteryn/Oteryn#108",
-    "checkpoint_lineage_token": "checkpoint-lineage:Oteryn/Oteryn#108",
-    "task_branch": "governance/example",
-    "task_head_sha": "0123456789abcdef0123456789abcdef01234567",
-    "pr_applicable": True,
-    "pr_id": "110",
-    "phase": "qualification",
-    "bounded_lifecycle_state": "RUNNING",
-    "last_material_progress": "focused tests green",
-    "completed_material_work": ["policy draft"],
-    "validation_evidence_refs": ["check:meta-gate"],
-    "blockers": [],
-    "worker_disposition": "continue_current",
-    "resume_mechanism": "same_session",
-    "resume_locator": None,
-    "next_action": "run exact-head qualification",
-}
-```
-
-Parameterize deletion of every always-required field, including `checkpoint_lineage_token` and `pr_applicable`, and assert `validate_continuation_snapshot(...)` rejects the snapshot. Require `checkpoint_lineage_token` to be non-empty and equal the independently supplied trusted identity. Require `pr_applicable` to be a real boolean in every snapshot. When `pr_applicable=true`, require a non-empty canonical `pr_id`; when `pr_applicable=false`, `pr_id` is not required and must not be fabricated. Also reject an invalid/non-40-hex `task_head_sha`, empty or non-string `next_action`, multiple next actions encoded as a list, non-list `completed_material_work`/`validation_evidence_refs`/`blockers`, and a missing/empty `pr_id` when `pr_applicable=true`.
-
-Add bounded-lifecycle authority fixtures. Prove all four cases:
-
-```text
-trusted canonical RUNNING + snapshot RUNNING + continue_current => structurally allowed
-trusted canonical RUNNING + terminal/none_terminal => reject
-trusted canonical terminal + terminal/none_terminal => allowed
-trusted canonical terminal + any nonterminal disposition => reject
-```
-
-For `checkpoint_write`, reject a snapshot whose `bounded_lifecycle_state` differs from the authority's canonical state even if its worker disposition would otherwise be valid. For `resume_read`, add historical `WAITING_EXTERNAL + release_waiting` fixtures with fresh canonical `READY` and fresh canonical terminal `DONE`: both must preserve the old lifecycle/disposition unchanged as authenticated history and pass only when `CheckpointTransitionAuthority` proves the exact lifecycle transition. Reject false/unknown/stale transition proof; prove that the fresh terminal case is not rejected merely because the historical disposition was nonterminal. Do not hard-code which state names are terminal in the continuation layer; the fake authority controls `is_terminal` in these tests.
-
-- [ ] **Step 6: Add task-lifetime separation tests**
-
-Reject snapshots whose sole terminal reason is one of:
-
-```python
-{
-    "worker_session_timeout",
-    "tool_timeout",
-    "foreground_budget_exhausted",
-    "context_rotation",
-}
-```
-
-unless the trusted canonical bounded lifecycle independently reports a valid terminal condition.
-
-- [ ] **Step 7: Add trusted retry-preservation tests**
-
-Construct a fake `CheckpointLineageAuthority` whose authoritative latest predecessor for `trusted_task.lineage_key` contains a bounded generation and non-zero canonical retry/evidence counters. Call:
-
-```python
-validate_continuation_snapshot(
-    policy,
-    resumed_snapshot,
-    trusted_task=trusted_task,
-    lineage_authority=lineage_authority,
-    transition_authority=transition_authority,
-    bounded_lifecycle_authority=bounded_lifecycle_authority,
-    mechanism_verifier=verifier,
-    remaining_work_authority=remaining_work_authority,
-    validation_mode="resume_read",
-)
-```
-
-First prove `resume_read` cannot substitute or rewrite predecessor retry/generation evidence: a caller snapshot that lowers self-declared counters, names an older predecessor, supplies a fabricated predecessor digest, or changes any snapshot repository/task/lineage/branch/PR/head/next-action coordinate must fail historical authentication before it can affect trusted state.
-
-Exercise **both checkpoint-write boundaries** explicitly. First, when `latest_predecessor(trusted_task.lineage_key)` returns `None`, prove that `proves_no_predecessor(trusted_task.lineage_key)` alone is insufficient: the fake bounded authority must expose already-consumed generation/retry/evidence state and `matches_current_retry_and_evidence_state(...)` must reject a first continuation checkpoint that lowers, resets or omits any applicable canonical value; unknown/unavailable current bounded state also fails closed. A truly first continuation checkpoint is accepted only when both no-predecessor proof and current bounded-state match succeed.
-
-Then exercise the **successor write** boundary. After a valid resume, build `successor_snapshot` for fresh trusted state and call `validate_continuation_snapshot(..., validation_mode="checkpoint_write")` while `lineage_authority.latest_predecessor(trusted_task.lineage_key)` returns the authenticated historical checkpoint. The fake `BoundedLifecycleAuthority.preserves_retry_and_evidence_continuity(...)` must reject every reduced, reset or omitted applicable bounded generation/retry/evidence value relative to that authoritative predecessor, and must allow only transitions the canonical `#69/#71` authority declares valid. Test unavailable/ambiguous predecessor and unavailable continuity proof as fail-closed. The continuation validator delegates canonical counter scopes and legal reset semantics to bounded authority; it never redefines them.
-
-- [ ] **Step 8: Add executor-selection tests**
-
-Prove:
-
-```python
-assert select_execution_surface(policy, {
-    "effort": "high",
-    "chat_tools_sufficient": True,
-    "heavy_deterministic_compute": False,
-    "persistent_capability_required": False,
-    "work_available": False,
-    "work_authorized": False,
-    "codex_available": False,
-    "codex_authorized": False,
-}) == "chat"
-
-assert select_execution_surface(policy, {
-    "effort": "medium",
-    "chat_tools_sufficient": True,
-    "heavy_deterministic_compute": True,
-    "repository_runner_available": True,
-    "persistent_capability_required": False,
-    "work_available": False,
-    "work_authorized": False,
-    "codex_available": False,
-    "codex_authorized": False,
-}) == "github_native"
-
-assert select_execution_surface(policy, {
-    "effort": "low",
-    "chat_tools_sufficient": False,
-    "persistent_capability_required": True,
-    "required_capability": "event_triggered_connected_app",
-    "work_available": True,
-    "work_authorized": True,
-    "work_capability_reason": "event_triggered_connected_app",
-    "codex_available": False,
-    "codex_authorized": False,
-}) == "work"
-```
-
-Also reject a Work/Codex selection whose only reason is `effort=high`. Add fail-closed cases for ordinary exhaustion and persistent-capability exhaustion. The machine policy's `capability_surface_compatibility` mapping is authoritative for capability-specific escalation: a surface is eligible only when the requested capability maps to it **and** current availability/authorization evidence is true. Availability/authorization alone never substitutes for capability support.
-
-Add exact cases including:
-
-```python
-# Event-triggered connected-app work is Work-only; available Codex cannot substitute.
-with self.assertRaisesRegex(ExecutionSurfaceUnavailable, "BLOCKED_CAPABILITY_UNAVAILABLE"):
-    select_execution_surface(policy, {
-        "chat_tools_sufficient": False,
-        "persistent_capability_required": True,
-        "required_capability": "event_triggered_connected_app",
-        "work_available": False,
-        "work_authorized": False,
-        "codex_available": True,
-        "codex_authorized": True,
-        "codex_capability_reason": "software_development_repo_loop",
-    })
-
-assert select_execution_surface(policy, {
-    "chat_tools_sufficient": False,
-    "persistent_capability_required": True,
-    "required_capability": "software_development_repo_loop",
-    "work_available": False,
-    "work_authorized": False,
-    "codex_available": True,
-    "codex_authorized": True,
-    "codex_capability_reason": "software_development_repo_loop",
-}) == "codex"
-```
-
-Add equivalent negative coverage for `work_available=true/work_authorized=false`, `codex_available=false`, `codex_available=true/codex_authorized=false`, a capability mapped only to another surface, and an unknown/unmapped required capability. Capability support plus availability/authorization facts must come from current product/control-plane evidence, not from effort or a self-declared capability reason. The selector must not invent Work/Codex support or silently choose an unusable surface. The typed blocker is a task/control-plane fact to persist and route; it is not permission to mark the task `DONE`.
-
-- [ ] **Step 9: Run focused GREEN validation**
-
-Run:
-
-```bash
-python3 -m unittest tools.governance.test_agent_continuation_policy -v
-python3 -m py_compile tools/governance/agent_continuation_policy.py tools/governance/test_agent_continuation_policy.py
-```
-
-Expected: PASS.
-
-- [ ] **Step 10: Commit**
-
-```bash
-git add ecosystem/agent-continuation-policy.json tools/governance/agent_continuation_policy.py tools/governance/test_agent_continuation_policy.py
-git commit -m "feat(governance): define persistent continuation policy"
-```
+Run the focused suite and require deterministic PASS before expanding tests.
 
 ---
 
-### Task 3: Publish the human contract and bind META CI
+## Phase 3 — Continuation safety regressions
 
-**Files:**
-- Create: `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md`
-- Modify: `AGENTS.md`
-- Modify: `.github/workflows/ci.yml`
-- Test: `tools/governance/test_agent_continuation_policy.py`
+Add one failing regression at a time, then implement the smallest fix.
 
-**Interfaces:**
-- Consumes: `ecosystem/agent-continuation-policy.json` and `validate_continuation_snapshot(...)` from Task 2.
-- Produces: protected-META human authority that references `#69` and `#102` rather than redefining them, plus required `meta-gate` execution of the focused tests.
+Required invariants:
 
-- [ ] **Step 1: Write contract-consistency RED tests**
+### Stable lineage
 
-Add tests that require the Markdown contract to contain these exact concepts:
+- predecessor/no-predecessor lookup uses only `repository + task_id + checkpoint_lineage_token`;
+- snapshot cannot self-select trusted task identity;
+- branch/PR/head/next action may advance without changing lineage;
+- immutable lineage mismatch fails closed.
 
-```text
-Chat-first, GitHub-native async, Work-by-exception
-worker/session timeout != task timeout
-tool timeout != task timeout
-context rotation != task timeout
-automatic continuation requires a real configured mechanism
-automatic continuation locator must be live/bound to trusted task + next_action at release; resume must authenticate the triggering/completion event against the historical checkpoint/action; fresh liveness is required only for a new future continuation claim
-retry continuity resolves the latest durable predecessor against independently trusted task identity inside the control-plane boundary
-GitHub-only release requires authoritative proof for the same trusted task that no later agent-worker action remains
-terminal disposition must match trusted canonical bounded lifecycle terminality
-Work/Codex selection requires verified availability and authorization
-rotate_resumable requires a worker-launching/preserving mechanism
-no safe execution surface => BLOCKED_CAPABILITY_UNAVAILABLE
-provider write authority must be explicitly authorized for the current task
-```
+### Checkpoint write
 
-Also require explicit references to `Oteryn/Oteryn#69` and `Oteryn/Oteryn#102`, plus a disposition/mechanism compatibility table equivalent to the approved spec.
+- latest predecessor is resolved by trusted lineage;
+- missing predecessor is accepted only when the lineage authority independently proves none exists;
+- first continuation checkpoint must match already-consumed current bounded state;
+- existing predecessor continuity is delegated to bounded lifecycle authority;
+- mutable checkpoint coordinates must match current `TrustedTaskIdentity`;
+- unknown/unavailable bounded authority fails closed.
 
-- [ ] **Step 2: Run tests and prove RED**
+### Resume read
 
-```bash
-python3 -m unittest tools.governance.test_agent_continuation_policy -v
-```
+- historical checkpoint integrity is verified before reconciliation;
+- historical mutable coordinates are not rewritten to look current;
+- automatic resume authenticates the actual historical mechanism/locator/event;
+- owner re-invocation uses owner-authorized re-entry evidence, never fabricated automatic-event evidence;
+- a trusted transition authority reconciles historical state to fresh GitHub/task context;
+- a consumed one-shot mechanism need not remain live after firing;
+- a successor checkpoint claiming future automatic resume must freshly verify that new mechanism.
 
-Expected: FAIL because the human contract and META bindings do not yet exist.
+### Disposition/mechanism matrix
 
-- [ ] **Step 3: Write the human contract**
+- `continue_current` ↔ `same_session`;
+- `rotate_resumable` ↔ only `scheduled_task|work_event_trigger|work_persistent` with non-empty verified locator;
+- `stop_reinvoke_required` ↔ `owner_reinvoke`;
+- `terminal` ↔ `none_terminal` plus independent bounded terminal state;
+- invalid pairings fail closed.
 
-Create `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` using the approved spec. Keep the canonical bounded states/retry numbers as references only. Define:
+### GitHub-native waiting
 
-- six coordinates;
-- worker dispositions;
-- executor-selection order, verified Work/Codex capability availability/authorization, and the typed fail-closed no-surface result;
-- independently trusted task identity that binds repository, task and checkpoint lineage before any continuation lookup;
-- truthful resume mechanisms, task/next-action binding, live verification at release, historical trigger/completion authentication at resume, fresh re-verification for successor continuation claims, and the fail-closed disposition/mechanism compatibility matrix;
-- checkpoint semantic minimum and internal authoritative predecessor-lineage resolution for canonical bounded counters/generations;
-- authoritative whole-task remaining-work proof for the same trusted task before `release_waiting + github_native`;
-- trusted bounded-lifecycle state/terminality alignment without redefining bounded states;
-- context compaction/rotation;
-- user-notification semantics;
-- provider write-authority boundary: META coordination/design/provider Issue references never authorize provider mutation; explicit current-task owner authorization for the exact provider is required;
-- provider override rule: stricter local safety is allowed, but a local worker/invocation budget cannot silently become whole-task termination.
+`release_waiting + github_native` requires:
 
-- [ ] **Step 4: Bind the contract from root META instructions**
+- concrete GitHub workflow/queue/control-plane locator;
+- authoritative proof, before release, that all remaining task work can reach terminal state without any later agent worker.
 
-Add a narrow paragraph to `AGENTS.md` after the bounded execution reference:
+If later worker action may be required, fail closed to a worker-capable mechanism or `stop_reinvoke_required`.
 
-```text
-For long-lived task continuation, agents MUST also follow docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md and ecosystem/agent-continuation-policy.json. Task lifetime, worker/session lifetime, command timeout, external waiting, retry/no-progress and context pressure are separate coordinates. Chat is the default execution surface when current tools are sufficient; Work/Codex requires a capability reason plus current verified availability/authorization. Automatic continuation may be claimed only when a real configured mechanism exists and its locator is live and bound to the independently trusted task/next action at release. A resume authenticates the triggering/completion event against the immutable historical checkpoint/action; fresh liveness is required again only for a successor automatic-continuation claim. Cross-repository provider writes remain separately authorized per the existing META authority boundary.
-```
+### Bounded continuity
 
-Do not alter the current effort-aware routing or Remote Desktop policy in this task.
+Worker/session/context/surface changes must never reset or enlarge bounded retry/evidence state. The continuation layer delegates this decision to the bounded lifecycle authority.
 
-- [ ] **Step 5: Bind deterministic validation into `meta-gate`**
+### Execution surface
 
-Add to `.github/workflows/ci.yml` in the governance validation section:
+- Chat is default when capabilities suffice;
+- GitHub-native is preferred for deterministic compute/waiting;
+- Work selection requires a verified material Work-only capability and authorization;
+- Codex selection requires the software-development capability case;
+- unavailable/unauthorized required capability with no safe fallback raises/returns `BLOCKED_CAPABILITY_UNAVAILABLE`.
 
-```bash
-python3 -m unittest tools.governance.test_agent_continuation_policy -v
-python3 -m py_compile tools/governance/agent_continuation_policy.py
-```
-
-Do not remove or weaken existing checks.
-
-- [ ] **Step 6: Run the complete applicable META validation**
-
-Run the focused continuation suite plus the existing routing/bounded-execution suites that are present on the refreshed protected main.
-
-Expected: all PASS. If the exact suite names changed after prerequisite merges, use the protected-main equivalents and record the exact commands.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md AGENTS.md .github/workflows/ci.yml tools/governance/test_agent_continuation_policy.py
-git commit -m "docs(governance): publish persistent continuation contract"
-```
+Run focused tests after every material fix, then the full continuation suite.
 
 ---
 
-### Task 4: Qualify and merge the META continuation contract
+## Phase 4 — Human contract and required-gate wiring
 
-**Files:**
-- No new implementation paths unless review identifies a real defect inside the Task 2/3 owned set.
+Create `PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` describing the same semantics in human-readable form.
 
-**Interfaces:**
-- Consumes: exact META candidate from Tasks 2/3.
-- Produces: protected-main canonical continuation policy and exact merge/readback identity.
+Update `AGENTS.md` only with the minimum pointer/requirements needed to make the continuation contract discoverable.
 
-- [ ] **Step 1: Open the dedicated `#108` implementation PR after the design packet is terminal**
+Wire the continuation regression suite into the existing required `meta-gate`.
 
-Do not reuse another lifecycle's writable branch. PR `#110` is the design/plan vehicle (with `#109` only its closed transport predecessor); after it is terminally merged/closed according to live policy and Task 1 prerequisites are satisfied, create a fresh implementation branch from current protected `main`. Do not silently convert the reviewed design branch into a canonical implementation writer.
+Add/extend a deterministic CI-contract regression that proves `meta-gate` actually invokes `test_agent_continuation_policy.py`. This prevents a false green where tests exist but are not executed.
 
-- [ ] **Step 2: Inspect the exact full diff**
+TDD order for wiring:
 
-Require the changed set to be limited to the Task 2/3 META paths plus any separately justified review repair.
+1. contract test fails because CI does not invoke continuation tests;
+2. add the invocation;
+3. hosted `meta-gate` proves GREEN.
 
-- [ ] **Step 3: Run risk classification**
-
-Use the current protected-main AI review classifier. Do not assume R0/R1/R2 from this plan.
-
-- [ ] **Step 4: Freeze the exact candidate and obtain required checks/review**
-
-No no-op/retrigger commits. Use same-head re-evaluation when external review evidence arrives after a failed gate and current canonical policy supports it.
-
-- [ ] **Step 5: Merge only through the current protected-main authority**
-
-If `#102` Merge Queue is canonical by this time, use it. Otherwise use the current protected repository merge path. Never weaken current protection to finish `#108`.
-
-- [ ] **Step 6: Verify protected-main readback**
-
-Confirm the merged contract/policy/tests exist at the resulting exact `main` SHA and applicable `meta-gate` succeeds.
+Do not create a second required status.
 
 ---
 
-### Task 5: Reconcile and adopt Game continuation semantics
+## Phase 5 — META qualification and integration
 
-**Prerequisite:** Task 4 protected-main readback PASS. Read-only Game preflight is permitted from the META task, but **no Game mutation may begin until the owner explicitly authorizes writes to `Oteryn/Oteryn-Game` for the current adoption task**. Issue `Oteryn/Oteryn-Game#148`, existing PRs, META design text and tool access do not satisfy this authorization gate.
+On one stable material candidate:
 
-**Files:**
-- Modify only after authorization: `Oteryn/Oteryn-Game:AGENTS.md`
-- Reconcile existing provider PR/Issue lineage: `Oteryn/Oteryn-Game#148`, existing stale/superseded bounded-execution PRs such as `#150` if still open.
-- Test: repository-selected Agent governance / policy validation on the exact final head.
+1. refresh protected main and PR exact head;
+2. confirm intended changed-file set only;
+3. inspect full exact diff;
+4. run required exact-head `meta-gate` and confirm the continuation tests actually executed;
+5. run broader governance regression suite where applicable;
+6. inspect all review threads/comments;
+7. use optional external AI review only if current `AGENTS.md` says its independent value justifies the cost; it remains advisory;
+8. repair material findings with strict TDD;
+9. require zero unresolved material threads;
+10. integrate through current GitHub Merge Queue/protected-branch rules;
+11. read back protected main and confirm the merged policy/contract exact state.
 
-**Interfaces:**
-- Consumes: exact merged META continuation policy/version, exact merged bounded-execution authority, and explicit current-task Game write authorization.
-- Produces: Game root policy that adopts both by reference and no longer contains stale `parallel-first`, superseded `#72/#73`, or session-limit-as-task-limit semantics.
-
-- [ ] **Step 1: Refresh Game live state and verify the authorization gate**
-
-Verify current `main`, root `AGENTS.md`, Issue `#148`, stale provider PRs, current execution-policy adoption and any newer root-policy owner. Separately verify explicit owner authorization naming `Oteryn/Oteryn-Game` for this current adoption task before creating/updating branches, files, commits, PRs or other provider state.
-
-Expected if authorization is absent: record `OWNER_PERMISSION_REQUIRED` for provider mutation, preserve read-only findings, perform no Game write and do not infer authority from `#148` or META.
-
-- [ ] **Step 2: Do not merge historical `#72/#73` provider lineage as-is**
-
-If PR `#150` or a successor still depends on `#73`, reconcile/close/supersede it through the provider lifecycle only after the provider write-authorization gate is satisfied; otherwise leave provider state read-only and record the required action.
-
-- [ ] **Step 3: Write the minimal root adoption**
-
-After authorization, root instructions must state:
-
-```text
-- adopt canonical META bounded execution by current protected-main reference;
-- adopt canonical META persistent continuation by current protected-main reference;
-- worker/session/tool/context boundaries do not by themselves terminate the Game task;
-- Chat-first executor selection applies when current tools are sufficient;
-- automatic continuation requires a real configured, live-verifiable and task-bound resume mechanism;
-- Game-specific merge/review/security/test requirements remain controlling.
-```
-
-- [ ] **Step 4: Run exact-head provider governance**
-
-Use the live Game-required policy/governance gate. Runtime/E2E should be `NOT_APPLICABLE` only if the live classifier agrees that the final diff is governance-only.
-
-- [ ] **Step 5: Merge and verify Game protected main**
-
-Use current Game protected merge authority and record exact resulting `main` SHA.
+Do not chase moving main with no-op/retrigger commits.
 
 ---
 
-### Task 6: Map continuation into Platform Control Room without a second schema
+## Phase 6 — Provider adoption
 
-**Prerequisite:** Task 4 protected-main readback PASS and live ownership reconciliation with Platform `#1009/#1266` plus any current root-policy PR such as `#1270`. Read-only Platform preflight is permitted from the META task, but **no Platform mutation may begin until the owner explicitly authorizes writes to `Oteryn/Oteryn-Platform` for the current adoption task**. Provider Issues/PRs and META references do not satisfy this gate.
+Provider work may proceed independently only after META continuation is canonical and only with explicit current-task write authorization for that exact provider.
 
-**Files:**
-- Modify only after authorization: `Oteryn/Oteryn-Platform:docs/agents/EXECUTION_PROTOCOL.md`
-- Modify only after authorization: `Oteryn/Oteryn-Platform:docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md`
-- Modify only after authorization: `Oteryn/Oteryn-Platform:docs/agents/GOVERNANCE_CONTRACT.json`
-- Modify only after authorization: `Oteryn/Oteryn-Platform:tools/agents/checkpoint.py`
-- Modify only after authorization: `Oteryn/Oteryn-Platform:tools/agents/resume.py`
-- Modify only if required for rendering/classification and authorized: `Oteryn/Oteryn-Platform:tools/agents/control_room.py`
-- Test: current checkpoint/resume/control-room policy suites discovered from protected `main`.
+### Game
 
-**Interfaces:**
-- Consumes: META continuation semantic minimum and explicit current-task Platform write authorization.
-- Produces: additive Platform mapping; no new Platform orchestration schema.
+Read-only preflight first. If authorized, add the minimum provider reference/adoption compatible with Game's existing controls and required `game-gate`.
 
-- [ ] **Step 1: Refresh Platform live state and verify the authorization gate**
+### Platform
 
-Verify current `main`, the live `#1009/#1266` ownership surfaces, active root-policy PRs and exact checkpoint/resume schema owner. Separately verify explicit owner authorization naming `Oteryn/Oteryn-Platform` for this current adoption task before any provider mutation.
+Read-only preflight first. If authorized, map organization continuation semantics into the existing Control Room/checkpoint/anti-stall model. Do not create a second Platform checkpoint schema or orchestration database.
 
-Expected if authorization is absent: record `OWNER_PERMISSION_REQUIRED`, preserve read-only reconciliation findings and perform no Platform write.
+### Atlas
 
-- [ ] **Step 2: Write failing checkpoint/resume tests**
+Read-only preflight first. If authorized, add the minimum provider reference/adoption compatible with Atlas's existing controls and required `atlas-gate`.
 
-After authorization, require additive continuation fields or derived values that represent:
+Each provider lane owns its own branch/PR and may run in parallel with other provider lanes when there are no shared writable surfaces.
 
-```yaml
-worker_disposition: continue_current | release_waiting | rotate_resumable | stop_reinvoke_required | terminal
-resume_mechanism: same_session | github_native | scheduled_task | work_event_trigger | work_persistent | owner_reinvoke | none_terminal
-resume_locator: <required for every configured automatic waiting/rotation continuation; otherwise per compatibility matrix>
-context_pressure: <existing Platform classification>
-```
+Absent exact provider authorization:
 
-Do not change the existing canonical task-status vocabulary merely to mirror META names. Require the same fail-closed compatibility matrix as META, including rejection of `rotate_resumable + same_session` and `rotate_resumable + github_native`, plus missing/empty, non-live, cross-task or wrong-next-action locators for automatic continuations. Require worker terminality to agree with Platform's trusted mapped canonical bounded-lifecycle terminality.
+- do not mutate;
+- record `OWNER_PERMISSION_REQUIRED` in the programme evidence;
+- continue other authorized lanes.
 
-- [ ] **Step 3: Prove RED**
-
-Run the exact existing Platform checkpoint/resume tests plus the new cases. Expected new cases fail before implementation.
-
-- [ ] **Step 4: Add additive contract semantics**
-
-Extend `GOVERNANCE_CONTRACT.json` only in a backward-compatible way if the fields can be additive. If the live `#1009` schema-first owner has already moved these values to a different canonical machine surface, update that surface instead and do not duplicate it.
-
-- [ ] **Step 5: Map Platform foreground budgets correctly**
-
-Update `ANTI_STALL_AND_EXECUTION_BUDGET.md` to say explicitly:
-
-```text
-normal/large foreground runtime, command timeout, terminal-CI wait and context-reconstruction budgets bound one Platform invocation/worker execution. Exhausting one of those budgets may require WAITING/ROTATE/BLOCKED, but does not by itself terminate the owner-visible task.
-```
-
-Preserve all existing numeric limits unless a separate owner-approved Platform task changes them.
-
-- [ ] **Step 6: Update checkpoint/resume implementation**
-
-Make `checkpoint.py` and `resume.py` validate truthful resume disposition without changing existing liveness/security behavior. Platform must derive one trusted task identity from its authoritative task/control-plane record and require checkpoint repository/task/lineage fields to match it. `rotate_resumable` must fail closed unless its mechanism is exactly `scheduled_task`, `work_event_trigger` or `work_persistent` with the required concrete locator; `same_session` and `github_native` must not qualify rotation. Automatic mechanisms must carry a concrete locator verified live and bound to that same task and next action at release. At resumption Platform must authenticate an automatic triggering/completion event against the immutable historical task/action; a consumed one-shot trigger need not remain live. For `owner_reinvoke`, Platform must instead authenticate the current owner-authorized invocation against the historical task/lineage/action with no fabricated automatic event or locator. Any successor automatic-continuation claim must be freshly live/bound to the successor action, and `owner_reinvoke` must not render as automatic continuation. Bounded retry/generation continuity must be resolved from Platform's authoritative latest checkpoint/control-plane lineage using that trusted task identity, never from caller-supplied predecessor state. Platform must likewise derive any GitHub-only no-later-worker decision from authoritative task/next-action state, and terminal disposition from its trusted canonical bounded-lifecycle mapping rather than from snapshot prose.
-
-- [ ] **Step 7: Update Control Room only if needed**
-
-If `control_room.py` already exposes enough checkpoint information, do not modify it. If it needs a small additive display field, add only worker disposition/resume mechanism; do not add a second scheduler.
-
-- [ ] **Step 8: Run Platform governance validation**
-
-Run the live exact-head Agent Governance / CI and the focused checkpoint/resume/control-room tests. Runtime/browser E2E is `NOT_APPLICABLE` only if the live classifier and repository rules agree.
-
-- [ ] **Step 9: Merge and verify Platform protected main**
-
-Record exact merged `main` and verify `platform-gate` plus required governance checks.
+Missing authorization is not implicit final defer. Final exclusion/defer requires an explicit durable owner decision.
 
 ---
 
-### Task 7: Reconcile and adopt Atlas continuation semantics
+## Phase 7 — Final drift and closeout
 
-**Prerequisite:** Task 4 protected-main readback PASS. Read-only Atlas preflight is permitted from the META task, but **no Atlas mutation may begin until the owner explicitly authorizes writes to `Oteryn/Oteryn-Atlas` for the current adoption task**. Issue `Oteryn/Oteryn-Atlas#176`, existing PRs, META design text and tool access do not satisfy this authorization gate.
+Refresh live GitHub state for META, Game, Platform and Atlas.
 
-**Files:**
-- Modify only after authorization: `Oteryn/Oteryn-Atlas:AGENTS.md`
-- Reconcile existing provider lineage: `Oteryn/Oteryn-Atlas#176` and stale/superseded provider PRs such as `#182` if still open.
-- Test: live Atlas governance/merge gates selected for the exact final diff.
+For every in-scope repository verify:
 
-**Interfaces:**
-- Consumes: exact protected META continuation and bounded-execution authorities, plus explicit current-task Atlas write authorization.
-- Produces: Atlas root adoption without weakening exact-head/provenance/E2E/specialist execution rules.
+- expected protected-main adoption state;
+- current required aggregate gate and relevant branch enforcement;
+- no duplicate/competing continuation lifecycle;
+- provider-local stronger controls were preserved;
+- no retired ADR0005 machinery was reintroduced by this rollout.
 
-- [ ] **Step 1: Refresh Atlas root ownership, gate classification and authorization**
+Terminal programme result requires:
 
-Check current `main`, root `AGENTS.md`, Issue `#176`, stale provider PRs and active Atlas verification-policy owners. Separately verify explicit owner authorization naming `Oteryn/Oteryn-Atlas` for this current adoption task before any provider mutation.
+- META implementation merged and read back from protected main;
+- each provider either merged/read back or explicitly deferred/excluded by a durable owner decision;
+- all required checks/threads/queue integration terminal;
+- no unaccounted writer/PR remains for the same continuation authority.
 
-Expected if authorization is absent: record `OWNER_PERMISSION_REQUIRED`, preserve read-only findings and perform no Atlas write.
-
-- [ ] **Step 2: Remove superseded lineage dependence**
-
-After authorization, do not terminally merge an existing provider PR whose dependency still says `#72/#73` is canonical. Reconcile or supersede it first.
-
-- [ ] **Step 3: Add the minimal root adoption**
-
-After authorization, state that worker/session/tool/context boundaries do not themselves terminate Atlas tasks, Chat-first selection applies when current tools suffice, automatic continuation must use a real configured, live-verifiable and task-bound mechanism, and all Atlas verification/provenance rules remain controlling.
-
-- [ ] **Step 4: Run the live exact-head Atlas gate**
-
-Do not infer a heavy-E2E waiver from this plan. Follow the live Atlas classifier exactly, including any required hosted/specialist proof.
-
-- [ ] **Step 5: Merge and verify Atlas protected main**
-
-Record exact merged `main` and verify required Atlas gates.
-
----
-
-### Task 8: Add organization drift checks and close the programme
-
-**Prerequisite:** Task 4 protected-main readback PASS. For each provider task in Tasks 5-7, require either (a) its protected-main adoption readback PASS, or (b) an explicit owner decision reducing `#108` final scope by deferring/excluding that provider. Absence of provider write authorization by itself is **not** an implicit scope reduction and must remain `OWNER_PERMISSION_REQUIRED` until the owner records a scope decision.
-
-**Files:**
-- Modify: `Oteryn/Oteryn:tools/governance/audit_github_readonly.py` or its current protected-main successor if that audit has been split.
-- Modify: corresponding live-audit regression tests discovered on protected `main`.
-- Modify only if current architecture requires: `ecosystem/governance-desired-state.json`.
-
-**Interfaces:**
-- Consumes: exact protected-main META identity plus exact protected-main identities for every provider that remains in the final `#108` scope, and the durable owner scope-reduction record for each excluded provider.
-- Produces: deterministic live-state drift detection for in-scope continuation adoption without arbitrary prose parsing as primary authority, plus terminal evidence that distinguishes adopted providers from explicitly deferred/excluded providers.
-
-- [ ] **Step 1: Write RED live-audit fixtures**
-
-Add continuation-owned provider fixtures that fail for:
-
-```text
-- stale #72/#73 canonical dependency in the continuation-adoption reference;
-- provider statement that a local foreground/session/command/context limit terminates the whole task;
-- provider statement that owner_reinvoke is automatic continuation;
-- provider statement that same_session or github_native alone qualifies rotate_resumable;
-- provider missing the protected META continuation policy reference/version after adoption.
-```
-
-Execution-routing/provider-policy drift such as stale `parallel-first` / serial-exception requirements remains owned by `#104/#107`; do **not** add a duplicate Task 8 RED fixture for that behavior. Run the existing `#107` provider-drift tests only as regression coverage so this task proves coexistence without absorbing that authority.
-
-Do not attempt to persist ephemeral per-task provider write authorization in desired-state policy; authorization must instead be verified at the provider mutation boundary by the executing task. Do not flag an explicitly owner-excluded provider for missing continuation adoption; verify the durable scope-reduction record instead.
-
-- [ ] **Step 2: Prove RED**
-
-Run the focused continuation-owned live-audit regression suite. Expected new continuation drift cases fail before implementation. Existing `#107` execution-policy drift tests are regression-only here and are expected to retain their current canonical behavior rather than become new RED cases for `#108`.
-
-- [ ] **Step 3: Implement exact structured drift checks**
-
-Prefer machine policy references/versions and bounded explicit markers. Do not create a broad natural-language parser that attempts to infer arbitrary continuation semantics from free-form Markdown. Apply adoption drift checks only to providers still in final scope; excluded providers require exact durable scope-decision evidence rather than synthetic adoption state.
-
-- [ ] **Step 4: Run full applicable META governance tests**
-
-Require continuation tests, existing `#107` execution-routing/provider-drift regressions, bounded-execution tests, and live-audit regressions to pass together. Passing another lifecycle's regression suite confirms non-regression only; it does not transfer its ownership into `#108`.
-
-- [ ] **Step 5: Qualify and merge drift enforcement**
-
-Use current protected META merge/review authority and exact-head checks.
-
-- [ ] **Step 6: Final live readback**
-
-Verify:
-
-```text
-META: continuation policy canonical and green
-For each provider still IN_SCOPE: continuation adoption/mapping canonical and green at exact protected-main SHA
-For each provider OUT_OF_SCOPE: explicit owner scope-reduction/defer decision recorded; no provider mutation or adoption is claimed
-#69/#71: sole bounded lifecycle
-#102/#103: sole merge/review-fingerprint lifecycle
-#104/#107: no competing bounded lifecycle
-#108: all remaining scoped acceptance criteria satisfied
-```
-
-- [ ] **Step 7: Close `#108` and terminalize the delivery lifecycle**
-
-Update Issue/PR state, branch disposition and protected-main evidence according to the current terminal branch/task lifecycle. Do not claim `DONE` until the exact protected-main readback is complete and every provider is accounted for as either protected-main adopted or explicitly removed/deferred by owner scope decision.
+Only then close `#108` as complete and dispose of task branches according to current repository policy.
