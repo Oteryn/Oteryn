@@ -82,6 +82,16 @@ none_terminal
 
 Fail closed on invalid pairs.
 
+The continuation layer must consume `BoundedLifecycleAuthority` ownership-release and terminality facts rather than infer them from its own disposition/mechanism pair:
+
+- `continue_current + same_session` requires authoritative **nonreleased + nonterminal** bounded state;
+- `release_waiting` with `github_native`, `scheduled_task`, `work_event_trigger` or `work_persistent` requires authoritative **released + nonterminal** bounded state, in addition to the mechanism-specific proof below;
+- `rotate_resumable` requires authoritative **nonreleased + nonterminal** bounded state plus a genuine replacement/persistent worker mechanism;
+- `stop_reinvoke_required + owner_reinvoke` requires authoritative **released + nonterminal** bounded state;
+- `terminal + none_terminal` requires authoritative bounded terminality.
+
+When the bounded authority reports terminal state — currently `DONE` — reject every nonterminal disposition. `READY` is not released merely because the next step is external; require a real bounded transition/classification to a released nonterminal state before persisting `release_waiting`.
+
 `rotate_resumable` is valid only with `scheduled_task`, `work_event_trigger` or `work_persistent` plus a concrete verified locator.
 
 `github_native` does not create a replacement Chat worker. `release_waiting + github_native` is valid only when an authoritative remaining-work check proves that all remaining work through terminal state can complete without later agent-worker action.
