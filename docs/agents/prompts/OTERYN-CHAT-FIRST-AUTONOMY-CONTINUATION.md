@@ -80,13 +80,20 @@ owner_reinvoke
 none_terminal
 ```
 
-Fail closed on invalid pairs.
+Fail closed on invalid pairs. Consume ownership-release and terminality facts from `BoundedLifecycleAuthority`; do not infer them from the continuation disposition or redefine the `#69` lifecycle:
 
-`rotate_resumable` is valid only with `scheduled_task`, `work_event_trigger` or `work_persistent` plus a concrete verified locator.
+- `continue_current + same_session` requires authoritative nonreleased + nonterminal state;
+- `release_waiting + github_native` requires authoritative released + nonterminal state and an authoritative remaining-work check proving that all remaining work through terminal state can complete without later agent-worker action;
+- `release_waiting + scheduled_task|work_event_trigger|work_persistent` requires authoritative released + nonterminal state plus a concrete live, authorized and task-bound verified locator;
+- `rotate_resumable + scheduled_task|work_event_trigger|work_persistent` requires authoritative nonreleased + nonterminal state plus a genuine replacement/persistent worker mechanism with a concrete verified locator;
+- `stop_reinvoke_required + owner_reinvoke` requires authoritative released + nonterminal state and no automatic continuation;
+- `terminal + none_terminal` requires authoritative terminal state.
 
-`github_native` does not create a replacement Chat worker. `release_waiting + github_native` is valid only when an authoritative remaining-work check proves that all remaining work through terminal state can complete without later agent-worker action.
+When bounded authority reports terminal, reject every nonterminal disposition. Under the current bounded contract that means `DONE` cannot be paired with `continue_current`, `release_waiting`, `rotate_resumable` or `stop_reinvoke_required`.
 
-If another worker will be needed and no worker-launching/preserving automatic mechanism exists, use `stop_reinvoke_required`; do not imply background continuation.
+`github_native` does not create a replacement Chat worker. If another worker will be needed and no worker-launching/preserving automatic mechanism exists, use `stop_reinvoke_required`; do not imply background continuation.
+
+`READY` is nonreleased and cannot be reinterpreted as released merely because the next operation is external. Before `release_waiting`, require the bounded authority to record a real transition/classification to a released nonterminal state, such as justified `WAITING_EXTERNAL`; otherwise retain or transfer active ownership with an applicable nonreleased disposition.
 
 `STALLED` is released bounded-retry exhaustion, not terminal completion. Never map `STALLED` to the continuation `terminal` disposition unless a newer bounded authority explicitly changes canonical terminality.
 
