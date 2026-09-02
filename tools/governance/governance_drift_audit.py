@@ -19,6 +19,7 @@ DEFAULT_DESIRED_STATE = ROOT / "ecosystem/governance-desired-state.json"
 ENFORCEMENT_FIELDS = (
     "required_gate",
     "merge_queue",
+    "allow_auto_merge",
     "strict_required_status_checks",
     "required_approvals",
     "codeowner_review_required",
