@@ -16,6 +16,14 @@ Before declaring a task blocked because of access limitations, agents must disco
 
 Completion claims require verified evidence. `UNKNOWN` is not automatically a `BLOCKER`, and a generic access disclaimer without capability discovery is invalid.
 
+## External execution-skill precedence
+
+Repository and user authority govern execution. Agent skills, plugins and workflow frameworks such as Superpowers are subordinate execution aids, not independent task or lifecycle authority.
+
+For an already-authorized Oteryn programme or task with an approved canonical design, implementation plan, checkpoint, or explicit continuation directive, Superpowers workflows MUST NOT introduce additional approval gates, re-brainstorm an approved design, require duplicate planning artifacts, replace canonical authority, or interrupt autonomous continuation solely because the skill's default workflow would do so. Relevant skills MAY still be used internally for implementation, testing, debugging, review, isolation, or verification when they do not conflict with the governing Oteryn authority.
+
+A skill or plugin MUST NOT weaken repository safety, validation, review, GitHub-first, or authorization requirements. When a skill workflow conflicts with applicable user instructions, this `AGENTS.md`, repository policy, or canonical task authority, the applicable higher-priority Oteryn authority controls.
+
 ## GitHub-first execution gate
 
 GitHub is the authoritative repository control plane for repo identity, default branch, Issue/task, PR, task branch, exact remote SHA, checks, reviews and merge state.
@@ -106,7 +114,7 @@ For substantial work:
 4. inspect the full exact diff before readiness;
 5. verify current repository state and any external coordinates referenced by the change when those facts are material;
 6. mark Ready only after implementation/self-review is complete;
-7. merge only when repository-required exact-head checks pass and there are no unresolved review findings;
+7. merge only when repository-required exact-head checks pass and there are no unresolved review findings; a P2 may be non-blocking only after its exact review thread is resolved and a trusted maintainer has recorded the required same-repository follow-up Issue;
 8. use squash merge unless a future repository policy explicitly requires another method;
 9. delete the source branch after successful merge when it has no continuing purpose.
 
@@ -136,18 +144,18 @@ Absence of CI in this bootstrap repository is not equivalent to a CI pass; recor
 - Deny by default when authorization is ambiguous.
 - Production or destructive external mutations require separate explicit owner authority even if META documentation describes them.
 
-## Owner-funded AI and review economy
+## AI review economy
 
-External AI review is governed by `docs/governance/AI_REVIEW_POLICY.md` and `ecosystem/ai-review-policy.json`. Do not spend Codex/Spark quota on every PR. Classify the final diff deterministically first.
+External AI review is advisory and governed by `docs/governance/AI_REVIEW_POLICY.md`. It is not a required GitHub status.
 
-- `R0` requires deterministic validation and exact-diff self-review only; do not invoke external AI review.
-- `R1` uses one fast reviewer invocation per stable review fingerprint after required CI is green.
-- `R2` uses one deep reviewer invocation per stable review fingerprint after required CI is green.
-- Never invoke an external reviewer for Draft/WIP state or repeatedly poll/re-run a reviewer for an unchanged fingerprint.
-- A prior review may be reused only under the policy's exact fingerprint/ancestor/review-neutral rules.
-- Issue #12 and its bootstrap PR are the one-time no-external-review bootstrap for this policy. After bootstrap, changes to the review policy/classifier/authority mapping are `R2`.
+- Default to no external AI review.
+- For an ordinary code change where independent review clearly adds value, prefer Codex Spark when available.
+- For a material high-risk/control-plane change, use one Codex deep review on a stable material candidate.
+- Trivial docs, formatting, generated evidence and metadata do not need external AI review.
+- If Spark is unavailable for low-risk work, do not automatically escalate to deep Codex.
+- Re-review only after a material risk-bearing change, not for cosmetic changes or governance retriggers.
 
-The repository owner has standing authorization for external AI consumption only when the merged risk policy requires `R1` or `R2` review and its invocation budget is respected. Other owner-funded AI/API use still requires explicit authorization for that task.
+Do not recreate formal R0/R1/R2 classification, review fingerprints, `ai-review-gate`, review envelopes, attestation bridges, or review-result parsers as merge authority.
 
 ## Architecture handover
 

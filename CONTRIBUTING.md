@@ -12,7 +12,7 @@ Contributions to this repository must remain ecosystem-level coordination work. 
 4. Open a pull request targeting `main`.
 5. Inspect the complete changed-file list and diff.
 6. Ensure the exact pull-request head passes the stable `meta-gate` check.
-7. Resolve material review findings before merge.
+7. Resolve material review findings before merge. A P2 may proceed only after its thread is resolved and its required same-repository follow-up Issue is recorded; P0/P1, escalated and unclassified findings block.
 8. Prefer squash merge unless repository policy changes deliberately.
 
 ## Architecture and contracts

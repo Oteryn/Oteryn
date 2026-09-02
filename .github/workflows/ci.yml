@@ -3,6 +3,8 @@ name: META CI
 on:
   pull_request:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   workflow_dispatch:
@@ -19,17 +21,30 @@ jobs:
     name: meta-gate
     runs-on: ubuntu-latest
     steps:
+      - name: Validate merge-group candidate identity
+        if: ${{ github.event_name == 'merge_group' }}
+        shell: bash
+        env:
+          MERGE_GROUP_HEAD_SHA: ${{ github.event.merge_group.head_sha || '' }}
+          MERGE_GROUP_BASE_REF: ${{ github.event.merge_group.base_ref || '' }}
+          GITHUB_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$MERGE_GROUP_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$GITHUB_SHA" == "$MERGE_GROUP_HEAD_SHA" ]]
+          [[ "$MERGE_GROUP_BASE_REF" == "refs/heads/main" ]]
+
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: Check candidate whitespace
         shell: bash
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || '' }}
+          HEAD_SHA: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           if [[ -n "$BASE_SHA" && ! "$BASE_SHA" =~ ^0+$ ]] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
@@ -55,20 +70,19 @@ jobs:
               Path('.github/CODEOWNERS'),
               Path('.github/dependabot.yml'),
               Path('docs/architecture/adr/0001-ecosystem-topology-authority.md'),
+              Path('docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md'),
               Path('docs/ci/CI_CONTRACT.md'),
               Path('docs/testing/ECOSYSTEM_TEST_STRATEGY.md'),
               Path('docs/release/RELEASE_COORDINATION.md'),
+              Path('docs/governance/AI_REVIEW_POLICY.md'),
               Path('ecosystem/repositories.json'),
               Path('ecosystem/governance-desired-state.json'),
               Path('ecosystem/compatibility.schema.json'),
               Path('ecosystem/agent-execution-routing-policy.json'),
-              Path('tools/governance/audit_github_readonly.py'),
-              Path('tools/governance/audit_github_readonly_core.py'),
-              Path('tools/governance/test_audit_github_readonly.py'),
-              Path('tools/governance/test_audit_github_readonly_terminal.py'),
               Path('tools/governance/agent_execution_routing.py'),
               Path('tools/governance/test_agent_execution_routing.py'),
               Path('tools/governance/test_remote_desktop_action_gate.py'),
+              Path('tools/governance/test_merge_queue_workflow_contract.py'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
           if missing:
@@ -172,13 +186,53 @@ jobs:
           )
           PY
 
-      - name: Validate governance desired state offline
+      - name: Validate simplified governance desired state
         shell: bash
         run: |
           set -euo pipefail
-          python3 tools/governance/audit_github_readonly.py --offline
-          python3 tools/governance/test_audit_github_readonly.py
-          python3 tools/governance/test_audit_github_readonly_terminal.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          state = json.loads(Path('ecosystem/governance-desired-state.json').read_text(encoding='utf-8'))
+          if state.get('schema_version') != 2:
+              raise SystemExit('governance desired-state schema_version must be 2')
+          if state.get('authority') != 'docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md':
+              raise SystemExit('governance desired-state authority must be ADR 0005')
+
+          expected = {
+              'Oteryn/Oteryn': ('META', 'meta-gate', 'COMPLETE'),
+              'Oteryn/Oteryn-Game': ('GAME', 'game-gate', 'COMPLETE'),
+              'Oteryn/Oteryn-Platform': ('PLATFORM', 'platform-gate', 'COMPLETE'),
+              'Oteryn/Oteryn-Atlas': ('ATLAS', 'atlas-gate', 'PENDING'),
+          }
+          rows = state.get('permanent_repositories')
+          if not isinstance(rows, list) or len(rows) != len(expected):
+              raise SystemExit('governance desired-state must contain exactly four repositories')
+          by_repo = {row.get('repository'): row for row in rows if isinstance(row, dict)}
+          if set(by_repo) != set(expected) or len(by_repo) != len(rows):
+              raise SystemExit('governance desired-state repository set is invalid or duplicated')
+
+          for repository, (role, gate, rollout) in expected.items():
+              row = by_repo[repository]
+              if (row.get('role'), row.get('required_gate'), row.get('rollout_state')) != (role, gate, rollout):
+                  raise SystemExit(f'{repository}: role/gate/rollout mismatch')
+              required_values = {
+                  'merge_queue': True,
+                  'strict_required_status_checks': False,
+                  'required_approvals': 0,
+                  'codeowner_review_required': False,
+                  'conversation_resolution': True,
+                  'linear_history': True,
+                  'force_pushes': False,
+                  'deletions': False,
+                  'broad_bypass': False,
+              }
+              for key, value in required_values.items():
+                  if row.get(key) != value:
+                      raise SystemExit(f'{repository}: {key} target must be {value!r}')
+          print('Simplified governance desired-state PASS')
+          PY
 
       - name: Validate agent execution routing
         shell: bash
@@ -186,42 +240,7 @@ jobs:
           set -euo pipefail
           python3 tools/governance/test_agent_execution_routing.py
           python3 tools/governance/test_remote_desktop_action_gate.py
-
-      - name: Validate AI review risk policy
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 tools/governance/test_ai_review_policy.py
-          python3 tools/governance/test_ai_review_git_metadata.py
-          python3 tools/governance/test_verify_ai_review_evidence.py
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          policy = json.loads(Path('ecosystem/ai-review-policy.json').read_text(encoding='utf-8'))
-          if policy.get('schema_version') != 1:
-              raise SystemExit('AI review policy schema_version must be 1')
-          if set(policy.get('review_tiers', {})) != {'R0', 'R1', 'R2'}:
-              raise SystemExit('AI review tiers must be exactly R0/R1/R2')
-          if policy['review_tiers']['R0']['external_review'] != 'none':
-              raise SystemExit('R0 must not consume external AI review')
-          if policy['review_tiers']['R2']['reviewer_class'] != 'deep':
-              raise SystemExit('R2 must require the deep reviewer class')
-          print('AI review policy contract PASS')
-          PY
-
-      - name: Emit exact pull-request AI review classification
-        if: ${{ github.event_name == 'pull_request' }}
-        shell: bash
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          python3 tools/governance/ai_review_policy.py \
-            --repo-root . \
-            --policy-file ecosystem/ai-review-policy.json \
-            --base "$BASE_SHA" \
-            --head "$HEAD_SHA"
+          python3 tools/governance/test_merge_queue_workflow_contract.py
 
       - name: Verify META boundary markers
         shell: bash
