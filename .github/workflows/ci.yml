@@ -247,6 +247,7 @@ jobs:
           python3 tools/governance/test_remote_desktop_action_gate.py
           python3 tools/governance/test_merge_queue_workflow_contract.py
           python3 tools/governance/test_bounded_execution_guard.py
+          python3 tools/governance/test_agent_continuation_policy.py
 
       - name: Verify META boundary markers
         shell: bash
