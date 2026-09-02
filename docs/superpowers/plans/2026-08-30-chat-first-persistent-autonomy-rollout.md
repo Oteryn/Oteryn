@@ -161,7 +161,22 @@ class TrustedCapabilitySnapshot:
 
 class CheckpointLineageAuthority(Protocol): ...
 class CheckpointTransitionAuthority(Protocol): ...
-class BoundedLifecycleAuthority(Protocol): ...
+
+class BoundedLifecycleAuthority(Protocol):
+    def current_state(self, trusted_task: TrustedTaskIdentity) -> str: ...
+    def releases_worker_ownership(
+        self,
+        state: str,
+        trusted_task: TrustedTaskIdentity,
+    ) -> bool: ...
+    def is_terminal(
+        self,
+        state: str,
+        trusted_task: TrustedTaskIdentity,
+    ) -> bool: ...
+    # Retry/evidence continuity methods remain bounded-authority owned.
+    ...
+
 class ResumeMechanismVerifier(Protocol): ...
 class RemainingWorkAuthority(Protocol): ...
 class ExecutionCapabilityAuthority(Protocol):
@@ -184,6 +199,8 @@ def select_execution_surface(
     capability_authority: ExecutionCapabilityAuthority,
 ) -> str: ...
 ```
+
+`releases_worker_ownership` and `is_terminal` are delegated queries into `#69`; #108 must not hard-code or redefine the bounded state enum. Under the current protected-main contract the expected readback is: `WAITING_EXTERNAL`, `BLOCKED`, and `STALLED` release ownership while remaining nonterminal; `RUNNING` and `READY` do not release ownership; `DONE` releases ownership and is terminal. Tests may assert this current integration contract while the continuation implementation itself consumes the authority methods rather than owning the list.
 
 `TrustedCapabilitySnapshot` is produced by the trusted authority from current-session/control-plane evidence. The caller cannot manufacture support/availability/authorization booleans and pass them as selection authority. Unknown/stale/unverifiable discovery fails closed. `BLOCKED_CAPABILITY_UNAVAILABLE` is valid only when the authority has evaluated the safe compatible fallback set and reports it exhausted.
 
@@ -271,7 +288,11 @@ The same closed **shape/type** semantic-minimum validation applies to `checkpoin
 - mutable checkpoint coordinates must match current `TrustedTaskIdentity`;
 - semantic-minimum fields and conditional fields must already be valid before a release/rotation checkpoint is persisted;
 - the proposed lifecycle state must match current `BoundedLifecycleAuthority` before persistence;
-- unknown/unavailable bounded authority fails closed.
+- before accepting any worker disposition, derive ownership/terminality from `BoundedLifecycleAuthority.current_state(...)`, `releases_worker_ownership(...)`, and `is_terminal(...)`;
+- `release_waiting` is valid only when the bounded authority reports **released ownership + nonterminal** for the current state;
+- `rotate_resumable` is valid only when the bounded authority reports **ownership not released + nonterminal**, because it transfers an otherwise-active worker slot to a genuine replacement/persistent worker execution;
+- `terminal` is valid only when the bounded authority independently reports terminal;
+- unknown/unavailable/contradictory bounded ownership or terminality fails closed.
 
 ### Resume read
 
@@ -287,26 +308,47 @@ The same closed **shape/type** semantic-minimum validation applies to `checkpoin
 
 ### Disposition/mechanism matrix
 
-- `continue_current` ↔ `same_session`;
-- `release_waiting` ↔ `github_native` only with a concrete GitHub locator plus authoritative whole-task proof that no later agent worker is required;
-- `release_waiting` ↔ `scheduled_task|work_event_trigger|work_persistent` only with a non-empty live/authorized/task-bound verified locator; these are valid waiting continuations and must not be misclassified as rotation;
-- `rotate_resumable` ↔ only `scheduled_task|work_event_trigger|work_persistent` with a non-empty live/authorized/task-bound verified locator that genuinely launches/preserves replacement worker execution;
-- `stop_reinvoke_required` ↔ `owner_reinvoke`;
-- `terminal` ↔ `none_terminal` plus independent bounded terminal state;
-- under the current `#69` contract, `STALLED` + `terminal|none_terminal` is rejected because `STALLED` is released but nonterminal; only the bounded authority may report terminality;
-- add positive tests for all four legal `release_waiting` pair classes (`github_native` and each of the three worker-capable mechanisms), including locator/binding requirements, plus negative tests for missing/unverified locators and other invalid pairings;
+Before pair-specific mechanism checks, query the bounded authority for the current state, whether that state releases active worker ownership, and whether it is terminal. The continuation layer must not infer these facts from disposition labels or maintain a competing lifecycle table.
+
+Current protected-main integration expectations are test fixtures, not #108-owned definitions:
+
+```text
+RUNNING           releases=false  terminal=false
+READY             releases=false  terminal=false
+WAITING_EXTERNAL  releases=true   terminal=false
+BLOCKED           releases=true   terminal=false
+STALLED           releases=true   terminal=false
+DONE              releases=true   terminal=true
+```
+
+Required compatibility:
+
+- `continue_current` ↔ `same_session`: bounded state is nonterminal and does not release ownership;
+- `release_waiting` ↔ `github_native`: bounded state **releases ownership and is nonterminal**, plus a concrete GitHub locator and authoritative whole-task proof that no later agent worker is required;
+- `release_waiting` ↔ `scheduled_task|work_event_trigger|work_persistent`: bounded state **releases ownership and is nonterminal**, plus a non-empty live/authorized/task-bound verified locator; these are valid waiting continuations and must not be misclassified as rotation;
+- `rotate_resumable` ↔ only `scheduled_task|work_event_trigger|work_persistent`: bounded state is **nonterminal and does not release ownership**, plus a non-empty live/authorized/task-bound verified locator and genuine replacement/persistent worker execution;
+- `stop_reinvoke_required` ↔ `owner_reinvoke`: no automatic mechanism exists; if the current bounded state still owns an active worker, callers must first classify the real owner/permission/policy dependency through the bounded authority rather than using #108 to fabricate a release;
+- `terminal` ↔ `none_terminal`: independent bounded authority reports terminal;
+- under the current `#69` contract, `STALLED + terminal|none_terminal` is rejected because `STALLED` is released but nonterminal;
+- reject `release_waiting` when bounded ownership is not released (`RUNNING`/`READY` in the current contract) even if the mechanism/locator is otherwise valid;
+- reject `release_waiting` for terminal `DONE`; terminal work uses `terminal + none_terminal`;
+- reject `rotate_resumable` when bounded ownership is already released (`WAITING_EXTERNAL`/`BLOCKED`/`STALLED` in the current contract), because those states use waiting/released semantics rather than replacement-worker rotation;
+- add positive tests for all four legal `release_waiting` mechanism classes against an authoritative released nonterminal state, positive rotation tests against an authoritative active nonterminal state, and negative cross-class tests for every current bounded-state category;
 - all other pairings fail closed.
+
+If a candidate is `READY` and GitHub Merge Queue becomes the external dependency, the continuation layer must not silently reinterpret `READY` as released. The caller must first obtain the appropriate bounded-authority transition/classification (for example to `WAITING_EXTERNAL` when an external dependency genuinely exists) before persisting `release_waiting`, or else keep/transfer active ownership using the applicable nonreleased disposition.
 
 ### GitHub-native waiting
 
 `release_waiting + github_native` requires:
 
+- authoritative bounded readback that current ownership is released and the state is nonterminal;
 - concrete GitHub workflow/queue/control-plane locator;
 - authoritative proof, before release, that all remaining task work can reach terminal state without any later agent worker.
 
-If later worker action may be required, fail closed to a worker-capable mechanism or `stop_reinvoke_required`.
+If later worker action may be required, fail closed to a worker-capable mechanism or `stop_reinvoke_required`; do not fabricate a released bounded state inside #108.
 
-For `release_waiting + scheduled_task|work_event_trigger|work_persistent`, GitHub-only whole-task proof is not the qualifier; instead the mechanism must be live, authorized, task-bound, action-bound as required by the canonical design, and carry the concrete locator needed to launch/preserve the later worker.
+For `release_waiting + scheduled_task|work_event_trigger|work_persistent`, GitHub-only whole-task proof is not the qualifier; instead bounded ownership must already be authoritatively released/nonterminal and the mechanism must be live, authorized, task-bound, action-bound as required by the canonical design, with the concrete locator needed to launch/preserve the later worker.
 
 ### Bounded continuity
 
