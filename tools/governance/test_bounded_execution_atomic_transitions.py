@@ -141,7 +141,7 @@ def with_binding(value):
         task_id=prepared["task_id"],
         base_head_sha="b" * 40,
         head_sha=prepared["task_head_sha"],
-        tier="R2",
+        tier="deep",
         classifier_revision="atomic-transition-test-v1",
         risk_fingerprint=prepared["review_fingerprint"],
     )

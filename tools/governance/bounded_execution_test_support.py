@@ -51,7 +51,7 @@ def _prepared(snapshot: dict[str, Any] | None, policy: dict[str, Any]) -> dict[s
             task_id=prepared["task_id"],
             base_head_sha="b" * 40,
             head_sha=prepared["task_head_sha"],
-            tier="R2",
+            tier="deep",
             classifier_revision="bounded-execution-test-v1",
             risk_fingerprint=prepared.get("review_fingerprint") or "f" * 64,
         )

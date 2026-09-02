@@ -93,7 +93,7 @@ The canonical organization defaults are machine-readable in `ecosystem/bounded-a
 - identical unchanged failure cycles: `2`;
 - full/heavy validation attempts for one exact technical head: `2`;
 - primary external-review invocations for one trusted canonical review binding: `1`;
-- automatic same-head AI-review gate rechecks for one exact head/evidence generation: `1`.
+- same-head external-evidence re-evaluations for one exact head/evidence generation: `1`.
 
 Durable counters may reset only when **their own generation scope** changes. Unrelated phase, status, narration or gate-field changes do not reset a consumed budget.
 
@@ -219,25 +219,9 @@ If a material finding appears:
 
 If only external evidence is pending, enter `WAITING_EXTERNAL` and preserve the head.
 
-## Same-head asynchronous review evidence
+## Same-head asynchronous evidence
 
-When authenticated external review evidence arrives after a required gate evaluated the same exact candidate head, the preferred recovery is same-head control-plane re-evaluation, not Git mutation.
-
-META's implementation uses `.github/workflows/governance-ai-review-recheck.yml` and `tools/governance/ai_review_recheck.py`. The recheck path:
-
-- accepts only configured trusted reviewer result identities;
-- resolves the current same-repository PR from live GitHub state;
-- binds candidate identity through the linked PR's exact head SHA and trusted base SHA;
-- treats `pull_request_target` run-level `head_sha` as the trusted base context, not as the candidate head;
-- paginates workflow-run discovery within a bounded scan;
-- rejects stale review commits;
-- selects only the latest exact-PR/exact-head/exact-base eligible failed attempt-1 gate;
-- re-reads PR head/base immediately before rerun to reject races;
-- performs at most one automatic same-head rerun per evidence generation;
-- never checks out or executes candidate code;
-- never receives repository-content write authority.
-
-The existing evidence verifier remains authoritative. Re-evaluation cannot manufacture review evidence or convert an invalid result into PASS.
+When authenticated external evidence arrives after a gate evaluated the same exact candidate head, prefer one bounded same-head control-plane re-evaluation over Git mutation. This is a generic orchestration constraint, not a required-status implementation or external-review merge authority. META does not own a scheduler, poller, reviewer-result parser, or dedicated review gate for this behavior.
 
 ## Heavy validation
 

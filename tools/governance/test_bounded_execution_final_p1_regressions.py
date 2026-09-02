@@ -79,7 +79,7 @@ class FinalMaterialAuthorityP1Tests(unittest.TestCase):
             task_id=previous["task_id"],
             base_head_sha="b" * 40,
             head_sha=previous["task_head_sha"],
-            tier="R2",
+            tier="deep",
             classifier_revision="final-p1-regression-v1",
             risk_fingerprint="f" * 64,
         )

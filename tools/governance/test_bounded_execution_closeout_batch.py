@@ -347,7 +347,7 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             task_id=previous["task_id"],
             base_head_sha="b" * 40,
             head_sha=previous["task_head_sha"],
-            tier="R2",
+            tier="deep",
             classifier_revision="classifier-v1",
             risk_fingerprint="f" * 64,
         )
@@ -394,7 +394,7 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             task_id=previous["task_id"],
             base_head_sha="b" * 40,
             head_sha=previous["task_head_sha"],
-            tier="R2",
+            tier="deep",
             classifier_revision="classifier-v1",
             risk_fingerprint="f" * 64,
         )
@@ -406,7 +406,7 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             task_id=current["task_id"],
             base_head_sha="b" * 40,
             head_sha=current["task_head_sha"],
-            tier="R2",
+            tier="deep",
             classifier_revision="classifier-v1",
             risk_fingerprint="e" * 64,
         )
@@ -623,7 +623,7 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
         pending = ledger()
         pending["identity_binding"] = {"status": "PENDING", "reason": ""}
         previous = snapshot(state="READY", phase="LOOP_BREAKER_AUDIT", late_material_findings=2, audited_late_material_findings=0, risk_ledger=pending)
-        previous["review_binding"] = make_review_binding(POLICY, repository=previous["repository"], task_id=previous["task_id"], base_head_sha="b" * 40, head_sha=previous["task_head_sha"], tier="R2", classifier_revision="audit-generation-test-v1", risk_fingerprint="f" * 64)
+        previous["review_binding"] = make_review_binding(POLICY, repository=previous["repository"], task_id=previous["task_id"], base_head_sha="b" * 40, head_sha=previous["task_head_sha"], tier="deep", classifier_revision="audit-generation-test-v1", risk_fingerprint="f" * 64)
         first = copy.deepcopy(previous)
         with tempfile.TemporaryDirectory() as directory:
             outbox = SqliteCheckpointOutbox(Path(directory) / "checkpoint.db")
@@ -711,7 +711,7 @@ class TrustedAuthorityAndReservationTests(unittest.TestCase):
             task_id=previous["task_id"],
             base_head_sha="b" * 40,
             head_sha=previous["task_head_sha"],
-            tier="R2",
+            tier="deep",
             classifier_revision="metadata-replay-test-v1",
             risk_fingerprint=previous["review_fingerprint"],
         )
