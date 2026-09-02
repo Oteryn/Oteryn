@@ -60,7 +60,7 @@
       "force_pushes": false,
       "deletions": false,
       "broad_bypass": false,
-      "rollout_state": "COMPLETE"
+      "rollout_state": "PENDING"
     }
   ]
 }
