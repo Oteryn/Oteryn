@@ -210,43 +210,54 @@ Required invariants:
 
 ### Checkpoint semantic minimum
 
-Define one baseline valid checkpoint fixture containing at least:
+Define one baseline valid checkpoint fixture with this closed top-level field set and literal accepted shapes:
 
 ```text
-repository
-task_id
-checkpoint_lineage_token
-task_branch
-pr_applicable
-pr_id                         # required iff pr_applicable=true
-task_head_sha
-phase
-bounded_lifecycle_state
-last_material_progress
-completed_work
-evidence_refs
-bounded_continuity_ref
-blockers
-context_pressure              # may be null only when genuinely not relevant
-worker_disposition
-resume_mechanism
-resume_locator                # required for mechanisms that require a locator
-next_action
+repository                non-empty repository coordinate string: owner/name
+ task_id                    non-empty string
+ checkpoint_lineage_token   non-empty opaque string
+ task_branch                non-empty string
+ pr_applicable              exact boolean
+ pr_id                      non-empty string iff pr_applicable=true; otherwise null
+ task_head_sha               lowercase 40-hex string
+ phase                       non-empty string
+ bounded_lifecycle_state     non-empty string that exactly matches BoundedLifecycleAuthority
+ last_material_progress      non-empty string summarizing the latest material change/evidence event
+ completed_work              JSON list of unique non-empty strings; empty list allowed
+ evidence_refs               JSON list of unique non-empty strings; empty list allowed
+ bounded_continuity_ref      non-empty opaque string locator/digest; internal retry schema remains #69-owned
+ blockers                    JSON list of unique non-empty strings; empty list allowed
+ context_pressure            exact enum string: not_applicable|normal|elevated|rotate_required
+ worker_disposition          exact member of WORKER_DISPOSITIONS
+ resume_mechanism            exact member of RESUME_MECHANISMS
+ resume_locator              non-empty string when the chosen mechanism requires a locator; otherwise null
+ next_action                 exactly one non-empty string field describing the next safe action
 ```
 
-Before implementation, add parameterized RED tests that delete **each** always-required field one at a time and require rejection. Add malformed/type-shape tests proving at minimum:
+The leading spaces above are presentation only; actual JSON keys are exactly the names shown without whitespace prefixes.
 
-- repository/task/lineage/branch/phase/lifecycle/next-action are non-empty strings;
-- `pr_applicable` is an exact JSON/Python boolean, never an integer alias;
-- `pr_id` is non-empty exactly when `pr_applicable=true`, and must not be fabricated for a non-PR checkpoint;
-- `task_head_sha` is an exact lowercase 40-hex SHA;
-- completed work, evidence references and blockers use deterministic list/tuple shapes with valid members;
-- bounded continuity reference is present and non-empty but its internal retry schema remains owned by `#69`;
-- exactly one concrete `next_action` exists;
-- locator-dependent mechanisms reject missing/empty locators;
-- context-pressure shape is validated when present and cannot invent an exact runtime token count the platform does not expose.
+The continuation policy must not accept unknown top-level checkpoint fields as a way to smuggle a second lifecycle/retry schema. Provider-specific storage may retain provider-owned metadata outside this normalized continuation snapshot, but the normalized object passed into `validate_continuation_snapshot` uses the closed field set above.
 
-The same semantic-minimum validation applies to `checkpoint_write` and to authenticated historical checkpoints during `resume_read`.
+Before implementation, add parameterized RED tests that delete **each** always-required key one at a time and require rejection. `pr_id` and `resume_locator` remain present in the normalized object even when their value is `null`; applicability is determined by the rules above, not by omitting keys.
+
+Add explicit malformed/type-shape RED cases proving:
+
+- `repository` rejects empty strings, non-strings and coordinates that are not exactly `owner/name`;
+- `task_id`, `checkpoint_lineage_token`, `task_branch`, `phase`, `bounded_lifecycle_state`, `last_material_progress`, `bounded_continuity_ref` and `next_action` reject empty/whitespace-only strings and all non-string values;
+- `pr_applicable` rejects `0`, `1`, strings and all non-boolean values;
+- `pr_id` rejects empty/non-string values when `pr_applicable=true`, and rejects any non-null value when `pr_applicable=false`;
+- `task_head_sha` rejects uppercase, short/long, non-hex and non-string values;
+- `completed_work`, `evidence_refs` and `blockers` each reject non-list values, duplicate members, empty/whitespace-only members and non-string members; an empty list is valid;
+- `context_pressure` rejects `null`, booleans, numbers, objects/lists and every string outside `not_applicable|normal|elevated|rotate_required`; `not_applicable` is the explicit truthful value when no context-pressure signal is relevant, so applicability is never inferred from an unprovable `null`;
+- `worker_disposition` and `resume_mechanism` reject unknown/non-string values;
+- `resume_locator` rejects empty/whitespace-only and non-string values whenever the mechanism requires a locator; it must be `null` for mechanisms that do not use one;
+- `last_material_progress`, list members and `next_action` are reconstruction summaries/locators only and must not encode secrets or raw large logs;
+- no semantic-minimum field may accept an arbitrary object merely because it is JSON-serializable;
+- `bounded_lifecycle_state` must also equal the fresh bounded-authority state; syntactically valid but stale/different state fails closed;
+- `bounded_continuity_ref` is mandatory but opaque to #108; tests must not parse it to duplicate #69 retry counters;
+- no field representing context pressure may contain or require an invented exact runtime token count.
+
+The same closed-shape semantic-minimum validation applies to `checkpoint_write` and to authenticated historical checkpoints during `resume_read` before any transition reconciliation.
 
 ### Checkpoint write
 
