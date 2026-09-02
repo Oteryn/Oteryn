@@ -4,254 +4,176 @@
 
 `OTERYN-CHAT-FIRST-AUTONOMY-CONTINUATION`
 
-## Prompt
+## Coordinator prompt
 
-Przejmij jako supervising coordinator lifecycle `Oteryn/Oteryn#108` i kontynuuj projekt organizacyjnej polityki wykonywania długich zadań agentowych.
+Continue `Oteryn/Oteryn#108` autonomously as the supervising coordinator.
 
 ### Source of truth
 
-GitHub live state jest jedynym source of truth dla repozytoriów, Issue/PR, branch/head SHA, policy, checks, reviews i merge state.
+GitHub live state is authoritative for repository, Issue/PR, branch/head, checks, reviews, Merge Queue and protected-main facts.
 
-Najpierw odtwórz aktualny stan. Nie ufaj SHA, statusom, dokumentacji ani wartościom produktowym zapisanym w tym promptcie bez ponownego sprawdzenia.
+Before every material mutation or integration decision, refresh at least:
 
-Obowiązkowo odśwież co najmniej:
+- current protected `main` and `AGENTS.md`;
+- ADR 0005 and any newer superseding governance authority;
+- `#108` and its current delivery/implementation PRs;
+- bounded execution authority from `#69` and its surviving protected-main implementation;
+- `#104/#107` routing/RDC/provider-convergence state;
+- current provider adoption state where relevant.
 
-- `Oteryn/Oteryn` protected `main` i aktualne `AGENTS.md`;
-- Issue `#108`;
-- META `#69` i PR `#71` — bounded autonomous execution / anti-loop;
-- META `#72` — execution-stall lifecycle;
-- META `#102` i aktualny rollout Merge Queue/review-fingerprint/anti-loop;
-- `ecosystem/agent-execution-routing-policy.json`;
-- aktualny stan bounded-execution adoption w Game, Platform i Atlas;
-- Platform `docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md`, `EXECUTION_PROTOCOL.md`, `PROJECT_LANES.json`, `GOVERNANCE_CONTRACT.json` oraz aktualny Control Room/schema-first ownership;
-- wszystkie nowsze PR/Issue/policy, które przejęły ownership nad execution budgets, context rotation, checkpointing, resume semantics albo merge queue.
+Historical SHAs and statuses in handoffs/docs are locators only.
 
-Przeczytaj `docs/agents/CHAT_FIRST_AUTONOMOUS_EXECUTION_HANDOFF.md` jako trwały zapis ustaleń, ale traktuj jego snapshoty jako provenance, nie live authority.
+### Precedence
 
-### Aktualne fakty produktowe OpenAI
+Follow current protected-main `AGENTS.md` and ADR 0005.
 
-Jeżeli właściwości Chat, Work, Codex, Scheduled Tasks, connected apps, event triggers, usage/credits albo context limits są materialne dla designu, zweryfikuj je ponownie wyłącznie na aktualnych oficjalnych źródłach OpenAI. Nie zakładaj, że zachowanie z 2026-08-30 nadal obowiązuje.
+Do **not** recreate retired governance machinery such as formal R0/R1/R2 merge states, review fingerprints, `ai-review-gate`, attestation bridges, durable dispatch/outbox systems, custom merge-proof ledgers or `LOOP_BREAKER_AUDIT` unless a newer protected-main authority explicitly reintroduces one.
 
-Nie wymyślaj nieopublikowanego limitu typu `Chat = 25 min`, `Work = 2 h` ani dokładnej liczby pozostałych tokenów kontekstu, jeżeli aktualny runtime/dokumentacja tego nie podaje.
+GitHub protected-branch enforcement, the repository aggregate gate and GitHub Merge Queue own integration freshness/enforcement.
 
-### Cel
+### Objective
 
-Zaprojektuj jedną spójną, organizacyjną politykę, która daje maksymalną praktyczną autonomię przy minimalnym zużyciu płatnej/współdzielonej puli Work/Codex.
+Implement the smallest organization continuation layer that preserves one owner-visible task across worker/session/tool/wait/context boundaries without weakening the existing bounded lifecycle.
 
-Docelowa zasada operacyjna:
+Operating principle:
 
 > **Chat-first, GitHub-native async, Work-by-exception.**
 
-Nie traktuj `high effort` jako automatycznego powodu użycia Work. Execution surface i effort są odrębnymi decyzjami.
+### Six independent coordinates
 
-### Nienegocjowalne rozdzielenie limitów
+Keep these separate:
 
-Design musi jawnie rozdzielić co najmniej:
+1. task lifetime;
+2. worker/session lifetime;
+3. tool/command timeout;
+4. external waiting;
+5. retry/no-progress state;
+6. context pressure.
 
-1. **task lifetime** — życie całego owner-visible zadania/programu;
-2. **worker/turn/session lifetime** — życie jednej aktywnej sesji;
-3. **tool/command timeout** — limit pojedynczej operacji/build/test/network/log stream;
-4. **external-wait budget** — bounded observation CI/review/dependency;
-5. **retry/no-progress budget** — anti-loop;
-6. **context budget/context pressure** — zdolność bieżącej sesji do bezpiecznego reasoning.
+A worker/session ending, command timeout, context rotation or phase completion is not task completion.
 
-Limit jednej warstwy nie może automatycznie kończyć innej warstwy.
+Retry/no-progress state remains owned by the bounded lifecycle and must never reset merely because a worker/session/surface changes.
 
-W szczególności:
+### Worker disposition and resume truthfulness
 
-- worker/session timeout != task timeout;
-- tool timeout != task timeout;
-- context rotation != task timeout;
-- phase completion != task completion;
-- preflight freshness != task timeout;
-- `WAITING_EXTERNAL` != failure;
-- checkpoint != no-op/retrigger commit.
+Use only:
 
-### Task lifetime
+```text
+continue_current
+release_waiting
+rotate_resumable
+stop_reinvoke_required
+terminal
+```
 
-Domyślnie całe zadanie nie powinno kończyć się z powodu arbitralnego wall-clock budgetu.
+Resume mechanisms are:
 
-Terminalne wyjście powinno odpowiadać rzeczywistemu stanowi, np.:
+```text
+same_session
+github_native
+scheduled_task
+work_event_trigger
+work_persistent
+owner_reinvoke
+none_terminal
+```
 
-- `DONE` — zweryfikowane terminalne zakończenie;
-- owner/permission decision required — brak bezpiecznej autonomicznej ścieżki;
-- safety/policy approval required;
-- terminal `STALLED` po wyczerpaniu właściwych bounded recovery paths i braku nowej materialnej hipotezy/akcji.
+Fail closed on invalid pairs.
 
-Nie osłabiaj anti-loop tylko po to, żeby task trwał dłużej.
+`rotate_resumable` is valid only with `scheduled_task`, `work_event_trigger` or `work_persistent` plus a concrete verified locator.
 
-### Chat-first
+`github_native` does not create a replacement Chat worker. `release_waiting + github_native` is valid only when an authoritative remaining-work check proves that all remaining work through terminal state can complete without later agent-worker action.
 
-Regularny Chat powinien być primary supervising/execution surface, gdy aktualnie dostępne narzędzia pozwalają wykonać pracę bezpiecznie i poprawnie.
+If another worker will be needed and no worker-launching/preserving automatic mechanism exists, use `stop_reinvoke_required`; do not imply background continuation.
 
-Chat powinien kontynuować użyteczną pracę w bieżącej turze tak długo, jak platforma na to pozwala i istnieje realny progress. Nie kończ dobrowolnie całego taska tylko dlatego, że:
+### Stable lineage
 
-- zakończyła się jedna faza;
-- osiągnięto miękki foreground checkpoint budget;
-- wykonano checkpoint;
-- timeoutowała pojedyncza komenda;
-- context pressure wymaga compaction;
-- worker powinien się zrotować.
+Durable predecessor lookup must use only immutable lineage identity:
 
-Jednocześnie nie udawaj, że zwykły Chat potrafi po zakończeniu odpowiedzi niewidzialnie stworzyć sobie nową foreground turę. Silent rotation jest dozwolone tylko wtedy, gdy istnieje rzeczywisty mechanizm automatycznego resume.
+```text
+repository
+task_id
+checkpoint_lineage_token
+```
 
-### Work/Codex-by-exception
+Branch, PR, exact head and next action are mutable execution coordinates. Reconcile them to fresh trusted GitHub state; do not use them to split normal continuation into a new lineage.
 
-Work/Codex wybieraj dopiero wtedy, gdy ich unikalne możliwości materialnie uzasadniają wspólny agentic usage, np.:
+### Checkpoints
 
-- potrzebne jest rzeczywiście persistent/background cloud execution;
-- potrzebny jest Work Cloud Browser;
-- potrzebny jest event-triggered connected-app resume;
-- Codex jest wyraźnie lepszym execution environment dla repo/code/terminal workflow;
-- delegated/persistent agent execution daje realną przewagę względem Chat + GitHub-native execution.
+Checkpoint after material milestones or before release/wait/rotation, not after every tool call.
 
-Nie używaj Work tylko dlatego, że task jest długi, wieloplikowy albo `high` effort.
+A checkpoint must make one concrete next safe action reconstructible from durable state. It references current bounded lifecycle/retry evidence but must not create a competing bounded counter schema.
 
-### GitHub-native async
+Checkpoint state is not justification for an empty/no-op/retrigger commit.
 
-Preferuj GitHub Actions/repository-approved runners dla ciężkich deterministycznych operacji, takich jak build, pełne testy, E2E, static analysis czy merge-group qualification.
+### Execution surface
 
-Agent ma analizować wynik pracy runnera, a nie konsumować kosztowną sesję agentową tylko po to, żeby czekać na compute.
+- Prefer Chat when current tools safely cover the task.
+- Prefer GitHub Actions/approved runners for deterministic compute and waiting.
+- Use Work only for a material Work-only capability.
+- Use Codex when its repository development loop materially improves safety/cost.
+- High effort alone never requires Work/Codex.
+- If no safe authorized surface exists for a required capability, fail closed as `BLOCKED_CAPABILITY_UNAVAILABLE`.
 
-Projektuj finalną integrację zgodnie z aktualnym #102: Merge Queue/auto-merge/same-head re-evaluation powinny redukować polling, chase-moving-main i no-op/retrigger history churn. Nie twórz drugiej konkurencyjnej merge authority.
+Remote Desktop/Desktop Commander remains subject to the exact current protected-main exception policy. Availability is not authorization.
 
-### Scheduled continuation
+### Parallelism
 
-Sprawdź aktualne możliwości Scheduled Tasks. Jeżeli nadal są dostępne w Chat i mogą używać GitHub, oceń je jako ekonomiczny periodic resume/monitoring tier.
+Use the smallest useful number of lanes.
 
-Nie zakładaj event-triggered GitHub webhook continuation w zwykłym Chat; jeżeli nadal wymaga Work, sklasyfikuj to jako świadomą eskalację.
+- one writer per branch/lane;
+- never allow overlapping writers on shared policy/workflow/schema;
+- parallelize independent provider repositories or read-only review when beneficial;
+- refresh live heads before integrating any lane.
 
-Nie deklaruj automatic resume, jeśli task/trigger faktycznie nie został skonfigurowany.
+### Provider authority
 
-### Context pressure
+META authority does not grant Game/Platform/Atlas writes.
 
-Context limit traktuj jako osobny execution budget.
+Before mutating a provider repository, require explicit owner authorization naming that exact repository and the current adoption task. Without it, perform only read-only preflight and record the permission blocker.
 
-Nie próbuj utrzymywać całego programu w jednej rosnącej rozmowie. Projekt ma preferować:
+Final programme closeout requires every provider either protected-main adopted or explicitly deferred/excluded by a durable owner decision.
 
-> minimal active context + durable GitHub/repository state.
+### Validation discipline
 
-Gdy context pressure rośnie:
+For code/policy changes use strict TDD:
 
-1. externalize large evidence/logs/artifacts;
-2. compact aktywny stan do materialnych faktów;
-3. zapisz durable checkpoint;
-4. kontynuuj w tej samej sesji, jeśli nadal jest bezpiecznie;
-5. zrotuj sesję, gdy dalszy reasoning byłby niebezpieczny/nieefektywny;
-6. następna sesja ma wczytać live GitHub + checkpoint + tylko potrzebne evidence, a nie rekonstruować całą historię chatu.
+1. write the focused failing regression;
+2. prove hosted/authorized RED;
+3. implement the smallest fix;
+4. prove focused GREEN;
+5. run the full applicable regression suite;
+6. inspect exact final diff and required exact-head checks;
+7. inspect all review threads/comments;
+8. integrate only through current protected-branch/Merge Queue rules;
+9. read back protected main before claiming completion.
 
-Nie raportuj `context limit` jako generic blocker, jeśli bezpieczny checkpoint + realny resume path pozwala kontynuować.
+Ensure CI itself is contract-tested so a regression test cannot silently exist without being executed by the required aggregate gate.
 
-### Checkpointing
+External AI review is advisory under ADR 0005. Use it only when current repository guidance says its value justifies the cost; never recreate it as merge authority.
 
-Checkpoint wykonuj po **materialnych milestone**, nie po każdym tool call.
+### Owner communication
 
-Obowiązkowo rozważ checkpoint:
+Do not interrupt for ordinary progress, checkpoints, recoverable failures or real automatic rotation.
 
-- po coherent `investigate/design/implement/validate/integrate/close` phase;
-- po materialnym fixie lub odkryciu;
-- po materialnie nowym wyniku validation;
-- przed heavy/long-running/failure-prone operation;
-- przed external waiting;
-- przed context/session rotation;
-- przed release worker ownership;
-- po zmianie materialnego finding/blockera.
+Notify only for:
 
-Design docelowego checkpointu powinien obejmować co najmniej:
+- verified terminal completion;
+- a concrete owner/permission/safety decision;
+- terminal bounded stall with no materially new safe path;
+- truthful owner re-invocation requirement because no automatic continuation exists;
+- an unavoidable tool capability gap that blocks the required protected integration operation after all safe alternatives are exhausted.
 
-- repository;
-- governing Issue/task;
-- PR;
-- branch;
-- exact task head SHA;
-- phase/lifecycle state;
-- last material progress;
-- completed material work;
-- validation/evidence references;
-- first material failure;
-- rejected hypotheses, gdy istotne;
-- retry/budget counters, gdy istotne;
-- context pressure, gdy istotne;
-- blockers;
-- dokładnie jeden konkretny `next_action`.
+### Dependency order
 
-Nie kopiuj tego przykładu jako nowej konkurencyjnej schema bez porównania z aktualnymi META/Platform contracts.
+Continue the live critical path rather than restarting design:
 
-### No-op/retrigger prohibition
+1. bounded execution survivor canonical on protected main;
+2. reconcile `#107` to routing/RDC/provider convergence only;
+3. terminalize the design packet;
+4. create a **fresh branch from then-current protected main** for canonical `#108` implementation;
+5. implement the thin continuation policy + contract + CI/tests;
+6. provider adoption only where separately authorized;
+7. protected-main/provider readback and terminal closeout.
 
-Nie twórz pustych/no-op/checkpoint/retrigger commits wyłącznie po to, żeby zapisać oczekiwanie albo obudzić CI/review.
-
-Po technical candidate freeze użyj autoryzowanego Issue/task/control-plane metadata surface, chyba że tracked-file update jest sam w sobie materialną i dozwoloną zmianą.
-
-### User communication
-
-Docelowo owner-facing noise ma być minimalny.
-
-Nie przerywaj użytkownikowi wyłącznie dlatego, że nastąpiło:
-
-- phase completion;
-- zwykły checkpoint;
-- recoverable tool timeout;
-- context compaction;
-- worker/session rotation **jeżeli istnieje prawdziwy automatic continuation path**;
-- lease renewal/release;
-- bounded retry progression.
-
-Powiadom użytkownika, gdy:
-
-- cały task jest terminalnie `DONE`;
-- potrzebna jest konkretna owner decision/permission;
-- potrzebne jest safety/protected/irreversible approval;
-- osiągnięto terminal stalled state po bounded recovery;
-- execution zatrzymuje się i **nie ma** realnego automatic resume, więc potrzebne będzie ponowne wywołanie przez ownera.
-
-Nigdy nie twierdź, że praca będzie kontynuowana w tle, jeżeli faktycznie nie istnieje mechanizm, który ją wznowi.
-
-### Reconciliation i overlap
-
-Nie duplikuj istniejącego bounded-execution PR #71 ani merge-queue lifecycle #102.
-
-Jeżeli któryś z tych lifecycle został do czasu uruchomienia tego promptu scalony, zamknięty, superseded albo rozszerzony, zachowaj wykonane elementy i zaprojektuj najmniejszy brakujący delta.
-
-Platform ma już dojrzały Control Room / anti-stall model. Nie twórz drugiego Platform orchestration schema. Ustal, jak przyjąć organizacyjne minimum bez utraty istniejących mocniejszych mechanizmów.
-
-Game/Atlas mają przyjąć organizacyjną semantykę dopiero przez właściwy provider-owned rollout i aktualne live authority.
-
-### Effort i multi-agent
-
-Sklasyfikuj effort na podstawie aktualnego scope po reconciliation.
-
-Użyj `parallel_when_beneficial` tylko gdy istnieją co najmniej dwa materialnie niezależne workstreamy i korzyść przewyższa coordination/integration cost. Użyj najmniejszej użytecznej liczby lanes.
-
-Nie pozwalaj równoległym writerom modyfikować tych samych policy/workflow/schema. Shared policy, merge queue, checkpoint schema i integration surfaces wymagają jednego ownera/lease i seryjnej integracji.
-
-### Wymagany output tego continuation
-
-W pierwszej kolejności doprowadź do jednego spójnego, zweryfikowanego **designu**, a nie do przypadkowej serii patchy.
-
-Zapisz w META:
-
-1. aktualny live-state reconciliation / overlap map;
-2. design organizacyjnego task/worker/tool/wait/retry/context lifecycle;
-3. executor-selection model `Chat-first / GitHub-native async / Work-by-exception`;
-4. durable checkpoint + compaction + resume semantics;
-5. user-notification semantics;
-6. provider adoption/migration path dla META/Game/Platform/Atlas;
-7. deterministic validation/drift strategy;
-8. implementation plan po zaakceptowaniu designu zgodnie z aktualnymi repo instructions.
-
-Nie wdrażaj canonical policy/runtime zmian tylko na podstawie starego handoffu. Najpierw zakończ reconciliation i design review wymagany przez aktualne instructions.
-
-### Safety
-
-- Nie osłabiaj branch protection, required checks, exact-head evidence, review authority, merge-queue safety ani anti-loop limits.
-- Nie obchodź hard platform/tool limits przez udawanie, że ich nie ma.
-- Nie konsumuj Work/Codex/owner-funded AI tylko po to, żeby utrzymać długą sesję, jeśli tańsza bezpieczna ścieżka daje ten sam wynik.
-- Nie twórz automatyzacji/scheduled tasks bez potrzeby i bez zgodności z aktualnymi uprawnieniami/planem.
-- Nie zmieniaj provider runtime, produkcji, sekretów ani danych w tym lifecycle.
-
-### Terminalny wynik tej fazy
-
-Zakończ dopiero, gdy design i jego durable repo/Issue/PR state są spójne, live-state reconciliation jest aktualne, nie ma nierozstrzygniętego ownership conflict i istnieje jednoznaczny następny etap.
-
-Jeżeli przed implementacją aktualne instructions wymagają owner review/approval designu, zatrzymaj się na tym jednym rzeczywistym gate z dokładnym path/PR i bez wykonywania policy rollout przed zatwierdzeniem.
+Do not stop at preparation, a PR, a canary or a green branch when a safe authorized next step remains.
