@@ -221,7 +221,7 @@ repository                non-empty repository coordinate string: owner/name
  pr_id                      non-empty string iff pr_applicable=true; otherwise null
  task_head_sha               lowercase 40-hex string
  phase                       non-empty string
- bounded_lifecycle_state     non-empty string that exactly matches BoundedLifecycleAuthority
+ bounded_lifecycle_state     non-empty string supplied by the bounded lifecycle authority at checkpoint-write time; historical value is preserved on resume
  last_material_progress      non-empty string summarizing the latest material change/evidence event
  completed_work              JSON list of unique non-empty strings; empty list allowed
  evidence_refs               JSON list of unique non-empty strings; empty list allowed
@@ -253,11 +253,14 @@ Add explicit malformed/type-shape RED cases proving:
 - `resume_locator` rejects empty/whitespace-only and non-string values whenever the mechanism requires a locator; it must be `null` for mechanisms that do not use one;
 - `last_material_progress`, list members and `next_action` are reconstruction summaries/locators only and must not encode secrets or raw large logs;
 - no semantic-minimum field may accept an arbitrary object merely because it is JSON-serializable;
-- `bounded_lifecycle_state` must also equal the fresh bounded-authority state; syntactically valid but stale/different state fails closed;
+- in `checkpoint_write` mode, `bounded_lifecycle_state` must equal the current bounded-authority state; syntactically valid but stale/different state fails closed before persistence;
+- in `resume_read` mode, the historical `bounded_lifecycle_state` is validated only for authenticated historical integrity and shape at the semantic-minimum stage; it must **not** be compared directly with the fresh bounded-authority state before transition reconciliation;
+- after historical integrity/event authentication, `CheckpointTransitionAuthority` must prove any lifecycle advance from the historical state to fresh task state, and `BoundedLifecycleAuthority` must independently confirm the resulting current lifecycle/terminality;
+- a historical `WAITING_EXTERNAL` checkpoint may reconcile to current `READY` or `DONE` only when those authorities prove the transition; direct pre-transition fresh equality would be a regression and must have a negative test;
 - `bounded_continuity_ref` is mandatory but opaque to #108; tests must not parse it to duplicate #69 retry counters;
 - no field representing context pressure may contain or require an invented exact runtime token count.
 
-The same closed-shape semantic-minimum validation applies to `checkpoint_write` and to authenticated historical checkpoints during `resume_read` before any transition reconciliation.
+The same closed **shape/type** semantic-minimum validation applies to `checkpoint_write` and authenticated historical checkpoints during `resume_read`. Fresh-state equality is mode-specific: it is required for new checkpoint writes, while historical resume values remain immutable evidence until transition reconciliation proves the move to current state.
 
 ### Checkpoint write
 
@@ -267,26 +270,32 @@ The same closed-shape semantic-minimum validation applies to `checkpoint_write` 
 - existing predecessor continuity is delegated to bounded lifecycle authority;
 - mutable checkpoint coordinates must match current `TrustedTaskIdentity`;
 - semantic-minimum fields and conditional fields must already be valid before a release/rotation checkpoint is persisted;
+- the proposed lifecycle state must match current `BoundedLifecycleAuthority` before persistence;
 - unknown/unavailable bounded authority fails closed.
 
 ### Resume read
 
 - historical checkpoint integrity and semantic-minimum shape are verified before reconciliation;
-- historical mutable coordinates are not rewritten to look current;
+- historical lifecycle/disposition and mutable coordinates remain immutable evidence and are not rewritten or forced equal to fresh state before transition proof;
 - automatic resume authenticates the actual historical mechanism/locator/event;
 - owner re-invocation uses owner-authorized re-entry evidence, never fabricated automatic-event evidence;
-- a trusted transition authority reconciles historical state to fresh GitHub/task context;
+- a trusted transition authority reconciles historical lifecycle/disposition plus historical mutable coordinates to fresh GitHub/task context;
+- bounded authority independently confirms the fresh current lifecycle/terminality and retry/evidence continuity after that transition proof;
+- historical `WAITING_EXTERNAL + release_waiting` can legitimately resume into fresh `READY` or terminal `DONE` when the transition is proven;
 - a consumed one-shot mechanism need not remain live after firing;
 - a successor checkpoint claiming future automatic resume must freshly verify that new mechanism.
 
 ### Disposition/mechanism matrix
 
 - `continue_current` ↔ `same_session`;
-- `rotate_resumable` ↔ only `scheduled_task|work_event_trigger|work_persistent` with non-empty verified locator;
+- `release_waiting` ↔ `github_native` only with a concrete GitHub locator plus authoritative whole-task proof that no later agent worker is required;
+- `release_waiting` ↔ `scheduled_task|work_event_trigger|work_persistent` only with a non-empty live/authorized/task-bound verified locator; these are valid waiting continuations and must not be misclassified as rotation;
+- `rotate_resumable` ↔ only `scheduled_task|work_event_trigger|work_persistent` with a non-empty live/authorized/task-bound verified locator that genuinely launches/preserves replacement worker execution;
 - `stop_reinvoke_required` ↔ `owner_reinvoke`;
 - `terminal` ↔ `none_terminal` plus independent bounded terminal state;
 - under the current `#69` contract, `STALLED` + `terminal|none_terminal` is rejected because `STALLED` is released but nonterminal; only the bounded authority may report terminality;
-- invalid pairings fail closed.
+- add positive tests for all four legal `release_waiting` pair classes (`github_native` and each of the three worker-capable mechanisms), including locator/binding requirements, plus negative tests for missing/unverified locators and other invalid pairings;
+- all other pairings fail closed.
 
 ### GitHub-native waiting
 
@@ -296,6 +305,8 @@ The same closed-shape semantic-minimum validation applies to `checkpoint_write` 
 - authoritative proof, before release, that all remaining task work can reach terminal state without any later agent worker.
 
 If later worker action may be required, fail closed to a worker-capable mechanism or `stop_reinvoke_required`.
+
+For `release_waiting + scheduled_task|work_event_trigger|work_persistent`, GitHub-only whole-task proof is not the qualifier; instead the mechanism must be live, authorized, task-bound, action-bound as required by the canonical design, and carry the concrete locator needed to launch/preserve the later worker.
 
 ### Bounded continuity
 
