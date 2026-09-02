@@ -129,6 +129,57 @@ class NarrowBoundedExecutionTests(unittest.TestCase):
             self.assertFalse(decision.allowed)
             self.assertIn("unchanged", decision.reason)
 
+    def test_operational_actions_require_a_durable_predecessor(self) -> None:
+        current = snapshot(first_material_failure="unit:test_x", completion_verified=True)
+        for action in ("mutate", "retrigger", "retry", "run_heavy_validation", "complete"):
+            decision = decide(POLICY, copy.deepcopy(current), action)
+            self.assertFalse(decision.allowed, action)
+            self.assertIn("previous", decision.reason, action)
+
+    def test_retry_counters_cannot_regress_within_their_scope(self) -> None:
+        retry_previous = snapshot(first_material_failure="unit:test_x", identical_failure_cycles=1)
+        retry_reset = snapshot(first_material_failure="unit:test_x", identical_failure_cycles=0)
+        with self.assertRaises(GuardError):
+            decide(POLICY, retry_reset, "observe", previous=retry_previous)
+
+        heavy_previous = snapshot(heavy_validation_attempts=1)
+        heavy_reset = snapshot(heavy_validation_attempts=0)
+        with self.assertRaises(GuardError):
+            decide(POLICY, heavy_reset, "observe", previous=heavy_previous)
+
+        self.assertTrue(decide(
+            POLICY,
+            snapshot(first_material_failure="unit:test_y", identical_failure_cycles=0),
+            "observe",
+            previous=retry_previous,
+        ).allowed)
+        self.assertTrue(decide(
+            POLICY,
+            snapshot(task_head_sha="b" * 40, heavy_validation_attempts=0),
+            "observe",
+            previous=heavy_previous,
+        ).allowed)
+
+    def test_previous_frozen_same_head_cannot_be_unfrozen_to_mutate(self) -> None:
+        previous = snapshot(candidate_frozen=True)
+        current = snapshot(candidate_frozen=False, gate_state="failed", material_reason="failing_required_test")
+        decision = decide(POLICY, current, "mutate", previous=previous)
+        self.assertFalse(decision.allowed)
+        self.assertIn("frozen", decision.reason)
+
+        new_head = snapshot(
+            candidate_frozen=False,
+            task_head_sha="b" * 40,
+            gate_state="failed",
+            material_reason="failing_required_test",
+        )
+        self.assertTrue(decide(POLICY, new_head, "mutate", previous=previous).allowed)
+
+    def test_unsupported_dependency_kind_fails_closed(self) -> None:
+        malformed = snapshot(blocking_dependency="ci:123", dependency_kind="EXTERNAL")
+        with self.assertRaises(GuardError):
+            decide(POLICY, malformed, "mutate", previous=snapshot())
+
     def test_main_only_change_is_not_a_snapshot_coordinate(self) -> None:
         self.assertNotIn("main_sha", POLICY["progress_fingerprint_fields"])
 
