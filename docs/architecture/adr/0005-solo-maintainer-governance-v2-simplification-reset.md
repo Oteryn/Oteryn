@@ -14,6 +14,7 @@ The permanent merge contract is:
 - exactly one externally required aggregate gate per permanent repository: `meta-gate`, `game-gate`, `platform-gate`, `atlas-gate`;
 - the aggregate gate executes and fails closed on both `pull_request` and `merge_group` candidates;
 - GitHub Merge Queue owns integration freshness after a real moving-base canary;
+- repository auto-merge is enabled as an integration convenience; it does not bypass GitHub Merge Queue, required aggregate gates, conversation resolution, or protected-branch enforcement;
 - strict required-status freshness is removed only after that canary succeeds;
 - required approving review count is `0` while there is one human maintainer;
 - required CODEOWNER approval is disabled;
