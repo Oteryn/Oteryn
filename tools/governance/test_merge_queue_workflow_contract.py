@@ -13,6 +13,7 @@ from governance_drift_audit import audit_snapshot
 ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW = ROOT / ".github/workflows/ci.yml"
 DESIRED_STATE = ROOT / "ecosystem/governance-desired-state.json"
+ADR_0005 = ROOT / "docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md"
 MERGE_GROUP_ADAPTER = ROOT / ".github/workflows/merge-group-ai-review-adapter.yml"
 ENFORCEMENT_FIELDS = (
     "required_gate",
@@ -89,6 +90,13 @@ def test_ci_has_one_external_gate_only() -> None:
     assert "ai_review_policy.py" not in workflow
     assert "trusted_review_attestation.py" not in workflow
     assert "verify_ai_review_evidence.py" not in workflow
+
+
+def test_adr0005_keeps_auto_merge_subordinate_to_merge_queue() -> None:
+    text = ADR_0005.read_text(encoding="utf-8")
+
+    assert "repository auto-merge is enabled" in text
+    assert "does not bypass GitHub Merge Queue" in text
 
 
 def test_desired_state_requires_auto_merge_for_every_permanent_repo() -> None:
@@ -176,6 +184,7 @@ if __name__ == "__main__":
     test_meta_gate_executes_bounded_execution_guard_regressions()
     test_legacy_ai_merge_group_adapter_is_retired()
     test_ci_has_one_external_gate_only()
+    test_adr0005_keeps_auto_merge_subordinate_to_merge_queue()
     test_desired_state_requires_auto_merge_for_every_permanent_repo()
     test_drift_audit_accepts_exact_target_snapshot()
     test_drift_audit_reports_known_mismatch_as_drift()
