@@ -12,7 +12,7 @@ The stable aggregate check name is:
 meta-gate
 ```
 
-Repository protection should require `meta-gate` on the exact pull-request head before merge. Internal steps may evolve without changing that public gate name.
+Repository protection requires only `meta-gate`. The same gate runs on normal pull requests and on the exact GitHub Merge Queue `merge_group` candidate. Internal validation may evolve without creating another externally required status.
 
 ## Required validation
 
@@ -28,11 +28,13 @@ Repository protection should require `meta-gate` on the exact pull-request head 
 - a release artifact digest is not an immutable `sha256:<64-hex>` value;
 - a merged release contract is not explicitly `compatible`;
 - raw map/client assets, database files or `.env` are committed into META;
-- candidate-range whitespace validation fails.
+- candidate-range whitespace validation fails;
+- the read-only governance desired-state or execution-routing validation fails.
 
 ## Trigger and runner policy
 
 - Pull requests targeting `main` run the gate.
+- Merge Queue `checks_requested` events run the same gate against the exact merge-group candidate (`github.sha` equals `merge_group.head_sha`).
 - Pushes to `main` run the same gate as post-merge verification.
 - Pull-request runs use concurrency cancellation so superseded heads do not waste Actions capacity.
 - The default runner is GitHub-hosted `ubuntu-latest`; META must not require a trusted self-hosted or production-connected runner for ordinary validation.
@@ -50,6 +52,8 @@ A compatible ecosystem release may reference successful provider evidence by imm
 
 ## Branch protection target
 
-During PR #15 enforcement bootstrap, `main` is protected with pull requests required, zero mandatory human approvals for the one-maintainer model, strict `meta-gate` status, administrator enforcement, linear history, conversation resolution, and force-push/deletion disabled. PR #15 installs the trusted-base `ai-review-gate` check; immediately after that PR merges, branch protection must require `ai-review-gate` as the review authority (with deterministic `meta-gate` retained as applicable).
+For the one-maintainer META model, protected `main` requires pull requests, `meta-gate`, Merge Queue, administrator enforcement, linear history and conversation resolution. Required approving review count and required CODEOWNER review are zero. Force push and deletion are disabled. After the successful moving-base Merge Queue canary recorded through PR #125, strict branch freshness is disabled because Merge Queue owns integration freshness.
+
+External AI review is advisory under `docs/governance/AI_REVIEW_POLICY.md`; it is not a required status and has no workflow-based merge authority.
 
 Changing branch/ruleset settings is an administrative GitHub operation, not something this workflow attempts to perform with `GITHUB_TOKEN`.

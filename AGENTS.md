@@ -10,13 +10,21 @@ It does **not** own Game, Platform or Atlas runtime implementation.
 
 Agents MUST follow `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`.
 
-For substantial autonomous work, agents MUST also follow `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md` and its machine-readable `docs/agents/EXECUTION_STATE_CONTRACT.json`: `WAITING_EXTERNAL` work must release the active worker, frozen candidates must not be mutated merely to retrigger external systems, no-op/retrigger commits are forbidden, and repeated unchanged failures must transition through bounded retry to `STALLED` rather than loop indefinitely.
+Agents MUST also follow `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md`: do not mutate an unchanged candidate to retrigger evidence, respect its bounded local retries, and release active ownership in waiting, blocked or stalled states until a material fact changes.
 
 Agents MAY use the `synology oteryn` developer MCP when it is available and the current task authorizes the relevant operation. They MUST follow `docs/agents/contracts/SYNOLOGY_MCP_EXECUTION_POLICY.md`: Synology MCP is an additional runtime/local evidence and execution path, not a replacement for GitHub. GitHub live state remains authoritative for repository, branch, commit, PR, issue, review, CI/check and release facts, and required GitHub verification/workflows MUST NOT be skipped because MCP access exists.
 
 Before declaring a task blocked because of access limitations, agents must discover available capabilities, distinguish tool absence from permission/policy restrictions, and continue useful work when any safe execution path remains.
 
 Completion claims require verified evidence. `UNKNOWN` is not automatically a `BLOCKER`, and a generic access disclaimer without capability discovery is invalid.
+
+## External execution-skill precedence
+
+Repository and user authority govern execution. Agent skills, plugins and workflow frameworks such as Superpowers are subordinate execution aids, not independent task or lifecycle authority.
+
+For an already-authorized Oteryn programme or task with an approved canonical design, implementation plan, checkpoint, or explicit continuation directive, Superpowers workflows MUST NOT introduce additional approval gates, re-brainstorm an approved design, require duplicate planning artifacts, replace canonical authority, or interrupt autonomous continuation solely because the skill's default workflow would do so. Relevant skills MAY still be used internally for implementation, testing, debugging, review, isolation, or verification when they do not conflict with the governing Oteryn authority.
+
+A skill or plugin MUST NOT weaken repository safety, validation, review, GitHub-first, or authorization requirements. When a skill workflow conflicts with applicable user instructions, this `AGENTS.md`, repository policy, or canonical task authority, the applicable higher-priority Oteryn authority controls.
 
 ## GitHub-first execution gate
 
@@ -36,7 +44,7 @@ python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-exe
 
 Use this execution order: current GitHub state; GitHub Actions or another repository-approved CI runner; a worker-owned isolated workspace; then, only when validated, a narrowly authorized host exception. Remote Desktop/Desktop Commander is **default-deny**. It may be used only when the packet sets `remote_desktop: exception`, `execution_target: host_exception`, no equivalent CI exists, and `remote_desktop_reason` is exactly one of `host_only_service`, `lan_or_hardware`, or `self_hosted_runner_diagnosis`.
 
-Capability discovery may inspect local connector/tool registration and argument schemas without invoking Remote Desktop. By contrast, every direct `Remote_Desktop_Commander.*` invocation requires a fresh valid host-exception packet and a positive per-call decision from `validate_remote_desktop_call(...)` immediately before that call. The per-call gate revalidates the routing packet/live GitHub state, exact semantic host action, exact connector tool identifier and exact call arguments; only policy-declared non-semantic runtime fields may differ. The packet must declare the connector function in `requested_remote_desktop_tools` and the approved `{tool, arguments}` invocation in `requested_remote_desktop_calls`; a prior positive decision for a different action, tool, argument set or call does not carry forward.
+Capability discovery may inspect local connector/tool registration and argument schemas without invoking Remote Desktop. By contrast, every direct `Remote_Desktop_Commander.*` invocation requires a fresh valid host-exception packet and a positive per-call decision from `validate_remote_desktop_call(...)` immediately before that call. The per-call gate revalidates the routing packet/live GitHub state, exact semantic host action, exact connector tool identifier and exact call arguments; only policy-declared non-semantic runtime fields may differ. The packet must declare that connector function in `requested_remote_desktop_tools` and the approved `{tool, arguments}` invocation in `requested_remote_desktop_calls`; a prior positive decision for a different action, tool, argument set or call does not carry forward.
 
 Agents must not invoke `Remote_Desktop_Commander.list_devices` merely to prove that Remote Desktop is reachable. The same rule applies to `who_am_i`, `ping`, `get_config`, filesystem/search/process/session/terminal/history functions and any other direct connector call: metadata-looking or read-only calls are still exception-only. Unknown connector functions fail closed, and functions classified by policy as always forbidden cannot be admitted through the three existing reasons. A Remote Desktop `DENY` is not automatically a blocker; continue through GitHub, GitHub Actions or an isolated workspace whenever those routes can perform useful authorized work.
 
@@ -138,18 +146,18 @@ Absence of CI in this bootstrap repository is not equivalent to a CI pass; recor
 - Deny by default when authorization is ambiguous.
 - Production or destructive external mutations require separate explicit owner authority even if META documentation describes them.
 
-## Owner-funded AI and review economy
+## AI review economy
 
-External AI review is governed by `docs/governance/AI_REVIEW_POLICY.md` and `ecosystem/ai-review-policy.json`. Do not spend Codex/Spark quota on every PR. Classify the final diff deterministically first.
+External AI review is advisory and governed by `docs/governance/AI_REVIEW_POLICY.md`. It is not a required GitHub status.
 
-- `R0` requires deterministic validation and exact-diff self-review only; do not invoke external AI review.
-- `R1` uses one fast reviewer invocation per stable review fingerprint after required CI is green.
-- `R2` uses one deep reviewer invocation per stable review fingerprint after required CI is green.
-- Never invoke an external reviewer for Draft/WIP state or repeatedly poll/re-run a reviewer for an unchanged fingerprint.
-- A prior review may be reused only under the policy's exact fingerprint/ancestor/review-neutral rules.
-- Issue #12 and its bootstrap PR are the one-time no-external-review bootstrap for this policy. After bootstrap, changes to the review policy/classifier/authority mapping are `R2`.
+- Default to no external AI review.
+- For an ordinary code change where independent review clearly adds value, prefer Codex Spark when available.
+- For a material high-risk/control-plane change, use one Codex deep review on a stable material candidate.
+- Trivial docs, formatting, generated evidence and metadata do not need external AI review.
+- If Spark is unavailable for low-risk work, do not automatically escalate to deep Codex.
+- Re-review only after a material risk-bearing change, not for cosmetic changes or governance retriggers.
 
-The repository owner has standing authorization for external AI consumption only when the merged risk policy requires `R1` or `R2` review and its invocation budget is respected. Other owner-funded AI/API use still requires explicit authorization for that task.
+Do not recreate formal R0/R1/R2 classification, review fingerprints, `ai-review-gate`, review envelopes, attestation bridges, or review-result parsers as merge authority.
 
 ## Architecture handover
 
