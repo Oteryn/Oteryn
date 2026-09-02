@@ -31,6 +31,7 @@ REQUIRED_SNAPSHOT_FIELDS = set(CANONICAL_FIELDS) | {
 }
 ALLOWED_OBSERVER_FIELDS = {"narration", "updated_at"}
 ACTIONS = {"observe", "mutate", "retrigger", "retry", "run_heavy_validation", "complete"}
+STABLE_TASK_IDENTITY_FIELDS = ("repository", "task_id")
 
 
 class GuardError(ValueError):
@@ -97,6 +98,11 @@ def validate_snapshot(snapshot: Mapping[str, Any], policy: Mapping[str, Any]) ->
     for key in CANONICAL_FIELDS + ["material_reason"]:
         if not isinstance(snapshot[key], str):
             raise GuardError(f"{key} must be a string")
+    allowed_dependency_kinds = {"none", *policy["dependency_semantics"]}
+    if snapshot["dependency_kind"] not in allowed_dependency_kinds:
+        raise GuardError("dependency_kind is not canonical")
+    if snapshot["blocking_dependency"] and snapshot["dependency_kind"] == "none":
+        raise GuardError("blocking_dependency requires a canonical blocking dependency_kind")
     if snapshot["state"] == "DONE" and not snapshot["completion_verified"]:
         raise GuardError("DONE requires caller-provided completion verification")
 
@@ -119,6 +125,35 @@ def failure_fingerprint(snapshot: Mapping[str, Any]) -> str:
     })
 
 
+def _validate_predecessor_history(current: Mapping[str, Any], previous: Mapping[str, Any]) -> None:
+    for field in STABLE_TASK_IDENTITY_FIELDS:
+        if current[field] != previous[field]:
+            raise GuardError(f"previous snapshot {field} does not match current task identity")
+
+    if (
+        failure_fingerprint(current) == failure_fingerprint(previous)
+        and current["identical_failure_cycles"] < previous["identical_failure_cycles"]
+    ):
+        raise GuardError("identical_failure_cycles cannot regress within one failure scope")
+
+    if (
+        current["task_head_sha"] == previous["task_head_sha"]
+        and current["heavy_validation_attempts"] < previous["heavy_validation_attempts"]
+    ):
+        raise GuardError("heavy_validation_attempts cannot regress on the same technical head")
+
+
+def _effective_current(current: Mapping[str, Any], previous: Mapping[str, Any] | None) -> dict[str, Any]:
+    result = copy.deepcopy(dict(current))
+    if (
+        previous is not None
+        and previous["candidate_frozen"]
+        and current["task_head_sha"] == previous["task_head_sha"]
+    ):
+        result["candidate_frozen"] = True
+    return result
+
+
 def _decision(policy: Mapping[str, Any], current: Mapping[str, Any], allowed: bool,
               state: str, reason: str, snapshot: dict[str, Any] | None = None) -> Decision:
     result = copy.deepcopy(snapshot if snapshot is not None else dict(current))
@@ -136,62 +171,69 @@ def decide(policy: Mapping[str, Any], current: Mapping[str, Any], action: str,
     validate_snapshot(current, policy)
     if previous is not None:
         validate_snapshot(previous, policy)
+        _validate_predecessor_history(current, previous)
     if action not in ACTIONS:
         raise GuardError(f"unsupported action: {action}")
 
+    effective = _effective_current(current, previous)
+
     if previous is not None and previous["state"] == "DONE":
         return _decision(policy, previous, action == "observe", "DONE", "DONE is terminal")
-    if current["state"] == "DONE":
-        return _decision(policy, current, action == "observe", "DONE", "DONE is terminal")
+    if effective["state"] == "DONE":
+        return _decision(policy, effective, action == "observe", "DONE", "DONE is terminal")
 
-    dependency_state = policy["dependency_semantics"].get(current["dependency_kind"])
-    if current["blocking_dependency"] and dependency_state:
-        return _decision(policy, current, action == "observe", dependency_state,
+    dependency_state = policy["dependency_semantics"].get(effective["dependency_kind"])
+    if effective["blocking_dependency"] and dependency_state:
+        return _decision(policy, effective, action == "observe", dependency_state,
                          "dependency prevents operational work")
 
-    changed = previous is None or progress_fingerprint(current, policy) != progress_fingerprint(previous, policy)
+    changed = previous is None or progress_fingerprint(effective, policy) != progress_fingerprint(previous, policy)
     if previous is not None and previous["state"] in {"WAITING_EXTERNAL", "BLOCKED", "STALLED"} and not changed:
         if action == "observe":
             return _decision(policy, previous, True, previous["state"], "observation allowed while released")
         return _decision(policy, previous, False, previous["state"], "material progress required to resume")
 
     if action == "observe":
-        return _decision(policy, current, True, current["state"], "observation allowed")
+        return _decision(policy, effective, True, effective["state"], "observation allowed")
 
-    if previous is not None and action in {"mutate", "retrigger"} and not changed:
-        return _decision(policy, current, False, current["state"],
+    if previous is None:
+        return _decision(policy, effective, False, effective["state"],
+                         "previous snapshot required for operational action")
+
+    if action in {"mutate", "retrigger"} and not changed:
+        return _decision(policy, effective, False, effective["state"],
                          "unchanged candidates cannot be mutated or retriggered")
 
-    if current["candidate_frozen"] and action in policy["candidate_freeze"]["forbidden_unchanged_actions"]:
-        valid_reason = current["material_reason"] in policy["candidate_freeze"]["material_reasons"]
+    if effective["candidate_frozen"] and action in policy["candidate_freeze"]["forbidden_unchanged_actions"]:
+        valid_reason = effective["material_reason"] in policy["candidate_freeze"]["material_reasons"]
         if not changed or not valid_reason:
-            return _decision(policy, current, False, current["state"],
+            return _decision(policy, effective, False, effective["state"],
                              "frozen candidate requires a recorded material reason and change")
 
     if action == "retry":
-        if not current["first_material_failure"]:
-            return _decision(policy, current, False, current["state"], "retry requires a material failure")
+        if not effective["first_material_failure"]:
+            return _decision(policy, effective, False, effective["state"], "retry requires a material failure")
         limit = policy["retry_budgets"]["identical_failure_cycles"]
-        if current["identical_failure_cycles"] >= limit:
-            return _decision(policy, current, False, "STALLED", "identical failure retry budget exhausted")
-        result = copy.deepcopy(dict(current))
+        if effective["identical_failure_cycles"] >= limit:
+            return _decision(policy, effective, False, "STALLED", "identical failure retry budget exhausted")
+        result = copy.deepcopy(effective)
         result["identical_failure_cycles"] += 1
-        return _decision(policy, current, True, "RUNNING", "bounded retry admitted", result)
+        return _decision(policy, effective, True, "RUNNING", "bounded retry admitted", result)
 
     if action == "run_heavy_validation":
         limit = policy["retry_budgets"]["heavy_validation_attempts"]
-        if current["heavy_validation_attempts"] >= limit:
-            return _decision(policy, current, False, "STALLED", "heavy validation budget exhausted")
-        result = copy.deepcopy(dict(current))
+        if effective["heavy_validation_attempts"] >= limit:
+            return _decision(policy, effective, False, "STALLED", "heavy validation budget exhausted")
+        result = copy.deepcopy(effective)
         result["heavy_validation_attempts"] += 1
-        return _decision(policy, current, True, current["state"], "bounded heavy validation admitted", result)
+        return _decision(policy, effective, True, effective["state"], "bounded heavy validation admitted", result)
 
     if action == "complete":
-        if not current["completion_verified"]:
-            return _decision(policy, current, False, current["state"], "completion verification required")
-        return _decision(policy, current, True, "DONE", "completion fact accepted")
+        if not effective["completion_verified"]:
+            return _decision(policy, effective, False, effective["state"], "completion verification required")
+        return _decision(policy, effective, True, "DONE", "completion fact accepted")
 
-    return _decision(policy, current, True, "RUNNING", "operational action admitted")
+    return _decision(policy, effective, True, "RUNNING", "operational action admitted")
 
 
 def main() -> int:
