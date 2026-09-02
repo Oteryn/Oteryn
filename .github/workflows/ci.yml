@@ -223,6 +223,7 @@ jobs:
                   raise SystemExit(f'{repository}: role/gate/rollout mismatch')
               required_values = {
                   'merge_queue': True,
+                  'allow_auto_merge': True,
                   'strict_required_status_checks': False,
                   'required_approvals': 0,
                   'codeowner_review_required': False,
