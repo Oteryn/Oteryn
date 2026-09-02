@@ -84,9 +84,7 @@
   "remote_desktop_call_gate": {
     "schema_version": 1,
     "argument_binding": "exact_after_nonsemantic_filter",
-    "nonsemantic_arguments": [
-      "deviceId"
-    ]
+    "nonsemantic_arguments": []
   },
   "resume_preflight_required_fields": [
     "verified_at",
