@@ -48,6 +48,9 @@
     "persistent_cloud_execution": ["work"],
     "software_development_loop": ["codex"]
   },
+  "capability_snapshot_freshness": {
+    "max_age_seconds": 900
+  },
   "context_pressure_values": ["not_applicable", "normal", "elevated", "rotate_required"],
   "blocked_result": "BLOCKED_CAPABILITY_UNAVAILABLE"
 }
