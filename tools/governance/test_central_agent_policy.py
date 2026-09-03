@@ -222,13 +222,12 @@ Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation.
 ## Domain invariants
 Game-owned safety constraints remain local.
 """
-    copied = lean + """
-## Execution shape
- 
-Use `single_agent` when one capable worker is proportionate. Use `parallel_when_beneficial` only when at least two materially independent workstreams justify coordination cost. One mutating owner per writable lane remains the default safety boundary; read-only analysis may fan out when it has clear value.
-
-Parallelism is an optimization, not a completion criterion. Serial work does not require an apology or a fabricated exception.
-"""
+    copied = lean + (
+        "\n## Execution shape\n"
+        " \n"
+        "Use `single_agent` when one capable worker is proportionate. Use `parallel_when_beneficial` only when at least two materially independent workstreams justify coordination cost. One mutating owner per writable lane remains the default safety boundary; read-only analysis may fan out when it has clear value.\n\n"
+        "Parallelism is an optimization, not a completion criterion. Serial work does not require an apology or a fabricated exception.\n"
+    )
     errors = central.validate_provider_overlay("Oteryn/Oteryn-Game", copied, policy=policy)
     assert "provider overlay must not copy organization-wide policy sections" in errors
 
@@ -319,15 +318,14 @@ Focused persistence regression plus exact-head repository gate.
 
 def test_task_prompt_rejects_verbatim_canonical_policy_section() -> None:
     policy = central.load_policy(REPO_ROOT)
-    copied = """ROLE / OUTCOME
-Repair the allocated task.
-
-## Integration
-	
-GitHub protected-branch enforcement, the repository's single aggregate gate and GitHub Merge Queue are integration authority where configured. Deterministic CI qualifies the applicable exact candidate; custom review fingerprints, envelopes, attestations, formal R0/R1/R2 states, `ai-review-gate` as merge authority and custom proof ledgers remain retired by ADR 0005.
-
-Do not bypass Merge Queue or replace it with a direct merge merely because a connector lacks an enqueue operation.
-"""
+    copied = (
+        "ROLE / OUTCOME\n"
+        "Repair the allocated task.\n\n"
+        "## Integration\n"
+        "\t\n"
+        "GitHub protected-branch enforcement, the repository's single aggregate gate and GitHub Merge Queue are integration authority where configured. Deterministic CI qualifies the applicable exact candidate; custom review fingerprints, envelopes, attestations, formal R0/R1/R2 states, `ai-review-gate` as merge authority and custom proof ledgers remain retired by ADR 0005.\n\n"
+        "Do not bypass Merge Queue or replace it with a direct merge merely because a connector lacks an enqueue operation.\n"
+    )
     errors = central.validate_task_prompt_text(copied, policy=policy)
     assert "task prompt must not copy organization-wide policy sections" in errors
 
