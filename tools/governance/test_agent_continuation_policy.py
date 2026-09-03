@@ -184,13 +184,16 @@ class FakeMechanismVerifier:
         self,
         *,
         live_bound: bool = True,
+        replacement_worker: bool = True,
         historical_event: bool = True,
         owner_reinvoke: bool = True,
     ) -> None:
         self.live_bound = live_bound
+        self.replacement_worker = replacement_worker
         self.historical_event = historical_event
         self.owner_reinvoke = owner_reinvoke
         self.live_calls: list[tuple[str, str, TrustedTaskIdentity, str]] = []
+        self.replacement_calls: list[tuple[str, str, TrustedTaskIdentity, str]] = []
         self.event_calls = 0
         self.owner_calls = 0
 
@@ -203,6 +206,16 @@ class FakeMechanismVerifier:
     ) -> bool:
         self.live_calls.append((mechanism, locator, trusted, expected_next_action))
         return self.live_bound
+
+    def proves_replacement_or_persistent_worker(
+        self,
+        mechanism: str,
+        locator: str,
+        trusted: TrustedTaskIdentity,
+        expected_next_action: str,
+    ) -> bool:
+        self.replacement_calls.append((mechanism, locator, trusted, expected_next_action))
+        return self.replacement_worker
 
     def verify_historical_resume_event(
         self, historical: dict[str, object], trusted: TrustedTaskIdentity
@@ -422,13 +435,14 @@ class PersistentContinuationTests(unittest.TestCase):
                 resume_mechanism=mechanism,
                 resume_locator=f"resume://{mechanism}/108",
             )
-            verifier = FakeMechanismVerifier(live_bound=True)
+            verifier = FakeMechanismVerifier(live_bound=True, replacement_worker=False)
             self.validate(
                 value,
                 bounded_authority=FakeBoundedAuthority("WAITING_EXTERNAL"),
                 mechanism_verifier=verifier,
             )
             self.assertEqual(verifier.live_calls[-1][3], trusted_task().expected_next_action)
+            self.assertEqual(verifier.replacement_calls, [])
             self.assertRejected(
                 value,
                 bounded_authority=FakeBoundedAuthority("READY"),
@@ -474,10 +488,17 @@ class PersistentContinuationTests(unittest.TestCase):
                 resume_mechanism=mechanism,
                 resume_locator=f"resume://{mechanism}/replacement",
             )
+            verifier = FakeMechanismVerifier(live_bound=True, replacement_worker=True)
             self.validate(
                 value,
                 bounded_authority=FakeBoundedAuthority("RUNNING"),
-                mechanism_verifier=FakeMechanismVerifier(live_bound=True),
+                mechanism_verifier=verifier,
+            )
+            self.assertEqual(len(verifier.replacement_calls), 1)
+            self.assertRejected(
+                value,
+                bounded_authority=FakeBoundedAuthority("RUNNING"),
+                mechanism_verifier=FakeMechanismVerifier(live_bound=True, replacement_worker=False),
             )
             self.assertRejected(
                 {**value, "bounded_lifecycle_state": "WAITING_EXTERNAL"},
