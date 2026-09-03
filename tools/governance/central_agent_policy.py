@@ -73,13 +73,19 @@ def validate_meta_bundle(root: Path, policy: dict[str, Any]) -> list[str]:
         errors.append(f"organization authority_repository must be {AUTHORITY_REPOSITORY}")
 
     surfaces = policy.get("canonical_human_surfaces")
+    readable_surfaces: dict[str, str] = {}
     if surfaces != EXPECTED_SURFACES:
         errors.append("canonical_human_surfaces must match the central META paths")
     else:
-        for relative in surfaces.values():
+        for name, relative in surfaces.items():
             path = root / relative
             if not path.is_file() or path.stat().st_size == 0:
                 errors.append(f"missing or empty central human policy surface: {relative}")
+                continue
+            try:
+                readable_surfaces[name] = path.read_text(encoding="utf-8")
+            except OSError:
+                errors.append(f"missing or unreadable central human policy surface: {relative}")
 
     machine_authorities = policy.get("machine_authorities")
     if not isinstance(machine_authorities, list) or not machine_authorities:
@@ -113,42 +119,53 @@ def validate_meta_bundle(root: Path, policy: dict[str, Any]) -> list[str]:
 
     provider_sections = policy.get("forbidden_provider_sections")
     task_sections = policy.get("forbidden_task_prompt_sections")
-    if not isinstance(provider_sections, list) or not all(isinstance(v, str) and v for v in provider_sections):
+    if (
+        not isinstance(provider_sections, list)
+        or not provider_sections
+        or not all(isinstance(v, str) and v for v in provider_sections)
+    ):
         errors.append("forbidden_provider_sections must be a non-empty string list")
-    if not isinstance(task_sections, list) or not all(isinstance(v, str) and v for v in task_sections):
+    if (
+        not isinstance(task_sections, list)
+        or not task_sections
+        or not all(isinstance(v, str) and v for v in task_sections)
+    ):
         errors.append("forbidden_task_prompt_sections must be a non-empty string list")
 
     if surfaces == EXPECTED_SURFACES:
-        organization_text = (root / EXPECTED_SURFACES["organization_policy"]).read_text(encoding="utf-8")
-        prompting_text = (root / EXPECTED_SURFACES["prompting_standard"]).read_text(encoding="utf-8")
-        eval_text = (root / EXPECTED_SURFACES["prompt_eval_standard"]).read_text(encoding="utf-8")
-        for marker in (
-            "one rule, one authority",
-            "single_agent",
-            "parallel_when_beneficial",
-            BINDING_PATH,
-            "immutable META commit",
-        ):
-            if marker not in organization_text:
-                errors.append(f"organization policy missing marker: {marker}")
-        for marker in (
-            "ROLE / OUTCOME",
-            "AUTHORITY / SCOPE DELTA",
-            "LIVE LOCATORS",
-            "DOMAIN CONSTRAINTS / DEPENDENCIES",
-            "ACCEPTANCE / VALIDATION DELTA",
-            "STOP / HANDOFF DELTA",
-            "Omit a section when it has no task-specific content.",
-        ):
-            if marker not in prompting_text:
-                errors.append(f"prompting standard missing marker: {marker}")
-        for marker in (
-            "ablation",
-            "same representative cases",
-            "Safety-critical regression tolerance is zero.",
-        ):
-            if marker not in eval_text:
-                errors.append(f"prompt eval standard missing marker: {marker}")
+        organization_text = readable_surfaces.get("organization_policy")
+        prompting_text = readable_surfaces.get("prompting_standard")
+        eval_text = readable_surfaces.get("prompt_eval_standard")
+        if organization_text is not None:
+            for marker in (
+                "one rule, one authority",
+                "single_agent",
+                "parallel_when_beneficial",
+                BINDING_PATH,
+                "immutable META commit",
+            ):
+                if marker not in organization_text:
+                    errors.append(f"organization policy missing marker: {marker}")
+        if prompting_text is not None:
+            for marker in (
+                "ROLE / OUTCOME",
+                "AUTHORITY / SCOPE DELTA",
+                "LIVE LOCATORS",
+                "DOMAIN CONSTRAINTS / DEPENDENCIES",
+                "ACCEPTANCE / VALIDATION DELTA",
+                "STOP / HANDOFF DELTA",
+                "Omit a section when it has no task-specific content.",
+            ):
+                if marker not in prompting_text:
+                    errors.append(f"prompting standard missing marker: {marker}")
+        if eval_text is not None:
+            for marker in (
+                "ablation",
+                "same representative cases",
+                "Safety-critical regression tolerance is zero.",
+            ):
+                if marker not in eval_text:
+                    errors.append(f"prompt eval standard missing marker: {marker}")
     return errors
 
 
