@@ -89,6 +89,7 @@ jobs:
               Path('tools/governance/test_agent_execution_routing.py'),
               Path('tools/governance/test_bounded_execution_guard.py'),
               Path('tools/governance/test_agent_continuation_policy.py'),
+              Path('tools/governance/test_agent_continuation_review_repairs.py'),
               Path('tools/governance/test_remote_desktop_action_gate.py'),
               Path('tools/governance/test_merge_queue_workflow_contract.py'),
           ]
@@ -252,6 +253,7 @@ jobs:
           python3 tools/governance/test_merge_queue_workflow_contract.py
           python3 tools/governance/test_bounded_execution_guard.py
           python3 tools/governance/test_agent_continuation_policy.py
+          python3 tools/governance/test_agent_continuation_review_repairs.py
 
       - name: Verify META boundary markers
         shell: bash
