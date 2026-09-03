@@ -89,6 +89,18 @@ class ResumeMechanismVerifier(Protocol):
         trusted_task: TrustedTaskIdentity,
         expected_next_action: str,
     ) -> bool: ...
+    def proves_replacement_or_persistent_worker(
+        self,
+        mechanism: str,
+        locator: str,
+        trusted_task: TrustedTaskIdentity,
+        expected_next_action: str,
+    ) -> bool: ...
+    def has_automatic_continuation(
+        self,
+        trusted_task: TrustedTaskIdentity,
+        expected_next_action: str,
+    ) -> bool: ...
     def verify_historical_resume_event(
         self, historical: dict[str, object], trusted_task: TrustedTaskIdentity
     ) -> bool: ...
@@ -107,6 +119,7 @@ class ExecutionCapabilityAuthority(Protocol):
     def current_snapshot(
         self, trusted_task: TrustedTaskIdentity, required_capability: str | None
     ) -> TrustedCapabilitySnapshot: ...
+    def current_time(self, trusted_task: TrustedTaskIdentity) -> str: ...
 
 
 _POLICY_KEYS = {
@@ -121,6 +134,7 @@ _POLICY_KEYS = {
     "disposition_mechanism_compatibility",
     "execution_surfaces",
     "capability_surface_compatibility",
+    "capability_snapshot_freshness",
     "context_pressure_values",
     "blocked_result",
 }
@@ -222,6 +236,13 @@ def _utc_timestamp(value: object) -> bool:
     return parsed.tzinfo == timezone.utc
 
 
+def _parse_utc(value: object) -> datetime:
+    if not _utc_timestamp(value):
+        raise ContinuationPolicyError("trusted timestamp is invalid")
+    assert isinstance(value, str)
+    return datetime.fromisoformat(value[:-1] + "+00:00")
+
+
 def load_policy(path: Path) -> dict[str, object]:
     loaded = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(loaded, dict):
@@ -254,6 +275,12 @@ def validate_policy(policy: dict[str, object]) -> None:
         raise ContinuationPolicyError("execution surfaces must be canonical")
     if policy.get("capability_surface_compatibility") != _CAPABILITY_SURFACES:
         raise ContinuationPolicyError("capability/surface compatibility must be canonical")
+    freshness = policy.get("capability_snapshot_freshness")
+    if not isinstance(freshness, dict) or set(freshness) != {"max_age_seconds"}:
+        raise ContinuationPolicyError("capability snapshot freshness must use the closed schema")
+    max_age = freshness.get("max_age_seconds")
+    if not isinstance(max_age, int) or isinstance(max_age, bool) or max_age != 900:
+        raise ContinuationPolicyError("capability snapshot max age must be 900 seconds")
     if policy.get("context_pressure_values") != _CONTEXT_PRESSURE:
         raise ContinuationPolicyError("context pressure vocabulary must be canonical")
     if policy.get("blocked_result") != "BLOCKED_CAPABILITY_UNAVAILABLE":
@@ -381,6 +408,12 @@ def _validate_pair(
     if not verify_future_mechanism:
         return
 
+    if disposition == "stop_reinvoke_required" and mechanism_verifier.has_automatic_continuation(
+        trusted_task,
+        trusted_task.expected_next_action,
+    ):
+        raise ContinuationPolicyError("owner reinvocation is invalid while automatic continuation exists")
+
     if mechanism in {"scheduled_task", "work_event_trigger", "work_persistent"}:
         locator = str(snapshot["resume_locator"])
         if not mechanism_verifier.is_live_and_bound(
@@ -390,6 +423,13 @@ def _validate_pair(
             trusted_task.expected_next_action,
         ):
             raise ContinuationPolicyError("automatic worker mechanism is not live/authorized/task/action bound")
+        if disposition == "rotate_resumable" and not mechanism_verifier.proves_replacement_or_persistent_worker(
+            mechanism,
+            locator,
+            trusted_task,
+            trusted_task.expected_next_action,
+        ):
+            raise ContinuationPolicyError("rotate_resumable requires verified replacement or persistent worker")
     elif disposition == "release_waiting" and mechanism == "github_native":
         if not remaining_work_authority.all_remaining_work_can_complete_without_agent_worker(trusted_task):
             raise ContinuationPolicyError("GitHub-native release cannot strand later worker work")
@@ -481,13 +521,23 @@ def _validate_capability_snapshot(
     policy: dict[str, object],
     snapshot: TrustedCapabilitySnapshot,
     required_capability: str | None,
+    current_time: str,
 ) -> None:
     if not isinstance(snapshot, TrustedCapabilitySnapshot):
         raise ContinuationPolicyError("capability evidence must come from the trusted snapshot type")
     if snapshot.required_capability != required_capability:
         raise ContinuationPolicyError("capability snapshot is bound to a different requirement")
-    if not _utc_timestamp(snapshot.observed_at):
-        raise ContinuationPolicyError("capability snapshot timestamp is invalid")
+    observed_at = _parse_utc(snapshot.observed_at)
+    current_at = _parse_utc(current_time)
+    freshness = policy["capability_snapshot_freshness"]
+    assert isinstance(freshness, dict)
+    max_age = freshness["max_age_seconds"]
+    assert isinstance(max_age, int) and not isinstance(max_age, bool)
+    age_seconds = (current_at - observed_at).total_seconds()
+    if age_seconds < 0:
+        raise ContinuationPolicyError("capability snapshot is from the future")
+    if age_seconds > max_age:
+        raise ContinuationPolicyError("capability snapshot is stale")
     if not _unique_nonempty_strings(snapshot.evidence_refs):
         raise ContinuationPolicyError("trusted capability evidence references are required")
     known = set(policy["execution_surfaces"])
@@ -518,7 +568,8 @@ def select_execution_surface(
     validate_policy(policy)
     _validate_trusted_task(trusted_task)
     facts = capability_authority.current_snapshot(trusted_task, required_capability)
-    _validate_capability_snapshot(policy, facts, required_capability)
+    current_time = capability_authority.current_time(trusted_task)
+    _validate_capability_snapshot(policy, facts, required_capability, current_time)
 
     eligible = (
         set(facts.compatible_surfaces)
