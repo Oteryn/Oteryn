@@ -56,6 +56,12 @@ def resolved_authority(
     }
 
 
+def trusted_resolver(repository: str, commit: str) -> dict[str, object] | None:
+    if repository == "Oteryn/Oteryn" and commit == FULL_SHA:
+        return resolved_authority()
+    return None
+
+
 def test_meta_bundle_is_complete_and_self_consistent() -> None:
     policy = central.load_policy(REPO_ROOT)
     assert central.validate_meta_bundle(REPO_ROOT, policy) == []
@@ -118,41 +124,50 @@ def test_meta_ci_wires_central_policy_once_into_existing_meta_gate() -> None:
 
 
 def test_provider_binding_accepts_only_exact_immutable_meta_coordinates() -> None:
-    assert central.validate_provider_binding(valid_binding()) == []
+    policy = central.load_policy(REPO_ROOT)
+    assert central.validate_provider_binding(
+        valid_binding(),
+        policy=policy,
+        authority_resolver=trusted_resolver,
+    ) == []
 
     for bad_commit in ("main", "01234567", FULL_SHA.upper(), "g" * 40, ""):
         malformed = valid_binding()
         malformed["authority_commit"] = bad_commit
-        errors = central.validate_provider_binding(malformed)
+        errors = central.validate_provider_binding(malformed, authority_resolver=trusted_resolver)
         assert "authority_commit must be a lowercase full 40-hex commit SHA" in errors
 
 
 def test_provider_binding_is_closed_and_cannot_fork_meta_identity() -> None:
     malformed = valid_binding()
     malformed["extra_policy"] = "local override"
-    assert "provider binding keys must match the canonical closed schema" in central.validate_provider_binding(malformed)
+    assert "provider binding keys must match the canonical closed schema" in central.validate_provider_binding(
+        malformed,
+        authority_resolver=trusted_resolver,
+    )
 
     malformed = valid_binding()
     malformed["authority_repository"] = "Oteryn/Oteryn-Game"
-    assert "authority_repository must be Oteryn/Oteryn" in central.validate_provider_binding(malformed)
+    assert "authority_repository must be Oteryn/Oteryn" in central.validate_provider_binding(
+        malformed,
+        authority_resolver=trusted_resolver,
+    )
 
     malformed = valid_binding()
     malformed["policy_id"] = "GAME_AGENT_POLICY"
-    assert "policy_id must be OTERYN_ORGANIZATION_AGENT_POLICY" in central.validate_provider_binding(malformed)
+    assert "policy_id must be OTERYN_ORGANIZATION_AGENT_POLICY" in central.validate_provider_binding(
+        malformed,
+        authority_resolver=trusted_resolver,
+    )
 
 
 def test_provider_binding_resolves_and_authenticates_pinned_meta_commit() -> None:
     policy = central.load_policy(REPO_ROOT)
 
-    def resolver(repository: str, commit: str) -> dict[str, object] | None:
-        if repository == "Oteryn/Oteryn" and commit == FULL_SHA:
-            return resolved_authority()
-        return None
-
     assert central.validate_provider_binding(
         valid_binding(),
         policy=policy,
-        authority_resolver=resolver,
+        authority_resolver=trusted_resolver,
     ) == []
 
     nonexistent = valid_binding()
@@ -160,7 +175,7 @@ def test_provider_binding_resolves_and_authenticates_pinned_meta_commit() -> Non
     errors = central.validate_provider_binding(
         nonexistent,
         policy=policy,
-        authority_resolver=resolver,
+        authority_resolver=trusted_resolver,
     )
     assert "authority_commit could not be resolved and authenticated from META" in errors
 
@@ -175,7 +190,10 @@ def test_provider_binding_resolves_and_authenticates_pinned_meta_commit() -> Non
     assert "authority_commit is not verified as merged to protected META main" in errors
 
 
-def test_provider_binding_with_policy_fails_closed_without_authority_resolver() -> None:
+def test_provider_binding_fails_closed_without_authority_resolver() -> None:
+    errors = central.validate_provider_binding(valid_binding())
+    assert "provider binding validation requires an authenticated META authority resolver" in errors
+
     policy = central.load_policy(REPO_ROOT)
     errors = central.validate_provider_binding(valid_binding(), policy=policy)
     assert "provider binding validation requires an authenticated META authority resolver" in errors
@@ -208,6 +226,24 @@ Repository-local safety constraints remain local.
         assert central.validate_provider_overlay(provider, lean, policy=policy) == []
     errors = central.validate_provider_overlay("Oteryn/Oteryn-Gmae", lean, policy=policy)
     assert "provider repository is not allowed by central META policy" in errors
+
+
+def test_provider_overlay_rejects_copied_continuation_authority() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    lean = """# Game agent instructions
+Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation.
+## Domain invariants
+Game-owned safety constraints remain local.
+"""
+    copied = (
+        lean
+        + "\n## Bounded autonomy, retry and continuation\n"
+        + "Local continuation follows ecosystem/agent-continuation-policy.json and "
+        + "docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md.\n"
+    )
+    errors = central.validate_provider_overlay("Oteryn/Oteryn-Game", copied, policy=policy)
+    assert "provider overlay must not copy organization-wide policy sections" in errors
+    assert "provider overlay must not directly redefine META machine modules" in errors
 
 
 def test_legacy_provider_adoption_validator_delegates_to_central_lean_overlay() -> None:
@@ -256,7 +292,11 @@ def test_binding_paths_must_match_central_policy() -> None:
     policy = central.load_policy(REPO_ROOT)
     malformed = copy.deepcopy(valid_binding())
     malformed["prompting_standard_path"] = "docs/agents/PROMPTING_STANDARD.md"
-    errors = central.validate_provider_binding(malformed, policy=policy)
+    errors = central.validate_provider_binding(
+        malformed,
+        policy=policy,
+        authority_resolver=trusted_resolver,
+    )
     assert "provider binding canonical paths must match META policy" in errors
 
 
