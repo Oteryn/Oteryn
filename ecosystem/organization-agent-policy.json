@@ -41,13 +41,19 @@
     "## Canonical Codex review routing",
     "## Parallel-agent Git concurrency",
     "## GitHub-first execution",
-    "## Bounded autonomy, retry and continuation"
+    "## Bounded autonomy, retry and continuation",
+    "## Live state\n\nGitHub live repository, branch, Issue, PR, review and check state is authoritative for lifecycle facts.",
+    "## Execution shape\n\nUse `single_agent` when one capable worker is proportionate.",
+    "## Integration\n\nGitHub protected-branch enforcement, the repository's single aggregate gate and GitHub Merge Queue are integration authority where configured."
   ],
   "forbidden_task_prompt_sections": [
     "## Remote Desktop execution routing",
     "## Canonical Codex review routing",
     "## Parallel-agent Git concurrency",
     "## GitHub-first execution",
-    "## Bounded autonomy, retry and continuation"
+    "## Bounded autonomy, retry and continuation",
+    "## Live state\n\nGitHub live repository, branch, Issue, PR, review and check state is authoritative for lifecycle facts.",
+    "## Execution shape\n\nUse `single_agent` when one capable worker is proportionate.",
+    "## Integration\n\nGitHub protected-branch enforcement, the repository's single aggregate gate and GitHub Merge Queue are integration authority where configured."
   ]
 }
