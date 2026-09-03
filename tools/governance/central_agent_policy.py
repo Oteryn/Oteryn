@@ -413,6 +413,7 @@ def validate_provider_overlay(
         "ecosystem/agent-continuation-policy.json",
         "docs/governance/ai_review_policy.md",
         "docs/agents/contracts/agent_execution_access_and_continuation_policy.md",
+        "docs/agents/contracts/bounded_autonomous_execution_policy.md",
         "docs/agents/contracts/persistent_autonomous_continuation_policy.md",
     )
     if any(module in lowered for module in direct_modules):
@@ -437,15 +438,31 @@ def validate_task_prompt_text(
             "## Canonical Codex review routing",
             "## GitHub-first execution",
             "## Parallel-agent Git concurrency",
+            "## Bounded autonomy, retry and continuation",
         ]
     )
     if _contains_forbidden_section(text, sections):
         errors.append("task prompt must not copy organization-wide policy sections")
 
     lowered = text.lower()
-    if "codex_review_policy.json" in lowered or "owner_funded_ai_policy" in lowered:
+    ai_review_modules = (
+        "codex_review_policy.json",
+        "owner_funded_ai_policy",
+        "docs/governance/ai_review_policy.md",
+    )
+    if any(module in lowered for module in ai_review_modules):
         errors.append("task prompt must not embed global AI-review policy")
-    if "remote_desktop_commander." in lowered or "ecosystem/agent-execution-routing-policy.json" in lowered:
+
+    execution_and_continuation_modules = (
+        "remote_desktop_commander.",
+        "ecosystem/agent-execution-routing-policy.json",
+        "ecosystem/bounded-autonomous-execution-policy.json",
+        "ecosystem/agent-continuation-policy.json",
+        "docs/agents/contracts/agent_execution_access_and_continuation_policy.md",
+        "docs/agents/contracts/bounded_autonomous_execution_policy.md",
+        "docs/agents/contracts/persistent_autonomous_continuation_policy.md",
+    )
+    if any(module in lowered for module in execution_and_continuation_modules):
         errors.append("task prompt must not embed global execution-routing policy")
     return errors
 
