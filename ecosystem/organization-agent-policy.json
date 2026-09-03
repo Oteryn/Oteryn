@@ -47,6 +47,7 @@
     "## Remote Desktop execution routing",
     "## Canonical Codex review routing",
     "## Parallel-agent Git concurrency",
-    "## GitHub-first execution"
+    "## GitHub-first execution",
+    "## Bounded autonomy, retry and continuation"
   ]
 }
