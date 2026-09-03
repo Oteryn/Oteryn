@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 from pathlib import Path
+import tempfile
 
 MODULE_PATH = Path(__file__).with_name("central_agent_policy.py")
 SPEC = importlib.util.spec_from_file_location("central_agent_policy", MODULE_PATH)
@@ -32,6 +33,33 @@ def valid_binding() -> dict[str, object]:
 def test_meta_bundle_is_complete_and_self_consistent() -> None:
     policy = central.load_policy(REPO_ROOT)
     assert central.validate_meta_bundle(REPO_ROOT, policy) == []
+
+
+def test_meta_bundle_rejects_empty_forbidden_section_lists() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    for key in ("forbidden_provider_sections", "forbidden_task_prompt_sections"):
+        malformed = copy.deepcopy(policy)
+        malformed[key] = []
+        errors = central.validate_meta_bundle(REPO_ROOT, malformed)
+        assert f"{key} must be a non-empty string list" in errors
+
+
+def test_meta_bundle_reports_missing_human_surface_without_throwing() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        for relative in policy["machine_authorities"]:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("authority\n", encoding="utf-8")
+        for relative in policy["canonical_human_surfaces"].values():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("placeholder\n", encoding="utf-8")
+        missing = root / policy["canonical_human_surfaces"]["organization_policy"]
+        missing.unlink()
+        errors = central.validate_meta_bundle(root, policy)
+        assert "missing or empty central human policy surface: docs/agents/policy/ORGANIZATION_AGENT_POLICY.md" in errors
 
 
 def test_provider_binding_accepts_only_exact_immutable_meta_coordinates() -> None:
