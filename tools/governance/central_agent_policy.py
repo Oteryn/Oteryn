@@ -323,6 +323,8 @@ def validate_provider_binding(
     valid_authority_commit = isinstance(authority_commit, str) and SHA_RE.fullmatch(authority_commit) is not None
     if not valid_authority_commit:
         errors.append("authority_commit must be a lowercase full 40-hex commit SHA")
+    if authority_resolver is None:
+        errors.append("provider binding validation requires an authenticated META authority resolver")
 
     expected_paths = EXPECTED_SURFACES
     actual_paths = {
@@ -339,8 +341,6 @@ def validate_provider_binding(
         if policy.get("canonical_human_surfaces") != actual_paths:
             if "provider binding canonical paths must match META policy" not in errors:
                 errors.append("provider binding canonical paths must match META policy")
-        if authority_resolver is None:
-            errors.append("provider binding validation requires an authenticated META authority resolver")
 
     if authority_resolver is not None and valid_authority_commit and binding.get("authority_repository") == AUTHORITY_REPOSITORY:
         try:
@@ -395,6 +395,7 @@ def validate_provider_overlay(
             "## Canonical Codex review routing",
             "## Parallel-agent Git concurrency",
             "## GitHub-first execution",
+            "## Bounded autonomy, retry and continuation",
         ]
     )
     if _contains_forbidden_section(text, sections):
@@ -409,8 +410,10 @@ def validate_provider_overlay(
     direct_modules = (
         "ecosystem/agent-execution-routing-policy.json",
         "ecosystem/bounded-autonomous-execution-policy.json",
+        "ecosystem/agent-continuation-policy.json",
         "docs/governance/ai_review_policy.md",
         "docs/agents/contracts/agent_execution_access_and_continuation_policy.md",
+        "docs/agents/contracts/persistent_autonomous_continuation_policy.md",
     )
     if any(module in lowered for module in direct_modules):
         errors.append("provider overlay must not directly redefine META machine modules")
