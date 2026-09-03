@@ -62,6 +62,35 @@ def test_meta_bundle_reports_missing_human_surface_without_throwing() -> None:
         assert "missing or empty central human policy surface: docs/agents/policy/ORGANIZATION_AGENT_POLICY.md" in errors
 
 
+def test_meta_bundle_tracks_current_continuation_and_skill_precedence() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    machine_authorities = policy["machine_authorities"]
+    for relative in (
+        "ecosystem/agent-continuation-policy.json",
+        "docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md",
+    ):
+        assert relative in machine_authorities
+
+    text = (REPO_ROOT / "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md").read_text(encoding="utf-8")
+    for marker in (
+        "WAITING_EXTERNAL",
+        "STALLED",
+        "no-op/retrigger",
+        "subordinate execution aids",
+        "additional approval gates",
+        "duplicate planning artifacts",
+    ):
+        assert marker in text
+
+
+def test_meta_ci_wires_central_policy_once_into_existing_meta_gate() -> None:
+    text = (REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert text.count("python3 tools/governance/test_central_agent_policy.py") == 1
+    assert text.count("python3 tools/governance/central_agent_policy.py") == 1
+    assert "Path('ecosystem/organization-agent-policy.json')" in text
+    assert "Path('docs/agents/policy/ORGANIZATION_AGENT_POLICY.md')" in text
+
+
 def test_provider_binding_accepts_only_exact_immutable_meta_coordinates() -> None:
     assert central.validate_provider_binding(valid_binding()) == []
 
