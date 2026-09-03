@@ -1,6 +1,6 @@
 # Oteryn Organization Agent Policy
 
-Policy ID: `OTERYN_ORGANIZATION_AGENT_POLICY`  
+Policy ID: `OTERYN_ORGANIZATION_AGENT_POLICY`
 Policy version: `3.0.0`
 
 This is the organization-wide semantic entry point for agent execution when it is present on protected META `main`. The governing principle is **one rule, one authority**: organization semantics live in META, provider repositories bind to an immutable META commit, and task prompts carry only task-specific deltas.
