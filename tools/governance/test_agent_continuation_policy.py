@@ -185,15 +185,18 @@ class FakeMechanismVerifier:
         *,
         live_bound: bool = True,
         replacement_worker: bool = True,
+        automatic_available: bool = False,
         historical_event: bool = True,
         owner_reinvoke: bool = True,
     ) -> None:
         self.live_bound = live_bound
         self.replacement_worker = replacement_worker
+        self.automatic_available = automatic_available
         self.historical_event = historical_event
         self.owner_reinvoke = owner_reinvoke
         self.live_calls: list[tuple[str, str, TrustedTaskIdentity, str]] = []
         self.replacement_calls: list[tuple[str, str, TrustedTaskIdentity, str]] = []
+        self.automatic_calls = 0
         self.event_calls = 0
         self.owner_calls = 0
 
@@ -216,6 +219,14 @@ class FakeMechanismVerifier:
     ) -> bool:
         self.replacement_calls.append((mechanism, locator, trusted, expected_next_action))
         return self.replacement_worker
+
+    def has_automatic_continuation(
+        self,
+        trusted: TrustedTaskIdentity,
+        expected_next_action: str,
+    ) -> bool:
+        self.automatic_calls += 1
+        return self.automatic_available
 
     def verify_historical_resume_event(
         self, historical: dict[str, object], trusted: TrustedTaskIdentity
@@ -243,15 +254,26 @@ class FakeRemainingWorkAuthority:
 
 
 class FakeCapabilityAuthority:
-    def __init__(self, result: TrustedCapabilitySnapshot) -> None:
+    def __init__(
+        self,
+        result: TrustedCapabilitySnapshot,
+        *,
+        current_time: str = "2026-09-02T18:10:00Z",
+    ) -> None:
         self.result = result
+        self._current_time = current_time
         self.calls: list[tuple[TrustedTaskIdentity, str | None]] = []
+        self.time_calls = 0
 
     def current_snapshot(
         self, trusted: TrustedTaskIdentity, required_capability: str | None
     ) -> TrustedCapabilitySnapshot:
         self.calls.append((trusted, required_capability))
         return self.result
+
+    def current_time(self, trusted: TrustedTaskIdentity) -> str:
+        self.time_calls += 1
+        return self._current_time
 
 
 def capability_snapshot(
@@ -670,6 +692,7 @@ class PersistentContinuationTests(unittest.TestCase):
         )
         self.assertEqual(selected, "chat")
         self.assertEqual(len(authority.calls), 1)
+        self.assertEqual(authority.time_calls, 1)
 
     def test_selector_respects_capability_compatibility_and_authorization(self) -> None:
         work = FakeCapabilityAuthority(
