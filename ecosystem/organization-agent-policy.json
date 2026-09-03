@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "policy_id": "OTERYN_ORGANIZATION_AGENT_POLICY",
+  "policy_version": "3.0.0",
+  "authority_repository": "Oteryn/Oteryn",
+  "canonical_human_surfaces": {
+    "organization_policy": "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md",
+    "prompting_standard": "docs/agents/policy/PROMPTING_STANDARD.md",
+    "prompt_eval_standard": "docs/agents/policy/PROMPT_EVAL_STANDARD.md"
+  },
+  "machine_authorities": [
+    "ecosystem/agent-execution-routing-policy.json",
+    "ecosystem/bounded-autonomous-execution-policy.json",
+    "docs/governance/AI_REVIEW_POLICY.md",
+    "docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md",
+    "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md"
+  ],
+  "provider_binding_schema": {
+    "schema_version": 1,
+    "required_keys": [
+      "authority_commit",
+      "authority_repository",
+      "organization_policy_path",
+      "policy_id",
+      "policy_version",
+      "prompt_eval_standard_path",
+      "prompting_standard_path",
+      "schema_version"
+    ],
+    "authority_commit_pattern": "^[0-9a-f]{40}$",
+    "allowed_providers": [
+      "Oteryn/Oteryn-Atlas",
+      "Oteryn/Oteryn-Game",
+      "Oteryn/Oteryn-Platform"
+    ]
+  },
+  "forbidden_provider_sections": [
+    "## Remote Desktop execution routing",
+    "## Canonical Codex review routing",
+    "## Parallel-agent Git concurrency",
+    "## GitHub-first execution"
+  ],
+  "forbidden_task_prompt_sections": [
+    "## Remote Desktop execution routing",
+    "## Canonical Codex review routing",
+    "## Parallel-agent Git concurrency",
+    "## GitHub-first execution"
+  ]
+}
