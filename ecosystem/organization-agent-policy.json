@@ -11,9 +11,11 @@
   "machine_authorities": [
     "ecosystem/agent-execution-routing-policy.json",
     "ecosystem/bounded-autonomous-execution-policy.json",
+    "ecosystem/agent-continuation-policy.json",
     "docs/governance/AI_REVIEW_POLICY.md",
     "docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md",
-    "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md"
+    "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md",
+    "docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md"
   ],
   "provider_binding_schema": {
     "schema_version": 1,
