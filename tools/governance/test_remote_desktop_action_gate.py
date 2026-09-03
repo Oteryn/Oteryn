@@ -434,33 +434,33 @@ def test_device_id_is_bound_to_exact_call() -> None:
 
 def test_provider_policy_adoption_rejects_historical_parallel_first_contract() -> None:
     stale = (
-        "The canonical organization policy is "
-        "Oteryn/Oteryn@8fac1d55805fc3372351ea0a55ad7728b3570ebc:ecosystem/agent-execution-routing-policy.json. "
+        "Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation. "
+        "The local authority is ecosystem/agent-execution-routing-policy.json. "
         "A substantial task packet must plan parallel-first. Serial work requires an explicit reason."
     )
-    errors = adoption.validate_provider_agents_text("Game", stale)
-    assert "historical META execution-policy pin is forbidden" in errors
+    errors = adoption.validate_provider_agents_text("Oteryn/Oteryn-Game", stale)
     assert "parallel-first execution wording is forbidden" in errors
+    assert "provider overlay must not directly redefine META machine modules" in errors
 
 
-def test_provider_policy_adoption_rejects_lowercase_historical_pin() -> None:
+def test_provider_policy_adoption_rejects_direct_meta_module_contract() -> None:
     stale = (
-        "The current protected META execution policy is "
-        "oteryn/oteryn@8fac1d55805fc3372351ea0a55ad7728b3570ebc:ecosystem/agent-execution-routing-policy.json. "
+        "Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation. "
+        "The current protected META execution policy is ecosystem/agent-execution-routing-policy.json. "
         "Use `single_agent` by default and `parallel_when_beneficial` when useful."
     )
-    errors = adoption.validate_provider_agents_text("Platform", stale)
-    assert "historical META execution-policy pin is forbidden" in errors
+    errors = adoption.validate_provider_agents_text("Oteryn/Oteryn-Platform", stale)
+    assert "provider overlay must not directly redefine META machine modules" in errors
 
 
-def test_provider_policy_adoption_accepts_live_effort_aware_contract() -> None:
+def test_provider_policy_adoption_accepts_central_binding_overlay() -> None:
     current = (
-        "The canonical organization execution-routing policy is the current protected `main` version of "
-        "`Oteryn/Oteryn:ecosystem/agent-execution-routing-policy.json`; historical commit pins are not authority. "
-        "Choose `single_agent` normally when one worker is proportionate and use `parallel_when_beneficial` only "
-        "when at least two materially independent workstreams justify the coordination cost."
+        "# Atlas agent instructions\n\n"
+        "Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation.\n\n"
+        "## Domain invariants\n"
+        "Projection, provenance, rendering and deployment-revision constraints remain Atlas-owned.\n"
     )
-    assert adoption.validate_provider_agents_text("Atlas", current) == []
+    assert adoption.validate_provider_agents_text("Oteryn/Oteryn-Atlas", current) == []
 
 
 if __name__ == "__main__":
