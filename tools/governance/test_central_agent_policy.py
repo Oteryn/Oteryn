@@ -246,6 +246,17 @@ Game-owned safety constraints remain local.
     assert "provider overlay must not directly redefine META machine modules" in errors
 
 
+def test_provider_overlay_rejects_copied_bounded_execution_contract() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    copied = """# Game agent instructions
+Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation.
+## Local lifecycle constraints
+Local retry authority is docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md.
+"""
+    errors = central.validate_provider_overlay("Oteryn/Oteryn-Game", copied, policy=policy)
+    assert "provider overlay must not directly redefine META machine modules" in errors
+
+
 def test_legacy_provider_adoption_validator_delegates_to_central_lean_overlay() -> None:
     lean = """# Atlas agent instructions
 Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation.
@@ -286,6 +297,23 @@ Focused persistence regression plus exact-head repository gate.
     errors = central.validate_task_prompt_text(copied)
     assert "task prompt must not copy organization-wide policy sections" in errors
     assert "task prompt must not embed global AI-review policy" in errors
+
+
+def test_task_prompt_rejects_copied_bounded_continuation_and_ai_authority() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    copied = """ROLE / OUTCOME
+Repair the allocated task.
+
+## Bounded autonomy, retry and continuation
+Follow ecosystem/agent-continuation-policy.json,
+docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md,
+docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md,
+and docs/governance/AI_REVIEW_POLICY.md as local task controllers.
+"""
+    errors = central.validate_task_prompt_text(copied, policy=policy)
+    assert "task prompt must not copy organization-wide policy sections" in errors
+    assert "task prompt must not embed global AI-review policy" in errors
+    assert "task prompt must not embed global execution-routing policy" in errors
 
 
 def test_binding_paths_must_match_central_policy() -> None:
