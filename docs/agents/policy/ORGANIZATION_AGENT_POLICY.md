@@ -33,9 +33,21 @@ Repository-native GitHub/GitHub Actions and an authorized isolated workspace are
 
 ## Bounded autonomy, retry and continuation
 
-`ecosystem/bounded-autonomous-execution-policy.json` and `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md` own bounded retry/progress semantics. Continue while a safe authorized next action exists. Do not create no-op/retrigger commits, repeated unchanged heavy validation or owner questions merely to demonstrate activity.
+`ecosystem/bounded-autonomous-execution-policy.json` and `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md` own bounded lifecycle, retry, progress, evidence and freeze semantics. `ecosystem/agent-continuation-policy.json` and `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` own persistent continuation validation and resume mechanics, subordinate to that bounded authority; continuation must not redefine bounded states, reset or enlarge retry/evidence truth, or claim background continuation without a verified resume mechanism.
+
+Continue while a safe authorized next action exists. Freeze an exact candidate before final qualification and do not mutate it solely to retrigger CI, review, mergeability, polling, status calculation or checkpoint publication. No-op/retrigger commits, checkpoint-only churn and repeated unchanged heavy validation are not progress.
+
+When only an authenticated external event can change material state, record the waiting reason and next event, transition to `WAITING_EXTERNAL` under the bounded authority and release active ownership instead of polling. Repeated materially unchanged failures remain bounded; when the applicable retry budget is exhausted without new evidence, transition to `STALLED` rather than repeat the action. Neither `WAITING_EXTERNAL` nor `STALLED` implies merge readiness.
 
 A checkpoint is durable recovery state, not a mandatory pause. Generic handoffs record coordinates and material state only; they do not contain copies of organization policy.
+
+## External execution skills
+
+Repository, task and user authority govern execution. Skills, plugins and workflow frameworks such as Superpowers are subordinate execution aids, not independent task, lifecycle, review or merge authority.
+
+For already-authorized work with an approved canonical design, implementation plan, checkpoint or explicit continuation directive, an execution skill must not introduce additional approval gates, re-brainstorm an approved decision, require duplicate planning artifacts, replace canonical authority, or interrupt authorized continuation solely because its default workflow would do so. Such aids may still support implementation, testing, debugging, review, isolation or verification when they remain consistent with the governing Oteryn authority.
+
+An execution skill must never weaken repository safety, validation, GitHub-first, review, authorization, production or integration requirements. When a skill workflow conflicts with applicable higher-priority Oteryn authority, that authority controls.
 
 ## AI review
 
