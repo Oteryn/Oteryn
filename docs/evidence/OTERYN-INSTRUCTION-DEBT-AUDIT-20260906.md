@@ -1,528 +1,316 @@
-# Oteryn — instruction-debt audit: GPT-6 Astra / GPT-5.6 Sol
+# Oteryn — instruction debt: koszt, złożoność i skuteczność
 
-Data audytu: 2026-09-06.
-Klasa: AUDIT_EVIDENCE — propozycje do przeglądu, nie polityka wykonawcza.
-Alias: `Oteryn: instruction debt audit`.
-Wejście aliasu: [OTERYN-INSTRUCTION-DEBT-AUDIT.md](../agents/prompts/OTERYN-INSTRUCTION-DEBT-AUDIT.md).
+Data: 2026-09-06. Rewizja raportu: 2 — niezależna inspekcja źródeł i ograniczone próby deterministyczne.
+Klasa: `AUDIT_EVIDENCE`. Rekomendacje nie są polityką wykonawczą ani zgodą na ich wdrożenie.
+Alias: [Oteryn: instruction debt audit](../agents/prompts/OTERYN-INSTRUCTION-DEBT-AUDIT.md).
 
-Audyt przeprowadzono tylko do odczytu. Późniejsze polecenie użytkownika upoważniło do zapisania raportu i aliasu w META; nie upoważniło do wdrożenia zaleceń ani zmian providerów, CI, ustawień lub produkcji. Stan opisany poniżej jest snapshotem audytu, nie obietnicą aktualności przy kolejnym użyciu. Przed decyzją odśwież tylko materialne, zmienne fakty.
+Aktualne polecenie użytkownika upoważnia do audytu i aktualizacji raportu w istniejącym META PR #151. Nie upoważnia do zmian polityk, CI, ustawień, repozytoriów produktowych ani produkcji. Zachowano identyfikatory D1–D17; dodano D18–D21. Pełny poprzedni raport, proponowane brzmienia i jego inwentaryzacja pozostają w [historycznej rewizji a08e0795](https://github.com/Oteryn/Oteryn/blob/a08e0795c49d62c5e2e33e1013444e245c661770/docs/evidence/OTERYN-INSTRUCTION-DEBT-AUDIT-20260906.md).
 
-Legenda:
-- FACT — bezpośrednio potwierdzone treścią lub odczytem GitHub.
-- HYPOTHESIS — przewidywane zachowanie, nie rezultat wykonanego scenariusza.
-- UNKNOWN — brak danych lub dostępu.
-- RECOMMENDATION — proponowana zmiana.
+Legenda: **FACT** — odczyt lub wykonana próba; **INFERENCE** — wniosek z dowodów; **HYPOTHESIS** — przewidywany efekt bez próby zachowania agenta; **UNKNOWN** — brak danych; **RECOMMENDATION** — propozycja. Stan jest snapshotem. Przed decyzją odświeżyć tylko materialne zmienne fakty.
 
 ## A. EXECUTIVE FINDINGS
 
-Audyt systemowy objął wszystkie pięć repozytoriów Oteryn widocznych przez połączenie GitHub. Największy pozostały dług wynika z równoległego utrzymywania nowych zasad i starszych instrukcji wykonawczych. Usunięcie Superpowers nie rozwiązało tych konfliktów.
+**RECOMMENDATION:** optymalizować całkowity koszt poprawnie zakończonego zadania, nie samą długość promptu. Koszt obejmuje kontekst, wywołania narzędzi, koordynację, CI, poprawki, odtworzenie stanu i udział człowieka. Krótsze instrukcje, które pomijają granicę uprawnień lub blokują poprawną pracę, nie są optymalizacją.
 
-FACT — zakres dowodów: pełne, nieucięte drzewa pięciu repozytoriów; wszystkie osiem znalezionych AGENTS.md; 122 pliki promptów; 29 plików aktywnych checkpointów; główne polityki, programy i definicje workflow. Łącznie pobrano 345 różnych plików repozytoryjnych. Duże kolekcje objęto inwentaryzacją, przeszukaniem treści i szczegółową inspekcją istotnych fragmentów. Nie jest to pełne code review każdego pliku.
-
-| Priorytet | Potwierdzony problem | Znaczenie |
+| Priorytet | Ustalenie | Znaczenie |
 | --- | --- | --- |
-| Wysoki | Game zachowuje instrukcje starego kontrolera review, choć root i JSON go wycofały | Sprzeczne wymagania i dodatkowe rozstrzyganie authority |
-| Wysoki | META wiąże software_development_loop wyłącznie z codex; Platform kieruje implementację z Work do Codex | Możliwe niepotrzebne handoffy mimo dostępnych narzędzi |
-| Wysoki | Game i Platform nadal mają obowiązkowe parallel-first | Brak jednolitej, proporcjonalnej delegacji |
-| Wysoki | 13 checkpointów Game w tasks/active wskazuje zamknięte Issues | Nieaktualne instrukcje wznowienia |
-| Średni–wysoki | Konkurujące reguły końca, retry i oczekiwania | Możliwy przedwczesny BLOCKED lub rotacja |
-| Średni–wysoki | Atlas maintenance opisuje inny required check niż live ruleset | Ryzyko oczekiwania na niewłaściwą bramkę |
-| Średni | Duplikacja w bootstrapie Platform | Duży obowiązkowy kontekst |
-| Średni | Model i effort w 19 promptach Game | Role związane ze starszym profilem wykonania |
-| Średni | Dwa problemy walidacji w META #145 | Centralizacja nie jest jeszcze spójnie egzekwowana |
+| Wysoki | D15/D19: walidator #145 zarówno przepuszcza sprzeczne nakazy, jak i odrzuca poprawne wskazanie pliku do audytu | Naprawić kontrakt i przypadki dodatnie, nie tylko dopisywać regexy |
+| Wysoki, warunkowy | D18: Platform root + nested AGENTS to 35 209 B wobec domyślnego limitu loadera 32 768 B | Ryzyko niepełnego załadowania; rzeczywista konfiguracja użytkownika jest nieznana |
+| Wysoki | D1/D3/D5/D6/D9: równoległe stare i nowe zasady review, delegacji oraz kontynuacji | Usuwać źródła rozbieżnych decyzji, zachowując safety i historię |
+| Przed adopcją | D20/D21: dowód ancestry nie jest dowodem protection; zielony test biblioteki nie dowodzi adopcji przez produkty | Precyzyjnie określić, co zweryfikowano |
+| Średni–wysoki | D10: dokumentacja Atlas wymienia inny required context niż ruleset | Uzgodnić instrukcje z rzeczywistym enforcementem, bez jego osłabiania |
+| Koszt do zmierzenia | D7/D14: duży obowiązkowy bootstrap oraz pełna kwalifikacja Game MQ | Oddzielić zmniejszenie kontekstu od osobnej optymalizacji CI |
 
-RECOMMENDATION: dokończyć istniejącą centralizację #142/#145, usunąć sprzeczne powtórzenia i uporządkować aktywne checkpointy. Nie tworzyć kolejnego systemu orkiestracji.
+FACT: uruchomiono 10 celowo dobranych prób skopiowanych funkcji walidatora; 7 wyników różni się od jawnie zdefiniowanego oczekiwania audytu. To kontrprzykłady z trzema kontrolami, nie 70% awaryjności systemu ani benchmark Astry. Szczegóły w E.
 
-UNKNOWN: pełne branch protection META i Platform, konfiguracja innych instalacji Chat/Work/Codex i zewnętrznych harnessów oraz niewidoczne ustawienia organizacyjne. Nie twierdzimy, że wszystkie powierzchnie ładują identyczne instrukcje.
+**Zmiana poprzedniej rekomendacji:** nie wystarczy „naprawić dwa regexy i scalić #145”. Potrzebne są również pozytywne przypadki legalnych zadań, zgodność deklarowanego dowodu ze sprawdzanym faktem oraz osobny dowód rzeczywistej adopcji. Nie tworzyć w tym celu kolejnego systemu orkiestracji lub usług zatwierdzających.
 
-## B. INSTRUCTION INVENTORY
+## B. INSTRUCTION INVENTORY AND EVIDENCE BOUNDARY
 
-### Repozytoria i rewizje
+### B1. Rewizje
 
-FACT: wyszukiwanie organizacyjne zwróciło pięć repozytoriów; kolejna strona była pusta. Drugie wyszukiwanie w instalacjach potwierdziło te same współrzędne. Manifest META wskazuje cztery produkty i jeden administracyjny backup. Nie jest to administracyjny dowód braku innych niewidocznych repozytoriów prywatnych.
-
-| Repozytorium | Badany main | Root AGENTS.md | Nested |
-| --- | --- | ---: | ---: |
-| Oteryn/Oteryn | 0c493896040072badeff1f333eb83d7114a993ff | 17 240 B | 0 |
-| Oteryn/Oteryn-Game | 9be69b4e0a06f3978d5c5c5603ca3e5670a9f18a | 15 437 B | 3 |
-| Oteryn/Oteryn-Platform | 3b2ea1c7392187d5d22488673073dc8f8305a374 | 26 661 B | 1 |
-| Oteryn/Oteryn-Atlas | 51623c7dab2346cee39cd51e3caa845bf4b65426 | 22 060 B | 0 |
-| Oteryn/Oteryn-Platform-Migration-Backup-20260818 | 6da4f83ef6a35afbab3332f90d7c7f171d23d235 | brak | 0 |
-
-Nested:
-- Game: apps/game-server/AGENTS.md
-- Game: crates/simulation-determinism/AGENTS.md
-- Game: docs/agents/AGENTS.md
-- Platform: docs/agents/AGENTS.md
-
-W badanych drzewach nie znaleziono AGENTS.override.md, repozytoryjnych SKILL.md ani typowych konfiguracji .codex/.claude/.cursor. Ustalenie nie dotyczy wszystkich historycznych branchy.
-
-### Źródła i aktywacja
-
-| Źródło | Aktywacja | Inspekcja i granice |
+| Oznaczenie | Repozytorium | Odczytana rewizja |
 | --- | --- | --- |
-| Instrukcje bieżącej sesji Work | ALWAYS ACTIVE | Dostępna warstwa sesji; nie eksport całej konfiguracji usług |
-| Lokalny config.toml Codex | MODEL/EXECUTION PROFILE | Bezpieczny podzbiór bez credentials |
-| Root AGENTS.md | SCOPE ACTIVE w repo | Wszystkie; GitHub, routing, review, retry i authority |
-| Nested AGENTS.md | SCOPE ACTIVE dla ścieżki; czasem wymuszone routerem | Wszystkie |
-| META docs/agents/contracts/* | TASK ACTIVATED; część obowiązkowa przez root | Zbadane |
-| META ecosystem/*policy.json | TASK ACTIVATED / wejście walidatorów | Zbadane |
-| Bootstrap i router Platform | SCOPE ACTIVE przez root | Zbadane; powielają specjalizacje |
-| docs/agents/prompts/*.md | LOAD ON DEMAND / TASK ACTIVATED | 122 pobrane/przeszukane; istotne szczegółowo |
-| Programy i role | TASK ACTIVATED | Dostępne programy Markdown zbadane |
-| tasks/active/*.md | TASK ACTIVATED przy wznowieniu | 29 plików |
-| .github/workflows/* | Zdarzenia GitHub | Definicje pobrane; istotne bramki prześledzone |
-| Archiwa i evidence | LEGACY / UNCERTAIN do jawnego użycia | Inwentaryzacja, wybrane dokumenty; nie każdy historyczny plik |
-| Backup RECOVERY_EVIDENCE.md | LOAD ON DEMAND przy recovery | Zbadany; nie jest product authority |
-| Katalog skilli sesji | DISCOVERY METADATA | Opisy przeanalizowane |
-| Wybrane SKILL.md | LOAD ON DEMAND | 8 wejść, istotne fragmenty i wybrane odsyłacze |
-| Inny Chat, Codex, zewnętrzne harnessy | INACCESSIBLE / UNKNOWN | Brak pełnej konfiguracji |
+| M | Oteryn/Oteryn main | `0c493896040072badeff1f333eb83d7114a993ff` |
+| G | Oteryn/Oteryn-Game main | `53c6bdf06a2282d893035a995c46052c88f935b4` |
+| P | Oteryn/Oteryn-Platform main | `3b2ea1c7392187d5d22488673073dc8f8305a374` |
+| A | Oteryn/Oteryn-Atlas main | `51623c7dab2346cee39cd51e3caa845bf4b65426` |
+| V | META PR #145, nadal Draft | `697233ed2b0a6495e1c897be9b70ffc2d7ae3428` |
+| R0 | Raport i alias przed aktualizacją, PR #151 Draft | `a08e0795c49d62c5e2e33e1013444e245c661770` |
 
-FACT — rozmiary:
-- Platform root + bootstrap + router: 51 868 B.
-- Z Platform docs/agents/AGENTS.md: 60 416 B.
-- META root + access/continuation + bounded: 46 544 B.
-- Same cztery rooty: 81 398 B.
+M, P i A są zgodne z poprzednim raportem. Porównanie G od `9be69b4e0a06f3978d5c5c5603ca3e5670a9f18a` obejmuje dwa commity i 12 ścieżek. Backup `Oteryn/Oteryn-Platform-Migration-Backup-20260818` pozostaje w historycznym zakresie raportu; jego stanu nie odświeżano w tej rewizji audytu.
 
-To bajty plików, nie pomiar tokenów ani oszczędności. Cztery rooty nie są automatycznie ładowane do zwykłego zadania jednego repo.
+### B2. Faktyczny zakres tej inspekcji
 
-### Dostęp i enforcement
+Ponownie przeczytano istotne źródła: root M/G oraz odpowiednie fragmenty root P/A; kontrakty access, bounded i persistent w M; JSON continuation; centralny kontrakt i standard promptów V; funkcje centralnego walidatora i workflow V; polityki review G; anti-stall G; bootstrap P; maintenance document i validator A; macierz CI G. Sprawdzono także rozmiary plików P, aktualny ruleset Atlas, PR #145/#151, dyskusję #151, porównanie G i zarchiwizowany checkpoint #346. Odczytano historyczny run CI i dokumentację OpenAI.
 
-FACT:
-- Game ruleset 20991995: game-gate, Merge Queue, resolution wątków, brak bypass actors.
-- Atlas rulesety 22103758 i 22352928: Merge Queue oraz protected maintenance audit.
-- META i Platform: branches/main/protection zwracało 403 Resource not accessible by integration.
-- Puste listy rulesetów META/Platform nie dowodzą braku klasycznego branch protection.
-- Archiwalny backup ma jeden plik RECOVERY_EVIDENCE.md, nie ma AGENTS.md i nie jest normative product authority.
+Poprzednie liczby 345 plików, 122 promptów, osiem AGENTS i 19 promptów z profilami modeli są **historyczną inwentaryzacją R0**, nie liczbą ponownie przejrzanych źródeł ani pomiarem ładowania w tej sesji. D8, D12, D13 i część D16 zachowano jako ustalenia bazowe, bez ponownego pełnego przeglądu ich kolekcji. Nie wykonano ponownego audytu całej konfiguracji organizacyjnej ani wszystkich archiwów.
 
-Źródła:
-- [Manifest repozytoriów META](https://github.com/Oteryn/Oteryn/blob/0c493896040072badeff1f333eb83d7114a993ff/ecosystem/repositories.json)
-- [Game ruleset](https://github.com/Oteryn/Oteryn-Game/rules/20991995)
-- [Atlas repository ruleset](https://github.com/Oteryn/Oteryn-Atlas/rules/22103758)
-- [Atlas organization ruleset](https://github.com/Oteryn/Oteryn-Atlas/rules/22352928)
+### B3. Rozmiar i aktywacja
+
+| Platform P | Bajty UTF-8 z metadanych GitHub |
+| --- | ---: |
+| `AGENTS.md` | 26 661 |
+| `docs/agents/AGENTS.md` | 8 548 |
+| Suma tych dwóch plików | 35 209 |
+| `docs/agents/PLATFORM_AGENT_BOOTSTRAP.md` | 18 025 |
+| `docs/agents/CONTEXT_ROUTING.md` | 7 182 |
+| Root + bootstrap + router | 51 868 |
+| Powyższe + nested AGENTS | 60 416 |
+
+To rozmiary źródeł, nie telemetryka tokenów. Automatycznie odkrywany łańcuch AGENTS i dokumenty jawnie doczytywane przez agenta to różne mechanizmy. Nie należy porównywać całych 60 416 B z limitem automatycznego loadera.
+
+Root/nested są aktywne zgodnie ze ścieżką i mechanizmem sesji. Bootstrap P jest obowiązkowy przez root. Prompty, specjalistyczne procedury i skills powinny być ładowane po trafnym wyborze. Evidence i archiwa nie są instrukcjami uruchomienia. Sam odsyłacz nie uzasadnia ponownego czytania wszystkich zależności.
 
 ## C. PRECEDENCE / ACTIVATION MAP
 
-### Hierarchia wspierana przez badane źródła
+**RECOMMENDATION — architektura docelowa:** krótki kontrakt organizacyjny M → jawny immutable binding produktu → root/nested z lokalnymi invariantami → delta konkretnego zadania. Model, effort, narzędzia i fallback należą do profilu wykonania, nie do tożsamości roli.
 
-1. Uprawnienia/ograniczenia sesji i jawny zakres użytkownika.
-2. Obowiązujący kontrakt repo i instrukcje dotyczące ścieżki.
-3. Jawnie przyjęta polityka META zgodnie z adopcją providera.
-4. Aktualna alokacja i kontrakt konkretnego zadania.
-5. Skill/framework jako pomoc wykonawcza.
-6. Historyczny prompt, checkpoint, komentarz i log jako dowód.
+FACT: Game przypina routing do META `e002fc7532188e73a0f495da3e20710541ed50e0`, Platform do `8fac1d55805fc3372351ea0a55ad7728b3570ebc`, Atlas do M. Nowy bundle V nie jest scalony. Nie uznawać obecnych produktów za adopters V ani traktować rozbieżnego starego pinu jako automatycznej zgody na jego podmianę.
 
-Nie jest to zasada „nowszy plik wygrywa”. Scope i jawne supersession są istotne. GitHub określa lifecycle, head i checks, ale dowolny komentarz nie tworzy produkcyjnych lub cross-repo permissions.
+Zakres użytkownika i obowiązujące uprawnienia pozostają nadrzędne. Root może jawnie wycofać starszy lokalny kontroler; sam młodszy timestamp nie rozstrzyga authority. GitHub rozstrzyga lifecycle/head/checks, lecz komentarz, alias, manifest i dostępne narzędzie nie tworzą uprawnień do produkcji lub innego repozytorium.
 
-### Łańcuchy i amplifikacja
-
-| Początek | Łańcuch | Efekt |
-| --- | --- | --- |
-| Platform task | root → bootstrap → router → nested → specjalizacje | Routing warunkowy, ale bootstrap już powiela wiele reguł |
-| Game Server Seam | lead prompt → runbook → implementation prompt → domena → legacy review docs | Przydatna wiedza miesza się z wycofanym kontrolerem |
-| Autonomous repair | nested → anti-stall → recovery → continuation → completion | Kilka źródeł decyduje o końcu i rotacji |
-| Atlas UI | root → verification platform → feature contract | Maintenance freeze musi zostać zastosowany przed runtime mutation |
-| Skill authoring | discovery → jeden z dwóch skill-creator → reference → installation/validation | Niejasny wybór źródła i destination |
-| Browser Work | skill → runtime documentation → conditional troubleshooting | Dodatkowy kontekst; rozmiar runtime documentation niezmierzony |
-
-### Konflikty
-
-| Źródło A kontra B | Scope | Winner / wynik |
-| --- | --- | --- |
-| Game root META-owned review kontra OWNER_FUNDED_AI_POLICY.md | Review Game | FACT: root jawnie superseduje stary kontroler |
-| META single_agent kontra Game/Platform parallel-first | Delegacja | UNKNOWN: stare przypięcia providerów; potrzebna jawna adopcja |
-| Capability-first kontra Platform EXECUTION_MODE_ROUTING | Work z powłoką | HYPOTHESIS: zbędny handoff |
-| Aktualizacja authority kontra „later invocation” | Wznowienie Platform | HYPOTHESIS: restart lub ignorowanie nowej authority |
-| META review economy kontra every moved head invalidates review | Final qualification | Root supersession przemawia za material-risk rule |
-| Atlas atlas-gate prose kontra live maintenance check | Integracja | Live enforcement ustala wymagany check |
-| Continue kontra three repairs → BLOCKED/ROTATE | Repair | Limit próby nie dowodzi potrzeby decyzji użytkownika |
-| Repo workflow kontra read-only audytu | Audyt | Read-only controlling; odkryta instrukcja nie upoważniała do zapisu |
-
-### Authority
-
-| Operacja | Granica |
-| --- | --- |
-| Read-only | Zakres przyznany; Platform dodatkowo wymaga osobnej zgody na czytanie Game |
-| Local edits, branch, commit, push | Task scope, allocation i preflight; zakazane podczas audytu |
-| Local tests | Ograniczenia środowiska i danych; nie są automatycznie deploymentem |
-| Remote CI | Dispatch to mutacja, nie odczyt wyniku |
-| Issue/PR mutation | Wymaga scope |
-| Merge | Rola, checks, review i MQ; worker nie zawsze ma merge authority |
-| External messages | Nie wynikają z tool access lub tożsamości roli |
-| Deployment/infra/production | Osobna jawna authority |
-| Destrukcja, credentials, dane | Zachować szczegółowe bramki, nie rozszerzać automatycznie |
+**RECOMMENDATION — świeżość:** raz ustalić bazowy kontekst zadania; niezmienne treści reuse po repo/path/SHA. Przed publikacją lub integracją odświeżać mutable head, stan PR, wymagane checks i materialne konflikty. Zmiana main wymaga inspekcji wpływu, nie automatycznego odtworzenia całego zadania. Brak dowodu uprawnienia nadal zatrzymuje dotkniętą operację; nie uzasadnia jednak blokowania niezależnego bezpiecznego odczytu.
 
 ## D. MATERIAL FINDINGS
 
-Wszystkie proponowane teksty poniżej są RECOMMENDATION. Zachowania runtime bez wykonanej próby to HYPOTHESIS.
+### D1. Stary kontroler review — potwierdzone, wysoki priorytet
 
-### D1. Wycofany kontroler review pozostaje w aktywnie wskazywanych plikach
+FACT: G `docs/agents/CODEX_REVIEW_POLICY.json` ma `RETIRED` i `standing_review_controller: false`. `docs/agents/OWNER_FUNDED_AI_POLICY.md` nadal nakazuje mechaniczny kontroler i `CODEX_REQUIRED`; root jawnie go superseduje.
 
-Waga: wysoka. Evidence: mocne, bezpośrednie pliki.
-Scope: Game review.
-Pliki: AGENTS.md (AI review policy — META-owned), docs/agents/CODEX_REVIEW_POLICY.json, docs/agents/OWNER_FUNDED_AI_POLICY.md, docs/agents/prompts/OTV2_SOL_SERVER_SEAM_LEAD.md.
+RECOMMENDATION: lokalny dokument ograniczyć do odsyłacza do aktualnej authority i właściwej granicy niereviewowanego użycia metered AI. Wycofać dispatchable kopie kontrolera w promptach, nie niezależność review. Kryterium: jeden wybór review dla tego samego ryzyka, bez drugiej bramki AI.
 
-FACT: JSON ma status RETIRED i standing_review_controller: false. Markdown nadal mówi „Apply CODEX_REVIEW_POLICY.json mechanically” i CODEX_REQUIRED; lead wymaga czytania go i kopiuje kontroler. Root jawnie superseduje starsze prose.
-Disposition: CONSOLIDATE.
+### D2. Routing po etykiecie powierzchni — potwierdzone w META
 
-Replacement:
-> AI-review routing is inherited from the current root AGENTS.md and its adopted META policy. This document defines no separate review tiers, standing-authorization controller or required AI status. Record only task-specific risk, reviewer independence, findings and evidence. Non-review metered AI use retains its applicable task-specific authorization requirements.
+FACT: M `ecosystem/agent-continuation-policy.json` dopuszcza `software_development_loop` tylko dla `codex`. Kontrakt access równocześnie wymaga rozpoznawania faktycznych narzędzi. Poprzedni raport opisuje dodatkowy handoff w P `EXECUTION_MODE_ROUTING.md`; tego pliku nie odczytano ponownie.
 
-PRESERVED CONSTRAINT: niezależność review, authorization wydatków poza przyjętą polityką, brak reviewer write authority.
+RECOMMENDATION: rozdzielić zdolność do edycji/testów od zdolności do trwałego automatycznego wznowienia. Kontynuować na obecnej autoryzowanej powierzchni, jeśli spełnia wymagania konkretnej czynności. JSON, walidator i procedura muszą zmienić się spójnie. HYPOTHESIS: mniej zbędnych handoffów; nie wykazano jeszcze oszczędności.
 
-### D2. Surface label zastępuje capability evidence
+### D3. Parallel-first — potwierdzone w G/P
 
-Waga: wysoka. Evidence: mocne.
-Pliki: META ecosystem/agent-continuation-policy.json, tools/governance/agent_continuation_policy.py; Platform docs/agents/EXECUTION_MODE_ROUTING.md.
-Fragment: software_development_loop: [codex].
-FACT: Platform kieruje local execution z Work do Codex, choć centralny kontrakt mówi o dostępnych narzędziach jako capability authority.
-HYPOTHESIS: niepotrzebne przekazanie z Work.
-Disposition: MOVE TO EXECUTION PROFILE / CLARIFY PRECEDENCE.
+FACT: rooty G/P wymagają parallel-first i uzasadnienia wykonania szeregowego; M uznaje `single_agent` za zwykłą strategię. Produkty mają starsze jawne piny.
 
-Replacement:
-> Select an execution surface from verified capabilities required by the next action. A surface label does not prove or exclude editing, testing, browser or persistence capability. Continue in the current authorized surface when it can produce the required evidence. Handoff only when a required capability is unavailable.
+RECOMMENDATION: przy kontrolowanej adopcji zastąpić obowiązek przez `single_agent` lub `parallel_when_beneficial`. Równoległość tylko dla niezależnego zakresu z korzyścią ponad koszt koordynacji. Zachować jeden mutating owner na writable lane. Nie narzucać nowego obowiązku uruchamiania subagentów „dla oszczędności”.
 
-PRESERVED CONSTRAINT: brak fikcyjnych testów i trwałej kontynuacji. Zmiana JSON wymaga zgodnego walidatora i testów, nie tylko dopisania powierzchni.
+### D4. Checkpointy — częściowo naprawione
 
-### D3. Obowiązkowe parallel-first
+FACT: G przeniósł `OTV2-20260906-native-evidence-wire-346.md` z `tasks/active` do `tasks/archive`; metadane to `completed` i `RELEASED`. Porównanie nie zmienia pozostałych 12 plików z pierwotnej listy 13. Nie odświeżono indywidualnie wszystkich ich Issues i alokacji; liczba 12 nie jest nowym potwierdzonym licznikiem stale work.
 
-Waga: wysoka. Evidence: mocne.
-Pliki: Game i Platform root AGENTS.md; routing/delegation.
-Fragmenty: „must plan parallel-first”; „Serial execution requires a recorded reason”.
-Disposition: CONSOLIDATE po jawnej adopcji aktualnej META policy.
+RECOMMENDATION: przed archiwizacją sprawdzić terminalne Issue/PR i release ownership. GitHub przechowuje lifecycle, plik jest recovery cache. Pakiet archiwizacji łączyć w spójną zmianę, nie serię PR-ów dla każdego pola. Nie tworzyć testu kodującego listę „dzisiaj zamkniętych Issues”.
 
-Replacement:
-> Choose single_agent or parallel_when_beneficial according to the adopted META execution policy. Parallel work requires materially independent tasks and a benefit exceeding coordination cost. Record ownership and integration order when parallel lanes are used. Serial work needs no exception.
+### D5. Retry budget a BLOCKED — potwierdzone
 
-PRESERVED CONSTRAINT: jeden mutating owner na writable branch/worktree, rozdzielone ścieżki i integracja.
+FACT: G `ANTI_STALL_AND_EXECUTION_BUDGET.md` i bootstrap P nakazują zakończenie po trzech repair cycles. M odróżnia `STALLED` przy niezmienionej awarii od zależności wymagającej właściciela/uprawnienia/polityki.
 
-### D4. Aktywne checkpointy zamkniętych Game Issues
+RECOMMENDATION: ograniczać niezmieniony łańcuch prób, a nie każdą nową diagnostycznie uzasadnioną naprawę. Zachować trwałe liczniki przez rotację. Nie interpretować wyczerpania budżetu workera jako ukończenia zadania lub konieczności decyzji użytkownika.
 
-Waga: wysoka. Evidence: mocne — pliki kontra live Issues.
-Scope: task resume/dispatch.
-FACT: 13 plików ma nieterminalną treść mimo closed completed owner Issues:
-#201, #208, #237, #250, #278, #279, #280, #281, #282, #283, #284, #285, #346.
-Przykład: docs/agents/tasks/active/OTV2-20260906-native-evidence-wire-346.md ma status validating; Issue #346 closed completed.
-Disposition: CONSOLIDATE.
+### D6. „Later invocation” — potwierdzone
 
-Replacement:
-> GitHub Issues own mutable task lifecycle. Active task files are recovery caches, not independent scheduling authority. After verified terminal closeout and ownership release, remove the packet from active dispatch and preserve its history. A stale packet never reopens completed work.
+FACT: bootstrap P wymaga kolejnego wywołania, zanim scalona zmiana authority zacznie obowiązywać; root wymaga uzgodnienia zmienionej authority przed dalszą mutacją.
 
-PRESERVED CONSTRAINT: przed przeniesieniem potwierdzić closeout i brak potrzebnej aktywnej alokacji. Historia pozostaje.
+RECOMMENDATION: po merge istotnej polityki odświeżyć applicability w bieżącym zadaniu i zachować niezmienioną pracę. Nadal bezwzględnie zakazać samoposzerzenia scope przez własną niezweryfikowaną gałąź. Nowe wywołanie nie powinno być rytuałem bezpieczeństwa.
 
-Dokładne pliki w docs/agents/tasks/active/:
-- OTV2-20260826-meta-execution-routing.md
-- OTV2-20260826-repair-foundation-terminal-reconciliation.md
-- OTV2-20260828-remote-desktop-per-action-gate.md
-- OTV2-20260828-terminal-session-replacement-allocation.md
-- OTV2-20260904-authority-api-floor.md
-- OTV2-20260904-authority-qualification-governance.md
-- OTV2-20260904-canonical-pr-pg-sim-gate.md
-- OTV2-20260904-merge-group-audit-pin-rotation.md
-- OTV2-20260905-authority-invariant-harness.md
-- OTV2-20260905-authority-recovery-matrix.md
-- OTV2-20260905-merge-group-pg-sim-activation.md
-- OTV2-20260905-risk-scoped-test-lanes.md
-- OTV2-20260906-native-evidence-wire-346.md
+### D7. Bootstrap P — potwierdzona duplikacja
 
-### D5. Repair budget mylony z blockerem użytkownika
+FACT: 18 025 B bootstrapu powtarza capability, publishing, komunikację, retry, recovery, GitHub-only i closeout obok root oraz specjalizacji.
 
-Waga: średnia–wysoka. Evidence: mocne dla tekstu; efekt hipotetyczny.
-Pliki: Game/Platform docs/agents/ANTI_STALL_AND_EXECUTION_BUDGET.md; Platform bootstrap/nested.
-Fragment: „After three repair cycles … return BLOCKED or ROTATE”.
-HYPOTHESIS: trzecia diagnostycznie użyteczna naprawa zatrzyma zadanie mimo bezpiecznej ścieżki.
-Disposition: CLARIFY PRECEDENCE.
+RECOMMENDATION: wejście pozostawia scope, safety i mapę warunkowego wyboru procedury. Usunąć powtórzone instrukcje dopiero po wskazaniu jednej obowiązującej authority. Nie rozbijać pliku na dziesięć obowiązkowo czytanych dokumentów; to przenosi koszt zamiast go usuwać.
 
-Replacement:
-> Exhausting an unchanged retry budget stops that action chain and yields STALLED; it does not by itself require user input. Continue a permitted diagnostic or repair action when materially new evidence justifies it. Preserve counters across worker rotation. Use BLOCKED only for a missing capability, information, authorization or unresolved authority decision needed for the remaining work.
+### D8. Szerokie ładowanie nested G — zachowane z baseline
 
-PRESERVED CONSTRAINT: bounded retries, brak ukrywania failures i resetów przez rotację.
+R0 wskazuje `docs/agents/CONTEXT_ROUTING.md` jako źródło obowiązkowego czytania `docs/agents/AGENTS.md` także poza zmianami dokumentacji. Ten router nie zmienił się w sprawdzonym delta G; bez nowego pełnego walkthrough.
 
-### D6. Authority freeze do następnej invocation
+RECOMMENDATION: najbliższe instrukcje dla affected paths oraz lifecycle tylko wtedy, gdy jest potrzebny. Trivial work bez checkpointu nie powinno tworzyć programu ani zbędnych plików zarządzania.
 
-Waga: średnia–wysoka. Evidence: mocne.
-Plik: Platform docs/agents/PLATFORM_AGENT_BOOTSTRAP.md, Authority freeze.
-Fragment: authority effective po merge i „a later invocation”.
-Disposition: CLARIFY PRECEDENCE.
+### D9. Review po każdej zmianie SHA — potwierdzone
 
-Replacement:
-> Unmerged changes cannot expand the task's own authority. After a relevant policy change reaches protected main, re-resolve its authority and applicability before further mutation. Reconciliation does not require a new invocation and must preserve unaffected work.
+FACT: anti-stall G unieważnia każde wymagane independent review po przesunięciu head; root review policy wymaga material risk-bearing change.
 
-PRESERVED CONSTRAINT: candidate nie autoryzuje siebie; nowe safety rules są respektowane.
+RECOMMENDATION: aktualny head wymaga wymaganych checks i przeglądu delta. Ponowne niezależne review, gdy zmieniło się oceniane ryzyko lub obowiązuje wyraźny exact-head contract. Zachować wcześniejszy dowód wraz z zakresem i rewizją, nigdy nie przepisywać starego CI jako wyniku nowego head.
 
-### D7. Duplikacja w bootstrapie Platform
+### D10. Atlas required context — ponownie potwierdzone
 
-Waga: średnia. Evidence: mocne; plik 18 025 B.
-Plik: docs/agents/PLATFORM_AGENT_BOOTSTRAP.md.
-Sekcje: Anti-stall baseline, Session recovery baseline, Terminal-only communication baseline, GitHub-only baseline.
-Disposition: SHORTEN / CONSOLIDATE.
+FACT: A `docs/maintenance/ATLAS-MAINTENANCE-MODE.md` podaje `atlas-gate`; live ruleset `22103758` wymaga `Merge authority audit / protected-base validate` i MQ. Nazwa joba nie dowodzi required context. Dokument nadal używa perspektywy „This Stage B candidate”, zamiast samodzielnego opisu późniejszego stanu.
 
-Replacement:
-> Apply the task routes listed above without copying their procedures here. The selected specialist policy owns its counters, recovery fields and completion rules. This bootstrap retains repository scope, prohibition of self-authorized expansion and the distinction between capability and permission.
+RECOMMENDATION: poprawić required-context locator i opis etapu po readbacku workflow inventory. Nie zmieniać rulesetu, by pasował do starego zdania. Frozen runtime/deployment oraz protected-base validator pozostają.
 
-PRESERVED CONSTRAINT: WWW-only, production/credentials i authority fences pozostają w wejściu.
+### D11. Historyczne procedury Atlas — ryzyko aktywacji
 
-### D8. Game router ładuje nested poza zakresem ścieżek
+FACT: root A zawiera maintenance freeze oraz rozbudowane procedury testowe. HYPOTHESIS: bez wyraźnego wyboru etapu agent może próbować wykonywać zawieszoną procedurę.
 
-Waga: średnia. Evidence: mocne.
-Plik: docs/agents/CONTEXT_ROUTING.md, Always.
-Fragment: „Read root AGENTS.md, docs/agents/AGENTS.md …”.
-Nested ma 7653 B.
-Disposition: NARROW TRIGGER.
+RECOMMENDATION: najpierw wybrać maintenance albo jawnie autoryzowane restoration. Procedury runtime przechowywać jako warunkowe references; nie usuwać właściwych oracles, visual acceptance ani rozdziału danych fixture/bounded/fullworld.
 
-Replacement:
-> Read root AGENTS.md and the nearest instructions for affected paths. Load docs/agents/AGENTS.md when changing agent documentation or when the selected task lifecycle requires its checkpoint contract. For trivial work, an absent task checkpoint is not a reason to create a programme.
+### D12. Model/effort w roli — baseline, zmieniona rekomendacja
 
-PRESERVED CONSTRAINT: właściwe path instructions i lifecycle.
+Liczba 19 promptów Game jest inwentaryzacją R0, nie nowym pomiarem. RECOMMENDATION: zachować alias jako rolę; model, powierzchnię, effort i fallback przenieść do profilu wykonania. Nie zakładać dostępności modelu lub wymuszenia effortu na każdej powierzchni.
 
-### D9. Re-review związane z każdą zmianą SHA
+Nie zalecamy globalnego `low` ani globalnego najwyższego effortu. Przy porównaniu instrukcji utrzymać ten sam model i effort. Dopiero potem oddzielnie mierzyć warianty effortu i delegacji. Aktualne wskazówki OpenAI zalecają przy migracji zachować dotychczasowy efektywny effort, poza przejściem z `none`/`minimal` do `low` [O2].
 
-Waga: średnia. Evidence: mocne.
-Plik: Game ANTI_STALL_AND_EXECUTION_BUDGET.md, Final-head freeze.
-Fragment: „every moved head invalidates … any required independent review”.
-META economy wymaga material risk-bearing change.
-Disposition: SCALE VERIFICATION.
+### D13. Każdy odsyłacz przy governance — baseline
 
-Replacement:
-> A new head requires current-head integration checks and inspection of the delta. Repeat independent review only when a material risk-bearing change makes the previous review unrepresentative, or an applicable explicit exact-head review requirement demands it. Preserve unaffected evidence with its original revision and scope.
+R0 wskazuje G `docs/agents/AGENTS.md` i wymóg review wszystkich referenced files. Brak nowego pełnego review tego nested pliku.
 
-PRESERVED CONSTRAINT: stare CI nie staje się dowodem nowego head; high-risk review zachowane.
+RECOMMENDATION: sprawdzać zmienioną politykę, bezpośrednich konsumentów i kontrakty dotknięte znaczeniem zmiany. Rozszerzać inspekcję po konkretnej zależności bezpieczeństwa lub kompatybilności, nie przez rekurencję każdego linku.
 
-### D10. Atlas maintenance: nazwa bramki niezgodna z rulesetem
+### D14. Game MQ i koszt kwalifikacji — konfiguracja potwierdzona
 
-Waga: średnia–wysoka. Evidence: mocne.
-Pliki: Atlas AGENTS.md (Validation and merge), docs/maintenance/ATLAS-MAINTENANCE-MODE.md.
-FACT: prose mówi „ruleset … atlas-gate”, live ruleset 22103758 wymaga Merge authority audit / protected-base validate. Job atlas-gate nadal istnieje w MQ; job name to nie to samo co required status.
-Disposition: CLARIFY PRECEDENCE.
+FACT: G `docs/agents/BUILD_TEST_MATRIX.md` opisuje impact routing PR oraz pełny zestaw MQ, w tym Linux/PG, Windows/SIM i supply chain. AGENTS nie jest zwykłą neutralną dokumentacją w classifierze. Szerokie testy są zamierzonym fail-closed zachowaniem, nie automatycznie błędem.
 
-Replacement:
-> During maintenance, qualify the candidate against the current protected maintenance policy and live required-workflow/status configuration. At this revision, the repository ruleset requires Merge authority audit / protected-base validate; the merge-group workflow also defines atlas-gate. Do not infer required status contexts solely from job names. Runtime verification and deployment remain suspended until the authorized restoration phase.
+RECOMMENDATION: osobny, autoryzowany projekt CI może wybierać unię ryzyk pełnego synthetic group diff z protected classifiera. Unknown/incomplete nadal wybiera FULL. Najpierw pomiar całego PR → MQ → main, następnie shadow i realne canary. Nie obiecywać oszczędności z samego skrócenia Markdown.
 
-PRESERVED CONSTRAINT: protected-base validation, freeze i MQ.
+### D15. Dwa braki #145 — potwierdzone próbami
 
-### D11. Historyczna procedura Atlas może uruchamiać zbyt szerokie testy
+FACT: V `tools/governance/central_agent_policy.py` używa literalnego substringu bez normalizacji whitespace; `validate_task_prompt_text()` nie stosuje kontroli parallel-first/serial-exception obecnych w overlay validatorze. P03–P06 pokazują akceptację tekstów objętych negatywnym oczekiwaniem audytu.
 
-Waga: średnia. Evidence: mocne dla tekstu; aktywacja hipotetyczna.
-Pliki: Atlas root, docs/testing/ATLAS-VERIFICATION-PLATFORM.md, prompty E2E optimization.
-Fragmenty: atlas-local-e2e, legacy 77-scenario qualification obok active maintenance.
-Disposition: MOVE TO ON-DEMAND REFERENCE.
+RECOMMENDATION: naprawić oba braki, ale nie stosować poprzedniej minimalnej propozycji regexów bez D19. Walidacja ma wykrywać sprzeczne aktywne dyrektywy, nie blokować audyt ich plików. Wymagane kontrolne przypadki dopuszczalne i odrzucane, w istniejącej suite.
 
-Replacement:
-> Legacy verification procedure — historical reference only during maintenance. It may be activated only by a current, explicitly authorized restoration task that names the applicable gate and evidence contract. This section does not authorize runtime changes or reinstatement of suspended workflows.
+### D16. Skills i konfiguracja zewnętrzna — UNKNOWN obecnie
 
-PRESERVED CONSTRAINT: UI/browser proof, rights/provenance, Game truth i minimal data capability.
+Nie potwierdzono ponownie historycznego katalogu skills, statusów disabled ani innych instalacji użytkownika. R0 zachowuje dowody tamtej sesji; nie uzasadnia ponownego usuwania lub reinstalacji.
 
-### D12. Profile modeli rozproszone po promptach
+RECOMMENDATION: precyzyjne metadata wyboru, treść ładowana po aktywacji i wąskie references, zgodnie z mechanizmem progressive disclosure [O3]. Nie dodawać nowego skilla, frameworka czy pluginu, gdy wystarcza poprawa istniejącego wejścia. Nie traktować katalogu `docs/superpowers/` jako dowodu aktywnego pluginu.
 
-Waga: średnia. Evidence: mocne, 19 promptów Game.
-Przykład: docs/agents/prompts/OTV2_SOL_SERVER_SEAM_LEAD.md:
-recommended_model: GPT-5.6 Sol
-recommended_effort: extra-high_or_highest_available
-Disposition: MOVE TO EXECUTION PROFILE.
+### D17. KEEP — ochrona funkcjonalności i bezpieczeństwa
 
-Replacement:
-> The invocation alias is a stable role identifier and does not select a model. Model, surface, effort and fallback are execution-profile settings. They do not change this role's scope, ownership or acceptance criteria.
+Zachować jawne scope i zakaz self-authorized expansion; jeden writer i ownership; protected checks/MQ tam, gdzie wymagane; independently current authority i session-generation fencing Game; determinism/clock/RNG; Atlas jako projekcję Game z prawami/provenance; niezależne negatywne oracles; rozdział fixture/bounded/fullworld; credential i production fences; historię recovery; zakaz no-op retriggerów, resetowania retry i fikcyjnej pracy w tle.
 
-Proponowany profil odpowiada przyjętemu sposobowi pracy; nie jest benchmarkiem ani potwierdzeniem dostępności na każdym koncie:
-- chat_model: GPT-5.6 Sol
-- work_codex_model: GPT-6 Astra
-- effort: selected_for_task
-- fallback: verify_available_capability
+Usunięcie zbędnego tekstu wymaga zachowania tych decyzji i obserwowalnych wyników. Żaden z nowych kontrprzykładów nie uzasadnia osłabienia zabezpieczeń produktu.
 
-PRESERVED CONSTRAINT: role, scope i acceptance niezależne od modelu; wyższy effort pozostaje dostępny.
+### D18. Loader AGENTS może nie objąć całej polityki — nowe
 
-### D13. Wszystkie odsyłacze przy governance change
+FACT: root P i nested `docs/agents/AGENTS.md` sumują się do 35 209 B, czyli 2441 B ponad 32 768 B, jeszcze przed separatorami. Dokumentacja Codex opisuje limit `project_doc_max_bytes` 32 KiB i ładowanie łańcucha root → current working directory [O1].
 
-Waga: średnia. Evidence: mocne.
-Plik: Game docs/agents/AGENTS.md, Governance changes.
-Fragment: „requires review of every referenced file”.
-Disposition: NARROW TRIGGER.
+INFERENCE, pewność wysoka warunkowo: dla takiego łańcucha przy domyślnej konfiguracji istnieje ryzyko niepełnego załadowania instrukcji. UNKNOWN: rzeczywisty limit, working directory i zachowanie loadera na powierzchniach użytkownika. Nie zaobserwowano obcięcia jego sesji.
 
-Replacement:
-> Review modified policy, its direct consumers and referenced contracts whose meaning or enforcement is affected. Expand the review when a reference exposes a relevant authority, safety or compatibility dependency. Unaffected references do not require recursive rereading.
+RECOMMENDATION: zredukować root i powtórzenia; najważniejsze granice pozostawić blisko wejścia. Sprawdzić rzeczywiste loaded instructions dla root i docs/agents w jednym reprezentatywnym środowisku. Nie podnosić limitu bezwarunkowo ani dodawać nowej blocking bramki liczby bajtów.
 
-PRESERVED CONSTRAINT: wpływ na enforcement i authority nadal sprawdzany.
+### D19. Linter blokuje legalne zadania — nowe, wykonane próby
 
-### D14. Game MQ weryfikuje szerzej niż PR
+FACT: P07/P09 odrzucają read-only audit z dokładnym locatorem polityki. P08 odrzuca lokalne ograniczenie równoległości dla migracji tylko dlatego, że zawiera frazę `parallel-first`. `PROMPTING_STANDARD.md` V dopuszcza scope/locators i zawężenie authority; regex nie rozróżnia tych funkcji tekstu.
 
-Waga: średnia, koszt. Evidence: mocne dla konfiguracji; savings niezmierzone.
-Plik: docs/agents/BUILD_TEST_MATRIX.md, Current Merge Queue gate.
-FACT: PR ma impact routing; MQ wymaga Linux/PG, Windows/SIM i supply chain.
-Disposition: SCALE VERIFICATION; osobna zmiana CI.
+RECOMMENDATION: odróżnić locator od skopiowanej polityki oraz aktywny nakaz od negacji i historycznego cytatu. Gdzie to pomaga, walidować jawnie wydzielone pola scope/locators, a nie każde wystąpienie nazwy pliku. Nie budować uniwersalnego silnika rozumienia Markdown ani odpłatnego LLM-judge dla każdego PR. Kryterium: przykłady legalnej pracy nie wymagają obchodzenia lintera przez zatajenie źródła.
 
-Replacement:
-> Compute required merge-group coverage from the complete synthetic group diff using protected verification authority. Select the union of affected dependency and risk groups. Incomplete or unknown impact selects the full qualification set. PR evidence alone does not replace merge-group qualification.
+### D20. Zakres dowodu resolvera jest zawężony — nowe, inspekcja statyczna
 
-PRESERVED CONSTRAINT: synthetic head, complete diff, fail-closed. Potrzebna implementacja i canary, nie sam Markdown.
+FACT: V `resolve_meta_authority_via_github()` ustawia `merged_to_protected_main` na podstawie statusu compare `ahead`/`identical`. Sprawdza istnienie commitu i ancestry, ale ta funkcja nie odczytuje protection. Osobny odczyt M `branches/main` potwierdził `protected: true`; nie twierdzimy, że obecne META jest niechronione.
 
-### D15. Dwa braki walidacji centralizacji #145
+RECOMMENDATION: rozdzielić te fakty lub jawnie konsumować protection evidence z istniejącego preflightu. Nazwa i zaakceptowany zakres dowodu muszą odpowiadać wykonanym sprawdzeniom. Nie dodawać kolejnego ledger/attestation controller. Nie wykonano eksperymentu na niechronionej gałęzi ani testu obejścia zabezpieczeń.
 
-Waga: wysoka przed integracją. Evidence: mocne — kod i nierozwiązane review.
-Źródło: Oteryn/Oteryn#145, head 697233ed2b0a6495e1c897be9b70ffc2d7ae3428.
-Plik: tools/governance/central_agent_policy.py.
-FACT: literal substring omijany soft wrappingiem; validate_task_prompt_text nie stosuje PARALLEL_FIRST_RE / SERIAL_EXCEPTION_RE stosowanych w overlays.
-Disposition: CONSOLIDATE.
+### D21. Bundle CI nie jest dowodem adopcji — nowe doprecyzowanie
 
-Minimalna propozycja dla _contains_forbidden_section:
-~~~python
-normalized = " ".join(text.casefold().split())
-return any(
-    isinstance(section, str)
-    and " ".join(section.casefold().split()) in normalized
-    for section in sections
-)
-~~~
+FACT: sprawdzony workflow V uruchamia suite i `central_agent_policy.py`; jego `main()` waliduje bundle. PR #145 jest META-only i nie zmienia root AGENTS. Nie ma z tego dowodu, że każdy rzeczywisty provider/prompt jest już objęty nowym kontraktem. Brak adopcji w tym PR jest jego jawnym zakresem, nie sam w sobie defektem.
 
-Minimalna propozycja dla validate_task_prompt_text:
-~~~python
-if PARALLEL_FIRST_RE.search(text) or SERIAL_EXCEPTION_RE.search(text):
-    errors.append("task prompt must not mandate parallel-first execution")
-~~~
+RECOMMENDATION: osobno raportować gotowość bundle, adopcję produktu i wynik próby agenta. Po adopcji sprawdzić rzeczywiste aktywne wejście oraz poprawny i niedozwolony przykład; historia nie staje się dispatchable przez samą obecność pliku. Centralizacja zakończona oznacza zastąpienie starych obowiązków, nie tylko dodanie nowej strony.
 
-PRESERVED CONSTRAINT: wykrywanie znanych kopii i sprzecznych nakazów. Nadal sprawdzić cytat i negację; checker nie dowodzi pełnej zgodności semantycznej.
+## E. EXECUTED PROBES AND SCENARIO WALKTHROUGHS
 
-### D16. Skills: discovery overlap i duże entry points
+### E1. Metoda i wynik
 
-Waga: średnia. Evidence: mocne dla źródeł sesji; efekty hipotetyczne. Nie są to pliki Oteryn.
+W izolowanym sandboxie przepisano bez zmian semantycznych cztery funkcje walidatora V i ich stałe. Uruchomiono bez sieci i bez mutacji repozytorium poniższe wejścia; `policy=None`, provider `Oteryn/Oteryn-Game`. To nie pełna suite repository ani test transportu GitHub. Oczekiwanie audytu wynika z rozróżnienia aktywnej kopii globalnej polityki i legalnej delty zadania w standardzie V.
 
-| Źródło | Dowód | Disposition i replacement |
-| --- | --- | --- |
-| e0/.system/skill-creator oraz e0/oai/skill-creator | Ta sama nazwa, odmienne destinations | NARROW TRIGGER: system „Author skill source files in an explicitly selected repository. Excludes ChatGPT personal-skill installation and lifecycle.”; OAI „Create, install, update or remove personal ChatGPT skills using the managed personal-skills checkout.” |
-| e0/oai/skill-creator/SKILL.md | 32 232 znaki; authoring, installation i recovery razem | SPLIT: „Select one route: authoring, installation/update, removal, or troubleshooting. Load only that route's reference. Read-only questions do not activate write or permission-probe procedures.” |
-| e0/oai/personal-context | Dodatkowe discovery po szerokim continuity triggerze | NARROW TRIGGER: „Retrieve prior personal context only when a specific missing prior fact can materially change the answer and is absent from visible conversation or current authoritative sources.” |
-| e0/builtins/documents | 40 933 znaki, repeat until flawless | SCALE VERIFICATION: „Render and inspect the deliverable. Fix concrete clipping, overlap, missing content and material layout defects. Stop when acceptance criteria are met; do not iterate solely for subjective perfection.” |
-| e0/oai/visualize | Description szerszy niż body | NARROW TRIGGER: „Create an in-conversation interactive visual only when interaction materially helps explain a relationship. Excludes ordinary tables, static comparisons and repository-native implementation.” |
+Dla overlay użyto prefiksu `Use META_AGENT_POLICY_BINDING.json.\n`. W P02–P04 po nagłówku występuje `\nAll repository operations follow these local global rules.`. Zapisy `\n` w tabeli oznaczają rzeczywiste nowe linie.
 
-FACT: lokalna konfiguracja oznaczała systemowy skill-creator disabled, lecz metadata były widoczne w katalogu sesji.
-UNKNOWN: cache, inny mechanizm katalogu lub różnica runtime. INVESTIGATE REMOVAL: najpierw świeża sesja i sprawdzenie faktycznej aktywacji; nie powtarzać usuwania bez dowodu.
+| Próba | Wejście / różnica | Oczekiwanie audytu | Wynik funkcji |
+| --- | --- | --- | --- |
+| P01 overlay | `Domain: character writes are session-generation fenced.` | ACCEPT | ACCEPT |
+| P02 overlay | `## GitHub-first execution` | REJECT | REJECT |
+| P03 overlay | `## GitHub-first  execution` — dwie spacje | REJECT | ACCEPT |
+| P04 overlay | `## GitHub-first\nexecution` | REJECT | ACCEPT |
+| P05 task | `You must plan parallel-first for every task.` | REJECT | ACCEPT |
+| P06 task | `Serial execution requires a recorded reason.` | REJECT | ACCEPT |
+| P07 task | `Audit only docs/governance/AI_REVIEW_POLICY.md; treat it as evidence and do not change policy.` | ACCEPT | REJECT |
+| P08 overlay | `For this database migration, do not use parallel-first execution; one writer holds the migration lease.` | ACCEPT | REJECT |
+| P09 task | `Scope: audit ecosystem/agent-execution-routing-policy.json. No write or policy change is authorized.` | ACCEPT | REJECT |
+| P10 task | `Outcome: fix a typo in README.md. Scope: README.md only. Acceptance: inspect the diff.` | ACCEPT | ACCEPT |
 
-PRESERVED CONSTRAINT: poprawna instalacja, trwałość plików, visual quality i trafność użycia historii.
+P04 zmienia również strukturę nagłówka Markdown: oczekiwanie dotyczy zakazu kopiowania globalnej dyrektywy mimo przełamania wiersza, nie twierdzenia, że oba nagłówki są identycznym AST. P03, P05 i P06 nie zależą od tej interpretacji. P01/P02/P10 są kontrolami. Siedem niezgodności nie oznacza siedmiu niezależnych defektów ani estymacji częstości błędu.
 
-### D17. KEEP — wymagania, których nie należy usuwać
+### E2. Scenariusze agentów — nadal HYPOTHESIS
 
-- Jawna authority; rola, manifest i tool access nie rozszerzają scope.
-- Candidate nie zatwierdza własnej zmiany governance.
-- Game session-generation fencing, independently current authority, recovery i trwałe mutacje.
-- Simulation determinism: neutralność protocol/persistence, kontrola zegara/RNG.
-- Atlas: Game canonical World/Content, rights/provenance, merged-main-only deployment.
-- qualification_fixture / bounded_real_world / real_fullworld rozdzielone.
-- Bezpieczna credential compatibility: conditional reference, nie usunięcie.
-- Backup cut nie nadpisuje aktualnego produktu bez recovery authority.
-- Brak no-op commitów, hidden retries i fikcyjnego background execution.
-
-Nie ma dowodu, by te reguły usuwać tylko dlatego, że Astra jest nowsza.
-
-## E. SCENARIO WALKTHROUGHS
-
-Wszystkie wyniki to HYPOTHESIS. Nie wykonano scenariuszy.
-
-| Scenariusz | Trace | Friction i completion |
-| --- | --- | --- |
-| 1. Literówka | root → Platform bootstrap/router lub Game nested → mała poprawka → lekkie checks → integracja | Bez ADR/E2E/programme. Duży bootstrap; Game MQ może uruchomić szerokie checks |
-| 2. DB migration | root/nested → data ownership/contract → scope/rollback → isolated migration/integration tests → risk review → required CI | Szczegółowe procedury uzasadnione. Production deployment osobno |
-| 3. UI visual | root → UI/test route → implementation/tests → browser i faktyczne obejrzenie obrazu → CI | Platform może wymusić zbędny Codex handoff. Atlas maintenance rzeczywiście blokuje runtime mutation |
-| 4. Failing local test | failure → diagnosis → targeted repair → proof | Three-repair cap może zatrzymać mimo nowej evidence. Identyczne próby bez evidence powinny dawać STALLED |
-| 5. Deployment z approval | przygotowanie artifactu → tests/config/rollback → review/integration → target/evidence → approval tuż przed protected action | Bez pytania o dozwolone preparation; merge nie jest production approval |
-| 6. Medium multi-file + research | allocation → niezależne badania → jeden mutating owner → integration evidence → checks | META/Atlas proporcjonalne; Game/Platform mogą wymusić fan-out. Celowe coordinator merge authority zachować |
-
-Docelowe znaczenie:
-- CONTINUE: dozwolony next action materialnie przybliża wynik.
-- COMPLETE: wymagane deliverables i proporcjonalna walidacja gotowe; deployment nieudawany.
-- BLOCKED: brak informacji, capability, authorization lub rozstrzygnięcia authority.
-- STALLED / WAITING_EXTERNAL: prawdziwe stany operacyjne, nie automatyczne pytanie użytkownika lub completion.
-
-## F. PROPOSED EDITS BY FILE
-
-Propozycje z D, nie wykonane zmiany.
-
-| Plik/rodzina | Minimalny zakres |
+| Scenariusz | Poprawne zachowanie do porównania |
 | --- | --- |
-| META ecosystem/agent-continuation-policy.json + validator | D2: capability-based routing, spójny schema/code |
-| META #145 tools/governance/central_agent_policy.py | D15: whitespace i concurrency symmetry |
-| Game docs/agents/OWNER_FUNDED_AI_POLICY.md | D1: wycofany controller; zachować non-review metered-use boundary |
-| Game OTV2_SOL_SERVER_SEAM_LEAD.md i podobne prompty | D1/D12: inheritance zamiast review/RDC copies, profile poza rolą |
-| Game/Platform AGENTS.md | D3: delegation po jawnej adopcji |
-| Game docs/agents/CONTEXT_ROUTING.md | D8: conditional nested |
-| Game docs/agents/AGENTS.md | D4/D13: checkpoint cache i affected-reference review |
-| Game/Platform ANTI_STALL_AND_EXECUTION_BUDGET.md | D5/D9: stalling vs blocker i proportionate review |
-| Platform PLATFORM_AGENT_BOOTSTRAP.md | D6/D7: authority reconciliation i usunięcie duplikacji |
-| Platform EXECUTION_MODE_ROUTING.md | D2: cienki profile |
-| Platform PROMPTING_STANDARD.md | Powtórzona komunikacja → jeden controlling contract |
-| Atlas AGENTS.md | D10/D11: maintenance i historyczne procedury |
-| Atlas docs/maintenance/ATLAS-MAINTENANCE-MODE.md | D10: aktualna wymagana bramka |
-| Game BUILD_TEST_MATRIX.md + workflow/classifier MQ | D14: osobna kwalifikowana zmiana CI |
-| D16 skills | Właściciel konfiguracji środowiska, nie polityka Oteryn |
+| Literówka / inert report | Właściwy scope, krótka inspekcja i wymagane checks; bez nowego programu i niepowiązanego E2E |
+| Migracja danych | Lokalna authority, zgodność/rollback, negatywne testy; production approval osobno |
+| Zmiana UI | Odpowiednie testy i rzeczywiście obejrzany obraz; Atlas freeze blokuje nieautoryzowany runtime |
+| Failing test | Nowa hipoteza i targeted repair; brak identycznego retry-until-green i sztucznego BLOCKED |
+| Deployment | Przygotowanie dozwolone, oddzielna zgoda na chronioną operację; merge nie jest deployment proof |
+| Wieloplikowe zadanie | Tylko korzystna delegacja, jeden writer na lane, poprawna integracja i durable handoff |
 
-Checkpointy D4 przenieść dopiero po ownership closeout. Nie tworzyć deterministic testu kodującego listę „dzisiaj zamkniętych Issues”.
+Nie uruchomiono tych sześciu scenariuszy na modelach ani porównania A/B.
+
+## F. PROPOSED EDITS AND COST MODEL
+
+### F1. Najmniejszy sensowny zakres zmian
+
+| Obszar | Propozycja | Dowód zachowania funkcji |
+| --- | --- | --- |
+| V `central_agent_policy.py` i istniejące testy | D15/D19; doprecyzowanie D20 | Corpus dopuszczalnych i zakazanych tekstów; osobne ancestry/protection facts |
+| G review prose/prompts | D1 | Jedna authority review; zachowana niezależność i metered-use boundary |
+| P root/bootstrap/router | D6/D7/D18 | Ładowanie właściwych instrukcji i ten sam zestaw safety decisions |
+| G/P jawny binding i lokalne reguły | D3/D5/D9 | Serial bez wyjątku; retry bounded; brak fałszywych stopów |
+| G aktywne checkpointy | D4 | Terminal lifecycle i release przed usunięciem z dispatch |
+| A maintenance document | D10/D11 | Zgodność z live context; freeze i protected-base validation bez zmian |
+| Profile wykonania i task prompts | D2/D8/D12/D13 | Brak zbędnych handoffów i ładowania; domain acceptance zachowane |
+| Game CI | D14 — osobny zakres | Pełny synthetic diff, fail-closed unknown, real PR/MQ canary |
+
+Atlas `allowedNormal()` dopuszcza odpowiednie A/M/D pod `docs/agents/`, więc sam plik binding JSON nie jest zakazany przez rozszerzenie. Nie oznacza to zgody na uruchomienie nowego workflow, candidate executable ani zmiany immutable maintenance validatora. Adopcja dokumentów i aktywacja nowego enforcementu muszą mieć właściwy zakres.
+
+### F2. Co mierzyć zamiast zgadywać oszczędności
+
+Podstawowa miara: koszt zasobów na zaakceptowane, poprawnie zakończone zadanie. Raportować osobno powodzenie, fałszywe blokery i naruszenia safety, żeby spadek kosztu przez porzucanie pracy nie wyglądał jak sukces.
+
+| Wymiar | Pomiar |
+| --- | --- |
+| Kontekst | Faktycznie loaded bytes/files i powtórne odczyty; input/cached/output/reasoning tokens wyłącznie z dostępnej telemetryki |
+| Koordynacja | Liczba handoffów, czas odbudowy kontekstu, konflikty ownership, materialnie użyte wyniki subagentów |
+| CI | Job-seconds i wall time oddzielnie; cały PR/MQ/main, liczba uruchomień i rerunów |
+| Funkcjonalność | Acceptance, poprawne wybory narzędzi/tests, completed tasks, fałszywe stop/approval |
+| Utrzymanie | Ile aktywnych źródeł wymaga edycji przy jednej zmianie zasady; nie sama liczba wszystkich plików |
+
+FACT: odczyt timing historycznego Game run `33973093609` zwrócił `run_duration_ms: 550000` i `billable.total_ms: 0` dla obu platform. Jobs endpoint potwierdził sześć zakończonych sukcesem jobs. To 9 min 10 s czasu runu, nie pomiar bieżącej średniej, nie suma job-seconds i nie dowód kwoty oszczędności.
+
+UNKNOWN: rachunki i efektywne stawki, token telemetry użytkownika, obecny cache-hit rate, reprezentatywny rozkład zadań, kontrolne czasy przed/po i koszt ludzkiej obsługi. Bez nich nie podajemy procentu ani kwoty. Zasady cache API nie dowodzą analogicznej oszczędności limitu subskrypcji ChatGPT [O4].
+
+RECOMMENDATION: reuse niezmiennych źródeł oraz ograniczone wyniki narzędzi, zamiast ponownego pobierania dużych plików. W API stabilne wejście może pomagać w cache, ale cenę i cache-write/read należy sprawdzić w rzeczywistym użyciu. Nie utrzymywać zbędnych instrukcji tylko dla trafień cache.
 
 ## G. SMALLEST USEFUL CLEANUP BATCH
 
-RECOMMENDATION — pierwszy pakiet bez redesignu:
-1. Game: wycofany review controller z OWNER_FUNDED_AI_POLICY i promptów.
-2. Game: 13 nieaktualnych checkpointów po closeout verification.
-3. Atlas: maintenance prose zgodne z live required check.
-4. META #145: dwa istniejące validator defects.
-5. Platform: usunięcie duplicate baselines z bootstrapu, zachowanie scope/safety.
+**Pakiet 1 — poprawność i jednoznaczność:** w istniejącej pracy #142/#145 naprawić D15/D19, ustalić zakres D20 i acceptance D21. Oddzielnymi autoryzowanymi zmianami usunąć wycofany kontroler Game oraz poprawić maintenance prose Atlas. Nie otwierać równoległej konkurencyjnej implementacji centralizacji.
 
-Następny pakiet:
-- jawna adopcja centralnego bindingu providerów;
-- delegacja i completion semantics;
-- capability-based profile Sol Chat / Astra Work–Codex;
-- osobno MQ/test optimization.
+**Pakiet 2 — mniej obowiązkowej pracy:** po scaleniu centralnej authority przyjmować jawny binding produktu i równocześnie wycofywać powielone obowiązki. Priorytet P root/bootstrap i loader; następnie delegacja, kontynuacja, review-delta i checkpointy. Zachować działanie już przydzielonych zadań oraz właściwe lokalne invariants.
 
-Nie duplikować aktywnych ownership lanes:
-- [META #142](https://github.com/Oteryn/Oteryn/issues/142)
-- [META #145](https://github.com/Oteryn/Oteryn/pull/145)
-- [Game #150](https://github.com/Oteryn/Oteryn-Game/pull/150)
-- [Platform #1270](https://github.com/Oteryn/Oteryn-Platform/pull/1270)
+**Pakiet 3 — optymalizacja kosztu wykonania:** osobno porównać effort/delegację i routing CI. Nie mieszać w jednym eksperymencie nowego modelu, nowych instrukcji, mniejszego effortu i ograniczenia testów. Atlas restoration pozostaje osobnym zadaniem maintenance, nie efektem ubocznym cleanupu.
 
-META #140 to zamknięte Issue programu, nie PR. #142 jest następcą. Stan #145 podczas audytu: draft, head 697233ed2b0a6495e1c897be9b70ffc2d7ae3428, zielony meta-gate i dwa unresolved review threads. Przed dalszą decyzją odświeżyć.
+Nie dodawać centralnego mega-promptu, nowego orchestratora, obowiązkowego LLM-review każdej zmiany, drugiego statusu merge, automatycznych exceptions dla numerów PR ani stałego pełnego audytu całej organizacji przy każdym aliasie.
 
-## H. VALIDATION PLAN
+## H. VALIDATION PLAN AND CONCLUSION
 
-Brak wykonanego runtime A/B dowodzącego poprawy. Dotychczasowe dowody to treść, rozmiary i live state, nie przewaga simplified instructions na Astrze.
+**Wykonano:** inspekcję źródeł z B, 10 deterministycznych prób z E, arytmetyczne porównanie rozmiarów loadera oraz odczyt historycznego CI. Nie uruchamiano produktowych testów ani ręcznie workflow; zwykła publikacja aktualizacji raportu może uruchomić istniejące CI.
 
-### A/B
+**RECOMMENDATION — walidacja etapowa:** najpierw istniejąca lokalna suite walidatora z kontrolami dodatnimi/ujemnymi. Następnie mały, uprzednio autoryzowany canary instrukcji: dokumentacja, diagnostyka awarii i zadanie wysokiego ryzyka w środowisku testowym. A = obecne instrukcje; B = jeden cleanup batch; ten sam snapshot/model/effort/narzędzia/acceptance. Powtarzać próby tam, gdzie zmienność lub ryzyko wymaga mocniejszego dowodu; nie tworzyć domyślnej wielkiej macierzy na każdy drobny edit.
 
-Dla sześciu zadań z E:
-- A: aktualne instrukcje.
-- B: jeden mały cleanup batch.
-- Ten sam model, effort, narzędzia, snapshot i acceptance.
-- Astra Work/Codex i Sol Chat osobno; nie mieszać surface w jednym wyniku.
-- Przy nondeterminism: co najmniej trzy próby na wariant jako bounded canary, nie pełny benchmark.
+Akceptacja: mniej zbędnego czytania, koordynacji lub uruchomień przy zachowaniu poprawności i kompletności. Zero tolerancji dla nieautoryzowanych operacji, fałszywego PASS i pominięcia safety invariant. W razie regresji przywrócić minimalny brakujący scaffold, nie całą historyczną warstwę. Kontrole wymagane przez bieżące repo pozostają obowiązkowe niezależnie od eksperymentu.
 
-| Metryka | Pomiar |
-| --- | --- |
-| Context | Faktycznie loaded files/bytes; tokens tylko z telemetry |
-| Reading | Repeated reads bez zmiany, niewykorzystane dokumenty |
-| Approval | Uzasadnione i zbędne przerwy |
-| Follow-through | Completion, false blocker, premature stop |
-| Verification | Selected tests, powtórki bez przesłanki, runner-time |
-| Delegation | Independence, handoff cost, ownership conflicts |
-| Correctness | Acceptance, invariants i regressions |
-| Safety | Unauthorized operations, data exposure, gate bypass: zero tolerance |
+**UNKNOWN / poza zakresem:** pełne administration/branch-protection META i Platform, konfiguracja pozostałych powierzchni i skills, niewidoczne repozytoria, wszystkie lifecycle records, skuteczność modeli w A/B i rzeczywiste oszczędności finansowe. Rewizja 2 nie jest audytem bezpieczeństwa produktu ani potwierdzeniem gotowości #145 do merge.
 
-### Historyczne obejścia: comparison experiments
+**Wniosek:** istnieje potwierdzony dług i nowe kontrprzykłady funkcjonalne. Największa wartość pochodzi z usunięcia konfliktów i zbędnych decyzji agenta, a nie z maksymalnej redukcji długości tekstu. Uproszczenie uznajemy za wdrożone dopiero po adopcji, wycofaniu starych obowiązków i proporcjonalnym dowodzie zachowania funkcji.
 
-| Current instruction | Simplified | Keep old only if |
-| --- | --- | --- |
-| Highest effort w roli | Effort w profilu task | Powtarzalna regresja correctness przy niższym |
-| Credential compatibility w root | Conditional reference | Agent z poprawnym routingiem nie publikuje bezpiecznie autoryzowanej zmiany |
-| Review po każdej zmianie SHA | Material-risk review | Pomijana zmiana unieważniająca review |
-| Every referenced file | Direct consumers + affected contracts | Pomijany istotny wpływ pośredni |
-| Three repairs → rotation | Identical-retry bound + new evidence | Pętla tej samej awarii |
-| Global policy copied in prompt | Inheritance + task delta | Naruszony konkretny invariant mimo poprawnego załadowania authority |
+### Źródła i odtwarzalność
 
-Acceptance: mniej zbędnej pracy przy zachowanej poprawności, completion i safety. Przy regresji przywrócić minimalny scaffold naprawiający konkretny problem, nie cały historyczny szablon.
+Ścieżki w D są względne do repo i pełnej rewizji z B1. Wybrane bezpośrednie locatory:
 
-## Source locators and evidence boundary
+- [M: root](https://github.com/Oteryn/Oteryn/blob/0c493896040072badeff1f333eb83d7114a993ff/AGENTS.md), [continuation JSON](https://github.com/Oteryn/Oteryn/blob/0c493896040072badeff1f333eb83d7114a993ff/ecosystem/agent-continuation-policy.json).
+- [V: walidator](https://github.com/Oteryn/Oteryn/blob/697233ed2b0a6495e1c897be9b70ffc2d7ae3428/tools/governance/central_agent_policy.py), [standard promptów](https://github.com/Oteryn/Oteryn/blob/697233ed2b0a6495e1c897be9b70ffc2d7ae3428/docs/agents/policy/PROMPTING_STANDARD.md), [workflow](https://github.com/Oteryn/Oteryn/blob/697233ed2b0a6495e1c897be9b70ffc2d7ae3428/.github/workflows/ci.yml).
+- [G: root](https://github.com/Oteryn/Oteryn-Game/blob/53c6bdf06a2282d893035a995c46052c88f935b4/AGENTS.md), [review prose](https://github.com/Oteryn/Oteryn-Game/blob/53c6bdf06a2282d893035a995c46052c88f935b4/docs/agents/OWNER_FUNDED_AI_POLICY.md), [archiwum #346](https://github.com/Oteryn/Oteryn-Game/blob/53c6bdf06a2282d893035a995c46052c88f935b4/docs/agents/tasks/archive/OTV2-20260906-native-evidence-wire-346.md), [macierz CI](https://github.com/Oteryn/Oteryn-Game/blob/53c6bdf06a2282d893035a995c46052c88f935b4/docs/agents/BUILD_TEST_MATRIX.md).
+- [P: root](https://github.com/Oteryn/Oteryn-Platform/blob/3b2ea1c7392187d5d22488673073dc8f8305a374/AGENTS.md), [bootstrap](https://github.com/Oteryn/Oteryn-Platform/blob/3b2ea1c7392187d5d22488673073dc8f8305a374/docs/agents/PLATFORM_AGENT_BOOTSTRAP.md), [metadata agents tree](https://api.github.com/repos/Oteryn/Oteryn-Platform/git/trees/ed9899c876a2d677dbfc93ab46eea88951210e73).
+- [A: maintenance document](https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/docs/maintenance/ATLAS-MAINTENANCE-MODE.md), [validator](https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/tools/maintenance/verify-maintenance-diff.mjs), [live ruleset 22103758](https://api.github.com/repos/Oteryn/Oteryn-Atlas/rulesets/22103758).
+- [Game historyczny run](https://github.com/Oteryn/Oteryn-Game/actions/runs/33973093609), [timing API](https://api.github.com/repos/Oteryn/Oteryn-Game/actions/runs/33973093609/timing).
 
-Repository paths in findings are relative to the repository named in that finding and the snapshot in B. Live URLs below are locators and may change:
-- [META root](https://github.com/Oteryn/Oteryn/blob/0c493896040072badeff1f333eb83d7114a993ff/AGENTS.md)
-- [Game root](https://github.com/Oteryn/Oteryn-Game/blob/9be69b4e0a06f3978d5c5c5603ca3e5670a9f18a/AGENTS.md)
-- [Platform root](https://github.com/Oteryn/Oteryn-Platform/blob/3b2ea1c7392187d5d22488673073dc8f8305a374/AGENTS.md)
-- [Atlas root](https://github.com/Oteryn/Oteryn-Atlas/blob/51623c7dab2346cee39cd51e3caa845bf4b65426/AGENTS.md)
-- [META centralization review](https://github.com/Oteryn/Oteryn/pull/145#pullrequestreview-5100690917)
-- [Backup recovery evidence](https://github.com/Oteryn/Oteryn-Platform-Migration-Backup-20260818/blob/6da4f83ef6a35afbab3332f90d7c7f171d23d235/RECOVERY_EVIDENCE.md)
+Dokumentacja OpenAI odczytana 2026-09-06, źródła zmienne:
 
-Archived documents and other harnesses were not exhaustively inspected. The document preserves the system audit findings, proposed wording and comparison plan; it is not a runtime test result, comprehensive security certification or mutation authorization.
+- [O1: AGENTS.md discovery i project_doc_max_bytes](https://learn.chatgpt.com/docs/agent-configuration/agents-md).
+- [O2: Model guidance — instruction following, testing, delegation i effort](https://developers.openai.com/api/docs/guides/latest-model).
+- [O3: Skills i progressive disclosure](https://learn.chatgpt.com/docs/build-skills).
+- [O4: Prompt caching API](https://developers.openai.com/api/docs/guides/prompt-caching).
+
+Wynik publikacji, dokładny final head i jego CI należy odczytać z PR #151. Nie zapisywać przyszłego własnego SHA w tym pliku ani nie przesuwać head wyłącznie dla aktualizacji statusu.
