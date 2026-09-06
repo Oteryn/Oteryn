@@ -1,6 +1,6 @@
 # Oteryn — instruction-debt audit: instruction consumers and portability
 
-Data: 2026-09-06. Rewizja: **4**. Klasa: **AUDIT_EVIDENCE**.
+Data: 2026-09-06. Rewizja: **5**. Klasa: **AUDIT_EVIDENCE**.
 Zakres: pięć widocznych repozytoriów organizacji; instrukcje, ich walidatory, zgodność z dokumentacją OpenAI i przenośność Astra–Sol.
 Alias: [Oteryn: instruction debt audit](../agents/prompts/OTERYN-INSTRUCTION-DEBT-AUDIT.md).
 
@@ -9,6 +9,8 @@ Polecenie kontynuacji upoważnia do audytu i aktualizacji jego wyników. Publika
 Historia: [R0: inwentaryzacja i D1–D17](https://github.com/Oteryn/Oteryn/blob/a08e0795c49d62c5e2e33e1013444e245c661770/docs/evidence/OTERYN-INSTRUCTION-DEBT-AUDIT-20260906.md), [R2: kontrprzykłady walidatora](https://github.com/Oteryn/Oteryn/blob/91bc3d5186b133a7010e71f9e01acbd6970c1482/docs/evidence/OTERYN-INSTRUCTION-DEBT-AUDIT-20260906.md), [R3: zakres organizacyjny i przenośność](https://github.com/Oteryn/Oteryn/blob/de2f2fd42b595a81fdcb377e8230c59c6998e446/docs/evidence/OTERYN-INSTRUCTION-DEBT-AUDIT-20260906.md). R4 zachowuje identyfikatory wcześniejszych ustaleń, doprecyzowuje D18/D22 i dodaje D25–D27. Pełne wcześniejsze opisy i propozycje pozostają pod tymi niezmiennymi rewizjami.
 
 Legenda: FACT — bezpośrednio sprawdzony tekst/wynik; INFERENCE — wniosek z dowodów; ASSUMPTION — niezweryfikowane założenie; RECOMMENDATION — propozycja; UNKNOWN — brak danych. Przewidywane oszczędności i zachowanie agentów nie są wynikami pomiaru.
+
+R5 zapisuje ocenę przerostu instrukcji i kierunek redukcji w sekcji I. Sekcje A–H zachowują wyniki i zakres R4; nie są nowym pełnym audytem ani ponowną weryfikacją dokumentacji OpenAI. Rewizja bazowa raportu: `3e8495a16efb8bb0c7a9bc23ec2cab9e4e00d926`.
 
 ## A. Executive findings
 
@@ -250,3 +252,49 @@ Pozostałe O3/O6/O8 i dawne opisy są zachowane w R3; nie liczymy ich jako nowyc
 **Podstawa wniosku:** dwa bezpośrednio prześledzone mechanizmy wymagające powtórzeń, dwa odtworzone przypadki błędnego pustego wyniku, siedem sprawdzonych granic allowlist oraz dokumentacja rozstrzygania profili i loadera.
 
 **Wniosek:** kolejna zmiana powinna usuwać zbędną warstwę wraz z jej technicznym konsumentem. Wspólne prompty nie wymagają identycznej struktury wszystkich repozytoriów, a wymiana modelu nie potwierdza zgodności środowiska. Zachować bezpieczne granice i użyteczne testy, naprawić fałszywe PASS/BLOCKED i dopiero mierzyć koszt. Publikacja tego raportu nie oznacza wdrożenia optymalizacji.
+
+## I. R5 — przerost warstwy operacyjnej i kierunek redukcji
+
+### I1. Werdykt i zakres zapisu
+
+**INFERENCE — wysoka pewność dla zbadanej warstwy operacyjnej:** Oteryn ma nadmiernie rozbudowane instrukcje sterujące pracą agentów. Problemem są konkurujące źródła tej samej decyzji, powtarzane procedury, szerokie obowiązkowe odczyty oraz walidatory utrzymujące te kopie. Nie jest to werdykt o nadmiernej złożoności całej architektury produktów ani o zbędności dokumentacji domenowej.
+
+R5 zapisuje w repozytorium syntezę późniejszej dyskusji z właścicielem. Nie dodaje nowych numerów ustaleń, nie przedstawia wcześniejszych prób jako ponownie wykonanych i nie deklaruje zakończenia przeglądu wszystkich plików. D1–D27 oraz dowody R4 pozostają zachowane. Polecenie „zapisz prace do repo” oznacza publikację wyników, nie wdrożenie rekomendacji ani zgodę na usuwanie zabezpieczeń.
+
+**Podstawa:** D7/D25 — powtórzenia i ich konsumenci w Platform; D8/D13 — obowiązkowy kontekst i odsyłacze; D1/D3/D5/D6/D9 — konkurujące reguły wykonania. Konkretnymi źródłami są P `docs/agents/AGENTS.md`, `docs/agents/PLATFORM_AGENT_BOOTSTRAP.md` i `tools/agents/policy_consistency.py` oraz G `docs/agents/CONTEXT_ROUTING.md`, przy rewizjach z B1. Atlas A `docs/agents/DOCUMENTATION_AGENT_IA.md` jest przykładem kierunku do zachowania: jedno źródło zmiennego lifecycle zamiast równoległego rejestru. To wskazania już zbadanych źródeł, nie nowa pełna inspekcja organizacji.
+
+### I2. Korekta wcześniejszego nacisku na centralizację
+
+**RECOMMENDATION:** celem jest redukcja zbędnych obowiązków, a nie tylko skrócenie ich zapisu lub przeniesienie do META. Krótki root wymagający przeczytania wielu innych dokumentów nie daje sam w sobie oszczędności. Obowiązkowy skill zawierający ten sam pakiet również nie jest rozwiązaniem.
+
+Centralny kontrakt ma sens tylko wtedy, gdy zastępuje dawne obowiązki. Nie rekomendujemy dokładania kolejnego standardu, obowiązkowego profilu, rejestru, koordynatora ani bramki wyłącznie w celu zarządzania nadmiarem instrukcji. Proponowany podział na zasady organizacji, lokalne ograniczenia i zadanie to podział odpowiedzialności; nie nakaz utworzenia trzech kolejnych dokumentów.
+
+Szczegółowe reguły oczekiwania, liczników i wyjątków należy oceniać razem: czy dają udowodnioną korzyść ponad prostą zasadę użytecznego postępu, ograniczonego ponawiania i prawdziwego checkpointu? Konieczne limity techniczne powinny mieć jedno źródło, najlepiej przy istniejącym mechanizmie egzekwowania. To propozycja przyszłej zmiany, nie bieżące uchylenie polityk.
+
+### I3. Dyspozycje do zastosowania przy porządkowaniu
+
+| Rodzaj treści | Rekomendowana dyspozycja | Warunek |
+| --- | --- | --- |
+| Powtórzona reguła globalna w root, bootstrapie, nested i promptach | Scalić w jednym właściwym źródle; usunąć zbędne kopie | Zachować zakres, pierwszeństwo i kontrolę zabezpieczenia |
+| Dokument służący głównie do odsyłania do kolejnych obowiązkowych dokumentów | Usunąć po przeniesieniu unikalnej potrzebnej treści | Sprawdzić odsyłacze, aliasy, loadery i konsumentów |
+| Obowiązek czytania plików niezwiązanych z zadaniem | Usunąć z domyślnej ścieżki; wskazać konkretny warunek odczytu | Właściwe dla modyfikowanej ścieżki instrukcje nadal obowiązują |
+| Historyczne obejście modelu, nieużywane pole, powielony szablon | Usunąć lub wycofać z aktywnego użycia | Najpierw sprawdzić realnego konsumenta i chroniony warunek |
+| Terminalny packet lub zastąpiony prompt | Usunąć z aktywnej powierzchni po sprawdzeniu lifecycle | Zachować wymagane provenance; nie obchodzić Atlas maintenance |
+| Unikalne ADR, kontrakty protokołu, fencing, prawa do danych i granice produkcji | Zachować; ładować stosownie do zadania | Nie traktować długości jako dowodu zbędności |
+| Walidator sprawdzający obecność powielonego zdania lub liczby | Zmienić razem z dokumentami; sprawdzać jedno źródło i istotny kontrakt | Nie wyłączać niezależnych kontroli uprawnień, izolacji ani wymaganych testów |
+
+To kryteria przeglądu, nie kompletna lista plików przeznaczonych do usunięcia. Nie udajemy, że każdy plik organizacji otrzymał już indywidualną dyspozycję.
+
+### I4. Najmniejsza praktyczna kolejność
+
+RECOMMENDATION: wykorzystać istniejącą pracę centralizacyjną wskazaną w F zamiast uruchamiać nowy program governance. Przed integracją odświeżyć jej aktualny stan i usunąć wskazane błędy walidacji. W Game i Platform dostarczać spójne zmiany: jedno źródło reguły, usunięte kopie, naprawione odsyłacze i zmieniony konsument w jednym PR danego produktu. Atlas upraszczać tylko w dopuszczonym zakresie maintenance. Backup pozostawić jako recovery/provenance.
+
+Przy każdej rzeczywistej partii wystarczy krótka tabela w istniejącym PR: plik/sekcja, zachować–skrócić–scalić–na żądanie–usunąć, źródło docelowe i zależny konsument. Nie tworzyć osobnej stałej bazy tych decyzji. Przed usunięciem zachować potrzebne niezmienniki i sprawdzić brak osieroconych odwołań. Dobierać testy do zmienianych kontroli; nie używać porządkowania dokumentacji jako pretekstu do wyłączenia wszystkich testów produktów.
+
+### I5. Kiedy optymalizacja będzie rzeczywiście wykonana
+
+RECOMMENDATION: oceniać rzeczywistą ścieżkę reprezentatywnego zadania, nie samą liczbę plików. Porównać obowiązkowo wczytane źródła i tekst, liczbę powtórnych odczytów, fałszywych blokad, przekazań i udział człowieka przy zachowaniu poprawnego wyniku. Pełne pomiary modelowe są potrzebne do twierdzeń o zachowaniu i oszczędnościach; nie są powodem, by bez końca odkładać bezpieczne usunięcie wykazanej kopii wraz z jej konsumentem.
+
+**UNKNOWN:** brak kompletnej aktualnej dyspozycji plik po pliku, pomiaru załadowanego kontekstu w środowiskach właściciela oraz wiarygodnego wyniku A/B kosztu poprawnie zakończonych zadań. Nie podajemy procentu oszczędności ani deklaracji, że optymalizacja została wdrożona.
+
+**Wniosek końcowy R5:** potrzebne jest odchudzenie warstwy operacyjnej agentów, nie kolejny system instrukcji. Usuwać zbędny obowiązek razem z mechanizmem, który go wymusza; zachować unikalną wiedzę projektu i sprawdzalne granice bezpieczeństwa. Zapis audytu w repozytorium nie jest wykonaniem tej przebudowy.
