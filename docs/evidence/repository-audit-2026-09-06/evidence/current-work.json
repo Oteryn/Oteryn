@@ -1,0 +1,84 @@
+{
+  "evidence_id": "E07",
+  "provenance_note": "Structured transcription of direct GitHub read-only CLI results from this conversation, not a raw API export.",
+  "repository": "Oteryn/Oteryn",
+  "observed_date": "2026-09-06",
+  "default_branch_sha": "0c493896040072badeff1f333eb83d7114a993ff",
+  "read_process_ids": {
+    "pull_requests_and_main": 5596,
+    "issues": 23764
+  },
+  "open_pull_requests": [
+    {
+      "number": 151,
+      "draft": true,
+      "head_sha": "9e4764ac4f791cd669617e66879dca8a2bd89775",
+      "branch": "docs/instruction-debt-audit-20260906",
+      "updated_at": "2026-09-06T17:49:30Z",
+      "title": "docs: preserve organization instruction-debt audit and alias"
+    },
+    {
+      "number": 145,
+      "draft": true,
+      "head_sha": "697233ed2b0a6495e1c897be9b70ffc2d7ae3428",
+      "branch": "governance/issue-142-central-agent-policy-implementation",
+      "updated_at": "2026-09-03T10:21:34Z",
+      "title": "feat(governance): implement central agent policy bundle"
+    },
+    {
+      "number": 143,
+      "draft": true,
+      "head_sha": "afa8072d4aa88d51e24da3857c3df9aba486c005",
+      "branch": "governance/issue-142-central-agent-policy",
+      "updated_at": "2026-09-02T21:39:20Z",
+      "title": "docs(governance): design central agent policy"
+    },
+    {
+      "number": 89,
+      "draft": false,
+      "head_sha": "734cc81ef3c3c357c321ff1a6368d872f434248a",
+      "branch": "architecture/world-atlas-convergence-terminal",
+      "updated_at": "2026-08-26T20:28:24Z",
+      "title": "docs(architecture): define unified Oteryn World Atlas programme"
+    },
+    {
+      "number": 60,
+      "draft": true,
+      "head_sha": "3ef377eb20bfcfe759eccf2cb5d585d228010ee3",
+      "branch": "recovery/v310-organization-closeout",
+      "updated_at": "2026-08-25T14:40:44Z",
+      "title": "recovery: record v3.10 organization closeout blockers"
+    }
+  ],
+  "issues": [
+    {
+      "number": 140,
+      "state": "closed",
+      "state_reason": "completed",
+      "updated_at": "2026-09-06T14:55:28Z",
+      "closed_at": "2026-09-06T14:55:28Z"
+    },
+    {
+      "number": 142,
+      "state": "open",
+      "state_reason": null,
+      "updated_at": "2026-09-03T10:12:12Z",
+      "closed_at": null
+    },
+    {
+      "number": 102,
+      "state": "open",
+      "state_reason": "reopened",
+      "updated_at": "2026-09-02T13:25:09Z",
+      "closed_at": null
+    },
+    {
+      "number": 59,
+      "state": "open",
+      "state_reason": null,
+      "updated_at": "2026-09-06T14:51:28Z",
+      "closed_at": null
+    }
+  ],
+  "scope_note": "Current lifecycle facts only. An open PR, green check or historical handoff does not prove merged implementation or operational recovery."
+}

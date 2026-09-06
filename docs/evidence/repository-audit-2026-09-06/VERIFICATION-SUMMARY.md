@@ -1,99 +1,51 @@
-# Verification summary — Oteryn repository audit 2026-09-06
+# Verification record — R3
 
-This file contains the public-safe verification evidence supporting the repository audit. It intentionally omits local host identifiers, credentials, token values, private filesystem paths, and raw client configuration.
+Audited commit: `0c493896040072badeff1f333eb83d7114a993ff`. Three categories below must not be conflated.
 
-## Snapshot integrity
+## A. Prior actual execution, preserved rather than rerun
 
-- repository: `Oteryn/Oteryn`
-- audited revision: `0c493896040072badeff1f333eb83d7114a993ff`
-- audited tree: `77c33f4c2d3bffcd5983e35928d870d618cb5f68`
-- tracked files: `78`
-- tracked bytes: `844834`
-- independent blob comparison: `0` mismatches
-- Python syntax parse: `14/14`
-- JSON parse: `7/7`
-- YAML parse: `.github/dependabot.yml`, `.github/workflows/ci.yml`, `.github/workflows/terminal-branch-lifecycle.yml` PASS
-- `git fsck`: PASS
-- final tracked working tree: clean
-- final diff check: PASS
+`evidence/prior-native-verification.json` gives commands, scope, process-result locators, counts and failure classes from R2. These are structured records of returned tool output, not invented raw logs.
 
-## Repository-native test execution
-
-| Test surface | Result |
+| Native suite | Result |
 |---|---|
-| `tools/governance/test_agent_execution_routing.py` | PASS |
-| `tools/governance/test_remote_desktop_action_gate.py` | PASS |
-| `tools/governance/test_merge_queue_workflow_contract.py` | PASS |
-| `tools/governance/test_agent_continuation_policy.py` | 26/26 PASS |
-| `tools/governance/test_agent_continuation_review_repairs.py` | 4/4 PASS |
-| `tools/governance/test_bounded_execution_guard.py` | Windows: 20 PASS + 1 harness ERROR because child process invokes literal `python3`; Linux: 21/21 PASS |
-| `tools/governance/test_verify_ai_review_evidence_compat_v1.py` | does not start: `ModuleNotFoundError` for removed `test_verify_ai_review_evidence_core` |
+| `test_agent_execution_routing.py` | Windows PASS / 0 |
+| `test_remote_desktop_action_gate.py` | Windows PASS / 0 |
+| `test_merge_queue_workflow_contract.py` | Windows PASS / 0 |
+| `test_agent_continuation_policy.py` | Windows 26/26 PASS / 0 |
+| `test_agent_continuation_review_repairs.py` | Windows 4/4 PASS / 0 |
+| `test_bounded_execution_guard.py` | Windows 20 PASS + 1 ERROR / 1; hardcoded python3 child / 9009 |
+| `test_verify_ai_review_evidence_compat_v1.py` | Import error before tests / 1; outside active CI |
 
-The last test is outside the active `meta-gate`; its failure is evidence of an orphaned compatibility test, not a failure of the current required gate.
+The same unchanged bounded suite passed 21/21 on Linux using three exact source blobs. Full prior log: `evidence/prior-linux-bounded.log`. This is not a full six-suite local Linux execution.
 
-## Native CI validation blocks
+Additional prior checks: both original Python CI blocks PASS; JSON 7 parse, Python 14 AST, YAML 3 parse, schema declaration validity, auxiliary Ruff E9/F63/F7/F82, fsck and clean diff/status. Schema declaration validity does not repair missing instance validation; auxiliary lint is not CodeQL.
 
-The unchanged validation logic from `.github/workflows/ci.yml` was executed against the audited checkout:
+Historical successful exact-snapshot GitHub evidence: merge_group run `33751703790`, job `100636500304`; push run `33751753882`. No fresh dispatch is claimed.
 
-- META repository contract: PASS (`7` JSON files, `4` repository entries, `0` release manifests)
-- simplified governance desired state: PASS
-- compatibility JSON Schema declaration: valid Draft 2020-12
-- limited Ruff check over authored Python: PASS
+## B. Fresh R3 diagnostics and evidence checks
 
-No release manifest existed, so this does not constitute end-to-end release-instance validation.
+`evidence/native-probe-results.json` records exact inputs, commands, stdout/stderr and exit status for seven calls to original code:
 
-## CI history inspected
+| Case | Exit | Interpretation |
+|---|---:|---|
+| Empty expected and observed arrays | 0 | TARGET with no repositories: AUD-10 |
+| Missing expected array | 3 | INVALID control |
+| Four expected, no observations | 2 | UNKNOWN control |
+| Four expected, matching synthetic observations | 0 | TARGET control, not real GitHub compliance |
+| Original inline block, canonical policy | 0 | Baseline control |
+| Same block, only META merge_queue changed true → 1 | 0 | Numeric value accepted: AUD-11 |
+| Original CLI, numeric policy versus boolean observations | 1 | Typed mismatch DRIFT: AUD-11 |
 
-Audit-period inventory reconciled `268` workflow runs. For current `META CI` during the inspected window:
+CLI Git blob: `8f165e91ad0bb06131f1955264a873a487369ae5`. Canonical policy blob: `049a3fff02451fdbc8ec75dd6bc017466911bb94`. Source workflow blob: `a198350259d8f9d082732cb0c4d99f90c6bf389c`. Extracted inline Python SHA-256: `ca07ab50e7032d51af4322d1c1af6ed8520209f0719473adaf6115ca5b00a7ef`. Extraction removes only YAML indentation; independently matched a read-only `git show` extraction from the exact source commit.
 
-- total: `165`
-- success: `112`
-- failure: `45`
-- cancelled: `8`
-- `merge_group`: `12/12` success
-- `push`: `13/13` success
+Temporary synthetic data were outside the audited repository. Original source bytes were unchanged before/after. No regression-test source, implementation repair, entire altered CI run, bypass experiment, package installation or new model execution occurred.
 
-Observed wall-clock proxy (`updated_at - created_at`) for the 165 META CI runs:
+Historical CI export recovery: original file SHA-256 `24775c60ffbb0944e9170896483badcf773f07ac519950c3a63dd1dd6073029a`; three CSV parts verified separately and joined by exact ID. `evidence/ci-recalculation.json` recomputes 268 total / 165 META records, META 112 success / 45 failure / 8 cancelled, and latency proxy 12 s median / 27 s p95 nearest-rank / 37 s maximum. These are not CPU time, billing or a forecast. No same META workflow/event/head group contains both success and failure; this is not proof of universal absence of flakes.
 
-- median: `12 s`
-- p95 nearest-rank: `27 s`
-- max: `37 s`
+The retained audit clone was read again: HEAD `0c493896...`, tree `77c33f4...`, empty porcelain, diff exit 0 (read-only process result 32792). Seven SKILL bodies and seven invocation metadata files were fully read cumulatively and hashed; no skill was activated just because it was audited.
 
-This is not billed duration or CPU time.
+## C. Publication verification
 
-## Live repository governance readback at audit close
+R3 publication is a separately authorized documentation operation on PR #153. It changes only audit material, not product code, tests, policy, workflow or protected settings. Exact prepared content hashes and a docs-only diff are checked against the remote commit. Existing PR-triggered META CI is read, not manually dispatched.
 
-- protected branch: `main`
-- required status: `meta-gate`, GitHub Actions App id `15368`
-- strict required-status freshness: `false`
-- required approving reviews: `0`
-- required CODEOWNER review: `false`
-- stale-review dismissal: `false`
-- admin enforcement: `true`
-- linear history: `true`
-- conversation resolution: `true`
-- force pushes: disabled
-- protected-branch deletion: disabled
-- merge method: squash only; merge/rebase disabled
-- repository auto-merge: enabled
-- delete source branch on merge: enabled
-- Merge Queue observed: `SQUASH`, `ALLGREEN`, maximum build entries `5`, maximum merge entries `5`, minimum `1`, wait `300 s`, check response timeout `3600 s`, zero queued entries at readback
-- Actions: enabled; default workflow token `read`; Actions may not approve PR reviews
-- secret scanning: enabled
-- secret scanning push protection: enabled
-- Dependabot security updates: enabled
-- private vulnerability reporting: disabled
-- CodeQL default setup: not configured; code-scanning analyses endpoint returned no analysis
-- environments: `0`
-- deployments: `0`
-- releases: `0`
-- tags: `0`
-- repository webhooks visible through the inspected endpoint: `0`
-
-## Publication drift note
-
-After the audit closed, protected `main` advanced from `0c493896040072badeff1f333eb83d7114a993ff` to `d0d5a54c5f06db9423d14b17e7f8eadefd15c6fb` through PR #152. The audit report is intentionally snapshot-bound to the earlier revision; the publication PR is based on the later `main` and does not claim to have semantically re-audited PR #152.
-
-## Limits
-
-The audit did not perform destructive or mutating governance canaries, did not read secret values, did not certify every possible bypass path, did not re-test production recovery, and did not measure billing/token A/B or all client platforms.
+A new commit or green publication check does not make historical settings current, prove an absent transport firewall, perform a production restore, or implement the recommended fixes.

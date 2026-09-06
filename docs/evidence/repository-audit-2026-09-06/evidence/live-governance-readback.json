@@ -1,0 +1,123 @@
+{
+  "evidence_id": "E01",
+  "provenance_note": "Structured transcription of directly returned tool results, not a raw API export. Process IDs identify Remote_Desktop_Commander calls on the authorized Windows audit host in this conversation.",
+  "date": "2026-09-06",
+  "repository": "Oteryn/Oteryn",
+  "repository_id": 1338152366,
+  "main_sha": "0c493896040072badeff1f333eb83d7114a993ff",
+  "source_process_ids": [
+    19616,
+    26068,
+    10420,
+    25356,
+    5596
+  ],
+  "classic_protection": {
+    "mechanism": "gh api --method GET repos/Oteryn/Oteryn/branches/main/protection",
+    "protected": true,
+    "strict_required_status_checks": false,
+    "required_checks": [
+      {
+        "context": "meta-gate",
+        "app_id": 15368
+      }
+    ],
+    "dismiss_stale_reviews": false,
+    "require_code_owner_reviews": false,
+    "require_last_push_approval": false,
+    "required_approving_review_count": 0,
+    "enforce_admins": true,
+    "required_linear_history": true,
+    "allow_force_pushes": false,
+    "allow_deletions": false,
+    "required_conversation_resolution": true,
+    "required_signatures": false,
+    "lock_branch": false
+  },
+  "graphql_branch_protection": {
+    "process_id": 5596,
+    "total_count": 1,
+    "pattern": "main",
+    "requiresStatusChecks": true,
+    "requiresStrictStatusChecks": false,
+    "requiresApprovingReviews": true,
+    "requiredApprovingReviewCount": 0,
+    "requiresCodeOwnerReviews": false,
+    "requiresConversationResolution": true,
+    "requiresLinearHistory": true,
+    "isAdminEnforced": true,
+    "allowsForcePushes": false,
+    "allowsDeletions": false
+  },
+  "rulesets_with_parents": [],
+  "merge_methods": {
+    "allow_squash_merge": true,
+    "allow_merge_commit": false,
+    "allow_rebase_merge": false,
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
+  },
+  "merge_queue": {
+    "process_id": 10420,
+    "id": "MQ_kwDOT8KVrs4AA-vO",
+    "configuration": {
+      "checkResponseTimeout": 3600,
+      "maximumEntriesToBuild": 5,
+      "maximumEntriesToMerge": 5,
+      "mergeMethod": "SQUASH",
+      "mergingStrategy": "ALLGREEN",
+      "minimumEntriesToMerge": 1,
+      "minimumEntriesToMergeWaitTime": 300
+    },
+    "entry_count": 0,
+    "entries": [],
+    "limitation": "Queue existence, configuration and historical use directly verified. Independent requiresMergeQueue field not exposed on queried BranchProtectionRule schema; no mutating bypass/canary experiment performed."
+  },
+  "actions_policy": {
+    "enabled": true,
+    "allowed_actions": "all",
+    "sha_pinning_required": false
+  },
+  "token_defaults": {
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false
+  },
+  "environments": [],
+  "deployments": [],
+  "releases": [],
+  "tags": [],
+  "repository_webhooks": [],
+  "repository_runner_registration_count": 0,
+  "runner_scope_note": "Repository-scoped registrations only; not an inventory of organization-wide runner access.",
+  "security": {
+    "private_vulnerability_reporting_enabled": false,
+    "code_scanning_default_setup": {
+      "state": "not-configured",
+      "languages": [
+        "actions",
+        "python"
+      ],
+      "query_suite": "default",
+      "threat_model": "remote"
+    },
+    "code_scanning_analyses_readback": {
+      "http_status": 404,
+      "message": "no analysis found"
+    },
+    "open_dependabot_alerts": [],
+    "open_dependabot_alerts_exit_code": 0,
+    "dependabot_security_updates": "enabled",
+    "secret_scanning": "enabled",
+    "secret_scanning_push_protection": "enabled",
+    "secret_scanning_ai_detection": "disabled",
+    "secret_scanning_delegated_alert_dismissal": "disabled",
+    "secret_scanning_delegated_bypass": "disabled",
+    "secret_scanning_non_provider_patterns": "disabled",
+    "secret_scanning_validity_checks": "disabled",
+    "secret_values_read": false
+  },
+  "license_metadata": null,
+  "has_pages": false,
+  "settings_mutations_performed": false,
+  "manual_workflow_dispatches": false
+}
