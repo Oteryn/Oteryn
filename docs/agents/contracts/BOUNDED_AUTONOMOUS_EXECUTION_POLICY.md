@@ -13,6 +13,27 @@ repeating an unchanged action chain. This is a deterministic coordination policy
 not an external service or repository lifecycle authority. GitHub and the repository's
 current governance remain authoritative for repository lifecycle facts.
 
+## No fixed worker runtime boundary
+
+The organization does not define a fixed wall-clock lifetime for productive workers,
+coordinators or owner invocations. A provider repository, task, allocation, plan or
+prompt MUST NOT turn `60 minutes`, `120 minutes`, an `execution window`, remaining
+productive minutes, or any equivalent elapsed-time budget into a generic stop,
+rotation, re-admission, task-split or fresh-grant condition.
+
+Elapsed time alone is not material progress and is also not a blocker. Productive
+authorized work continues while this policy remains `RUNNING` or another current
+governing authority permits useful work. Stop/release decisions must come from a
+material dependency or authority state, bounded unchanged retries/heavy-validation,
+an actual tool/context/environment boundary, explicit owner stop, or verified
+completion.
+
+Finite time limits remain appropriate for individual commands and for bounded waiting,
+polling or no-progress detection when a provider policy defines them. Those operational
+limits MUST NOT be generalized into a maximum productive worker/session lifetime.
+Historical fixed-runtime/window values may remain as provenance, but they are not
+current execution authority.
+
 ## Lifecycle
 
 The canonical states are:
