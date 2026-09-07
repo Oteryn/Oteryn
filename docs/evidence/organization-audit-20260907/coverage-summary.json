@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "source_leaf_total": 4325,
+  "active_repository_leaf_total": 4324,
+  "per_repository": {
+    "meta": {
+      "leaves": 174,
+      "direct_scoped": 19,
+      "unverified_semantics": 155,
+      "grouped": 0,
+      "not_applicable": 0
+    },
+    "game": {
+      "leaves": 830,
+      "direct_scoped": 17,
+      "unverified_semantics": 813,
+      "grouped": 0,
+      "not_applicable": 0
+    },
+    "platform": {
+      "leaves": 2165,
+      "direct_scoped": 21,
+      "unverified_semantics": 2144,
+      "grouped": 0,
+      "not_applicable": 0
+    },
+    "atlas": {
+      "leaves": 1155,
+      "direct_scoped": 7,
+      "unverified_semantics": 1148,
+      "grouped": 0,
+      "not_applicable": 0
+    },
+    "migration_archive": {
+      "leaves": 1,
+      "direct_scoped": 1,
+      "unverified_semantics": 0,
+      "grouped": 0,
+      "not_applicable": 0
+    }
+  },
+  "ledger_sha256": "eb8426c410a57aeb262580b529c958cc88c06fb02f31ed7a546d4ce59baf8454",
+  "identity_coverage": "COMPLETE_FOR_PINNED_FIVE_REPOSITORIES",
+  "semantic_coverage": "PARTIAL_EXPLICIT",
+  "unclassified_paths": 0,
+  "semantic_completion_claimed": false,
+  "durability": "Full CSV accompanies the audit delivery. Committed coverage-review.tsv plus immutable Git trees and verify_report.py reproduce every row. The temporary source artifact is not the sole durable source."
+}

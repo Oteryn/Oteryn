@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "items": [
+    {
+      "id": "SEMANTIC-COVERAGE",
+      "missing": "Unreviewed/currently unbound repository semantics",
+      "reason": "Full source bytes available; fresh scoped ledger does not adopt unsupported all-line historical coverage.",
+      "effect": "Original exhaustive completeness cannot be claimed.",
+      "owner_route": "META186 plus provider audit owners",
+      "closure_condition": "Import exact historical disposition ledgers with bounded validity, review changed/uncovered authored families, and retain justified grouping/N/A."
+    },
+    {
+      "id": "HISTORY-REVALIDATION",
+      "missing": "Current outcome of explicitly unverified historical findings",
+      "reason": "Source changed, live PR/ref state not read or runtime condition unexecuted.",
+      "effect": "76 rows means reconciliation accounting, not 76 verified outcomes.",
+      "owner_route": "META153/Game364/Platform451/Atlas315",
+      "closure_condition": "Resolve each REQUIRES/UNKNOWN/OPEN_INHERITED row with exact source/runtime/live evidence."
+    },
+    {
+      "id": "ADMIN-STATE",
+      "missing": "Current organization/admin security settings",
+      "reason": "Managed integration does not expose all admin-only configuration.",
+      "effect": "No current private reporting/scanning/member/privilege attestation.",
+      "owner_route": "Organization owner via META186",
+      "closure_condition": "Provide dated nonsecret exported settings and authorized verification; never secret values."
+    },
+    {
+      "id": "INFRA-STATE",
+      "missing": "Private production runtime configuration",
+      "reason": "No host exception or production access used.",
+      "effect": "No infrastructure health or deployment readiness conclusion.",
+      "owner_route": "Provider operations owners",
+      "closure_condition": "Authorized read-only configuration/health snapshot with redaction and exact release."
+    },
+    {
+      "id": "RECOVERY",
+      "missing": "Current release/data restore/rollback",
+      "reason": "Historical migration restore is not current product recovery.",
+      "effect": "RPO/RTO and live data recovery not qualified.",
+      "owner_route": "META59/60 and provider operations",
+      "closure_condition": "Isolated approved current-release/data restore with measured RPO/RTO, smoke, rollback and cleanup."
+    },
+    {
+      "id": "COST-CI",
+      "missing": "Actual CI cost/latency/flake dataset",
+      "reason": "Only static77-workflow census and task-local executions available.",
+      "effect": "No measured organization cost reduction or routing efficiency claim.",
+      "owner_route": "Provider CI programmes",
+      "closure_condition": "Collect representative recent PR/MQ/push cohort, sample criteria and timestamps; measure queue/run/capacity/cache/retry/yield before changes."
+    },
+    {
+      "id": "COST-AGENTS",
+      "missing": "Actual token/API/wall-clock cost",
+      "reason": "R5Q explicitly labels these NOT_MEASURED.",
+      "effect": "Fewer Markdown reads do not prove token/billing savings.",
+      "owner_route": "META instruction optimization owner",
+      "closure_condition": "Instrument supported execution telemetry, stratify task classes and compare cost/quality/safety without claiming an enforced model default."
+    },
+    {
+      "id": "SUPPLY-CHAIN",
+      "missing": "Fresh CVE/SBOM/history/provenance assessment",
+      "reason": "No live advisory/complete secret-history scan executed.",
+      "effect": "Lockfiles and Dependabot do not establish clean supply chain.",
+      "owner_route": "Provider security owners",
+      "closure_condition": "Authorized advisory/SBOM/provenance scans with source/lock/time/scope/exclusion and triage; keep sensitive findings private."
+    },
+    {
+      "id": "NATIVE-G1",
+      "missing": "Game native durable user journey",
+      "reason": "No Rust runtime here; programme G1 remains outstanding.",
+      "effect": "Component/source tests cannot establish actual gameplay composition.",
+      "owner_route": "Game364/162",
+      "closure_condition": "Real producer/native command -> logical owner -> durable effect -> visible projection through reconnect/restart with no duplicate effect/rollback."
+    },
+    {
+      "id": "UI-343",
+      "missing": "Initialized Atlas product/UI acceptance",
+      "reason": "Issue343/PR344 records shell-only evidence and pending runtime acceptance.",
+      "effect": "No full product UX, renderer synchronization or accessibility PASS.",
+      "owner_route": "Atlas343/344; maintenance315",
+      "closure_condition": "Qualified minimum-data browser environment, pinned Playwright, real journeys/screenshots/keyboard/accessibility checks and independent acceptance."
+    },
+    {
+      "id": "PORTABILITY",
+      "missing": "Complete supported OS/runtime matrix",
+      "reason": "Linux Python/Node tests only; PHP version mismatched and Rust unavailable.",
+      "effect": "No current Windows/GPU/full supported runtime qualification.",
+      "owner_route": "Provider build owners",
+      "closure_condition": "Execute bounded required native/OS matrix with exact source/toolchain identities."
+    },
+    {
+      "id": "LIVE-TELEMETRY",
+      "missing": "Production SLO/alerts and failure yield",
+      "reason": "No current telemetry queried.",
+      "effect": "No measured availability, alert correctness or failure recovery conclusion.",
+      "owner_route": "Provider operations",
+      "closure_condition": "Read dated sanitized metrics, exercise approved isolated alert delivery and map critical journeys to observable conditions."
+    },
+    {
+      "id": "PRIVACY-RIGHTS",
+      "missing": "Complete data/asset rights and privacy posture",
+      "reason": "Root license inventory and repository statements are not complete rights/privacy assessments.",
+      "effect": "No legal compliance or third-party-data clearance conclusion.",
+      "owner_route": "Owner plus provider data/security owners",
+      "closure_condition": "Document intended META/Atlas terms, asset provenance/usage terms, data inventory/retention/consent boundaries and appropriate expert review."
+    },
+    {
+      "id": "PLATFORM-H02",
+      "missing": "Login/revocation interleaving",
+      "reason": "Hypothesis remains unexecuted.",
+      "effect": "Cannot promote to a confirmed exploit or silently drop it.",
+      "owner_route": "Platform451",
+      "closure_condition": "Controlled current-generation concurrency reproduction with positive and negative controls."
+    },
+    {
+      "id": "INDEPENDENT-REVIEW",
+      "missing": "Independent semantic review of this revision",
+      "reason": "Author/source checks are not another reviewer.",
+      "effect": "No self-awarded10/10 or independent acceptance claimed.",
+      "owner_route": "PR185 reviewer",
+      "closure_condition": "Review stable material head for unsupported assertions, scope substitutions, missing IDs, source/candidate conflation and evidence validity."
+    }
+  ]
+}

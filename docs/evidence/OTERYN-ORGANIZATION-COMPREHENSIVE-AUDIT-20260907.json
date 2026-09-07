@@ -1,186 +1,117 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "report_id": "OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907",
-  "generated_date": "2026-09-07",
-  "status": "COMPLETE_WITHIN_ACCESSIBLE_SCOPE",
-  "production_readiness_claimed": false,
+  "revision": "R2-EVIDENCE-RECONCILIATION",
+  "status": "QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE",
+  "governing_issue": "Oteryn/Oteryn#186",
+  "pull_request": "Oteryn/Oteryn#185",
+  "source_collection_time_utc": "2026-09-07T22:06:16.642480Z",
   "repositories": {
     "meta": {
       "repository": "Oteryn/Oteryn",
-      "main_sha": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "commit_sha": "1a01c5b3e08666a82245b1cac78da3736c65e785",
       "tree_sha": "f084e824ec5e14d5909c9750d906d91d51425fd5",
-      "coverage": "COVERED",
-      "required_gate": "meta-gate"
+      "leaf_count": 174
     },
     "game": {
       "repository": "Oteryn/Oteryn-Game",
-      "main_sha": "3327db49c0c3e2d90afe6a74954c579a36aba2a5",
-      "tree_sha": "fc0f18e4b67a2df16c4fb24ebf8933cf4c1714bf",
-      "coverage": "COVERED",
-      "required_gate": "game-gate",
-      "qualification": "G1_NOT_TERMINAL"
+      "commit_sha": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "tree_sha": "49cabfccf7d4876e5bc9276fc5963caa33dab8a5",
+      "leaf_count": 830
     },
     "platform": {
       "repository": "Oteryn/Oteryn-Platform",
-      "main_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "commit_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
       "tree_sha": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
-      "coverage": "COVERED_WITH_NUMERIC_LEDGER_LIMITATION",
-      "required_gate": "platform-gate",
-      "exact_numeric_leaf_ledger": "NOT_EMITTED_DUE_CURRENT_TOOLING_LIMITATION"
+      "leaf_count": 2165
     },
     "atlas": {
       "repository": "Oteryn/Oteryn-Atlas",
-      "main_sha": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+      "commit_sha": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
       "tree_sha": "a1009378f8d3950a5ee62fb3ee65041f7d53a1e0",
-      "coverage": "COVERED",
-      "qualification": "PAUSED_BEFORE_VERIFICATION_RESTORATION",
-      "historical_exact_leaf_count": 1140,
-      "historical_dispositions": {
-        "DIRECT": 131,
-        "GROUPED": 550,
-        "NOT_APPLICABLE": 459,
-        "PARTIAL": 0,
-        "UNVERIFIED": 0,
-        "INACCESSIBLE": 0
-      }
+      "leaf_count": 1155
+    },
+    "migration_archive": {
+      "repository": "Oteryn/Oteryn-Platform-Migration-Backup-20260818",
+      "commit_sha": "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+      "tree_sha": "dbf8349a21e432df47d1475b8431939bbe94d6e1",
+      "leaf_count": 1
     }
   },
-  "severity_summary": {
-    "P0_confirmed": 0,
-    "P1_current_confirmed": 4
+  "source_identity_validation": {
+    "active_repositories": 4,
+    "archive_repositories": 1,
+    "active_leaf_count": 4324,
+    "including_archive_leaf_count": 4325,
+    "historical_supporting_snapshots": 3,
+    "all_collected_root_trees_verified": 8,
+    "unique_blobs_verified": 4641
   },
-  "current_p1_findings": [
-    {
-      "id": "ORG-P1-PLATFORM-CLASSIFIER",
-      "repository": "Oteryn/Oteryn-Platform",
-      "summary": "Change classifier can false-negative material runtime changes for rename/type-change combinations.",
-      "target": "Use status-aware NUL-delimited Git diff semantics, preserve rename source and destination, detect type/mode/symlink transitions, fail closed on unknown status, and cover with real-Git regression fixtures."
-    },
-    {
-      "id": "ORG-P1-PLATFORM-FANIN",
-      "repository": "Oteryn/Oteryn-Platform",
-      "summary": "Required platform-gate does not provide complete exact-candidate fan-in for all impact-relevant qualification profiles.",
-      "target": "One impact-class to profile manifest, equivalent PR and merge_group classification, stable terminal fan-in that blocks failure/cancelled/missing/unjustified-skipped required profiles."
-    },
-    {
-      "id": "ORG-P1-PLATFORM-EMAIL-OUTBOX",
-      "repository": "Oteryn/Oteryn-Platform",
-      "summary": "Identity email-change security notifications are persisted and delivered without a durable transactionally coordinated per-message delivery model.",
-      "target": "Transactional outbox or equivalent with idempotency, delivery state, bounded retry, terminal state and restart/expiry/revocation tests."
-    },
-    {
-      "id": "ORG-P1-GAME-SESSION-AUTHORITY",
-      "repository": "Oteryn/Oteryn-Game",
-      "summary": "Complete persisted/reloaded retired-session nonreuse authority is not yet terminally closed in the active remediation line.",
-      "target": "Persist and reload complete retired-session authority and qualify S0->S1->S2 reuse rejection across reconnect/restart without duplicate effects or authority rollback."
-    }
+  "semantic_coverage": "PARTIAL_EXPLICIT_NOT_ALL_LINE",
+  "production_readiness_claimed": false,
+  "independent_score": null,
+  "known_current_main_p1_ids": [
+    "GAME-F20",
+    "PLATFORM-F01",
+    "PLATFORM-F02",
+    "PLATFORM-F16"
   ],
-  "closed_historical_high_priority_findings": [
-    "Atlas F01-F16 remediation set",
-    "Game client lifecycle error handling and PKCE bounds",
-    "Game AI CandidateId uniqueness",
-    "Game Ability nonpositive magnitude validation",
-    "Game WP1/F01+F02 required-gate credibility and native-command fail-closed behavior"
+  "known_current_main_p1_count": 4,
+  "candidate_only_reported_p1_ids": [
+    "GAME-CANDIDATE-361"
   ],
-  "audit_domains": {
-    "A": "AUDITED",
-    "B": "AUDITED",
-    "C": "AUDITED",
-    "D": "AUDITED",
-    "E": "AUDITED",
-    "F": "AUDITED",
-    "G": "AUDITED",
-    "H": "AUDITED",
-    "I": "AUDITED_MEASUREMENTS_PARTLY_UNKNOWN",
-    "J": "AUDITED",
-    "K": "AUDITED",
-    "L": "AUDITED",
-    "M": "AUDITED_CURRENT_LIVE_PROOF_PARTLY_UNKNOWN",
-    "N": "AUDITED_ACCESSIBLE_ADMIN_ONLY_UNKNOWN",
-    "O": "AUDITED_LIVE_TELEMETRY_UNKNOWN",
-    "P": "AUDITED",
-    "Q": "AUDITED",
-    "R": "AUDITED",
-    "S": "AUDITED_WITHIN_ACCESSIBLE_GITHUB_STATE",
-    "T": "AUDITED",
-    "U": "AUDITED_FULL_LATEST_MATRIX_NOT_EXECUTED",
-    "V": "AUDITED",
-    "W": "AUDITED"
+  "confirmed_p0_in_scoped_review": 0,
+  "severity_counts_exhaustive": false,
+  "reconciled_register_rows": 76,
+  "historical_source_ids_accounted": 74,
+  "additional_followup_ids": 2,
+  "unresolved_unknowns": 15,
+  "audit_domains_accounted": 23,
+  "audit_domains_all_pass": false,
+  "workflow_census": {
+    "meta": {
+      "workflows": 2,
+      "jobs": 4,
+      "merge_group_workflows": 1
+    },
+    "game": {
+      "workflows": 17,
+      "jobs": 41,
+      "merge_group_workflows": 1
+    },
+    "platform": {
+      "workflows": 55,
+      "jobs": 100,
+      "merge_group_workflows": 1
+    },
+    "atlas": {
+      "workflows": 3,
+      "jobs": 5,
+      "merge_group_workflows": 2
+    },
+    "total_workflows": 77,
+    "total_declared_jobs": 150,
+    "matrix_expanded": false,
+    "semantic_qualification_claimed": false
   },
-  "coverage_closeout": {
-    "point_14": "COMPLETE_WITHIN_ACCESSIBLE_SCOPE",
-    "repository_family_coverage": "COMPLETE",
-    "audit_domains_A_W": "COMPLETE",
-    "current_finding_revalidation": "COMPLETE",
-    "historical_finding_reconciliation": "COMPLETE",
-    "silently_omitted_domains": 0,
-    "unclassified_repository_families": 0,
-    "hidden_partials": 0
+  "corrected_coordinate": {
+    "repository": "Oteryn/Oteryn-Game",
+    "original_unresolvable_sha": "3327db49c0c3e2d90afe6a74954c579a36aba2a5",
+    "observations": [
+      "Git fetch exit128 in run34165374247",
+      "Native GitHub Git-commit GET returned404",
+      "Replacement main ref, commit and all root-tree/blob identities verified"
+    ],
+    "replacement_sha": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+    "original_cause": "UNKNOWN; no fabrication motive or simple upstream drift inferred"
   },
-  "explicit_unknowns": [
-    "current private-production runtime state",
-    "current live production telemetry",
-    "latest complete deploy/restore/rollback proof",
-    "current full Game G1 qualification",
-    "Atlas restored verification qualification",
-    "organization Security Center/admin-only settings not exposed by current integration",
-    "secret values",
-    "current full CVE/SBOM/secret-history scan",
-    "GitHub Actions billing/minute totals",
-    "actual agent API billing-token cost and wall time",
-    "full current local build/test/migration execution on all repositories"
-  ],
-  "prioritized_remediation": [
-    {
-      "priority": 1,
-      "name": "Platform verification integrity",
-      "scope": ["classifier", "exact-candidate fan-in"]
-    },
-    {
-      "priority": 2,
-      "name": "Platform identity email outbox"
-    },
-    {
-      "priority": 3,
-      "name": "Game WP2/WP4 session-authority closure"
-    },
-    {
-      "priority": 4,
-      "name": "Finish Platform audit artifact lineage and exact per-leaf export when execution plane is available"
-    },
-    {
-      "priority": 5,
-      "name": "Atlas verification restoration after explicit owner resume"
-    },
-    {
-      "priority": 6,
-      "name": "Current-release disaster-recovery qualification"
-    },
-    {
-      "priority": 7,
-      "name": "Measured CI cost and latency optimization"
-    },
-    {
-      "priority": 8,
-      "name": "Governance stale-authority cleanup"
-    },
-    {
-      "priority": 9,
-      "name": "Agent token/time/cost measurement"
-    },
-    {
-      "priority": 10,
-      "name": "Supply-chain, SBOM, provenance and licensing hardening"
-    }
-  ],
-  "live_programme_references": [
-    "Oteryn/Oteryn#153",
-    "Oteryn/Oteryn-Game#364",
-    "Oteryn/Oteryn-Game#360",
-    "Oteryn/Oteryn-Game#361",
-    "Oteryn/Oteryn-Platform#1294",
-    "Oteryn/Oteryn-Platform#451",
-    "Oteryn/Oteryn-Atlas#315"
-  ],
-  "authority_note": "Live provider repository state outranks this snapshot if it moves after the recorded coordinates. Refresh protected-main SHA, active Issue/PR ownership and exact candidate state before mutation."
+  "evidence_directory": "organization-audit-20260907",
+  "canonical_register": "organization-audit-20260907/finding-register.tsv",
+  "coverage_review": "organization-audit-20260907/coverage-review.tsv",
+  "coverage_summary": "organization-audit-20260907/coverage-summary.json",
+  "domain_matrix": "organization-audit-20260907/domain-matrix.tsv",
+  "workflow_inventory": "organization-audit-20260907/workflow-inventory.tsv",
+  "verification": "organization-audit-20260907/verification-index.json",
+  "unknown_register": "organization-audit-20260907/unknowns.json",
+  "authority_note": "Provider implementation and live lifecycle authority remain in their repositories. Evidence is source-pinned; later source/config/consumer/Issue/PR changes can invalidate it. No provider writes, production actions, protection changes, new required gates or restored Atlas workflows are authorized by this report."
 }

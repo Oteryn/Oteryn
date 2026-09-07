@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "results": [
+    {
+      "id": "atlas-focused-node",
+      "source_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+      "command": [
+        "node",
+        "--test",
+        "tests/fullworld-runtime/runtime-safety.test.mjs",
+        "tests/fullworld-runtime/cdp-session.test.mjs",
+        "tests/fullworld-publication/canonical-json-parity.test.mjs"
+      ],
+      "exit_code": 0,
+      "log_sha256": "86e88c911bc725aeec96626b52f7f996bdd979aa678050c76f0a1c4476d188f6"
+    },
+    {
+      "id": "atlas-output-safety",
+      "source_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tests/fullworld-publication/test_output_safety.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log_sha256": "c8e604e50efb36abcae18564d7fe4ef2e3101abefbae4a3ed15b436564532c15"
+    },
+    {
+      "id": "game-semantic-dispatch",
+      "source_commit": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/architecture/tests",
+        "-p",
+        "test_semantic_contract_audit_dispatch.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log_sha256": "8e1a2ea36767c2854d3885b3e979bdd088c63515aeea183fe80ba737eb567dee"
+    },
+    {
+      "id": "meta-central_agent_policy.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/central_agent_policy.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "c2c7048579f7cbddde925c74afecf8363144995d372c64d6071f73b8e6ee0612"
+    },
+    {
+      "id": "meta-test_agent_continuation_policy.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_agent_continuation_policy.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "56fe3aeb17809548e7a858e31837b0f851131d6b748ed871c16bbc9885bbdf70"
+    },
+    {
+      "id": "meta-test_agent_continuation_review_repairs.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_agent_continuation_review_repairs.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "feabb4add9e2ca3374e538560634d1ec97dc4f4ce89aab12f3d726e36ea9b2f6"
+    },
+    {
+      "id": "meta-test_agent_execution_routing.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_agent_execution_routing.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "36bb8c33048149e8afb1906835545c4ccb340329cc918d64625e07e6ce48c8a1"
+    },
+    {
+      "id": "meta-test_bounded_execution_guard.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_bounded_execution_guard.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "c13b84184b97654af7523809135695b895cd7aee6a6319bea2996128b2089f78"
+    },
+    {
+      "id": "meta-test_central_agent_policy.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_central_agent_policy.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "c411f8ea786595efa9ce2d659f22f562d33ea95e54825b0509eb2cf661d513ce"
+    },
+    {
+      "id": "meta-test_merge_queue_workflow_contract.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_merge_queue_workflow_contract.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "328f7b1f9d1ec28b78555e6c4ca42ecd1c53f78673c630d5c31f3131c5b2c438"
+    },
+    {
+      "id": "meta-test_remote_desktop_action_gate.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_remote_desktop_action_gate.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "df6250a8fe28bf01ee0d843f1f9873df9c091ad16e62a1e86de4ba381ca736be"
+    },
+    {
+      "id": "meta-validate_release_manifests.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/validate_release_manifests.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "978b1b7bdb0d4a93744797e02461e49e420fda5ca4383f4f4f077393528ec5cb"
+    },
+    {
+      "id": "platform-test_classify_changes",
+      "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tests/ci/test_classify_changes.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log_sha256": "709e5336527501d9320c14134842c2f674df01bda8d542371acdecde6b620094"
+    },
+    {
+      "id": "platform-test_required_test_gate",
+      "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tests/ci/test_required_test_gate.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log_sha256": "71ce2af8ac9d3bdc3b31464cd5d73c2407cba696f1434b88e8cfc761ab71a82f"
+    }
+  ],
+  "collector_tests": 18,
+  "platform_existing_tests": 29,
+  "game_dispatcher_tests": 37,
+  "atlas_focused_tests": 33,
+  "routing_policy_fixtures": 28,
+  "real_git_cases": 8,
+  "routing_false_negatives": 2,
+  "reproduced_unsafe_skip_cases": [
+    "type_and_docs",
+    "rename_into_docs"
+  ],
+  "routing_product_verdict": "FAIL_FOR_TWO_CASES",
+  "acquisition": {
+    "failed_run": 34165374247,
+    "failed_job": 101875254866,
+    "failure": "Unresolvable original Game commit; 18 collector tests passed; acquisition did not pass",
+    "successful_run": 34165469839,
+    "artifact_id": 10033995995,
+    "artifact_sha256": "ac3a5682c5a36f1bf20066c726565761a3612864b62886f36d2af4e9a032a861",
+    "collector_head": "72dc835d9123fd59f67b0e1f2f4a4e3a1181c1bf",
+    "source_object_count": 4641,
+    "source_object_bytes": 55462229,
+    "independent_blob_and_tree_integrity": "PASS_8_ROOT_TREES_AND_ALL_OBJECTS"
+  },
+  "environment": {
+    "python": "3.13.5",
+    "git": "2.47.3",
+    "node": "22.16.0",
+    "php": "8.4.23 (not Platform pinned 8.5)",
+    "rust": "NOT_AVAILABLE",
+    "internet": "sandbox DNS unavailable; approved GitHub-hosted read-only collection used"
+  },
+  "not_executed": [
+    "Full Laravel/PHP8.5 runtime/migration suite",
+    "Native Rust build/test/Windows/G1",
+    "Actual Atlas product E2E, UI visual/accessibility qualification and restoration",
+    "Live SMTP failure injection",
+    "Actual production deploy/restore/rollback or live admin/security verification",
+    "Fresh complete dependency/CVE/SBOM/secret-history scan",
+    "Paid agent/token/cost benchmark"
+  ],
+  "interpretation": "Test success is scoped to executed assertions. Two false-negative routing cases are reproduced product failures, not product PASS. Full source identities do not imply full review. Initial interrupted META batch was not counted; per-command reruns have durable results."
+}
