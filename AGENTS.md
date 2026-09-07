@@ -6,34 +6,35 @@
 
 It does **not** own Game, Platform or Atlas runtime implementation.
 
-## Agent execution discipline
+## Policy and task routing
 
-Use `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` for
-GitHub preflight, authorized execution, Remote Desktop exact-call gating, isolation,
-proportionate lane planning, late integration and truthful completion.
-`docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md` owns bounded retries,
-freeze and no-progress decisions; productive work has no generic elapsed-time stop.
-For work crossing session/context/wait boundaries, additionally load
-`docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` and
-`ecosystem/agent-continuation-policy.json`. Never invent automatic continuation.
+Follow `docs/agents/policy/ORGANIZATION_AGENT_POLICY.md` for shared execution
+semantics. This repository owns that policy; the rules below retain META-specific
+scope and the local bootstrap needed to deliver it.
 
-Only when a current task needs and authorizes Synology access, load
-`docs/agents/contracts/SYNOLOGY_MCP_EXECUTION_POLICY.md`. GitHub remains repository
-and required-check authority; tools do not grant permission.
+Load the relevant procedure when performing its operation:
 
-## Skills and historical material
+- Repository work: `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`
+  owns GitHub preflight, isolation, execution routing and publication readback.
+  GitHub is lifecycle authority; local clones are execution planes only.
+- Substantial starts/resumptions: validate the routing packet through
+  `tools/governance/agent_execution_routing.py` with
+  `ecosystem/agent-execution-routing-policy.json` and freshly verified GitHub facts.
+- Retry/freeze decisions: `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md`.
+  Productive work has no generic elapsed-time stop.
+- Session/context/wait transitions:
+  `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` and
+  `ecosystem/agent-continuation-policy.json`. Do not invent automatic continuation.
+- Review/integration: `docs/governance/AI_REVIEW_POLICY.md` and ADR 0005. Protected
+  `meta-gate` and GitHub Merge Queue remain required; local checks are not substitutes.
+- Prompt authoring/evaluation: `docs/agents/policy/PROMPTING_STANDARD.md` and
+  `docs/agents/policy/PROMPT_EVAL_STANDARD.md`, respectively.
+- Authorized Synology work only: `docs/agents/contracts/SYNOLOGY_MCP_EXECUTION_POLICY.md`.
 
-Skills and plugins are optional execution aids, subordinate to current user and
-repository authority. They must not add approval lifecycles, duplicate planning,
-expand scope or interrupt useful authorized work. Files marked historical/retired,
-old task prompts and retained `docs/superpowers/` plans are evidence, not dispatchable
-execution authority. A historical invocation's permission grant is not reusable.
-
-## GitHub-first execution gate
-
-Complete the canonical contract's GitHub preflight before mutation and verify the
-remote exact head after publication. Local clones/worktrees/caches are execution
-planes, not repository authority. Local-only patches and tests are not delivered work.
+Remote Desktop is default-deny, including metadata-looking direct calls; an actual
+host exception requires the canonical contract's fresh positive exact-call gate.
+Skills are optional aids, not additional authority or approval lifecycles. Retired
+prompts and `docs/superpowers/` material are evidence, not dispatchable instructions.
 
 ## Restricted publishing-credential compatibility
 
@@ -50,15 +51,6 @@ use another authorized repository-native write path or report the exact limitati
 Never embed the token in a remote URL or persist a new credential helper to bypass
 that boundary. Credential presence expands no repository/path/task/merge/production
 permission. Do not force-push; verify the remote exact head after publishing.
-
-## Execution-routing policy
-
-For substantial new/resumed task packets, use
-`ecosystem/agent-execution-routing-policy.json` through
-`tools/governance/agent_execution_routing.py`. The canonical access contract defines
-its arguments and execution order. Remote Desktop is default-deny, including
-metadata-looking direct calls; only a fresh positive exact-call authorization admits
-an actual host exception. Discover registration/schema metadata without invoking it.
 
 ## Organization runner routing
 
@@ -112,38 +104,21 @@ During repository migration, records must distinguish at least:
 
 Use explicit pending/unknown states rather than pretending future topology already exists. Live repository state outranks stale documentation.
 
-## Work visibility
+## Delivery and acceptance
 
-For substantial work:
+Use a dedicated task branch and an early Draft PR for substantial work. Inspect the
+complete changed-file list and diff, validate affected machine-readable contracts,
+and verify material repository coordinates and transition claims. Mark Ready only
+when implementation/self-review is complete. Follow the routed review policy and
+normal exact-candidate Merge Queue path; no ordinary direct-to-main writes, bypass,
+force push or missing-check PASS. The initial repository bootstrap is historical,
+not a standing exception.
 
-1. use a dedicated task branch;
-2. open a Draft PR early when practical;
-3. keep the changed paths narrowly scoped;
-4. inspect the full exact diff before readiness;
-5. verify current repository state and any external coordinates referenced by the change when those facts are material;
-6. mark Ready only after implementation/self-review is complete;
-7. merge only when repository-required exact-head checks pass and there are no unresolved review findings; a P2 may be non-blocking only after its exact review thread is resolved and a trusted maintainer has recorded the required same-repository follow-up Issue;
-8. use squash merge unless a future repository policy explicitly requires another method;
-9. delete the source branch after successful merge when it has no continuing purpose.
-
-Do not push ordinary feature/governance work directly to `main`.
-
-### Initial-bootstrap exception
-
-The one direct `main` commit that created `README.md` in the previously empty repository is the bootstrap anchor required to make branching possible. It is not standing permission for future direct-to-main writes. The bootstrap is historical evidence only; normal current task branches and PRs govern all subsequent changes.
-
-## Validation and evidence
-
-Completion claims require observable evidence, not worker narrative. At minimum:
-
-- inspect the exact changed-file list and full diff;
-- parse/validate machine-readable files with an appropriate deterministic parser when tooling exists;
-- check that repository coordinates and migration states do not contradict known live state;
-- verify any repository-required CI/checks on the exact final head;
-- inspect reviews, inline threads and PR comments before merge;
-- record `NOT_APPLICABLE` explicitly when a runtime/E2E check genuinely does not apply to documentation/metadata-only work.
-
-Missing or inaccessible CI is not a pass. `meta-gate` and GitHub Merge Queue remain the current required verification/integration path; local checks do not substitute for their exact-head evidence.
+Squash integration remains the default. Resolve every blocking review finding;
+a non-blocking P2 requires its resolved exact thread and a trusted maintainer's
+same-repository follow-up Issue. Verify protected-main readback and delete a terminal
+source branch when it has no continuing purpose. Report runtime/E2E `NOT_APPLICABLE`
+when warranted by documentation/metadata scope, never as a substitute for required CI.
 
 ## Security and sensitive data
 
@@ -151,12 +126,6 @@ Missing or inaccessible CI is not a pass. `meta-gate` and GitHub Merge Queue rem
 - Do not put sensitive material in ADRs, manifests, PR bodies, comments or logs.
 - Deny by default when authorization is ambiguous.
 - Production or destructive external mutations require separate explicit owner authority even if META documentation describes them.
-
-## AI review economy
-
-Use `docs/governance/AI_REVIEW_POLICY.md` for risk-proportionate independent review.
-External AI is advisory, never a required status or merge authority. Do not restore
-retired review fingerprints, formal R0/R1/R2 states, envelopes or attestation bridges.
 
 ## Architecture handover
 
