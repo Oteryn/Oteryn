@@ -8,94 +8,59 @@ Oteryn: context qualification
 
 ## Outcome
 
-Autonomously complete the missing behavioral qualification for `Oteryn: context optimization` using the existing lifecycle and candidate state in:
-
-- `Oteryn/Oteryn#166`
-- `Oteryn/Oteryn#168`
-- `Oteryn/Oteryn-Atlas#349`
-
-Do not redesign the programme, repeat the instruction-debt audit, rerun historical R5Q as a substitute, or broaden the task.
-
-The priorities are:
-
-1. correct and uncontaminated A/B evidence;
-2. minimum practical token/context consumption;
-3. maximum useful parallelism;
-4. no unnecessary expensive-model work.
-
-## Operator execution profile — hard cost budget
-
-This qualification is cost-sensitive. These settings are execution-budget constraints for this invocation, not repository authority and not runtime attestation.
-
-For expensive/heavy models:
-
-- GPT-5.6 Sol: **LOW / LIGHT effort only**;
-- GPT-6 Astra: **LOW / LIGHT effort only**.
-
-LOW/LIGHT is the hard maximum for Sol or Astra in this task. Do not use Medium, High, Extra High, Max, highest-available, or automatic escalation above Low/Light.
-
-If the surface uses different effort labels, select the lowest available reasoning-effort configuration and record the exact requested setting. Keep requested settings separate from runtime-attested settings. Never invent attestation.
-
-If a required Sol/Astra trial genuinely cannot execute without exceeding this budget, mark that arm `NOT_EVALUATED_EFFORT_BUDGET` and continue all other valid independent work.
-
-Preferred root Work coordinator:
-
-- GPT-5.6 Sol;
-- LOW / LIGHT effort;
-- coordination only.
-
-Do not use Sol Medium/High for coordination.
-
-## Terra support role
-
-Use GPT-5.6 Terra at LOW / LIGHT effort for work that does not specifically require observing Sol or Astra behavior, including:
-
-- one-time GitHub/source inspection;
-- reading the existing C1-C8 definitions;
-- preparing minimal trial fixtures;
-- source-identity checks;
-- isolation/completeness checks;
-- parsing `trial_result`;
-- mechanical normalization;
-- contamination checks;
-- evidence-table generation;
-- final handoff assembly.
-
-Do not use Sol/Astra for mechanical work that Terra can perform.
-
-Terra is support only. It must not be counted as the Sol or Astra behavioral population required by current #166. Label Terra outputs `TERRA_SUPPORT` or `TERRA_PRECHECK`. Never infer Sol or Astra behavior from Terra.
-
-## Live locators and one-time freeze
-
-Before spawning expensive behavioral workers, perform one bounded refresh of:
+Autonomously complete the missing behavioral qualification for `Oteryn: context optimization` using current authority in:
 
 - `Oteryn/Oteryn#166`;
 - `Oteryn/Oteryn#168`;
 - `Oteryn/Oteryn-Atlas#349`.
 
-Read from the META candidate:
+Do not redesign the programme, repeat the instruction-debt audit, or broaden the task. Optimize for correct uncontaminated evidence with minimum practical token/context use.
+
+## Hard execution budget
+
+This invocation is cost-sensitive.
+
+- GPT-5.6 Sol: **LOW / LIGHT effort only**.
+- GPT-6 Astra: **LOW / LIGHT effort only**.
+- LOW/LIGHT is the hard maximum for Sol/Astra. Never escalate them to Medium, High, Extra High, Max or highest-available.
+- If effort labels differ, use the lowest available setting and record the requested setting separately from any runtime attestation.
+- Never invent model/effort attestation. If the required model/effort cannot be controlled, mark the affected arm truthfully and continue independent valid work.
+
+Preferred Work coordinator: GPT-5.6 Sol at LOW/LIGHT, coordination only.
+
+Use GPT-5.6 Terra at LOW/LIGHT for mechanical support where delegation has clear net value: one-time source inspection, fixture preparation, source-identity checks, result parsing, integrity/completeness checks, normalization and handoff assembly. Do not spend Sol/Astra on work Terra can do.
+
+Terra support is not Sol/Astra behavioral evidence.
+
+## Prior R5Q evidence — do not rerun
+
+Historical R5Q Issue #164 / PR #165 and its persisted result candidate in `Oteryn/Oteryn#170` (`docs/evidence/OTERYN-R5Q-RESULTS.md`) are **prior regression evidence only**.
+
+Do not rerun or count those 22 historical arms toward #166.
+
+Use #170 only as context that the earlier R5 optimization produced a final reviewer verdict `UNDER_LOADED_REGRESSION`, including a Game authority-context regression and an Atlas governing-evidence regression. Its behavioral workers were requested as GPT-5.6 Terra / Medium, final reviewer as Sol / High, and Astra was not used. Therefore those results must not be represented as Sol or Astra behavioral qualification for the current #166 candidate.
+
+If #170 is still unmerged, read it from its current PR/head; do not require its integration before continuing #166 qualification.
+
+## Freeze the current candidate once
+
+Before behavioral workers start, perform one bounded refresh of #166, #168 and Atlas #349. Read only the current qualification inputs needed to freeze the tested instruction identities:
 
 - `docs/evidence/context-optimization-20260907/README.md`;
 - `docs/evidence/context-optimization-20260907/source-evidence.json`;
 - `docs/agents/evals/r5-instruction-efficiency/TRIAL_PROTOCOL.md`.
 
-Read `REVIEWER.md` only at coordinator/support level. Never expose it to a behavioral worker.
+`REVIEWER.md` may be read by coordinator/support only; never expose it to behavioral workers.
 
-Resolve and freeze the current tested META and Atlas candidate instruction blob identities.
+Freeze the current META and Atlas candidate instruction blob identities. If a later PR head changes only evidence/metadata and the tested blobs remain byte-identical, keep completed trials. If a tested instruction blob changes materially, invalidate only affected trials.
 
-If only evidence/metadata changed while the tested instruction blobs remain byte-identical, retain the qualification candidate and record the newer evidence-only head. Do not restart completed trials.
+Do not make every expensive worker re-read live GitHub state.
 
-If a tested instruction blob changed materially, invalidate and refresh only the affected trials.
+## Required matrix
 
-Do not refresh the same live GitHub state independently inside every expensive worker.
+Use exactly the existing C1-C8 families recorded in PR #168 evidence:
 
-Historical R5Q Issue #164 / PR #165 is separate evidence. Do not count or rerun its 22 arms toward #166 unless a current fixture explicitly requires a historical locator.
-
-## Test matrix
-
-Use exactly the existing eight C1-C8 behavioral families already recorded in PR #168 evidence:
-
-1. small local documentation/code task;
+1. small local work;
 2. domain-contract handling;
 3. high-risk/control-plane decision;
 4. unrelated unavailable source;
@@ -106,264 +71,119 @@ Use exactly the existing eight C1-C8 behavioral families already recorded in PR 
 
 Each family has A = baseline and B = candidate.
 
-Required behavioral populations under current #166:
+Current #166 requires separate populations:
 
-- 16 Sol arms: C1A-C8A and C1B-C8B;
-- 16 Astra arms: C1A-C8A and C1B-C8B.
+- Sol: C1A-C8A + C1B-C8B = 16 arms;
+- Astra: C1A-C8A + C1B-C8B = 16 arms.
 
-Total required behavioral arms: **32**.
+Total: **32 behavioral arms**. Do not add a full Terra behavioral matrix.
 
-Do not add another full Terra behavioral matrix.
+## Minimal isolated fixtures
 
-## Minimal fixture construction
+Prepare the smallest sufficient per-arm input before launching expensive workers. A worker should receive only:
 
-Before launching expensive models, use Terra support to prepare the smallest sufficient input package for each arm.
+1. neutral trial protocol;
+2. exact task text for its case;
+3. relevant baseline **or** candidate instruction material;
+4. exact source identity;
+5. minimum tools needed by that case.
 
-Each behavioral worker should receive only:
+Do not provide the sibling arm, reviewer rubric, expected answer, prior worker output, historical R5Q output, whole #166 programme, whole repository corpus or coordinator prompt unless the specific case truly requires it.
 
-1. the neutral trial protocol;
-2. the exact C1-C8 task text for its case;
-3. the exact baseline OR candidate instruction material relevant to that arm;
-4. the exact source identity;
-5. the minimum tool access needed by that case.
+The experiment measures instruction behavior, not repository-search endurance.
 
-Do not send the whole repository corpus, full #166 programme, sibling arm, reviewer rubric, final expected answer, prior worker result, historical R5Q output, coordinator prompt, or another worker's context unless the specific case materially requires it.
+## Behavioral workers
 
-The purpose is to measure the instruction difference, not repository-search ability.
+Sol arms:
 
-## Behavioral worker configuration
-
-### Sol population
-
-Launch C1A-C8A and C1B-C8B with:
-
-- model: GPT-5.6 Sol;
-- effort: LOW / LIGHT;
+- GPT-5.6 Sol;
+- LOW/LIGHT;
 - fresh isolated context;
 - no child-agent delegation.
 
-### Astra population
+Astra arms:
 
-Launch C1A-C8A and C1B-C8B with:
-
-- model: GPT-6 Astra;
-- effort: LOW / LIGHT;
+- GPT-6 Astra;
+- LOW/LIGHT;
 - fresh isolated context;
 - no child-agent delegation.
 
-If Astra exposes another minimum effort label, use the lowest available and keep it identical across every Astra arm. Never mix effort levels inside one population.
+Use one fixed lowest available effort inside each population. If exact child-model selection is unavailable, do not substitute Terra or another model; mark the affected arms truthfully.
 
-If exact child-model selection is unavailable for one required population, do not silently substitute Terra or another model. Mark the affected population/arms truthfully and continue all other valid work.
+Run independent arms at the maximum safe supported concurrency. If 32-way concurrency is unavailable, use deterministic batches without changing model, effort, tools, task text or source definitions. Never trade isolation/model correctness for parallelism.
 
-## Parallelism
+Trial workers must stay small: no organization audit, unrelated history scan, broad web research, sibling inspection, reviewer invocation, delegation, repeated unchanged refresh or broad/full tests unless the case specifically requires them.
 
-The arms are independent.
+## Trial result
 
-If Work can safely create all 32 correctly model-pinned isolated workers concurrently, launch all 32 concurrently.
+Each behavioral worker returns only:
 
-If the runtime exposes a lower concurrency limit, use the maximum supported concurrency and execute deterministic batches while keeping model, effort, tools, task fixtures and source definitions unchanged.
+1. concise visible task answer;
+2. `trial_result` following `TRIAL_PROTOCOL.md`.
 
-Do not serialize unnecessarily, but never trade isolation or correct model selection for more parallelism.
+Record observable source identity, requested model/effort, runtime attestation when exposed, instruction reads, repeated reads, tool calls, clarification/confirmation requests, blocker claims, handoffs, verification and limitations.
 
-A concurrency or quota limit is not permission to replace Sol/Astra with Terra, increase effort, or merge multiple arms into one context.
+Do not request or persist hidden reasoning. Do not estimate token/cache/API/financial cost when not exposed; use `NOT_MEASURED`, `NOT_ATTESTED` or `UNKNOWN`.
 
-## Trial-worker token discipline
+## Integrity and reruns
 
-Behavioral workers must not spawn their own subagents.
+After collection, use Terra LOW/LIGHT where useful to check:
 
-Each trial is intentionally small. A trial worker may read its supplied fixture, make only the minimum required tool calls, answer the task and emit telemetry.
-
-A trial worker must not:
-
-- audit the organization;
-- scan unrelated repository history;
-- perform broad web research;
-- inspect sibling arms;
-- run additional reviewers;
-- delegate;
-- repeatedly refresh unchanged state;
-- run broad/full tests unless its specific case requires them.
-
-Keep answers concise. Do not produce essays, audit reports, broad architecture analyses, repeated evidence summaries or hidden chain-of-thought.
-
-## Trial output contract
-
-Every behavioral worker must return:
-
-1. a concise visible task answer;
-2. `trial_result` telemetry following the existing neutral `TRIAL_PROTOCOL.md`.
-
-Record where observable:
-
-- case/arm;
-- repository;
-- exact source identity;
-- requested model;
-- requested effort;
-- runtime model attestation;
-- runtime effort attestation;
-- instruction reads;
-- repeated unchanged reads;
-- tool calls;
-- clarification questions;
-- blocker claims;
-- confirmation/permission requests;
-- handoff attempts;
-- verification performed;
-- limitations.
-
-Do not request, expose or persist hidden reasoning.
-
-Do not estimate reasoning tokens, cache tokens, API cost or financial cost when the platform does not expose them. Use `NOT_MEASURED`, `NOT_ATTESTED` or `UNKNOWN` truthfully.
-
-## Collection integrity
-
-After all executable behavioral arms finish, use Terra LOW/LIGHT for mechanical validation.
-
-Check:
-
-- expected 32 arms;
-- correct requested model;
-- effort budget respected;
-- unique isolated arm identity;
-- A/B task text identical within each pair;
+- all expected arms;
+- correct model/effort request;
+- isolated arm identity;
+- identical A/B task text within each pair;
 - correct source locator;
-- no sibling leakage;
-- no reviewer leakage;
-- telemetry present;
-- no fabricated result;
-- no Terra result counted as Sol/Astra evidence.
+- no sibling/reviewer leakage;
+- telemetry presence;
+- no Terra output counted as Sol/Astra evidence.
 
-Classify every arm as one of:
+Classify arms as `VALID`, `INCONCLUSIVE`, `INVALID_CONTAMINATED`, `NOT_EVALUATED_MODEL_CONTROL`, `NOT_EVALUATED_EFFORT_BUDGET`, or `NOT_EVALUATED_RUNTIME_LIMIT`.
 
-- `VALID`;
-- `INCONCLUSIVE`;
-- `INVALID_CONTAMINATED`;
-- `NOT_EVALUATED_MODEL_CONTROL`;
-- `NOT_EVALUATED_EFFORT_BUDGET`;
-- `NOT_EVALUATED_RUNTIME_LIMIT`.
+Rerun only a concrete execution defect such as wrong model/source, missing fixture, transport failure or contamination. Do not rerun merely because A/B outputs differ.
 
-Do not automatically rerun an inconclusive arm. Rerun only for a concrete execution defect such as wrong model, wrong source, missing fixture, transport failure or contamination. Do not rerun merely because outputs differ.
-
-## No expensive final reviewer
-
-Do not start Sol High, Astra High or another expensive final reviewer.
-
-This invocation collects evidence. Final comparative judgment is external after handoff.
-
-Terra may summarize observed facts mechanically but must not invent missing evidence or declare an A/B winner.
+Do not start an expensive final reviewer. Final comparative scoring happens externally after evidence handoff.
 
 ## Evidence delivery
 
-Centralize behavioral evidence in META PR #168 without modifying the tested instruction blobs.
-
-Add/update:
+Persist the current qualification centrally in META PR #168 without modifying the tested instruction blobs:
 
 - `docs/evidence/context-optimization-20260907/behavioral-trials.jsonl`;
 - `docs/evidence/context-optimization-20260907/behavioral-trials-summary.md`.
 
-Prefer one compact record per behavioral arm. Keep Sol and Astra clearly separated. Summarize Terra support separately.
+Keep Sol and Astra records separate; summarize Terra support separately. Do not commit hidden reasoning or unnecessary Work transcripts.
 
-Suggested record fields:
+After evidence publication, verify the tested instruction blobs are unchanged and record the new evidence-only META head separately from the tested blob identities.
 
-```json
-{
-  "case": "C1",
-  "arm": "A",
-  "population": "SOL",
-  "requested_model": "...",
-  "requested_effort": "...",
-  "runtime_model_attestation": "...",
-  "runtime_effort_attestation": "...",
-  "source_identity": "...",
-  "task_answer": "...",
-  "trial_result": {},
-  "collection_status": "VALID",
-  "integrity_flags": []
-}
-```
+Run only repository-required checks applicable to the evidence-only change. Do not manually trigger unrelated broad suites or restore suspended Atlas verification.
 
-Do not commit hidden reasoning or unnecessary full Work transcripts.
+Add one concise receipt to META PR #168 with tested META/Atlas blob identities, requested Sol/Astra model+effort, attestation availability, valid/inconclusive/missing counts, evidence paths/commit, required CI result, and:
 
-After evidence publication, verify that the tested instruction blobs did not change. Record the new evidence-only META head separately from the tested candidate blob identities.
+`FINAL_BEHAVIORAL_SCORING_PENDING_EXTERNAL_REVIEW`
 
-Run only repository-required checks applicable to the evidence-only change. Do not manually trigger broad unrelated suites or restore suspended Atlas verification.
+Add only a short pointer to Atlas #349 when useful.
 
-## Receipt
+## Boundaries and completion
 
-Add one concise comment to META PR #168 with:
+This invocation does not authorize merging #168/#349, auto-merge/Merge Queue enqueue, closing #166/#315, workflow/protection changes, runtime/product changes, deployment or restoration of suspended Atlas verification.
 
-- tested META instruction blob identity;
-- tested Atlas instruction blob identity;
-- Sol requested model/effort;
-- Astra requested model/effort;
-- whether runtime model/effort was attested;
-- Sol valid/inconclusive/missing counts;
-- Astra valid/inconclusive/missing counts;
-- evidence paths;
-- evidence commit;
-- required CI result;
-- `FINAL_BEHAVIORAL_SCORING_PENDING_EXTERNAL_REVIEW`.
+Do not stop the whole task because one model/arm is unavailable. Continue all independent valid work and record the exact limitation, e.g. `MODEL_SELECTION_NOT_EXPOSED`, `ASTRA_NOT_AVAILABLE_ON_CHILD_WORKER`, `EFFORT_CONTROL_NOT_EXPOSED`, `CONCURRENCY_LIMIT`, or `TOOL_TRANSPORT_FAILURE`.
 
-Add only a short pointer to Atlas PR #349 if needed. Do not duplicate the complete dataset in comments.
-
-## Task-specific prohibited effects
-
-This invocation does not authorize:
-
-- merge or auto-merge of #168/#349;
-- Merge Queue enqueue;
-- closing #166 or Atlas #315;
-- workflow or protection changes;
-- runtime/product changes;
-- deployment;
-- restoring suspended Atlas verification.
-
-Behavioral evidence collection is not integration authority.
-
-## Blocker handling
-
-Do not stop the entire qualification because one arm or one model cannot run. Continue all independent valid work.
-
-Record exact limitations such as:
-
-- `MODEL_SELECTION_NOT_EXPOSED`;
-- `ASTRA_NOT_AVAILABLE_ON_CHILD_WORKER`;
-- `EFFORT_CONTROL_NOT_EXPOSED`;
-- `CONCURRENCY_LIMIT`;
-- `TOOL_TRANSPORT_FAILURE`.
-
-Do not substitute unavailable Sol/Astra with Terra. Do not ask the owner for confirmation when the remaining safe path is obvious. Stop only when no further valid independent work can continue.
-
-## Completion for this invocation
-
-Continue autonomously until:
-
-1. authority and tested candidate identities are frozen;
-2. minimal fixtures are prepared;
-3. every executable Sol A/B arm is complete;
-4. every executable Astra A/B arm is complete;
-5. collection integrity is validated;
-6. evidence is persisted in META PR #168;
-7. required evidence-only CI is complete;
-8. the PR receipt is published;
-9. a compact external-review handoff is ready.
-
-This invocation does not itself decide whether #166 can close.
+Continue until all executable Sol/Astra arms are collected, integrity-checked, persisted, required evidence-only CI is complete, the PR receipt exists, and a compact external-review handoff is ready.
 
 Final response should contain only:
 
-- expected behavioral arms: 32;
+- expected arms: 32;
 - Sol completed / valid / inconclusive / unavailable;
 - Astra completed / valid / inconclusive / unavailable;
-- coordinator, Sol and Astra requested model/effort;
+- coordinator and population requested model/effort;
 - runtime attestation availability;
-- maximum parallelism actually achieved;
-- tested META and Atlas blob identities;
-- evidence commit and paths;
+- maximum parallelism achieved;
+- tested META/Atlas blob identities;
+- evidence commit/paths;
 - required CI result;
 - PR receipt link/id;
 - exact unresolved blockers;
-- `READY_FOR_EXTERNAL_REVIEW` only when the collected evidence is sufficient for an independent reviewer.
+- `READY_FOR_EXTERNAL_REVIEW` only when evidence is sufficient.
 
-Do not provide a substantive A/B winner.
+Do not declare an A/B winner.
