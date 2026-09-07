@@ -1,0 +1,99 @@
+name: Final cleanup source snapshot (temporary)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  source-snapshot:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'tools/final-cleanup-source-176'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Export public source and lifecycle snapshots without executing repository code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import urllib.request
+          
+          rows = {
+              'META': ('Oteryn', '000f530436bc6370dfbc13d5a087bc750b0e4742', [60, 89, 153]),
+              'Game': ('Oteryn-Game', 'a793457cf3001df37109acb2c4b4a772b53db97a', [150, 262, 288, 293]),
+              'Platform': ('Oteryn-Platform', 'e38755206b1c4ce0bc103b636772cc788f684aca', [1116, 1120, 1269]),
+              'Atlas': ('Oteryn-Atlas', '5ea38a62fe1af8b8068adcb84350e9644905943c', [136, 331, 342]),
+          }
+          work = Path(os.environ['RUNNER_TEMP']) / 'final-source-work'
+          output = Path(os.environ['RUNNER_TEMP']) / 'final-source-export'
+          work.mkdir()
+          output.mkdir()
+          manifest = {'purpose': 'read-only execution cache; refresh before mutation',
+                      'started_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                      'repositories': {}}
+          for name, (repository, admission, prs) in rows.items():
+              root = work / name
+              root.mkdir()
+              def git(*args):
+                  return subprocess.check_output(
+                      ['git', '-c', 'core.hooksPath=/dev/null', '-C', str(root), *args],
+                      text=True, timeout=180,
+                  ).strip()
+              git('init', '--quiet')
+              url = f'https://github.com/Oteryn/{repository}.git'
+              git('fetch', '--no-tags', '--no-recurse-submodules', url, 'refs/heads/main:refs/heads/observed-main')
+              git('branch', 'admission-main', admission)
+              refs = ['refs/heads/admission-main', 'refs/heads/observed-main']
+              pr_heads = {}
+              for number in prs:
+                  ref = f'refs/heads/pr-{number}'
+                  git('fetch', '--no-tags', '--no-recurse-submodules', url, f'refs/pull/{number}/head:{ref}')
+                  pr_heads[str(number)] = git('rev-parse', ref)
+                  refs.append(ref)
+              (output / f'{name}-heads.tsv').write_text(git('ls-remote', '--heads', url) + '\n')
+              bundle = output / f'{name}.bundle'
+              git('bundle', 'create', str(bundle), *refs)
+              git('bundle', 'verify', str(bundle))
+              metadata = {}
+              for label, endpoint in [('repository', ''), ('open_issues', '/issues?state=open&per_page=100'),
+                                      ('open_prs', '/pulls?state=open&per_page=100'),
+                                      ('rulesets', '/rulesets?includes_parents=true&per_page=100')]:
+                  api = f'https://api.github.com/repos/Oteryn/{repository}{endpoint}'
+                  request = urllib.request.Request(api, headers={'Accept': 'application/vnd.github+json',
+                                                                 'User-Agent': 'Oteryn-final-source-export'})
+                  try:
+                      with urllib.request.urlopen(request, timeout=30) as response:
+                          body = json.load(response)
+                          metadata[label] = {'data': body, 'link': response.headers.get('Link')}
+                  except Exception as exc:
+                      metadata[label] = {'unavailable': type(exc).__name__, 'message': str(exc)}
+              (output / f'{name}-metadata.json').write_text(json.dumps(metadata, indent=2) + '\n')
+              manifest['repositories'][name] = {
+                  'repository': f'Oteryn/{repository}',
+                  'admission_sha': git('rev-parse', admission + '^{commit}'),
+                  'main_sha': git('rev-parse', 'observed-main^{commit}'),
+                  'main_tree': git('rev-parse', 'observed-main^{tree}'),
+                  'pr_heads': pr_heads, 'bundle': bundle.name,
+                  'sha256': hashlib.sha256(bundle.read_bytes()).hexdigest(),
+              }
+          manifest['finished_at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+          (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          print(json.dumps(manifest, indent=2))
+          PY
+      - name: Upload source transport artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: final-cleanup-sources-176
+          path: ${{ runner.temp }}/final-source-export/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
