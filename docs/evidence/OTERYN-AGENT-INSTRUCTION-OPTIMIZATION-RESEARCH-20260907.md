@@ -1,8 +1,8 @@
 # Oteryn — agent instruction optimization research
 
-Date: 2026-09-07  
-Class: **AUDIT_EVIDENCE / RECOMMENDATION**  
-Status: **NON-NORMATIVE**  
+Date: 2026-09-07
+Class: **AUDIT_EVIDENCE / RECOMMENDATION**
+Status: **NON-NORMATIVE**
 Related: `Oteryn/Oteryn#140`, Draft PR `#145`, Draft PR `#151`
 
 This document records a research synthesis for simplifying Oteryn agent instructions, prompts, skills and governance across META, Game, Platform and Atlas. It is evidence and design guidance only. It does not adopt a new policy, change provider repositories, alter permissions, change CI, modify branch protection, enable a model, or authorize production operations.
@@ -30,12 +30,12 @@ The optimization objective is not minimum Markdown bytes in Git. It is minimum *
 
 ### 2.1 Primary: official OpenAI documentation
 
-1. **GPT-6 Astra model guidance**  
-   <https://developers.openai.com/api/docs/guides/latest-model>  
+1. **GPT-6 Astra model guidance**
+   <https://developers.openai.com/api/docs/guides/latest-model>
    Material observation: Astra has stronger instruction following and can be more sensitive to instructions in skills and files such as `AGENTS.md`; OpenAI explicitly recommends auditing accessible skills and instruction files for guidance that can influence behavior.
 
-2. **Codex / ChatGPT `AGENTS.md` configuration**  
-   <https://learn.chatgpt.com/docs/agent-configuration/agents-md>  
+2. **Codex / ChatGPT `AGENTS.md` configuration**
+   <https://learn.chatgpt.com/docs/agent-configuration/agents-md>
    Material observations:
    - project instructions are discovered from repository root down to the current working directory;
    - in each directory at most one instruction file is selected, with `AGENTS.override.md` preferred over `AGENTS.md`;
@@ -46,8 +46,8 @@ The optimization objective is not minimum Markdown bytes in Git. It is minimum *
    - nested instructions should be placed close to specialized work;
    - review rules should be concise and formatting/lint checks should normally be left to CI.
 
-3. **OpenAI skills documentation**  
-   <https://learn.chatgpt.com/docs/build-skills>  
+3. **OpenAI skills documentation**
+   <https://learn.chatgpt.com/docs/build-skills>
    Material observations:
    - skills use progressive disclosure: name/description are initially visible and full `SKILL.md` is loaded after selection;
    - `SKILL.md` requires `name` and `description`;
@@ -56,8 +56,8 @@ The optimization objective is not minimum Markdown bytes in Git. It is minimum *
    - `agents/openai.yaml` can set `policy.allow_implicit_invocation: false`, leaving explicit invocation available;
    - repository skills may be scoped to the root or a narrower working directory.
 
-4. **Reasoning-model prompting best practices**  
-   <https://developers.openai.com/api/docs/guides/reasoning-best-practices>  
+4. **Reasoning-model prompting best practices**
+   <https://developers.openai.com/api/docs/guides/reasoning-best-practices>
    Material observations:
    - keep prompts straightforward and direct;
    - do not routinely instruct reasoning models to expose or perform chain-of-thought step-by-step prompting;
@@ -65,22 +65,22 @@ The optimization objective is not minimum Markdown bytes in Git. It is minimum *
    - start zero-shot and add examples only when needed;
    - state specific constraints and a concrete success target.
 
-5. **OpenAI harness engineering**  
-   <https://openai.com/index/harness-engineering/>  
+5. **OpenAI harness engineering**
+   <https://openai.com/index/harness-engineering/>
    Material observation: OpenAI describes an internal architecture where a short `AGENTS.md` is a map/table of contents and deeper knowledge lives in structured documentation. The roughly 100-line example is an implementation example, not a universal size requirement.
 
 ### 2.2 Secondary: external research
 
-1. **Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for Coding Agents?**  
-   <https://arxiv.org/abs/2602.11988>  
+1. **Evaluating AGENTS.md: Are Repository-Level Context Files Helpful for Coding Agents?**
+   <https://arxiv.org/abs/2602.11988>
    Reported result: in that experimental setting repository context files tended to reduce task success and increased inference cost by more than 20%; the authors attribute part of the effect to unnecessary requirements causing broader exploration and recommend minimal human-written requirements.
 
-2. **On the Impact of AGENTS.md Files on the Efficiency of AI Coding Agents**  
-   <https://arxiv.org/abs/2601.20404>  
+2. **On the Impact of AGENTS.md Files on the Efficiency of AI Coding Agents**
+   <https://arxiv.org/abs/2601.20404>
    Reported result: in 124 PRs across 10 repositories, the presence of `AGENTS.md` was associated with lower median runtime and lower output-token consumption while completion behavior remained comparable.
 
-3. **Do Context Files Help Coding Agents? A Two-Agent Ablation Study on Real Repositories**  
-   <https://arxiv.org/abs/2607.27250>  
+3. **Do Context Files Help Coding Agents? A Two-Agent Ablation Study on Real Repositories**
+   <https://arxiv.org/abs/2607.27250>
    Reported result: the controlled study found no measurable correctness improvement from context strategy in its tested tasks, emphasizing that context files do not compensate for implementation-skill failures.
 
 These studies are not directly comparable and do not establish a universal optimum. They support measuring Oteryn itself rather than assuming that either “more context” or “less context” always wins.
