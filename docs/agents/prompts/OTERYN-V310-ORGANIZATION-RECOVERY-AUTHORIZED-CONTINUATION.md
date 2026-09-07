@@ -28,7 +28,8 @@ Required target state:
 - `GAP-RECOVERY-005`: `BLOCKED_EXTERNAL_PREREQUISITE` if the historical single-owner prerequisite remains unresolved on current evidence;
 - `GAP-RECOVERY-006`: `PASS` using non-destructive production backup/restore evidence.
 
-`GAP-RECOVERY-005` is a known external prerequisite. DO NOT stop the whole invocation merely because it cannot pass. Finish `001..004` and `006` first.
+While that prerequisite remains unresolved, it does not stop the other scoped
+recovery work. Finish every authorized independent item in `001..004` and `006`.
 
 `GAP-RECOVERY-007` remains terminal historical evidence and MUST NOT be reopened.
 
@@ -221,7 +222,11 @@ If one or more required values exist only in a non-readable destination and no r
 Historical starting observation: only one organization owner/account existed.
 Reverify the prerequisite; this template does not attest current ownership.
 
-Therefore the required disposition for this invocation is:
+This continuation alias applies while that prerequisite remains unresolved. If
+current independent recovery proof resolves it, use the parent closeout template
+and refreshed lifecycle instead of reporting a stale blocker.
+
+While unresolved, the required disposition is:
 
 `GAP-RECOVERY-005 = BLOCKED_EXTERNAL_PREREQUISITE`
 
