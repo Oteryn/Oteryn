@@ -443,14 +443,24 @@ def test_provider_policy_adoption_rejects_historical_parallel_first_contract() -
     assert "provider overlay must not directly redefine META machine modules" in errors
 
 
-def test_provider_policy_adoption_rejects_direct_meta_module_contract() -> None:
-    stale = (
+def test_provider_policy_adoption_distinguishes_references_from_controllers() -> None:
+    # A bound source reference plus a tiny bootstrap is not a local policy fork.
+    # Text acceptance is not evidence of actual instruction delivery or tool permission.
+    reference = (
         "Resolve `docs/agents/META_AGENT_POLICY_BINDING.json` before material mutation. "
         "The current protected META execution policy is ecosystem/agent-execution-routing-policy.json. "
         "Use `single_agent` by default and `parallel_when_beneficial` when useful."
     )
-    errors = adoption.validate_provider_agents_text("Oteryn/Oteryn-Platform", stale)
-    assert "provider overlay must not directly redefine META machine modules" in errors
+    assert adoption.validate_provider_agents_text("Oteryn/Oteryn-Platform", reference) == []
+
+    for controller in (
+        "The local execution authority is ecosystem/agent-execution-routing-policy.json.",
+        "Follow ecosystem/agent-execution-routing-policy.json as local task controllers.",
+    ):
+        errors = adoption.validate_provider_agents_text(
+            "Oteryn/Oteryn-Platform", reference + " " + controller,
+        )
+        assert "provider overlay must not directly redefine META machine modules" in errors
 
 
 def test_provider_policy_adoption_accepts_central_binding_overlay() -> None:
