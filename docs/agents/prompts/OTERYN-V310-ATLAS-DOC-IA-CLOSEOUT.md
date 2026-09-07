@@ -1,9 +1,12 @@
 # OTERYN-V310-ATLAS-DOC-IA-CLOSEOUT
 
-> TASK TEMPLATE, not standing authority. Refresh the governing live Issue/PR and current explicit owner authorization before invocation; historical permissions, heads and execution procedures below do not override [AGENTS.md](../../../AGENTS.md). This marker does not close or defer the underlying task.
+> Task template, not authority. Use the target root/nearest `AGENTS.md`, bound
+> META procedures and current authorization for execution, review and integration.
+> Scope lists are ceilings narrowed by live provider restrictions. Reverify all
+> historical permissions, heads and external facts. This does not close the task.
 
 PROMPT_ID: `OTERYN-V310-ATLAS-DOC-IA-CLOSEOUT`
-PROMPT_VERSION: `1.0`
+PROMPT_VERSION: `1.1`
 STATUS: `TEMPLATE_REQUIRES_LIVE_AUTHORIZATION`
 PROGRAMME: `OTERYN-ORG-AUDIT-v3.10`
 
@@ -93,9 +96,10 @@ For each Atlas GAP, inspect current recurring need and existing authority, then 
 7. Add high-signal deterministic checks to the existing Atlas gate only where needed to prevent known IA drift.
 8. Preserve extraction/provenance and publication-rights facts unchanged.
 
-## Parallel-work safety
+## Ownership delta
 
-Game, Platform and Recovery agents may run simultaneously. Do not touch their repositories/branches/Issues/PRs. Inspect Atlas live task ownership before editing and use exactly one dedicated Issue/task, branch and PR for this work.
+Other provider IA and Recovery lanes may be active. Preserve their owned paths and
+records; this template does not allocate a second writer or reopen their tasks.
 
 ## Validation
 
@@ -107,8 +111,6 @@ Before completion:
 - any new canonical doc has owner/scope/lifecycle/supersession metadata appropriate to its class;
 - full diff contains no product/runtime/generated-data changes;
 - `atlas-gate` and `provenance-gate` remain green on the exact final head when required by live policy;
-- reviews/threads are clean;
-- squash merge and source-branch cleanup are verified;
 - resulting `main` contains the terminal IA state.
 
 Product/browser/runtime E2E is `NOT_APPLICABLE` unless this task improperly changes executable behavior; executable behavior changes are forbidden.

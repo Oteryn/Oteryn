@@ -1,9 +1,12 @@
 # OTERYN-V310-PLATFORM-DOC-IA-CLOSEOUT
 
-> TASK TEMPLATE, not standing authority. Refresh the governing live Issue/PR and current explicit owner authorization before invocation; historical permissions, heads and execution procedures below do not override [AGENTS.md](../../../AGENTS.md). This marker does not close or defer the underlying task.
+> Task template, not authority. Use the target root/nearest `AGENTS.md`, bound
+> META procedures and current authorization for execution, review and integration.
+> Scope lists are ceilings narrowed by live provider restrictions. Reverify all
+> historical permissions, heads and external facts. This does not close the task.
 
 PROMPT_ID: `OTERYN-V310-PLATFORM-DOC-IA-CLOSEOUT`
-PROMPT_VERSION: `1.0`
+PROMPT_VERSION: `1.1`
 STATUS: `TEMPLATE_REQUIRES_LIVE_AUTHORIZATION`
 PROGRAMME: `OTERYN-ORG-AUDIT-v3.10`
 
@@ -76,24 +79,20 @@ Explicitly forbidden:
 9. Add only deterministic high-signal lifecycle checks to existing Agent Governance when necessary. Do not create a new external required check or broaden runtime CI.
 10. Close each Platform-targeted GAP with `PASS`, evidence-backed `NOT_NEEDED`, or an exact blocker. Never invent a canonical path merely for symmetry.
 
-## Parallel-work safety
+## Ownership delta
 
-Game, Atlas and Recovery agents may run simultaneously. Do not touch their repositories, task branches, Issues, PRs or evidence ownership.
-
-Before editing, inspect current Platform Issues/PRs and active task packets for overlapping ownership. Use one dedicated Issue/task, branch and PR. Preserve unrelated active work exactly.
+Other provider IA and Recovery lanes may be active. Preserve their owned paths and
+records; this template does not allocate a second writer or reopen their tasks.
 
 ## Validation
 
 Before completion:
-- full exact-head diff review;
 - changed paths all inside the authorized surfaces;
 - deterministic current-head inventory re-run;
 - prompt metadata/classification validation;
 - task-liveness and Issue-link validation;
 - handover expiry/non-authority validation;
 - Agent Governance focused tests and repository-required CI on the exact final head;
-- zero unresolved review threads/requested changes;
-- normal squash merge and source-branch cleanup;
 - post-merge `main` readback.
 
 Runtime/browser/product E2E: `NOT_APPLICABLE` because this task must not change executable product behavior.

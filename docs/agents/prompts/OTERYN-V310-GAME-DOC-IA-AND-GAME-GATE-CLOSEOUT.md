@@ -1,9 +1,12 @@
 # OTERYN-V310-GAME-DOC-IA-AND-GAME-GATE-CLOSEOUT
 
-> TASK TEMPLATE, not standing authority. Refresh the governing live Issue/PR and current explicit owner authorization before invocation; historical permissions, heads and execution procedures below do not override [AGENTS.md](../../../AGENTS.md). This marker does not close or defer the underlying task.
+> Task template, not authority. Use the target root/nearest `AGENTS.md`, bound
+> META procedures and current authorization for execution, review and integration.
+> Scope lists are ceilings narrowed by live provider restrictions. Reverify all
+> historical permissions, heads and external facts. This does not close the task.
 
 PROMPT_ID: `OTERYN-V310-GAME-DOC-IA-AND-GAME-GATE-CLOSEOUT`
-PROMPT_VERSION: `1.0`
+PROMPT_VERSION: `1.1`
 STATUS: `TEMPLATE_REQUIRES_LIVE_AUTHORIZATION`
 PARALLEL_CLASSIFICATION: `SAFE_WITH_OTHER_V310_PROVIDER_WORKSTREAMS`
 PROGRAMME: `OTERYN-ORG-AUDIT-v3.10`
@@ -87,24 +90,20 @@ If a transition is still required, you may change ONLY the Game `main` required-
 
 Do not redesign CI, rename unrelated jobs or change any other repository/organization setting.
 
-## Parallel-work safety
+## Ownership delta
 
-Platform Doc/IA, Atlas Doc/IA and organization Recovery agents may run concurrently. Do not touch their repositories, Issues, branches, PRs, task packets or owned surfaces.
-
-Before mutation, inspect current Game Issues/PRs/branches for overlap. Use one dedicated Issue/task, one branch and one PR for this work. Do not absorb unrelated open work.
+Other provider IA and Recovery lanes may be active. Preserve their owned paths and
+records; this template does not allocate a second writer or reopen their tasks.
 
 ## Validation
 
 Before completion:
-- inspect the full changed-file list and diff;
 - verify every changed path is authorized;
 - run provider governance/prompt/task lifecycle validations applicable to the exact changes;
 - verify current-head Documentation/Agent IA inventory deterministically;
 - verify no terminal task/prompt/handover is left falsely active;
 - if gate settings changed, verify exact pre/post protection and exact-head `game-gate` evidence;
 - run repository-required CI on the exact final head;
-- inspect reviews/threads/comments;
-- merge only through normal protected policy, squash-only unless live policy says otherwise;
 - verify resulting `main` and source-branch cleanup.
 
 Runtime/gameplay E2E is `NOT_APPLICABLE` for documentation/governance-only changes. If gate implementation behavior changes, run the workflow-level representative proof required above.
