@@ -1,5 +1,7 @@
 # Solo-Maintainer Governance V2 — Safety Implementation Addendum
 
+> SUPERSEDED by ADR 0005 — provenance only; do not execute the retired review/lifecycle procedures. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 > **For agentic workers:** Read this addendum together with `docs/superpowers/plans/2026-08-31-solo-maintainer-governance-v2.md` and `docs/superpowers/specs/2026-08-31-solo-maintainer-governance-v2-safety-amendment.md`. The safety amendment is normative where any conflict exists.
 
 **Goal:** Make the Solo-Maintainer Governance V2 rollout prove the historical moving-head failure mode is eliminated, prevent aggregate-gate false positives, bound temporary transitions, and prevent governance self-modification from autonomously authorizing itself.

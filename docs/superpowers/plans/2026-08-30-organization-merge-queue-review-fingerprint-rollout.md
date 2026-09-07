@@ -1,5 +1,7 @@
 # Organization Merge Queue + Review Fingerprint Rollout Plan
 
+> SUPERSEDED by ADR 0005 — provenance only; do not execute the retired review/lifecycle procedures. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 > **For the rollout agent:** execute this plan from live GitHub state. Issue/PR/SHA values mentioned here are locators only. Do not treat this document as lifecycle authority.
 
 **Goal:** Replace loop-prone author-managed branch freshness and exact-SHA-only review invalidation with one organization-wide model: candidate-head review by risk fingerprint, Merge Queue integration, exact merge-group CI, and bounded anti-loop execution.

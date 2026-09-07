@@ -1,5 +1,7 @@
 # Parallel-Agent Git Concurrency Implementation Plan
 
+> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Roll out the accepted organization-wide Git concurrency model so parallel agents preserve valid task work across unrelated `main` advancement and reconcile only at the integration boundary.

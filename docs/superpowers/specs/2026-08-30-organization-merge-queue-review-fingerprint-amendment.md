@@ -1,5 +1,7 @@
 # Organization Merge Queue + Review Fingerprint — Binding Safety Amendment
 
+> SUPERSEDED by ADR 0005 — provenance only; do not execute the retired review/lifecycle procedures. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 **Status:** binding amendment to the Issue #102 target architecture carried by PR #117. Where this file conflicts with the original design, rollout plan, or reusable rollout prompt in the same PR, this amendment wins. Implementation must fail closed until these amended invariants are satisfied by protected-main code and the applicable staged canary evidence.
 
 ## Why this amendment exists

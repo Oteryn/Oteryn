@@ -1,5 +1,7 @@
 # Solo-Maintainer Governance V2 Implementation Plan
 
+> SUPERSEDED by ADR 0005 — provenance only; do not execute the retired review/lifecycle procedures. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace moving-head/enterprise-style governance with a solo-maintainer model that preserves deterministic security and integration safeguards while making GitHub Merge Queue and one aggregate gate per repository the normal merge authority.

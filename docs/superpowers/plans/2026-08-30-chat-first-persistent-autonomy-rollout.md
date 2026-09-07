@@ -1,5 +1,7 @@
 # Chat-first Persistent Autonomy Implementation Plan
 
+> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 **Goal:** deliver the smallest deterministic continuation layer for `Oteryn/Oteryn#108` while preserving the bounded lifecycle, ADR 0005 GitHub-native integration model and provider ownership.
 
 **Spec:** `docs/superpowers/specs/2026-08-30-chat-first-persistent-autonomy-design.md`

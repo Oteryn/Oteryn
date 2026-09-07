@@ -8,61 +8,57 @@ It does **not** own Game, Platform or Atlas runtime implementation.
 
 ## Agent execution discipline
 
-Agents MUST follow `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md`.
+Use `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` for
+GitHub preflight, authorized execution, Remote Desktop exact-call gating, isolation,
+proportionate lane planning, late integration and truthful completion.
+`docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md` owns bounded retries,
+freeze and no-progress decisions; productive work has no generic elapsed-time stop.
+For work crossing session/context/wait boundaries, additionally load
+`docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` and
+`ecosystem/agent-continuation-policy.json`. Never invent automatic continuation.
 
-Agents MUST also follow `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md`: do not mutate an unchanged candidate to retrigger evidence, respect its bounded local retries, and release active ownership in waiting, blocked or stalled states until a material fact changes.
+Only when a current task needs and authorizes Synology access, load
+`docs/agents/contracts/SYNOLOGY_MCP_EXECUTION_POLICY.md`. GitHub remains repository
+and required-check authority; tools do not grant permission.
 
-For substantial tasks that must survive worker/session, command, external-wait or context boundaries, agents MUST also follow `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` and the machine-readable `ecosystem/agent-continuation-policy.json`. Persistent continuation is subordinate to the bounded authority: it MUST NOT redefine bounded lifecycle states, reset/enlarge bounded retry or evidence state, or claim background continuation without a verified resume mechanism.
+## Skills and historical material
 
-Agents MAY use the `synology oteryn` developer MCP when it is available and the current task authorizes the relevant operation. They MUST follow `docs/agents/contracts/SYNOLOGY_MCP_EXECUTION_POLICY.md`: Synology MCP is an additional runtime/local evidence and execution path, not a replacement for GitHub. GitHub live state remains authoritative for repository, branch, commit, PR, issue, review, CI/check and release facts, and required GitHub verification/workflows MUST NOT be skipped because MCP access exists.
-
-Before declaring a task blocked because of access limitations, agents must discover available capabilities, distinguish tool absence from permission/policy restrictions, and continue useful work when any safe execution path remains.
-
-Completion claims require verified evidence. `UNKNOWN` is not automatically a `BLOCKER`, and a generic access disclaimer without capability discovery is invalid.
-
-## External execution-skill precedence
-
-Repository and user authority govern execution. Agent skills, plugins and workflow frameworks such as Superpowers are subordinate execution aids, not independent task or lifecycle authority.
-
-For an already-authorized Oteryn programme or task with an approved canonical design, implementation plan, checkpoint, or explicit continuation directive, Superpowers workflows MUST NOT introduce additional approval gates, re-brainstorm an approved design, require duplicate planning artifacts, replace canonical authority, or interrupt autonomous continuation solely because the skill's default workflow would do so. Relevant skills MAY still be used internally for implementation, testing, debugging, review, isolation, or verification when they do not conflict with the governing Oteryn authority.
-
-A skill or plugin MUST NOT weaken repository safety, validation, review, GitHub-first, or authorization requirements. When a skill workflow conflicts with applicable user instructions, this `AGENTS.md`, repository policy, or canonical task authority, the applicable higher-priority Oteryn authority controls.
+Skills and plugins are optional execution aids, subordinate to current user and
+repository authority. They must not add approval lifecycles, duplicate planning,
+expand scope or interrupt useful authorized work. Files marked historical/retired,
+old task prompts and retained `docs/superpowers/` plans are evidence, not dispatchable
+execution authority. A historical invocation's permission grant is not reusable.
 
 ## GitHub-first execution gate
 
-GitHub is the authoritative repository control plane for repo identity, default branch, Issue/task, PR, task branch, exact remote SHA, checks, reviews and merge state.
+Complete the canonical contract's GitHub preflight before mutation and verify the
+remote exact head after publication. Local clones/worktrees/caches are execution
+planes, not repository authority. Local-only patches and tests are not delivered work.
 
-Agents MUST complete the GitHub preflight defined in `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` before mutating any local/remote checkout or starting host-local implementation/execution that can change repository or external state. If GitHub preflight is genuinely unavailable, host-local tools may still be used for the safe read-only analysis and patch/handoff preparation permitted by the central contract, but not to mutate or bypass GitHub lifecycle authority.
+## Restricted publishing-credential compatibility
 
-Host-local filesystems, clones, worktrees, containers and shells are execution/cache planes only. They MUST NOT be used to select authoritative repository state or bypass GitHub lifecycle. Durable local changes receive no completion credit until committed, pushed to the approved GitHub branch/PR and verified against the remote exact head.
+This profile applies only after the repository lifecycle has allocated an approved
+task branch and existing PR. It does not grant PR-write permission to a restricted
+publishing credential; PR creation remains a separately authorized control-plane action.
 
-## Codex GitHub publishing credential compatibility
-
-This compatibility path applies only after the repository lifecycle has already allocated an approved task branch and existing PR. PR creation remains a coordinator/repository-control-plane action; this rule does not authorize creating a replacement PR or granting the Codex credential pull-request write permission.
-
-For an already-authorized GitHub write to that existing branch/PR, if `GH_TOKEN` and `GITHUB_TOKEN` are unset but agent-visible `GH` is present, the agent MAY pass it transiently as `GH_TOKEN="$GH"` to the exact authorized `gh` command. For `git push`, do not assume that environment mapping alone authenticates Git: first verify that the existing remote/credential path can consume the authorized GitHub identity without exposing or persisting the credential. If it cannot, use another already-authorized repository-native write path or report the precise publishing blocker; do not embed the token in a remote URL or persist a new credential helper merely to bypass this boundary.
-
-Credential presence never expands repository, branch, path, task, merge, production, or secret authority. The agent MUST update only the approved existing task branch/PR, MUST NOT force-push, and MUST verify the remote exact head after publication. If no authorized credential is present, report the precise unauthenticated operation after capability discovery instead of generalizing that GitHub is read-only.
+For an authorized write to that branch/PR, when `GH_TOKEN` and `GITHUB_TOKEN` are
+unset but agent-visible `GH` is present, it may be passed transiently as
+`GH_TOKEN="$GH"` to the exact authorized `gh` command. Environment mapping alone
+does not authenticate `git push`: verify that the existing remote/credential path
+can consume the authorized identity without exposing or persisting it. Otherwise
+use another authorized repository-native write path or report the exact limitation.
+Never embed the token in a remote URL or persist a new credential helper to bypass
+that boundary. Credential presence expands no repository/path/task/merge/production
+permission. Do not force-push; verify the remote exact head after publishing.
 
 ## Execution-routing policy
 
-`ecosystem/agent-execution-routing-policy.json` is the canonical machine-readable policy for substantial new or resumed task packets. Validate a packet against a freshly obtained GitHub snapshot with:
-
-```text
-python3 tools/governance/agent_execution_routing.py --policy ecosystem/agent-execution-routing-policy.json --packet <packet.json> --live-state <fresh-github-state.json>
-```
-
-Use this execution order: current GitHub state; GitHub Actions or another repository-approved CI runner; a worker-owned isolated workspace; then, only when validated, a narrowly authorized host exception. Remote Desktop/Desktop Commander is **default-deny**. It may be used only when the packet sets `remote_desktop: exception`, `execution_target: host_exception`, no equivalent CI exists, and `remote_desktop_reason` is exactly one of `host_only_service`, `lan_or_hardware`, or `self_hosted_runner_diagnosis`.
-
-Capability discovery may inspect local connector/tool registration and argument schemas without invoking Remote Desktop. By contrast, every direct `Remote_Desktop_Commander.*` invocation requires a fresh valid host-exception packet and a positive per-call decision from `validate_remote_desktop_call(...)` immediately before that call. The per-call gate revalidates the routing packet/live GitHub state, exact semantic host action, exact connector tool identifier and exact call arguments; only policy-declared non-semantic runtime fields may differ. The packet must declare that connector function in `requested_remote_desktop_tools` and the approved `{tool, arguments}` invocation in `requested_remote_desktop_calls`; a prior positive decision for a different action, tool, argument set or call does not carry forward.
-
-Agents must not invoke `Remote_Desktop_Commander.list_devices` merely to prove that Remote Desktop is reachable. The same rule applies to `who_am_i`, `ping`, `get_config`, filesystem/search/process/session/terminal/history functions and any other direct connector call: metadata-looking or read-only calls are still exception-only. Unknown connector functions fail closed, and functions classified by policy as always forbidden cannot be admitted through the three existing reasons. A Remote Desktop `DENY` is not automatically a blocker; continue through GitHub, GitHub Actions or an isolated workspace whenever those routes can perform useful authorized work.
-
-The exception authorizes the minimum recorded host action, exact requested connector tools and exact declared call arguments, not a replacement source of truth. A convenient local checkout, shell, Docker daemon, toolchain, or available Remote Desktop session is never an exception reason. When an equivalent CI workflow exists, agents MUST NOT use Remote Desktop/Desktop Commander to poll process output, Docker logs, workflow state, or Git state; inspect the equivalent GitHub workflow, its logs, status, and artifacts instead.
-
-Before resuming work, obtain and record a new GitHub preflight with the repository, current default-branch SHA, governing Issue, PR, task-head SHA, and verification timestamp. A prior handoff, local branch, worktree, session, cache, or log is evidence only and cannot satisfy that preflight.
-
-Project task preparation is **effort-aware and proportional**. Before choosing an execution shape for substantial work, classify expected effort as `low`, `medium`, or `high` and assess the dependency graph, critical path, shared mutable surfaces, constrained resources, and coordination/integration overhead. `single_agent` is a normal first-class strategy and requires no serial exception. Use `parallel_when_beneficial` only when at least two materially independent workstreams can make concurrent progress and the expected benefit exceeds coordination and integration cost; use the smallest useful lane count rather than maximizing concurrency. Record a short `decision_basis` for the chosen shape. Parallel lanes retain an ID, owned paths, one isolated branch/worktree, dependencies, shared-resource leases, and an integration order; lanes MUST NOT share writable branches or worktrees, and shared mutable or constrained resources require an explicit lease with one holder and a release condition.
+For substantial new/resumed task packets, use
+`ecosystem/agent-execution-routing-policy.json` through
+`tools/governance/agent_execution_routing.py`. The canonical access contract defines
+its arguments and execution order. Remote Desktop is default-deny, including
+metadata-looking direct calls; only a fresh positive exact-call authorization admits
+an actual host exception. Discover registration/schema metadata without invoking it.
 
 ## Organization runner routing
 
@@ -134,7 +130,7 @@ Do not push ordinary feature/governance work directly to `main`.
 
 ### Initial-bootstrap exception
 
-The one direct `main` commit that created `README.md` in the previously empty repository is the bootstrap anchor required to make branching possible. It is not standing permission for future direct-to-main writes. All remaining initial authority files, including this `AGENTS.md`, must be delivered through the dedicated bootstrap branch and PR.
+The one direct `main` commit that created `README.md` in the previously empty repository is the bootstrap anchor required to make branching possible. It is not standing permission for future direct-to-main writes. The bootstrap is historical evidence only; normal current task branches and PRs govern all subsequent changes.
 
 ## Validation and evidence
 
@@ -147,7 +143,7 @@ Completion claims require observable evidence, not worker narrative. At minimum:
 - inspect reviews, inline threads and PR comments before merge;
 - record `NOT_APPLICABLE` explicitly when a runtime/E2E check genuinely does not apply to documentation/metadata-only work.
 
-Absence of CI in this bootstrap repository is not equivalent to a CI pass; record it as unavailable/not configured and rely on proportionate deterministic validation plus exact-diff self-review until repository workflows are deliberately introduced.
+Missing or inaccessible CI is not a pass. `meta-gate` and GitHub Merge Queue remain the current required verification/integration path; local checks do not substitute for their exact-head evidence.
 
 ## Security and sensitive data
 
@@ -158,19 +154,12 @@ Absence of CI in this bootstrap repository is not equivalent to a CI pass; recor
 
 ## AI review economy
 
-External AI review is advisory and governed by `docs/governance/AI_REVIEW_POLICY.md`. It is not a required GitHub status.
-
-- Default to no external AI review.
-- For an ordinary code change where independent review clearly adds value, prefer Codex Spark when available.
-- For a material high-risk/control-plane change, use one Codex deep review on a stable material candidate.
-- Trivial docs, formatting, generated evidence and metadata do not need external AI review.
-- If Spark is unavailable for low-risk work, do not automatically escalate to deep Codex.
-- Re-review only after a material risk-bearing change, not for cosmetic changes or governance retriggers.
-
-Do not recreate formal R0/R1/R2 classification, review fingerprints, `ai-review-gate`, review envelopes, attestation bridges, or review-result parsers as merge authority.
+Use `docs/governance/AI_REVIEW_POLICY.md` for risk-proportionate independent review.
+External AI is advisory, never a required status or merge authority. Do not restore
+retired review fingerprints, formal R0/R1/R2 states, envelopes or attestation bridges.
 
 ## Architecture handover
 
-The initial ecosystem-topology ADR in this repository becomes META's topology authority only when its PR is merged to `main`. Until then, the previously accepted Platform topology ADR remains the temporary authority.
+Accepted `docs/architecture/adr/0001-ecosystem-topology-authority.md` records META topology authority. Historical bootstrap/handover conditions are not a pending transition on current `main`.
 
-After META authority becomes canonical, product repositories retain authority over their own implementation, provider schemas and runtime behavior. A META ADR can coordinate boundaries and sequencing but does not silently transfer those product responsibilities.
+Product repositories retain authority over their own implementation, provider schemas and runtime behavior. A META ADR can coordinate boundaries and sequencing but does not silently transfer those product responsibilities.

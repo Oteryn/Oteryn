@@ -1,5 +1,7 @@
 # Solo-Maintainer Governance V2 — audit and target design
 
+> SUPERSEDED by ADR 0005 — provenance only; do not execute the retired review/lifecycle procedures. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 ## Status
 
 **PROPOSED — owner-approved direction, not yet live enforcement authority.**

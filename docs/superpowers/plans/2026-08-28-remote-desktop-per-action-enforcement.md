@@ -1,5 +1,7 @@
 # Remote Desktop Per-Action Enforcement Implementation Plan
 
+> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans for this in-flight implementation. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make every direct `Remote_Desktop_Commander.*` invocation fail closed unless the exact call is covered by a fresh, valid META host-exception packet.

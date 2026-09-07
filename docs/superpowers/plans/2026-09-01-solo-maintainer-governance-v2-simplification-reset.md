@@ -1,5 +1,7 @@
 # Solo-Maintainer Governance V2 Simplification Reset Implementation Plan
 
+> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Replace the over-specified V2 lifecycle/AI-review governance with the approved native-GitHub model, then implement the minimal META Merge Queue cutover separately.

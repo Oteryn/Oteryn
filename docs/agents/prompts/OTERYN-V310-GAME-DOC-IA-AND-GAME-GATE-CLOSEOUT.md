@@ -1,8 +1,10 @@
 # OTERYN-V310-GAME-DOC-IA-AND-GAME-GATE-CLOSEOUT
 
+> TASK TEMPLATE, not standing authority. Refresh the governing live Issue/PR and current explicit owner authorization before invocation; historical permissions, heads and execution procedures below do not override [AGENTS.md](../../../AGENTS.md). This marker does not close or defer the underlying task.
+
 PROMPT_ID: `OTERYN-V310-GAME-DOC-IA-AND-GAME-GATE-CLOSEOUT`
 PROMPT_VERSION: `1.0`
-STATUS: `READY`
+STATUS: `TEMPLATE_REQUIRES_LIVE_AUTHORIZATION`
 PARALLEL_CLASSIFICATION: `SAFE_WITH_OTHER_V310_PROVIDER_WORKSTREAMS`
 PROGRAMME: `OTERYN-ORG-AUDIT-v3.10`
 

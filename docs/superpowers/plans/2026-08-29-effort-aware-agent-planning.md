@@ -1,5 +1,7 @@
 # Effort-Aware Agent Planning Implementation Plan
 
+> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace Oteryn's organization-wide `parallel-first` routing preference with effort-aware proportional planning that chooses single-agent or parallel execution based on real expected benefit.

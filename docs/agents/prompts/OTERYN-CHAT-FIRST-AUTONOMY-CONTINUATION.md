@@ -1,5 +1,7 @@
 # OTERYN-CHAT-FIRST-AUTONOMY-CONTINUATION
 
+> TASK TEMPLATE, not standing authority. Refresh the governing live Issue/PR and current explicit owner authorization before invocation; historical permissions, heads and execution procedures below do not override [AGENTS.md](../../../AGENTS.md). This marker does not close or defer the underlying task.
+
 ## Alias
 
 `OTERYN-CHAT-FIRST-AUTONOMY-CONTINUATION`
