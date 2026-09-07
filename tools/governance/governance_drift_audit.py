@@ -58,6 +58,33 @@ def _same_value(expected: Any, actual: Any) -> bool:
     return type(expected) is type(actual) and expected == actual
 
 
+def validate_desired_state(document: dict[str, Any]) -> list[dict[str, Any]]:
+    """Validate the shared typed contract used by CI and the offline drift audit.
+
+    Scope may be any non-empty subset. CI separately enforces the canonical
+    four-repository rollout; empty observations still mean UNKNOWN, not INVALID.
+    """
+    if (not isinstance(document, dict) or type(document.get("schema_version")) is not int
+            or document["schema_version"] != 2):
+        raise ValueError("desired state schema_version must be integer 2")
+    rows = _rows(document, "permanent_repositories", "desired state")
+    if not rows:
+        raise ValueError("desired state repository scope must not be empty")
+    _index_repositories(rows, "desired-state")
+    for row in rows:
+        for field in ENFORCEMENT_FIELDS:
+            value = row.get(field)
+            if field == "required_gate":
+                valid = isinstance(value, str) and bool(value.strip())
+            elif field == "required_approvals":
+                valid = type(value) is int and value >= 0
+            else:
+                valid = type(value) is bool
+            if not valid:
+                raise ValueError(f"{row['repository']}: desired {field} has missing or invalid type/value")
+    return rows
+
+
 def audit_snapshot(desired_state: dict[str, Any], live_state: dict[str, Any]) -> dict[str, Any]:
     """Return TARGET, DRIFT or UNKNOWN for each permanent repository.
 
@@ -65,10 +92,7 @@ def audit_snapshot(desired_state: dict[str, Any], live_state: dict[str, Any]) ->
     repository or enforcement field is UNKNOWN. A known mismatch is DRIFT and
     takes precedence over UNKNOWN for that repository and for the aggregate.
     """
-    if desired_state.get("schema_version") != 2:
-        raise ValueError("desired state schema_version must be 2")
-
-    desired_rows = _rows(desired_state, "permanent_repositories", "desired state")
+    desired_rows = validate_desired_state(desired_state)
     live_rows = _rows(live_state, "repositories", "live state")
     desired_by_repo = _index_repositories(desired_rows, "desired-state")
     live_by_repo = _index_repositories(live_rows, "live-state")
@@ -80,10 +104,6 @@ def audit_snapshot(desired_state: dict[str, Any], live_state: dict[str, Any]) ->
     repository_reports: list[dict[str, Any]] = []
     for desired in desired_rows:
         repository = desired["repository"]
-        missing_desired = [field for field in ENFORCEMENT_FIELDS if field not in desired]
-        if missing_desired:
-            raise ValueError(f"{repository}: desired state missing enforcement fields: {missing_desired}")
-
         live = live_by_repo.get(repository)
         if live is None:
             repository_reports.append(

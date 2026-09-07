@@ -203,9 +203,10 @@ jobs:
           import json
           from pathlib import Path
 
+          from tools.governance.governance_drift_audit import validate_desired_state
+
           state = json.loads(Path('ecosystem/governance-desired-state.json').read_text(encoding='utf-8'))
-          if state.get('schema_version') != 2:
-              raise SystemExit('governance desired-state schema_version must be 2')
+          validate_desired_state(state)
           if state.get('authority') != 'docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md':
               raise SystemExit('governance desired-state authority must be ADR 0005')
 

@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -215,9 +217,9 @@ class NarrowBoundedExecutionTests(unittest.TestCase):
             path = Path(directory) / "snapshot.json"
             path.write_text(json.dumps(snapshot()), encoding="utf-8")
             result = subprocess.run(
-                ["python3", str(ROOT / "tools/governance/bounded_execution_guard.py"),
+                [sys.executable, str(ROOT / "tools/governance/bounded_execution_guard.py"),
                  "--policy", str(POLICY_PATH), "--snapshot", str(path), "--action", "observe"],
-                check=True, capture_output=True, text=True,
+                check=True, capture_output=True, text=True, env={**os.environ, "PATH": ""},
             )
         self.assertTrue(json.loads(result.stdout)["allowed"])
 

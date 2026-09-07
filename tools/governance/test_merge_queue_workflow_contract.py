@@ -4,6 +4,11 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
+import tempfile
+import textwrap
 import re
 from pathlib import Path
 
@@ -221,6 +226,66 @@ def test_drift_audit_rejects_duplicate_repository_snapshot() -> None:
         raise AssertionError("duplicate live repository snapshot must fail closed")
 
 
+def test_empty_governance_scope_is_invalid_in_api_and_cli() -> None:
+    empty = {"schema_version": 2, "permanent_repositories": []}
+    try:
+        audit_snapshot(empty, {"repositories": []})
+    except ValueError as exc:
+        assert "empty" in str(exc)
+    else:
+        raise AssertionError("an empty audit must not claim TARGET")
+    with tempfile.TemporaryDirectory() as directory:
+        desired = Path(directory) / "desired.json"
+        live = Path(directory) / "live.json"
+        desired.write_text(json.dumps(empty), encoding="utf-8")
+        live.write_text('{"repositories": []}', encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "tools/governance/governance_drift_audit.py"),
+             "--desired-state", str(desired), "--live-state", str(live)],
+            capture_output=True, text=True, check=False,
+        )
+        assert result.returncode == 3, result.stdout + result.stderr
+        assert json.loads(result.stdout)["status"] == "INVALID"
+    assert audit_snapshot(_desired_state(), {"repositories": []})["status"] == "UNKNOWN"
+
+
+def test_governance_desired_values_have_exact_types() -> None:
+    for field, invalid in (("merge_queue", 1), ("force_pushes", 0),
+                           ("required_approvals", False), ("required_approvals", 0.0)):
+        desired = _desired_state()
+        desired["permanent_repositories"][0][field] = invalid
+        try:
+            audit_snapshot(desired, _matching_live_state())
+        except ValueError as exc:
+            assert field in str(exc)
+        else:
+            raise AssertionError(f"invalid desired type accepted for {field}: {invalid!r}")
+    live = _matching_live_state()
+    live["repositories"][0]["merge_queue"] = 1
+    assert audit_snapshot(_desired_state(), live)["status"] == "DRIFT"
+
+
+def test_ci_rejects_numeric_boolean_desired_state() -> None:
+    # Execute the actual CI entry, not a second transcription of its predicates.
+    workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+    section = workflow.split("- name: Validate simplified governance desired state", 1)[1]
+    source = section.split("python3 - <<'PY'\n", 1)[1].split("\n          PY", 1)[0]
+    desired = _desired_state()
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "ecosystem/governance-desired-state.json"
+        path.parent.mkdir()
+        for numeric_boolean in (False, True):
+            if numeric_boolean:
+                desired["permanent_repositories"][0]["merge_queue"] = 1
+            path.write_text(json.dumps(desired), encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, "-c", textwrap.dedent(source)], cwd=directory,
+                env={**os.environ, "PYTHONPATH": str(ROOT)},
+                capture_output=True, text=True, check=False,
+            )
+            assert (result.returncode != 0) == numeric_boolean, result.stdout + result.stderr
+
+
 if __name__ == "__main__":
     test_meta_gate_qualifies_pull_requests_and_exact_merge_group_candidates()
     test_meta_gate_executes_bounded_execution_guard_regressions()
@@ -235,4 +300,7 @@ if __name__ == "__main__":
     test_drift_audit_reports_auto_merge_mismatch_as_drift()
     test_drift_audit_preserves_unobservable_field_as_unknown()
     test_drift_audit_rejects_duplicate_repository_snapshot()
+    test_empty_governance_scope_is_invalid_in_api_and_cli()
+    test_governance_desired_values_have_exact_types()
+    test_ci_rejects_numeric_boolean_desired_state()
     print("merge queue workflow contract PASS")

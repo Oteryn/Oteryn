@@ -66,7 +66,8 @@ def lane() -> dict[str, object]:
         "id": "policy",
         "owned_paths": ["docs/agents/schemas/**"],
         "depends_on": [],
-        "branch_and_worktree": "governance/policy:worktrees/policy",
+        "branch": "refs/heads/governance/policy",
+        "worktree": "worker:/worktrees/policy",
         "shared_leases": [],
     }
 
@@ -144,15 +145,15 @@ def test_policy_has_exact_reason_action_mapping() -> None:
     }
 
 
-def test_policy_schema_version_must_be_exactly_two() -> None:
-    for invalid_version in (None, 1, 3, "2"):
+def test_policy_schema_version_must_be_exactly_three() -> None:
+    for invalid_version in (None, 1, 2, 3.0, True, "3"):
         malformed = policy()
         if invalid_version is None:
             del malformed["schema_version"]
         else:
             malformed["schema_version"] = invalid_version
         errors = routing.validate_packet(default_packet(), live_state=live_state(), policy=malformed)
-        assert "policy schema_version must be 2" in errors
+        assert "policy schema_version must be 3" in errors
 
 
 def test_call_gate_schema_version_rejects_json_boolean() -> None:

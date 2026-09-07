@@ -102,8 +102,8 @@ def _is_unique_string_list(value: object) -> bool:
 def _policy_errors(policy: dict[str, object]) -> list[str]:
     """Reject malformed policy data before it can authorize a packet."""
     errors: list[str] = []
-    if policy.get("schema_version") != 2:
-        errors.append("policy schema_version must be 2")
+    if type(policy.get("schema_version")) is not int or policy["schema_version"] != 3:
+        errors.append("policy schema_version must be 3")
 
     targets_value = policy.get("execution_targets")
     runners_value = policy.get("runner_classes")
@@ -188,8 +188,13 @@ def _policy_errors(policy: dict[str, object]) -> list[str]:
             or parallel_minimum_lanes != 2
         ):
             errors.append("policy parallel_lane_rules.parallel_minimum_lanes must be 2")
-        if lane_rules.get("unique_branch_and_worktree") is not True:
-            errors.append("policy parallel_lane_rules.unique_branch_and_worktree must be true")
+        for key in ("unique_branch", "unique_worktree"):
+            if lane_rules.get(key) is not True:
+                errors.append(f"policy parallel_lane_rules.{key} must be true")
+        if lane_rules.get("required_lane_fields") != [
+            "id", "owned_paths", "depends_on", "branch", "worktree", "shared_leases"
+        ]:
+            errors.append("policy parallel_lane_rules.required_lane_fields must use separate branch and worktree identities")
 
     required_fields = policy.get("resume_preflight_required_fields")
     if required_fields != list(_CANONICAL_RESUME_PREFLIGHT_FIELDS):
@@ -388,7 +393,7 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
     required_lane_fields = {value for value in _list(rules.get("required_lane_fields")) if isinstance(value, str)}
     lane_ids: set[str] = set()
     lane_paths: list[tuple[str, list[str]]] = []
-    branch_and_worktrees: dict[str, list[str]] = {}
+    identities: dict[str, dict[str, list[str]]] = {"branch": {}, "worktree": {}}
     lease_claims: dict[str, list[tuple[str, object, object, bool]]] = {}
     for lane in lanes:
         identifier = lane.get("id")
@@ -415,11 +420,18 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
             errors.append(f"lane '{display_identifier}' requires owned_paths")
         if not isinstance(lane.get("depends_on", []), list):
             errors.append(f"lane '{display_identifier}' depends_on must be a list")
-        branch_and_worktree = lane.get("branch_and_worktree")
-        if not isinstance(branch_and_worktree, str) or not branch_and_worktree.strip():
-            errors.append(f"lane '{display_identifier}' requires branch_and_worktree")
-        else:
-            branch_and_worktrees.setdefault(branch_and_worktree, []).append(display_identifier)
+        if "branch_and_worktree" in lane:
+            errors.append(f"lane '{display_identifier}' branch_and_worktree is retired; declare branch and worktree")
+        for coordinate in ("branch", "worktree"):
+            identity = lane.get(coordinate)
+            if (not isinstance(identity, str) or not identity or identity != identity.strip()
+                    or any(ord(char) < 32 for char in identity)):
+                errors.append(f"lane '{display_identifier}' requires a canonical non-empty {coordinate} identity")
+            elif coordinate == "branch" and (
+                    not identity.startswith("refs/heads/") or len(identity) == len("refs/heads/")):
+                errors.append(f"lane '{display_identifier}' branch must be a full refs/heads/ ref")
+            else:
+                identities[coordinate].setdefault(identity, []).append(display_identifier)
         if not isinstance(lane.get("shared_leases", []), list):
             errors.append(f"lane '{display_identifier}' shared_leases must be a list")
         for lease in _list(lane.get("shared_leases")):
@@ -445,10 +457,10 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
                 )
         lane_paths.append((display_identifier, owned_paths))
 
-    if rules.get("unique_branch_and_worktree") is True:
-        for lane_identifiers in branch_and_worktrees.values():
+    for coordinate, recorded in identities.items():
+        for lane_identifiers in recorded.values():
             if len(lane_identifiers) > 1:
-                errors.append("parallel lanes cannot share branch_and_worktree")
+                errors.append(f"parallel lanes cannot share {coordinate}")
 
     for lane in lanes:
         identifier = lane.get("id") if isinstance(lane.get("id"), str) else "<unnamed>"
