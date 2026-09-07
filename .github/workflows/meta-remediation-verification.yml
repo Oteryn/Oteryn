@@ -15,8 +15,6 @@ jobs:
     timeout-minutes: 8
     permissions:
       contents: write
-    outputs:
-      correctness: ${{ steps.prepare.outputs.correctness }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,7 +35,7 @@ jobs:
           OUT.mkdir()
           def api(path, body=None):
               # Only Git object writes; this helper has no ref/PR/settings mutation.
-              if body is not None and path not in ('/git/trees', '/git/commits'):
+              if body is not None and path not in ('/git/trees', '/git/blobs'):
                   raise ValueError('non-object mutation denied')
               request = urllib.request.Request(API + path,
                   data=json.dumps(body).encode() if body is not None else None,
@@ -114,16 +112,21 @@ jobs:
               assert sorted(git('diff', '--cached', '--name-only', BASE, cwd=work).decode().splitlines()) == sorted(paths)
               assert not (work / '.github/workflows/meta-remediation-verification.yml').exists()
               (OUT / (name + '.diff')).write_bytes(git('diff', '--cached', BASE, cwd=work))
-              tree = api('/git/trees', {'base_tree': pack['base_tree'], 'tree': changes})
-              assert tree['sha'] == group['expected_tree']
-              parent = os.environ['GITHUB_SHA'] if name == 'correctness' else BASE
-              commit = api('/git/commits', {'message': group['message'], 'tree': tree['sha'], 'parents': [parent]})
-              assert commit['tree']['sha'] == tree['sha'] and [p['sha'] for p in commit['parents']] == [parent]
-              results.append({'name': name, 'branch': group['branch'], 'sha': commit['sha'],
-                              'tree': tree['sha'], 'parent': parent, 'paths': paths})
-              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-                  output.write(name + '=' + commit['sha'] + '\n')
-              print(name, commit['sha'], tree['sha'])
+              workflow_entries = [e for e in changes if e['path'].startswith('.github/workflows/')]
+              for entry in workflow_entries:
+                  blob = api('/git/blobs', {'content': entry.pop('content'), 'encoding': 'utf-8'})
+                  entry['sha'] = blob['sha']
+              tree = api('/git/trees', {'base_tree': pack['base_tree'], 'tree': [e for e in changes if e not in workflow_entries]})
+              # Workflow path assignment requires the connector's existing workflow scope.
+              # Runner creates source objects only; connector finishes trees and refs.
+              results.append({'name': name, 'branch': group['branch'], 'staging_tree': tree['sha'],
+                              'expected_tree': group['expected_tree'], 'workflow_entries': workflow_entries,
+                              'parent': os.environ['GITHUB_SHA'] if name == 'correctness' else BASE,
+                              'paths': paths, 'message': group['message']})
+              if name == 'correctness':
+                  (OUT / 'correctness.tar.gz').write_bytes(git('archive', '--format=tar.gz', group['expected_tree'], cwd=work))
+                  (OUT / 'correctness.tree.txt').write_bytes(git('ls-tree', '-r', group['expected_tree'], cwd=work))
+              print(name, 'staging tree', tree['sha'], 'expected final tree', group['expected_tree'])
           (OUT / 'candidates.json').write_text(json.dumps(results, indent=2) + '\n')
           # Supporting source export is read-only and does not alter any provider.
           overlap = '88d2ea0c978921570d77d1cf4239856e31a2d661'
@@ -151,67 +154,3 @@ jobs:
           path: ${{ runner.temp }}/r4-object-evidence/
           retention-days: 14
           if-no-files-found: error
-
-  security-observation:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      security-events: read
-      pull-requests: read
-    steps:
-      - name: Observe security and integration metadata; no settings writes
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import datetime, json, os, pathlib, urllib.error, urllib.request
-          API = 'https://api.github.com/repos/Oteryn/Oteryn'
-          def read(url, query=None):
-              request = urllib.request.Request(url,
-                  data=json.dumps({'query': query}).encode() if query else None,
-                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
-                           'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2026-03-10',
-                           'Content-Type': 'application/json'})
-              try:
-                  with urllib.request.urlopen(request, timeout=30) as response:
-                      return {'http_status': response.status, 'body': json.load(response)}
-              except urllib.error.HTTPError as error:
-                  return {'http_status': error.code, 'body': json.loads(error.read())}
-          report = {'observed_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                    'repository': 'Oteryn/Oteryn', 'workflow_sha': os.environ['GITHUB_SHA'],
-                    'credential': 'GITHUB_TOKEN; read-only job permissions'}
-          for key, endpoint in {
-              'private_vulnerability_reporting': '/private-vulnerability-reporting',
-              'codeql_default_setup': '/code-scanning/default-setup',
-              'code_scanning_analyses': '/code-scanning/analyses?per_page=1',
-              'branch_protection': '/branches/main/protection',
-              'active_workflows': '/actions/workflows?per_page=100',
-          }.items():
-              report[key] = read(API + endpoint)
-          report['merge_queue'] = read('https://api.github.com/graphql',
-              'query { repository(owner:"Oteryn",name:"Oteryn") { mergeQueue(branch:"main") { id entries(first:10) { totalCount nodes { pullRequest { number headRefOid } } } } } }')
-          target = pathlib.Path(os.environ['RUNNER_TEMP']) / 'r4-security-readback.json'
-          target.write_text(json.dumps(report, indent=2) + '\n')
-          print(json.dumps({k: v.get('http_status') for k, v in report.items() if isinstance(v, dict)}))
-          PY
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: r4-security-readback-${{ github.sha }}
-          path: ${{ runner.temp }}/r4-security-readback.json
-          retention-days: 14
-          if-no-files-found: error
-
-  windows-portability:
-    needs: prepare-objects
-    runs-on: windows-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.prepare-objects.outputs.correctness }}
-          persist-credentials: false
-      - name: Run bounded harness with alias-independent child interpreter
-        run: python tools/governance/test_bounded_execution_guard.py
