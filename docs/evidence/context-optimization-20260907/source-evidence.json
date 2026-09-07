@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "purpose": "Task-only source evidence for #166, not an instruction, lifecycle registry or runtime attestation.",
+  "measurement": "UTF-8 source bytes and splitlines; evidence files excluded from instruction totals.",
+  "records": [
+    {
+      "repository": "Oteryn/Oteryn",
+      "baseline_commit": "4fa4d81d55fee44aa21f2a1d80e4a883b6024982",
+      "baseline_root_blob": "bc7bede1e31a4b55639c5f34a4b7629094d35e80",
+      "baseline_root_bytes": 8303,
+      "baseline_root_lines": 134,
+      "candidate_files": {
+        "AGENTS.md": {
+          "bytes": 6612,
+          "lines": 116,
+          "blob": "a3c50c14b0fdb18a7aec42bd43310e38ffe34134"
+        },
+        "docs/agents/operations/RESTRICTED_PUBLISHING.md": {
+          "bytes": 1201,
+          "lines": 17,
+          "blob": "006b44e323da7d894d26c74ef0bbd111931630ea"
+        },
+        "docs/agents/operations/RUNNER_ROUTING.md": {
+          "bytes": 1384,
+          "lines": 15,
+          "blob": "b27eca659051ecacb3a06e7d0ebb43c7d763b7a7"
+        }
+      },
+      "candidate_instruction_union_bytes": 9197,
+      "source_root_reduction_bytes": 1691,
+      "delivered_tokens": null,
+      "token_cost": null
+    },
+    {
+      "repository": "Oteryn/Oteryn-Atlas",
+      "baseline_commit": "1443615e10cec21d481380b289dcbb742415d709",
+      "baseline_root_blob": "92f8b48bd68ce415dc3911519e562e54e6c68804",
+      "baseline_root_bytes": 7855,
+      "baseline_root_lines": 63,
+      "candidate_files": {
+        "AGENTS.md": {
+          "bytes": 6398,
+          "lines": 56,
+          "blob": "9c713a3265227278c1afd0c1230a1bf7ecc36c10"
+        },
+        "docs/agents/operations/VERIFICATION_CAPABILITY.md": {
+          "bytes": 1809,
+          "lines": 11,
+          "blob": "0c075021edb0b43db64cf1afb7bce43061886d7b"
+        },
+        "docs/agents/operations/LIVE_DEPLOYMENT.md": {
+          "bytes": 754,
+          "lines": 7,
+          "blob": "d13e4c782d795f192c8f138923a699b6ac10c3e0"
+        }
+      },
+      "candidate_instruction_union_bytes": 8961,
+      "source_root_reduction_bytes": 1457,
+      "delivered_tokens": null,
+      "token_cost": null
+    }
+  ],
+  "checks": {
+    "authenticated_baselines": "PASS",
+    "positive_preservation_cases": 2,
+    "negative_controls_rejected": 16,
+    "python_compile": "PASS",
+    "isolated_source_diff_whitespace": "PASS",
+    "full_repository_local_checkout": false
+  },
+  "behavioral_trials_executed": 0,
+  "independent_workers_started": 0,
+  "source_delivery": "NOT_EVALUATED",
+  "runtime_model_effort": "NOT_EXPOSED",
+  "tokens_cache_cost": "NOT_MEASURED"
+}

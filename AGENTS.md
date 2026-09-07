@@ -40,7 +40,8 @@ prompts and `docs/superpowers/` material are evidence, not dispatchable instruct
 
 Before using CLI/Git credential compatibility for an authorized publication, read
 `docs/agents/operations/RESTRICTED_PUBLISHING.md`. Credentials do not expand
-authority; keep them out of remote URLs and persistent credential helpers.
+authority. Never embed a token in a remote URL or persist a new credential
+helper to bypass that boundary.
 
 Before selecting or changing an Actions runner, migrating a legacy runner workload,
 or considering a host-local META workload, read
