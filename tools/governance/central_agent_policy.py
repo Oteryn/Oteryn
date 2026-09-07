@@ -429,8 +429,11 @@ def _section_list(policy: dict[str, Any] | None, key: str) -> list[str] | None:
 def _statements(text: str) -> list[str]:
     body = re.sub(r"(?m)^\s{0,3}#{1,6}\s+.*$", "", _operative_markdown(text))
     result: list[str] = []
-    for block in re.split(r"\n\s*\n", body):
-        result.extend(re.split(r"(?<=[.!?])\s+", " ".join(block.split())))
+    # A hard line/list-item boundary ends a lint statement even without a full
+    # stop. Otherwise one negative/audit line can hide a following directive.
+    # This is intentionally bounded text lint, not a natural-language parser.
+    for line in body.splitlines():
+        result.extend(re.split(r"(?<=[.!?;])\s+", " ".join(line.split())))
     return result
 
 
@@ -493,6 +496,33 @@ def _allowed_providers(policy: dict[str, Any] | None) -> tuple[str, ...]:
     return ALLOWED_PROVIDERS
 
 
+def _has_binding_directive(text: str) -> bool:
+    """Require a direct affirmative bootstrap, not a mention in audit/negation.
+
+    Accept a small explicit grammar instead of trying to infer arbitrary prose:
+    `Resolve/Read/Use <binding>` with an optional policy label or agent subject.
+    Instruction delivery is still verified separately during provider adoption.
+    """
+    binding_re = re.compile(r"(?<![\w/.-])" + re.escape(BINDING_PATH) + r"(?![\w/.-])")
+    action_re = re.compile(
+        r"^(?:[-*+]\s+|\d+[.)]\s+)?"
+        r"(?:(?:organization|meta)\s+policy:\s*)?"
+        r"(?:(?:agents?|workers?|you)\s+(?:must|shall)\s+)?"
+        r"(?:resolve|read|load|use|follow|consult)\s+$", re.IGNORECASE,
+    )
+    for statement in _statements(text):
+        match = binding_re.search(statement)
+        if match is None or _is_audit_or_negative(statement):
+            continue
+        prefix = statement[:match.start()].replace("`", "").replace("**", "")
+        suffix = statement[match.end():]
+        if action_re.fullmatch(prefix) and not re.search(
+            r"\b(?:not|never|optional|prohibited|forbidden|unnecessary)\b", suffix, re.IGNORECASE,
+        ):
+            return True
+    return False
+
+
 def validate_provider_overlay(
     provider: str,
     text: str,
@@ -507,7 +537,7 @@ def validate_provider_overlay(
     if provider not in _allowed_providers(policy):
         errors.append("provider repository is not allowed by central META policy")
     active = _operative_markdown(text)
-    if re.search(r"(?<![\w/.-])" + re.escape(BINDING_PATH) + r"(?![\w/.-])", active) is None:
+    if not _has_binding_directive(active):
         errors.append(f"provider overlay must resolve {BINDING_PATH}")
     sections = _section_list(policy, "forbidden_provider_sections")
     if sections is None:

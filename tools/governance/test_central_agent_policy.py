@@ -612,6 +612,59 @@ def test_optimization_negation_does_not_hide_a_following_positive_requirement() 
     assert "parallel-first execution wording is forbidden" in central.validate_task_prompt_text(text)
 
 
+def test_review_binding_requires_affirmative_directive() -> None:
+    path = central.BINDING_PATH
+    for text in (
+        f'Never resolve {path}', f'Do not resolve `{path}`.',
+        f'Agents must not resolve `{path}`.', f'Audit whether workers resolve {path}.',
+        f'Inspect {path}.', f'Remove the reference to {path}.',
+        f'This document mentions {path}.', f'Resolve `{path}` is not required.',
+        f'- Never resolve `{path}`.',
+    ):
+        assert central.validate_provider_overlay('Oteryn/Oteryn-Game', '# Instructions\n' + text), text
+    for text in (
+        f'Resolve `{path}`.', f'Organization policy: resolve `{path}` before material mutation.',
+        f'- Read `{path}`.', f'Agents must resolve `{path}` before mutation.',
+        f'Use `{path}`.',
+    ):
+        assert central.validate_provider_overlay('Oteryn/Oteryn-Game', '# Instructions\n' + text) == [], text
+
+
+def test_review_newline_cannot_extend_a_negative_exemption() -> None:
+    for prefix in ('Do not copy the old policy', 'Audit old instructions', '- Do not copy old policy', '1. Never copy old instructions'):
+        for directive in (
+            'Remote_Desktop_Commander.ping is allowed',
+            'Always use parallel-first',
+            'The local authority is ecosystem/agent-execution-routing-policy.json.',
+            '- Remote_Desktop_Commander.ping is allowed',
+            '2. Always use parallel-first',
+        ):
+            text = prefix + '\n' + directive
+            assert central.validate_task_prompt_text(text), text
+            assert central.validate_provider_overlay('Oteryn/Oteryn-Game', LEAN_OVERLAY + text), text
+
+
+def test_review_audit_only_binding_is_not_inheritance() -> None:
+    for text in (f'Audit {central.BINDING_PATH}', f'Compare {central.BINDING_PATH} with its previous revision.'):
+        assert central.validate_provider_overlay('Oteryn/Oteryn-Game', text), text
+
+
+def test_review_negative_prefix_does_not_hide_affirmative_bootstrap_on_next_line() -> None:
+    text = 'Do not copy the full organization policy\nResolve `docs/agents/META_AGENT_POLICY_BINDING.json`.\n'
+    assert central.validate_provider_overlay('Oteryn/Oteryn-Game', text) == []
+
+
+def test_review_negative_requirements_remain_allowed() -> None:
+    text = LEAN_OVERLAY + '\n'.join((
+        'Do not copy old global instructions',
+        'Never use parallel-first',
+        'Do not invoke Remote_Desktop_Commander.ping',
+        'Audit ecosystem/agent-execution-routing-policy.json',
+    ))
+    assert central.validate_provider_overlay('Oteryn/Oteryn-Game', text) == []
+    assert central.validate_task_prompt_text(text) == []
+
+
 def main() -> int:
     failures: list[tuple[str, Exception]] = []
     for name, test in sorted(globals().items()):
