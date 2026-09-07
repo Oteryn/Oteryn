@@ -14,6 +14,20 @@ from pathlib import Path
 import re
 
 
+def _is_branch_ref(identity: str) -> bool:
+    # Full-ref rules from git-check-ref-format, without a per-call Git process.
+    # The packet uses refs/heads identities, not --branch shorthand expansion.
+    return (
+        identity.startswith("refs/heads/")
+        and not identity.endswith(".")
+        and not any(part == "" or part.startswith(".") or part.endswith(".lock")
+                    for part in identity.split("/"))
+        and ".." not in identity and "@{" not in identity
+        and not any(ord(char) <= 32 or ord(char) == 127 or char in "~^:?*[\\"
+                    for char in identity)
+    )
+
+
 def load_policy(path: Path) -> dict[str, object]:
     """Load a JSON policy object without consulting external state."""
     loaded = json.loads(path.read_text(encoding="utf-8"))
@@ -427,9 +441,8 @@ def _validate_lanes(parallel: dict[str, object], policy: dict[str, object], erro
             if (not isinstance(identity, str) or not identity or identity != identity.strip()
                     or any(ord(char) < 32 for char in identity)):
                 errors.append(f"lane '{display_identifier}' requires a canonical non-empty {coordinate} identity")
-            elif coordinate == "branch" and (
-                    not identity.startswith("refs/heads/") or len(identity) == len("refs/heads/")):
-                errors.append(f"lane '{display_identifier}' branch must be a full refs/heads/ ref")
+            elif coordinate == "branch" and not _is_branch_ref(identity):
+                errors.append(f"lane '{display_identifier}' branch must be a valid full refs/heads/ ref")
             else:
                 identities[coordinate].setdefault(identity, []).append(display_identifier)
         if not isinstance(lane.get("shared_leases", []), list):

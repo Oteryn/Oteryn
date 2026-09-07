@@ -346,6 +346,24 @@ def test_isolation_rejects_ambiguous_or_missing_identities() -> None:
     assert routing.validate_packet(packet, live_state=live_state(), policy=policy())
 
 
+def test_branch_ref_syntax_matches_git_rules() -> None:
+    invalid = (
+        "refs/heads/foo..bar", "refs/heads/foo bar", "refs/heads/foo.lock",
+        "refs/heads/foo.lock/bar", "refs/heads/.hidden", "refs/heads/a/.hidden",
+        "refs/heads/a/", "refs/heads/a//b", "refs/heads/a.", "refs/heads/a@{b",
+        "refs/heads/a~b", "refs/heads/a^b", "refs/heads/a:b", "refs/heads/a?b",
+        "refs/heads/a*b", "refs/heads/a[b", "refs/heads/a\\b", "refs/heads/a\x7fb",
+    )
+    valid = ("refs/heads/topic", "refs/heads/a/b", "refs/heads/a.b", "refs/heads/a@b")
+    for identity in (*invalid, *valid):
+        packet = default_packet()
+        packet["parallel_execution"]["lanes"][0]["branch"] = identity
+        errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+        assert bool(errors) == (identity in invalid), (identity, errors)
+        result = subprocess.run(["git", "check-ref-format", identity], capture_output=True)
+        assert bool(result.returncode) == (identity in invalid), identity
+
+
 def test_isolation_policy_cannot_disable_independent_identity_checks() -> None:
     for key in ("unique_branch", "unique_worktree"):
         config = policy()
