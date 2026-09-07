@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "kind": "new reproducibility replacement; original pack not authenticated",
+  "scope": "isolated functions on historical immutable snapshots; not current provider runtime/CI",
+  "python": "3.13.5",
+  "node": "v22.16.0",
+  "sources": {
+    "platform": {
+      "repository": "Oteryn/Oteryn-Platform",
+      "commit": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+      "path": "tools/agents/task_issue_liveness.py",
+      "blob": "1634a776976d231b10e8d322c49a2a1ed087eb6b"
+    },
+    "atlas": {
+      "repository": "Oteryn/Oteryn-Atlas",
+      "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+      "path": "tools/maintenance/verify-maintenance-diff.mjs",
+      "blob": "714fb73fe08b7c741d606c6e5a8ecdf33a3adf10"
+    }
+  },
+  "results": [
+    {
+      "case": "L01",
+      "fixture": "missing",
+      "live_valid": true,
+      "task_count": 0,
+      "errors": 0,
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "L02",
+      "fixture": "regular-file",
+      "live_valid": true,
+      "task_count": 0,
+      "errors": 0,
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "L03",
+      "fixture": "empty-directory",
+      "live_valid": true,
+      "task_count": 0,
+      "errors": 0,
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "L04",
+      "fixture": "readme-only",
+      "live_valid": true,
+      "task_count": 0,
+      "errors": 0,
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "L05",
+      "fixture": "stub-error",
+      "live_valid": false,
+      "task_count": 1,
+      "errors": 1,
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "L06",
+      "fixture": "stub-valid",
+      "live_valid": true,
+      "task_count": 1,
+      "errors": 0,
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "A01",
+      "change": {
+        "status": "M",
+        "path": "AGENTS.md"
+      },
+      "observed": true,
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "A02",
+      "change": {
+        "status": "A",
+        "path": "docs/agents/META_AGENT_POLICY_BINDING.json"
+      },
+      "observed": true,
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "A03",
+      "change": {
+        "status": "A",
+        "path": ".codex/agents/auditor.toml"
+      },
+      "observed": false,
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "A04",
+      "change": {
+        "status": "A",
+        "path": ".agents/skills/review/SKILL.md"
+      },
+      "observed": false,
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "A05",
+      "change": {
+        "status": "R",
+        "oldPath": "docs/agents/tasks/active/a.md",
+        "path": "docs/agents/tasks/archive/a.md"
+      },
+      "observed": "error",
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "A06",
+      "change": {
+        "status": "M",
+        "path": "tools/maintenance/verify-maintenance-diff.mjs"
+      },
+      "observed": "error",
+      "matches_reported_behavior": true
+    },
+    {
+      "case": "A07",
+      "change": {
+        "status": "M",
+        "path": "src/runtime.ts"
+      },
+      "observed": false,
+      "matches_reported_behavior": true
+    }
+  ],
+  "matches": 13
+}
