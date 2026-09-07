@@ -4,64 +4,161 @@ on:
     branches: [main]
     paths:
       - .github/workflows/organization-audit-qualification.yml
-      - tools/audit/stale-session-admission.php
+      - tools/audit/public-surface.mjs
 permissions:
   contents: read
 concurrency:
   group: audit-185-native-evidence
   cancel-in-progress: false
 jobs:
-  isolated-characterization:
+  concurrency:
     if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 8
+    services:
+      mariadb:
+        image: mariadb@sha256:2439dcd7d14010ecd1ff7a4e1c5abe8e208c34fe35290744deeeaac3569043c3
+        env:
+          MARIADB_ROOT_PASSWORD: audit-isolated-fixture-only
+          MARIADB_DATABASE: audit185_concurrency
+          MARIADB_ROOT_HOST: '%'
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_DATABASE: audit185_concurrency
+      DB_USERNAME: root
+      DB_PASSWORD: audit-isolated-fixture-only
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      GAME_AUTH_CONCURRENCY_TEST: '1'
+      CHARACTER_PROFILE_CONCURRENCY_TEST: '1'
     steps:
-      - name: Read the exact audit probe
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Oteryn/Oteryn-Platform
+          ref: de917b3477a1de0667531380de3660e8b2ab59aa
+          persist-credentials: false
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
+          extensions: pdo_mysql, pdo_sqlite, pcntl, gd
+          tools: composer:v2
+      - name: Execute four previously skipped concurrency controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/audit-185-concurrency"
+          mkdir -p "$out"
+          test "$(git rev-parse HEAD)" = de917b3477a1de0667531380de3660e8b2ab59aa
+          test "$(git rev-parse HEAD^{tree})" = ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e
+          composer install --no-interaction --prefer-dist --no-progress > "$out/install.log" 2>&1
+          test ! -e .env
+          : > .env
+          timeout --kill-after=5s 180s vendor/bin/phpunit --filter 'GameTicketConcurrencyTest|CharacterProfilePreferenceConcurrencyTest' --log-junit "$out/junit.xml" > "$out/tests.log" 2>&1
+          rm .env
+          git diff --exit-code
+          python3 - "$out/junit.xml" <<'PY'
+          import sys,xml.etree.ElementTree as ET
+          root=ET.parse(sys.argv[1]).getroot()
+          cases=root.findall('.//testcase')
+          assert len(cases)==4, len(cases)
+          assert all(c.find('skipped') is None and c.find('failure') is None and c.find('error') is None for c in cases)
+          print('Four dedicated concurrency tests executed with no skips/errors/failures.')
+          PY
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: audit-185-concurrency-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/audit-185-concurrency
+          if-no-files-found: error
+          retention-days: 7
+  public-ui:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_URL: http://127.0.0.1:8080
+      DB_CONNECTION: sqlite
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      CANARY_DB_HOST: 127.0.0.1
+      CANARY_DB_PORT: '9'
+      CANARY_RUNTIME_REDIS_PORT: '9'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           path: audit
           persist-credentials: false
-      - name: Read immutable Platform source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: Oteryn/Oteryn-Platform
           ref: de917b3477a1de0667531380de3660e8b2ab59aa
           path: provider
           persist-credentials: false
-      - name: Set up the source-declared PHP toolchain
-        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
         with:
           php-version: '8.5'
           coverage: none
-          extensions: pdo_mysql, pcntl, gd
+          extensions: pdo_mysql, pdo_sqlite, gd
           tools: composer:v2
-      - name: Install locked dependencies
+      - name: Prepare locked browser and isolated synthetic source data
         working-directory: provider
         shell: bash
         run: |
           set -euo pipefail
+          out="$RUNNER_TEMP/audit-185-public-ui"
+          mkdir -p "$out"
+          export DB_DATABASE="$RUNNER_TEMP/audit185-ui.sqlite"
+          test ! -e "$DB_DATABASE"
+          touch "$DB_DATABASE"
+          printf 'DB_DATABASE=%s\n' "$DB_DATABASE" >> "$GITHUB_ENV"
           test "$(git rev-parse HEAD)" = de917b3477a1de0667531380de3660e8b2ab59aa
-          mkdir -p "$RUNNER_TEMP/audit-185-characterization"
-          composer install --no-interaction --prefer-dist --no-progress > "$RUNNER_TEMP/audit-185-characterization/install.log" 2>&1
-          php -l ../audit/tools/audit/stale-session-admission.php
-          if php ../audit/tools/audit/stale-session-admission.php "$PWD" "$RUNNER_TEMP/forbidden-probe" > "$RUNNER_TEMP/audit-185-characterization/consent-negative.log" 2>&1; then
-            echo 'Missing-consent control unexpectedly passed'; exit 1
-          fi
-          test ! -e "$RUNNER_TEMP/forbidden-probe"
-      - name: Characterize stale credential admission with positive and negative controls
+          composer install --no-interaction --prefer-dist --no-progress > "$out/install.log" 2>&1
+          php artisan migrate --force > "$out/migrations.log" 2>&1
+          php scripts/acceptance/seed.php seed > /dev/null
+          cd scripts/acceptance
+          npm ci --ignore-scripts --no-audit --no-fund > "$out/npm-ci.log" 2>&1
+          npx --no-install playwright install --with-deps chromium > "$out/browser-install.log" 2>&1
+      - name: Observe public pages at four viewports without submitting mutations
         working-directory: provider
         env:
-          OTERYN_AUDIT185_ISOLATED_SESSION: '1'
+          OTERYN_AUDIT185_PUBLIC_UI: '1'
         shell: bash
         run: |
           set -euo pipefail
-          php ../audit/tools/audit/stale-session-admission.php "$PWD" "$RUNNER_TEMP/audit-185-characterization/session-admission.json"
-      - name: Preserve bounded diagnostic evidence
+          out="$RUNNER_TEMP/audit-185-public-ui"
+          php artisan serve --host=127.0.0.1 --port=8080 > "$RUNNER_TEMP/audit185-server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8080/login > /dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+          node --check ../audit/tools/audit/public-surface.mjs
+          timeout --kill-after=5s 360s node ../audit/tools/audit/public-surface.mjs "$PWD" "$out/browser"
+          git diff --exit-code
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: audit-185-session-admission-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/audit-185-characterization
+          name: audit-185-public-ui-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/audit-185-public-ui
           if-no-files-found: error
           retention-days: 7
