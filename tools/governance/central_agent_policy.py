@@ -449,6 +449,13 @@ def _statements(text: str) -> list[str]:
         r"\bparallel[-_ ]first\b|remote_desktop_commander\.\w+", re.IGNORECASE,
     )
     unfinished = re.compile(r"\b(?:not|never|must|shall|may|can|use|resolve|read|load|follow|invoke|call|is|are|the|an?)\s*$", re.IGNORECASE)
+    incomplete_negative = re.compile(
+        r"^(?:[-*+]\s+|\d+[.)]\s+)?"
+        r"(?:(?:agents?|workers?|you)\s+)?"
+        r"(?:do\s+not|never|must\s+not)"
+        r"(?:\s+(?:use|resolve|read|load|follow|invoke|call))?\s*$",
+        re.IGNORECASE,
+    )
 
     def flush() -> None:
         if pending:
@@ -461,8 +468,10 @@ def _statements(text: str) -> list[str]:
             flush()
             continue
         if pending:
-            incomplete = unfinished.search(pending[-1]) and (
-                not _is_audit_or_negative(pending[0]) or unfinished.search(pending[0])
+            pending_text = " ".join(pending)
+            incomplete = bool(unfinished.search(pending[-1])) and (
+                not _is_audit_or_negative(pending_text)
+                or incomplete_negative.fullmatch(pending_text) is not None
             )
             if item.match(line) or ((starter.match(line) or directive.search(line)) and not incomplete):
                 flush()

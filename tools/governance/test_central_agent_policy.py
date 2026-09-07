@@ -745,6 +745,32 @@ def test_review_modals_split_from_subject_are_not_lost() -> None:
         assert central.validate_task_prompt_text("Do not copy historical instructions\n" + directive), directive
 
 
+def test_review_complete_negative_clause_ending_in_use_does_not_absorb_grant() -> None:
+    directive = "All agents may invoke Remote_Desktop_Commander.ping."
+    for prefix in (
+        "Do not copy anything except the rules providers use",
+        "Workers must not replace the safeguards maintainers use",
+        "Never remove the audit conventions teams use",
+    ):
+        text = prefix + "\n" + directive
+        assert central.validate_task_prompt_text(text), text
+        assert central.validate_provider_overlay("Oteryn/Oteryn-Game", LEAN_OVERLAY + text), text
+
+
+def test_review_genuinely_incomplete_negative_directives_keep_soft_wraps() -> None:
+    for subject in ("", "Agents ", "Workers ", "You "):
+        for action in ("use", "invoke"):
+            prefix = f"{subject}must not {action}" if subject else f"Do not {action}"
+            text = prefix + "\nRemote_Desktop_Commander.ping."
+            assert central.validate_task_prompt_text(text) == [], text
+            assert central.validate_provider_overlay("Oteryn/Oteryn-Game", LEAN_OVERLAY + text) == [], text
+
+    for preceding in ("Audit historical instructions", "Do not copy the old policy"):
+        text = preceding + "\nDo not invoke\nRemote_Desktop_Commander.ping."
+        assert central.validate_task_prompt_text(text) == [], text
+        assert central.validate_provider_overlay("Oteryn/Oteryn-Game", LEAN_OVERLAY + text) == [], text
+
+
 
 def main() -> int:
     failures: list[tuple[str, Exception]] = []
