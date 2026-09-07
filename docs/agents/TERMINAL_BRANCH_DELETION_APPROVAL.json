@@ -1,11 +1,11 @@
 {
-  "apply_on_main": false,
+  "apply_on_main": true,
   "candidate_count": 12,
   "confirmation": "APPROVE_REVIEWED_TERMINAL_CLOSED_UNMERGED_BRANCHES_ISSUE_1050",
   "entries_sha256": "225b80416e4d99f06054b0c57b1312973ce74a61cd77080078baf75b1d35f6be",
   "issue": 1050,
   "policy_sha256": "f70be5beb95a1b73644786df6fdb9bb32fc39853db0cdf896dfa7fb7403f7024",
-  "review_summary": "Reviewed exact live set of 12 terminal closed-unmerged META branches. Open #89/#153/#60 and approval PR #179 are excluded; ambiguous context/loop-breaker/R4 verification refs and superseded #143 were separately terminalized through exact closed-PR lifecycle before this approval. Preserve only current protected/open authority.",
+  "review_summary": "Reviewed exact live set of 12 terminal closed-unmerged META branches. Open #89/#153/#60 and approval work are excluded; ambiguous context/loop-breaker/R4 verification refs and superseded #143 were separately terminalized through exact closed-PR lifecycle before this approval. Apply is enabled only for this exact reviewed digest; live revalidation remains fail-closed.",
   "reviewed_at": "2026-09-07T18:54:00Z",
   "reviewed_by": "Oteryn final cleanup #176/#178",
   "schema_version": 1,
