@@ -4,7 +4,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/organization-audit-qualification.yml
-      - tools/audit/password-reset-race.php
+      - tools/audit/stale-session-admission.php
 permissions:
   contents: read
 concurrency:
@@ -15,16 +15,6 @@ jobs:
     if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
-    services:
-      mariadb:
-        image: mariadb@sha256:2439dcd7d14010ecd1ff7a4e1c5abe8e208c34fe35290744deeeaac3569043c3
-        env:
-          MARIADB_ROOT_PASSWORD: audit-isolated-fixture-only
-          MARIADB_ROOT_HOST: '%'
-        ports: ['3306:3306']
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=5s --health-timeout=5s --health-retries=20
     steps:
       - name: Read the exact audit probe
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -54,46 +44,24 @@ jobs:
           test "$(git rev-parse HEAD)" = de917b3477a1de0667531380de3660e8b2ab59aa
           mkdir -p "$RUNNER_TEMP/audit-185-characterization"
           composer install --no-interaction --prefer-dist --no-progress > "$RUNNER_TEMP/audit-185-characterization/install.log" 2>&1
-          php -l ../audit/tools/audit/password-reset-race.php
-          if php ../audit/tools/audit/password-reset-race.php parent "$PWD" "$RUNNER_TEMP/forbidden-probe" > "$RUNNER_TEMP/audit-185-characterization/consent-negative.log" 2>&1; then
+          php -l ../audit/tools/audit/stale-session-admission.php
+          if php ../audit/tools/audit/stale-session-admission.php "$PWD" "$RUNNER_TEMP/forbidden-probe" > "$RUNNER_TEMP/audit-185-characterization/consent-negative.log" 2>&1; then
             echo 'Missing-consent control unexpectedly passed'; exit 1
           fi
           test ! -e "$RUNNER_TEMP/forbidden-probe"
-      - name: Characterize one-time-token serialization on a disposable database
+      - name: Characterize stale credential admission with positive and negative controls
         working-directory: provider
         env:
-          OTERYN_AUDIT185_ISOLATED_DB: '1'
+          OTERYN_AUDIT185_ISOLATED_SESSION: '1'
         shell: bash
         run: |
           set -euo pipefail
-          php ../audit/tools/audit/password-reset-race.php parent "$PWD" "$RUNNER_TEMP/audit-185-characterization/reset-race"
-      - name: Isolate Artisan warning presentation on the existing recovery suite
-        working-directory: provider
-        shell: bash
-        run: |
-          set -euo pipefail
-          test ! -e .env
-          out="$RUNNER_TEMP/audit-185-characterization"
-          set +e
-          php artisan test --filter=PasswordRecoveryTest --display-warnings > "$out/artisan-no-env.log" 2>&1
-          first=$?
-          set -e
-          test ! -e .env
-          : > .env
-          set +e
-          php artisan test --filter=PasswordRecoveryTest --display-warnings > "$out/artisan-empty-env.log" 2>&1
-          second=$?
-          set -e
-          rm -- .env
-          printf '{"without_env_exit":%s,"empty_env_exit":%s,"scope":"existing PasswordRecoveryTest via Artisan; separate SQLite synthetic fixture"}\n' "$first" "$second" > "$out/artisan-control.json"
-          git diff --exit-code
-          test "$first" -eq 0
-          test "$second" -eq 0
+          php ../audit/tools/audit/stale-session-admission.php "$PWD" "$RUNNER_TEMP/audit-185-characterization/session-admission.json"
       - name: Preserve bounded diagnostic evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: audit-185-characterization-${{ github.event.pull_request.head.sha }}
+          name: audit-185-session-admission-${{ github.event.pull_request.head.sha }}
           path: ${{ runner.temp }}/audit-185-characterization
           if-no-files-found: error
           retention-days: 7
