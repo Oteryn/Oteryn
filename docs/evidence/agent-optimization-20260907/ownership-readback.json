@@ -1,0 +1,371 @@
+{
+  "observed_at": "2026-09-07T10:06:04.140Z",
+  "programme_parent": "Oteryn/Oteryn#142",
+  "external_ownership": [
+    {
+      "repository": "Oteryn/Oteryn-Game",
+      "pr": 379,
+      "head": "cd9d0168d1bc2a738f4857036d94feb17ac84d94",
+      "scope": "R5 successor to #373 under #367; active instruction/consumer repairs",
+      "disposition": "Independent read-only finding verification in progress; do not mutate overlapping owner branch or assume merge authority from Draft body"
+    },
+    {
+      "repository": "Oteryn/Oteryn-Game",
+      "pr": 376,
+      "head": "e99679d551d7f7d031d1a8d3b847fc187440e285",
+      "scope": "12 terminal task packets under #374",
+      "disposition": "Preserve external ownership; our W6 closeout only #375 exact packet"
+    },
+    {
+      "repository": "Oteryn/Oteryn-Platform",
+      "pr": 1303,
+      "head": "ec473212e36b00e07154dcaf10a18d4e11d39235",
+      "scope": "R5 policy adoption under #1302",
+      "disposition": "Independent reachability/finding verification against merged #1304 in progress; no competing mutation"
+    },
+    {
+      "repository": "Oteryn/Oteryn-Atlas",
+      "pr": 346,
+      "head": "54afb366e7f17b5047c5263898f9a22bd795ae67",
+      "scope": "Maintenance authority docs and owned E2E prompt family",
+      "disposition": "Excluded from our W4 edits; actual ruleset name read independently and recorded"
+    }
+  ],
+  "other_open_prs": {
+    "Oteryn": [
+      {
+        "number": 163,
+        "title": "docs(evidence): record agent optimization screening and closeout",
+        "draft": true,
+        "head": "f0efe41d27fb92b5361dff279c4aec7d5c65f83f"
+      },
+      {
+        "number": 153,
+        "title": "docs(audit): complete R4 current-main repository audit",
+        "draft": false,
+        "head": "eae38fa0963bd3b6ebb5e090f079944b5a1892db"
+      },
+      {
+        "number": 89,
+        "title": "docs(architecture): define unified Oteryn World Atlas programme",
+        "draft": false,
+        "head": "734cc81ef3c3c357c321ff1a6368d872f434248a"
+      },
+      {
+        "number": 60,
+        "title": "recovery: record v3.10 organization closeout blockers",
+        "draft": true,
+        "head": "3ef377eb20bfcfe759eccf2cb5d585d228010ee3"
+      }
+    ],
+    "Oteryn-Game": [
+      {
+        "number": 379,
+        "title": "fix(agents): complete R5 META adoption review repairs",
+        "draft": true,
+        "head": "cd9d0168d1bc2a738f4857036d94feb17ac84d94"
+      },
+      {
+        "number": 378,
+        "title": "ci: refresh current audited consumer snapshots",
+        "draft": false,
+        "head": "b20dfb4e476b694a3f5bd08b2c7d6ee64a9daf6c"
+      },
+      {
+        "number": 376,
+        "title": "docs(agents): archive terminal task packets",
+        "draft": true,
+        "head": "e99679d551d7f7d031d1a8d3b847fc187440e285"
+      },
+      {
+        "number": 371,
+        "title": "fix(architecture): make semantic audits scope-aware",
+        "draft": true,
+        "head": "8f425f8025eadd454b8df5c224632faa72197300"
+      },
+      {
+        "number": 361,
+        "title": "fix(foundation): repair early-terminal reconnect phases",
+        "draft": true,
+        "head": "176af0eeb76228dcfec575b57f7744a6290ef1e8"
+      },
+      {
+        "number": 360,
+        "title": "docs(audit): publish repository coverage and verification evidence",
+        "draft": true,
+        "head": "d8a69a2fda51a8882c2e0d9bae61204f9cde163b"
+      },
+      {
+        "number": 356,
+        "title": "feat(durability): account SQLx driver resources (WIP)",
+        "draft": true,
+        "head": "f8c2530284e9fad20d97cae5140d4c9c5c1933bd"
+      },
+      {
+        "number": 335,
+        "title": "feat(durability): persist atomic fresh admission",
+        "draft": false,
+        "head": "834db1d7118d751e31287715d3eaac7780a0c7b9"
+      },
+      {
+        "number": 295,
+        "title": "docs(architecture): checkpoint Rested and death-recovery direction",
+        "draft": true,
+        "head": "5e74abdee0d55698c20fd7c06adb49ab778a00cd"
+      },
+      {
+        "number": 293,
+        "title": "docs(agents): add Durability multiagent launch runbook",
+        "draft": true,
+        "head": "81d225d2d751654b92500500b6ac28f62ec45369"
+      },
+      {
+        "number": 288,
+        "title": "ci(governance): rotate merge-group gate blob authority",
+        "draft": true,
+        "head": "4644390972375c44c3a44b9e8a8e38e320c9ba40"
+      },
+      {
+        "number": 262,
+        "title": "ci(queue): prepare native merge-group gate",
+        "draft": false,
+        "head": "573f964532b4b870465ea4f8bee5002f9ab2554b"
+      },
+      {
+        "number": 261,
+        "title": "build(deps): bump ed25519-dalek from 2.2.0 to 3.0.0",
+        "draft": false,
+        "head": "6aa727813e63d2ca74781051247b8a9abb139fa4"
+      },
+      {
+        "number": 260,
+        "title": "build(deps): bump base64 from 0.22.1 to 0.23.1",
+        "draft": false,
+        "head": "6eeb9a597c0a64fbc33dd79f011044dc65a0ddce"
+      },
+      {
+        "number": 259,
+        "title": "build(deps): bump wgpu from 30.0.0 to 30.0.1",
+        "draft": false,
+        "head": "2a73d5ad4d51d7ff28176efca80e9b8df22a3c29"
+      },
+      {
+        "number": 258,
+        "title": "ci(deps): bump github/codeql-action/analyze from 4.37.7 to 4.37.9",
+        "draft": false,
+        "head": "76dc6f5b23666e96504fa2b982f45ecf25fe25ab"
+      },
+      {
+        "number": 257,
+        "title": "ci(deps): bump github/codeql-action/init from 4.37.7 to 4.37.9",
+        "draft": false,
+        "head": "a5b88fa980bdab4387330b9f02c5806aa4d3f4ab"
+      },
+      {
+        "number": 243,
+        "title": "test(durability): establish clean recovery RED",
+        "draft": true,
+        "head": "eb28c42125c346e7f6f1c72e69d51af35af8fc1f"
+      },
+      {
+        "number": 228,
+        "title": "docs(architecture): capture anti-bot player reporting analysis",
+        "draft": true,
+        "head": "93f17b434128b9ad077e62e1adce3af9a7d5c335"
+      },
+      {
+        "number": 150,
+        "title": "docs(agents): prevent autonomous retry loops",
+        "draft": true,
+        "head": "d6d0e1d85782f5ebe6a82901852bd1cbff823fef"
+      },
+      {
+        "number": 2,
+        "title": "ci(deps): bump actions/upload-artifact from 4.6.2 to 7.0.1",
+        "draft": false,
+        "head": "a28a828bd8a1986778efd5fd492a433aa69015da"
+      }
+    ],
+    "Oteryn-Platform": [
+      {
+        "number": 1303,
+        "title": "agents: adopt META policy and retire duplicated Platform consumers",
+        "draft": true,
+        "head": "ec473212e36b00e07154dcaf10a18d4e11d39235"
+      },
+      {
+        "number": 1298,
+        "title": "feat(portal): complete Oteryn player-facing portal redesign",
+        "draft": true,
+        "head": "4910e9dd4d54139847e317a5521688f556831942"
+      },
+      {
+        "number": 1294,
+        "title": "docs(audit): persist comprehensive Platform repository audit",
+        "draft": true,
+        "head": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b"
+      },
+      {
+        "number": 1281,
+        "title": "chore(deps): bump github/codeql-action/analyze from 4.37.6 to 4.37.9",
+        "draft": false,
+        "head": "3e94d944ebbf1c037b7f04c1f032a70f7de39385"
+      },
+      {
+        "number": 1280,
+        "title": "chore(deps): bump github/codeql-action/init from 4.37.6 to 4.37.9",
+        "draft": false,
+        "head": "d4bd71c5ef3f18ccf312371a099df96bf587423b"
+      },
+      {
+        "number": 1279,
+        "title": "chore(deps-dev): bump phpunit/phpunit from 13.3.0 to 13.3.2",
+        "draft": false,
+        "head": "6b958a3af7da59597e619933b752d16056674073"
+      },
+      {
+        "number": 1278,
+        "title": "chore(deps): bump laravel/framework from 13.25.0 to 13.29.0",
+        "draft": false,
+        "head": "e4a7d0d5f2ee572a0661849d099e52e0f1f535a1"
+      },
+      {
+        "number": 1277,
+        "title": "chore(deps-dev): bump phpstan/phpstan from 2.2.8 to 2.2.9",
+        "draft": false,
+        "head": "723b70b9e0b3a94fdee305baff1b508938b88b6c"
+      },
+      {
+        "number": 1269,
+        "title": "docs(ci): prepare organization canary audit",
+        "draft": true,
+        "head": "2078e945786d8d912d4ce7d171454d582ce9909f"
+      },
+      {
+        "number": 1251,
+        "title": "chore(deps): bump docker/setup-buildx-action from 4.2.0 to 4.3.0",
+        "draft": false,
+        "head": "4a499b60ab9b33ae83fd268a9a2c655750527ed8"
+      },
+      {
+        "number": 1250,
+        "title": "chore(deps-dev): bump mockery/mockery from 1.6.12 to 1.6.15",
+        "draft": false,
+        "head": "2be19933961e09c785c15b16efabdd3d02aa243c"
+      },
+      {
+        "number": 1211,
+        "title": "ops(atlas): cut over Synology preview to current merged Atlas",
+        "draft": true,
+        "head": "80bed726929e1bb205a33fe9e5d0aeb7b502b078"
+      },
+      {
+        "number": 1162,
+        "title": "chore(deps): bump pragmarx/google2fa from 9.0.0 to 9.1.0",
+        "draft": false,
+        "head": "f44f639cca6fe2a82593a4286aede32bd2034e0a"
+      },
+      {
+        "number": 1120,
+        "title": "docs(content): establish CONTENT-COORD barrier",
+        "draft": true,
+        "head": "e557ea4e87ba9a55ad5b694d168bb6813b32dcf5"
+      },
+      {
+        "number": 1116,
+        "title": "docs(programme): bootstrap content completion project",
+        "draft": true,
+        "head": "932d814ee75cbd1b964834655f3672d617c650b1"
+      },
+      {
+        "number": 338,
+        "title": "feat(catalog): add inactive schema 1.3 NPC shop consumer",
+        "draft": true,
+        "head": "8baec8d66c1bab0b618684096300ab491dacacb4"
+      }
+    ],
+    "Oteryn-Atlas": [
+      {
+        "number": 346,
+        "title": "docs(agents): reconcile Atlas maintenance authority",
+        "draft": true,
+        "head": "54afb366e7f17b5047c5263898f9a22bd795ae67"
+      },
+      {
+        "number": 344,
+        "title": "feat(ui): keyboard-first Find, contextual details and map-first Atlas panels (#343)",
+        "draft": true,
+        "head": "159fd044e1c3186fd77ea00b9025318268350d2c"
+      },
+      {
+        "number": 342,
+        "title": "docs(evidence): preserve Atlas repository audits from 2026-09-06",
+        "draft": true,
+        "head": "d128a7da4f394a4b2fa2d56cc1728d25d36b87c2"
+      },
+      {
+        "number": 331,
+        "title": "docs(evidence): add Astra Atlas simplification coordinator packet",
+        "draft": true,
+        "head": "1c81ac72bf99d796a80cbaf24ddf6c72d372b608"
+      },
+      {
+        "number": 167,
+        "title": "fix(deploy): make Atlas root redirect reverse-proxy safe",
+        "draft": false,
+        "head": "48a89cec8fa65a162166309660dad3d78e338813"
+      },
+      {
+        "number": 162,
+        "title": "feat(atlas): animate creatures walking in place",
+        "draft": true,
+        "head": "e4f64806d04fabdf3b178095bf246b4ab2526a85"
+      },
+      {
+        "number": 141,
+        "title": "test(atlas): add Firefox and WebKit real-browser acceptance depth",
+        "draft": true,
+        "head": "ce4039e2dd6490d799d128d54ffcd65668a969e9"
+      },
+      {
+        "number": 136,
+        "title": "docs(agents): add static creature restore closeout alias",
+        "draft": false,
+        "head": "b1a64d627bb143cebeba0514cef56a6792a9a63c"
+      },
+      {
+        "number": 9,
+        "title": "ci(atlas): stage full-world preview closeout",
+        "draft": true,
+        "head": "065e781fc890270d7aa97cd623cba11eeb619568"
+      }
+    ]
+  },
+  "final_review_findings": {
+    "Game": {
+      "verdict": "WITHDRAW_BROAD_ROLLOUT_QUALIFICATION",
+      "p1": [
+        "operative standing-review authorization via retired policy",
+        "competing retry/lifecycle controller and states"
+      ],
+      "owner": "Oteryn/Oteryn-Game#379 / #367",
+      "canonical_withdrawal": "https://github.com/Oteryn/Oteryn-Game/issues/367#issuecomment-5569126004"
+    },
+    "Platform": {
+      "verdict": "BOUNDED_1304_ACCEPTED_PROGRAMME_P1_OPEN",
+      "p1": [
+        "reachable specialist direct-merge fallback conflicts with META",
+        "competing terminal-only controller"
+      ],
+      "owner": "Oteryn/Oteryn-Platform#1303 / #1302",
+      "candidate_needs": "Historical ec473 review required non-force reconciliation; owner subsequently reconciled #1304 and advanced candidate. Latest external head is not qualified by the earlier review or this programme lane."
+    }
+  },
+  "later_observed_external_heads": {
+    "Oteryn/Oteryn-Game#379": "b210ab4da087fbed99ded92b59014c35b6a4ec8a",
+    "Oteryn/Oteryn-Game#376": "cd1c8b8ba437a72fd3ee2abef078448c17a15d4c",
+    "Oteryn/Oteryn-Platform#1303": "46f177124fd6604d699bef822b209eed0df29249",
+    "Oteryn/Oteryn-Atlas#346": "f40ac04667068fcb377dcc86dc860f5e331ae486"
+  },
+  "note": "External source heads advanced while this lane worked, confirming live mutation ownership. Reviews bind to stated current-main findings, not changing external integration candidates."
+}

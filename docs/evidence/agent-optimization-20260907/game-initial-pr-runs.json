@@ -1,0 +1,101 @@
+[
+  {
+    "id": 34103196352,
+    "name": "Agent governance • pull_request • 373",
+    "head": "ebe152af34bd003dd5c41b38eb550f10944be988",
+    "status": "completed",
+    "conclusion": "success",
+    "attempt": 1,
+    "created": "2026-09-07T08:55:37Z",
+    "updated": "2026-09-07T08:55:49Z",
+    "url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34103196352"
+  },
+  {
+    "id": 34103196396,
+    "name": "Architecture semantic audit • pull_request • 373",
+    "head": "ebe152af34bd003dd5c41b38eb550f10944be988",
+    "status": "completed",
+    "conclusion": "success",
+    "attempt": 1,
+    "created": "2026-09-07T08:55:37Z",
+    "updated": "2026-09-07T08:55:52Z",
+    "url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34103196396"
+  },
+  {
+    "id": 34103196461,
+    "name": "Merge gate • pull_request • 373",
+    "head": "ebe152af34bd003dd5c41b38eb550f10944be988",
+    "status": "in_progress",
+    "conclusion": null,
+    "attempt": 1,
+    "created": "2026-09-07T08:55:37Z",
+    "updated": "2026-09-07T08:56:05Z",
+    "url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34103196461"
+  },
+  {
+    "id": 34101779615,
+    "name": "Architecture semantic audit • pull_request • 373",
+    "head": "a232cacacd7284f95b1d17c231aaa9c6888e0bfe",
+    "status": "completed",
+    "conclusion": "success",
+    "attempt": 1,
+    "created": "2026-09-07T08:39:46Z",
+    "updated": "2026-09-07T08:39:54Z",
+    "url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34101779615"
+  },
+  {
+    "id": 34101779684,
+    "name": "Agent governance • pull_request • 373",
+    "head": "a232cacacd7284f95b1d17c231aaa9c6888e0bfe",
+    "status": "completed",
+    "conclusion": "success",
+    "attempt": 1,
+    "created": "2026-09-07T08:39:46Z",
+    "updated": "2026-09-07T08:39:59Z",
+    "url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34101779684"
+  },
+  {
+    "id": 34101779669,
+    "name": "Merge gate • pull_request • 373",
+    "head": "a232cacacd7284f95b1d17c231aaa9c6888e0bfe",
+    "status": "completed",
+    "conclusion": "success",
+    "attempt": 1,
+    "created": "2026-09-07T08:39:46Z",
+    "updated": "2026-09-07T08:48:09Z",
+    "url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34101779669"
+  },
+  {
+    "id": 34101497119,
+    "name": "Architecture semantic audit • pull_request • 373",
+    "head": "2507c56571605eb6642a0a808631a29931e1518d",
+    "status": "completed",
+    "conclusion": "success",
+    "attempt": 1,
+    "created": "2026-09-07T08:36:36Z",
+    "updated": "2026-09-07T08:36:44Z",
+    "url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34101497119"
+  },
+  {
+    "id": 34101497140,
+    "name": "Agent governance • pull_request • 373",
+    "head": "2507c56571605eb6642a0a808631a29931e1518d",
+    "status": "completed",
+    "conclusion": "success",
+    "attempt": 1,
+    "created": "2026-09-07T08:36:36Z",
+    "updated": "2026-09-07T08:36:48Z",
+    "url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34101497140"
+  },
+  {
+    "id": 34101497133,
+    "name": "Merge gate • pull_request • 373",
+    "head": "2507c56571605eb6642a0a808631a29931e1518d",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "attempt": 1,
+    "created": "2026-09-07T08:36:36Z",
+    "updated": "2026-09-07T08:40:14Z",
+    "url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34101497133"
+  }
+]

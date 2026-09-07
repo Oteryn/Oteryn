@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "measurement": {
+    "encoding": "UTF-8 tracked Git blobs",
+    "lines": "Python str.splitlines() unless an existing evaluation record is explicitly cited",
+    "corpus_rule": "baseline/candidate union of the scoped root, nearest/bootstrap, active reusable prompt, prompt-evaluation, and local validator paths; a path absent at one revision contributes zero bytes and zero lines at that revision",
+    "exclusions": [
+      "evidence-only head changes",
+      "lifecycle-only head changes",
+      "workflow-only head changes",
+      "historical prompt bodies not marked active",
+      "token estimates",
+      "billing or cost estimates"
+    ]
+  },
+  "repositories": {
+    "META": {
+      "baseline": "5ed3f14400af450b5875c091e443da70f2d67ab9",
+      "candidate": "da4cbbceab286ac9ea350a9748eb7e570870851e",
+      "scope": "the exact nine instruction/prompt paths changed by protected #159/#160/#162",
+      "union_files": 9,
+      "before": {
+        "files": 9,
+        "bytes": 79894,
+        "lines": 1419
+      },
+      "after": {
+        "files": 9,
+        "bytes": 60331,
+        "lines": 1121
+      },
+      "paths": [
+        "AGENTS.md",
+        "docs/agents/CHAT_FIRST_AUTONOMOUS_EXECUTION_HANDOFF.md",
+        "docs/agents/prompts/OTERYN-CHAT-FIRST-AUTONOMY-CONTINUATION.md",
+        "docs/agents/prompts/OTERYN-INSTRUCTION-DEBT-AUDIT.md",
+        "docs/agents/prompts/OTERYN-V310-ATLAS-DOC-IA-CLOSEOUT.md",
+        "docs/agents/prompts/OTERYN-V310-GAME-DOC-IA-AND-GAME-GATE-CLOSEOUT.md",
+        "docs/agents/prompts/OTERYN-V310-ORGANIZATION-RECOVERY-AUTHORIZED-CONTINUATION.md",
+        "docs/agents/prompts/OTERYN-V310-ORGANIZATION-RECOVERY-CLOSEOUT.md",
+        "docs/agents/prompts/OTERYN-V310-PLATFORM-DOC-IA-CLOSEOUT.md"
+      ],
+      "qualification": "central META source delta; retained central policy/validator bundle overhead, not provider source savings"
+    },
+    "Game": {
+      "baseline": "a6f69427d663539c6a8e23f166e69147b66ec078",
+      "candidate": "6f9378e2dcfd00ac44cf3a973792c43d683c2ac4",
+      "candidate_tree": "7adcaa9f1f7a4c8067bed4be1cbd4a6d3a55b687",
+      "source_corpus": {
+        "scope": "47 PROMPT_LIFECYCLE reusable prompts plus root AGENTS.md, nearest docs/agents/AGENTS.md bootstrap, PROMPTING_STANDARD.md and PROMPT_EVAL_STANDARD.md",
+        "union_files": 51,
+        "before": {
+          "files": 51,
+          "bytes": 539335,
+          "lines": 9578
+        },
+        "after": {
+          "files": 51,
+          "bytes": 346532,
+          "lines": 8240
+        }
+      },
+      "local_validator_corpus": {
+        "union_files": 7,
+        "before": {
+          "files": 6,
+          "bytes": 139778,
+          "lines": 3373
+        },
+        "after": {
+          "files": 2,
+          "bytes": 13800,
+          "lines": 307
+        },
+        "removed": [
+          "tools/agents/validate_remote_desktop_prompt_routing.py",
+          "tools/agents/test_validate_remote_desktop_prompt_routing.py",
+          "tools/agents/test_validate_remote_desktop_prompt_routing_codex_regressions.py",
+          "tools/agents/test_validate_remote_desktop_prompt_routing_codex_round12.py",
+          "tools/agents/test_prompt_deduplication.py"
+        ],
+        "retained_or_replacement": [
+          "tools/agents/validate_inherited_prompt_policy.py",
+          "tools/agents/tests/test_meta_agent_policy_adoption.py"
+        ]
+      },
+      "combined": {
+        "union_files": 58,
+        "before": {
+          "files": 57,
+          "bytes": 679113,
+          "lines": 12951
+        },
+        "after": {
+          "files": 53,
+          "bytes": 360332,
+          "lines": 8547
+        }
+      },
+      "active_reusable_prompts": {
+        "before": 47,
+        "after": 47,
+        "authority": "docs/agents/PROMPT_LIFECYCLE.json"
+      }
+    },
+    "Platform": {
+      "baseline": "3557085c20512d25576d8884cc54471665784b00",
+      "candidate": "bad2e5a2bcf5193ecb6418a21526d062e49115bc",
+      "candidate_tree": "3934259316b65b251a82710284fa02e15859a62b",
+      "union_files": 20,
+      "before": {
+        "files": 20,
+        "bytes": 307953,
+        "lines": 5277
+      },
+      "after": {
+        "files": 20,
+        "bytes": 106829,
+        "lines": 1944
+      },
+      "categories": {
+        "root_bootstrap_nearest": {
+          "files": 3,
+          "before_bytes": 55134,
+          "before_lines": 578,
+          "after_bytes": 11192,
+          "after_lines": 135
+        },
+        "local_prompt_standards": {
+          "files": 2,
+          "before_bytes": 19793,
+          "before_lines": 360,
+          "after_bytes": 3836,
+          "after_lines": 45
+        },
+        "local_validator_and_tests": {
+          "files": 2,
+          "before_bytes": 69393,
+          "before_lines": 1217,
+          "after_bytes": 25343,
+          "after_lines": 552
+        },
+        "active_reusable_prompts": {
+          "files": 10,
+          "before_bytes": 137233,
+          "before_lines": 2494,
+          "after_bytes": 44661,
+          "after_lines": 664
+        },
+        "prompt_text_suites": {
+          "files": 3,
+          "before_bytes": 26400,
+          "before_lines": 628,
+          "after_bytes": 21797,
+          "after_lines": 548
+        }
+      },
+      "validator_replacement": [
+        "tools/agents/policy_consistency.py",
+        "tools/agents/test_policy_consistency.py"
+      ],
+      "active_reusable_prompts": {
+        "before": 10,
+        "after": 10,
+        "historical_inert": 13,
+        "catalog_total": 23,
+        "authority": "docs/agents/DOCUMENTATION_IA_CATALOG.json"
+      }
+    },
+    "Atlas": {
+      "baseline": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+      "candidate": "53527271db3c49fc44bf548f8934addf7dd695b4",
+      "instructions": {
+        "paths": [
+          "AGENTS.md",
+          "docs/agents/DOCUMENTATION_AGENT_IA.md"
+        ],
+        "union_files": 2,
+        "before": {
+          "files": 2,
+          "bytes": 25587,
+          "lines": 195
+        },
+        "after": {
+          "files": 2,
+          "bytes": 11208,
+          "lines": 106
+        }
+      },
+      "active_reusable_prompts": {
+        "union_files": 38,
+        "before": {
+          "files": 38,
+          "bytes": 403160,
+          "lines": 9029
+        },
+        "after": {
+          "files": 38,
+          "bytes": 400453,
+          "lines": 8969
+        },
+        "w4_edited": 6,
+        "w4_deferred": "docs/agents/prompts/ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md"
+      },
+      "local_validator_corpus": {
+        "union_files": 5,
+        "before": {
+          "files": 3,
+          "bytes": 17010,
+          "lines": 388
+        },
+        "after": {
+          "files": 5,
+          "bytes": 35686,
+          "lines": 840
+        },
+        "added": [
+          "tools/governance/validate_meta_agent_policy.py",
+          "tools/governance/test_validate_meta_agent_policy.py"
+        ],
+        "retained_modified": [
+          "tools/governance/test_agent_prompt_lifecycle.mjs"
+        ]
+      },
+      "combined": {
+        "union_files": 45,
+        "before": {
+          "files": 43,
+          "bytes": 445757,
+          "lines": 9612
+        },
+        "after": {
+          "files": 45,
+          "bytes": 447347,
+          "lines": 9915
+        }
+      }
+    }
+  },
+  "tracked_execution_configuration": {
+    "paths": [
+      "skills/",
+      ".agents/",
+      ".codex/"
+    ],
+    "META": {
+      "before": 0,
+      "after": 0,
+      "candidate_SKILL_md_anywhere": 0
+    },
+    "Game": {
+      "before": 0,
+      "after": 0,
+      "candidate_SKILL_md_anywhere": 0
+    },
+    "Platform": {
+      "before": 0,
+      "after": 0,
+      "candidate_SKILL_md_anywhere": 0
+    },
+    "Atlas": {
+      "before": 0,
+      "after": 0,
+      "candidate_SKILL_md_anywhere": 0
+    },
+    "Atlas_disposition": "W3B_NOT_APPLICABLE: no existing config or live mandate; optional introduction is outside maintenance authority, not required pending work."
+  },
+  "operative_residue": {
+    "Game": "none identified in the bounded evaluation record",
+    "Platform": "copied organization execution/continuation/communication/model controllers removed from all ten active prompts; 13 historical entries remain explicitly inert",
+    "Atlas": "one duplicated GitHub-first procedure remains in ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md because open PR #346 owns the path; the other 31 prompts had no bounded heading match, which is not a semantic-ablation verdict",
+    "META": "the central authority and validator bundle is intentionally retained; the nine-path delta routes task templates and continuation through current authority"
+  },
+  "telemetry": {
+    "tokens": "NOT_AVAILABLE",
+    "billing": "NOT_AVAILABLE",
+    "cost": "NOT_AVAILABLE"
+  },
+  "final_acceptance_caveat": "This bounded source inventory does not assert all operative instructions were migrated. Final independent review found remaining Game P1 owner-funded/retry controllers and Platform P1 specialist controllers under active external PR379/1303 ownership; broad Game rollout acceptance withdrawn. See residue reviews and REPORT."
+}

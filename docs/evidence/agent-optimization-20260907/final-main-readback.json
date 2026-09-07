@@ -1,0 +1,30 @@
+{
+  "observed_at": "2026-09-07T10:38:46.624Z",
+  "branches": [
+    {
+      "protected": true,
+      "repository": "Oteryn",
+      "sha": "da4cbbceab286ac9ea350a9748eb7e570870851e",
+      "tree": "0676f1785954d35bd370cc2241ee22ffb0f50be1"
+    },
+    {
+      "protected": true,
+      "repository": "Oteryn-Game",
+      "sha": "10b6be51551af5d70d45b4f56c2f6d3e8f6dc528",
+      "tree": "b59af37e02f565cf82c181899e589dfd83719d82"
+    },
+    {
+      "protected": true,
+      "repository": "Oteryn-Platform",
+      "sha": "b0f268d682b1f9117140168a3a9d9b86c56ba9cc",
+      "tree": "d82a0bec94d5a6184a1eeb87d067142647747439"
+    },
+    {
+      "protected": true,
+      "repository": "Oteryn-Atlas",
+      "sha": "53527271db3c49fc44bf548f8934addf7dd695b4",
+      "tree": "bd0b6e72e42aceeef36ae9622302ed333c1ae39c"
+    }
+  ],
+  "note": "Final provider readback before report integration. META report's own post-merge SHA will be read back in its PR/parent comment, without a self-referential commit."
+}

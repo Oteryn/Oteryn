@@ -1,0 +1,230 @@
+[
+  {
+    "pr": 345,
+    "id": 34102052047,
+    "phase": "PR",
+    "jobs": [
+      {
+        "id": 101678495333,
+        "name": "Merge authority audit / protected-base validate",
+        "result": "success",
+        "seconds": 11
+      }
+    ]
+  },
+  {
+    "pr": 345,
+    "id": 34102371227,
+    "phase": "MQ",
+    "jobs": [
+      {
+        "id": 101679486444,
+        "name": "atlas-gate",
+        "result": "success",
+        "seconds": 6
+      }
+    ]
+  },
+  {
+    "pr": 345,
+    "id": 34102371301,
+    "phase": "MQ",
+    "jobs": [
+      {
+        "id": 101679486233,
+        "name": "Merge authority audit / protected-base validate",
+        "result": "success",
+        "seconds": 6
+      }
+    ]
+  },
+  {
+    "pr": 345,
+    "id": 34102422152,
+    "phase": "terminal_lifecycle",
+    "jobs": [
+      {
+        "id": 101679652967,
+        "name": "close / validate-operation",
+        "result": "success",
+        "seconds": 4
+      },
+      {
+        "id": 101679653930,
+        "name": "read",
+        "result": "skipped",
+        "seconds": 0
+      },
+      {
+        "id": 101679679950,
+        "name": "apply",
+        "result": "skipped",
+        "seconds": 0
+      },
+      {
+        "id": 101679683345,
+        "name": "close / apply-reviewed-manifest",
+        "result": "skipped",
+        "seconds": 0
+      },
+      {
+        "id": 101679683893,
+        "name": "close / close-event-cleanup",
+        "result": "skipped",
+        "seconds": 0
+      }
+    ]
+  },
+  {
+    "pr": 347,
+    "id": 34103410644,
+    "phase": "PR",
+    "jobs": [
+      {
+        "id": 101682831460,
+        "name": "Merge authority audit / protected-base validate",
+        "result": "success",
+        "seconds": 8
+      }
+    ]
+  },
+  {
+    "pr": 347,
+    "id": 34103558937,
+    "phase": "MQ",
+    "jobs": [
+      {
+        "id": 101683318537,
+        "name": "atlas-gate",
+        "result": "success",
+        "seconds": 6
+      }
+    ]
+  },
+  {
+    "pr": 347,
+    "id": 34103558899,
+    "phase": "MQ",
+    "jobs": [
+      {
+        "id": 101683318378,
+        "name": "Merge authority audit / protected-base validate",
+        "result": "success",
+        "seconds": 8
+      }
+    ]
+  },
+  {
+    "pr": 347,
+    "id": 34103614826,
+    "phase": "terminal_lifecycle",
+    "jobs": [
+      {
+        "id": 101683495521,
+        "name": "close / validate-operation",
+        "result": "success",
+        "seconds": 2
+      },
+      {
+        "id": 101683496984,
+        "name": "apply",
+        "result": "skipped",
+        "seconds": 0
+      },
+      {
+        "id": 101683497313,
+        "name": "read",
+        "result": "skipped",
+        "seconds": 0
+      },
+      {
+        "id": 101683518163,
+        "name": "close / close-event-cleanup",
+        "result": "skipped",
+        "seconds": 0
+      },
+      {
+        "id": 101683518223,
+        "name": "close / apply-reviewed-manifest",
+        "result": "skipped",
+        "seconds": 0
+      }
+    ]
+  },
+  {
+    "pr": 348,
+    "id": 34105663446,
+    "phase": "PR",
+    "jobs": [
+      {
+        "id": 101689966482,
+        "name": "Merge authority audit / protected-base validate",
+        "result": "success",
+        "seconds": 7
+      }
+    ]
+  },
+  {
+    "pr": 348,
+    "id": 34106211138,
+    "phase": "MQ",
+    "jobs": [
+      {
+        "id": 101691704319,
+        "name": "atlas-gate",
+        "result": "success",
+        "seconds": 6
+      }
+    ]
+  },
+  {
+    "pr": 348,
+    "id": 34106211085,
+    "phase": "MQ",
+    "jobs": [
+      {
+        "id": 101691704183,
+        "name": "Merge authority audit / protected-base validate",
+        "result": "success",
+        "seconds": 10
+      }
+    ]
+  },
+  {
+    "pr": 348,
+    "id": 34106264558,
+    "phase": "terminal_lifecycle",
+    "jobs": [
+      {
+        "id": 101691881640,
+        "name": "close / validate-operation",
+        "result": "success",
+        "seconds": 3
+      },
+      {
+        "id": 101691882511,
+        "name": "apply",
+        "result": "skipped",
+        "seconds": 0
+      },
+      {
+        "id": 101691909360,
+        "name": "close / close-event-cleanup",
+        "result": "skipped",
+        "seconds": 0
+      },
+      {
+        "id": 101691909856,
+        "name": "close / apply-reviewed-manifest",
+        "result": "skipped",
+        "seconds": 0
+      },
+      {
+        "id": 101691915321,
+        "name": "read",
+        "result": "skipped",
+        "seconds": 0
+      }
+    ]
+  }
+]
