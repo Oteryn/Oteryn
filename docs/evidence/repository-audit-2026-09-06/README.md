@@ -12,6 +12,7 @@ Start with [the complete report](OTERYN-REPOSITORY-AUDIT-COMPLETED-R2-20260906.m
 - Coverage: 78 tracked paths; cumulative direct inspection, not a claim of defect-free code.
 - Later main: `d0d5a54c5f06db9423d14b17e7f8eadefd15c6fb` (#152, one documentation change), inspected as a separate delta.
 - Publication uses existing PR #153. It does not implement recommendations or merge the PR.
+- `PUBLICATION-RECEIPT.json` records the R3 material commit and its successful exact-head publication CI without embedding the later receipt commit itself.
 
 ## Evidence map
 
@@ -26,6 +27,7 @@ Start with [the complete report](OTERYN-REPOSITORY-AUDIT-COMPLETED-R2-20260906.m
 | E08 | `evidence/ci-recalculation.json`, `evidence/coverage-reconciliation.json` — independently recomputed counts, statistics and inventory |
 | E09 | `evidence/native-probe-results.json` — seven fresh diagnostic invocations of unchanged validators, exact inputs/output/exit codes |
 | E10 | `evidence/revision-provenance.json` — source revisions, original-prompt identity and correction map |
+| E11 | `PUBLICATION-RECEIPT.json` — R3 material commit/tree, exact-head `meta-gate` receipt and publication boundary |
 
 `VERIFICATION-SUMMARY.md` distinguishes historical execution, fresh diagnostics and publication checks. `REPRODUCE.md` gives safe isolated reproduction instructions. `COVERAGE-LEDGER.md` contains every audited path and immutable source locator.
 
