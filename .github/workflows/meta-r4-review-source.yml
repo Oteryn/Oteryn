@@ -14,8 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: 414d115695b56f6d79078a7e19cc1b3590e0edd2
+          ref: d54e25f4f05cf7360af0cea00d3fdc553befc632
           persist-credentials: false
+      - name: Install the candidate validation dependencies
+        run: python3 -m pip install --disable-pip-version-check -r tools/governance/requirements-validation.txt
       - name: Verify and stage only two reviewed source blobs
         env:
           GH_TOKEN: ${{ github.token }}
@@ -34,15 +36,15 @@ jobs:
                   return json.load(response)
           def blob(data):
               return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
-          patch_sha = '0dfef4a80cfae1ddf20d5db50ba59e57f132cadd'
+          patch_sha = '649b92acfda1d579a017bc601d3a623063af0be3'
           data = base64.b64decode(api('/git/blobs/' + patch_sha)['content'])
           assert blob(data) == patch_sha
           patch = json.loads(data)
           assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip() == patch['base']
-          assert patch['base_tree'] == '14db51a8a66f01455c05879bb4ffc285de045f98'
+          assert patch['base_tree'] == 'dd489ee2280fb6d498ea9c98b0b1385d25c436a0'
           assert {f['path'] for f in patch['files']} == {
-              'tools/governance/agent_execution_routing.py',
-              'tools/governance/test_agent_execution_routing.py'}
+              'tools/governance/validate_release_manifests.py',
+              'tools/governance/test_merge_queue_workflow_contract.py'}
           entries=[]
           for change in patch['files']:
               path=pathlib.Path(change['path']);old=path.read_bytes()
@@ -58,8 +60,8 @@ jobs:
           subprocess.run(['git','add','--',*[e['path'] for e in entries]],check=True)
           subprocess.run(['git','diff','--cached','--check'],check=True)
           tree=subprocess.check_output(['git','write-tree'],text=True).strip()
-          assert tree == patch['expected_tree'] == '9d1d4d6e2819c9636cffc484749f6ef012774a4f'
-          subprocess.run(['python3','tools/governance/test_agent_execution_routing.py'],check=True)
+          assert tree == patch['expected_tree'] == '080d84ef62075f9b140c36c0a4aaaf4aab8508ae'
+          subprocess.run(['python3','tools/governance/test_merge_queue_workflow_contract.py'],check=True)
           staged=api('/git/trees',{'base_tree':patch['base_tree'],'tree':entries})
           assert staged['sha'] == tree
           print('REVIEWED_SOURCE_TREE=' + tree)
