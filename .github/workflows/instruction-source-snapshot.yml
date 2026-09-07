@@ -1,0 +1,76 @@
+name: Instruction source snapshot (temporary)
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  source-snapshot:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'tools/instruction-source-snapshot-20260907'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Export exact public source revisions without executing repository code
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          rows = {
+              'META': ('Oteryn', 'd0d5a54c5f06db9423d14b17e7f8eadefd15c6fb', '47a4cee1262e6d112bfd53c883ad1d83f814a8de'),
+              'Game': ('Oteryn-Game', 'b008614881fcc74f09e55e4d1b9e6c64ece04ce9', 'da5859e35a63cda629c783e3b0635f8a01ece489'),
+              'Platform': ('Oteryn-Platform', '294e18909b8319695021011ccbeb1386cac32ced', None),
+              'Atlas': ('Oteryn-Atlas', '51623c7dab2346cee39cd51e3caa845bf4b65426', None),
+          }
+          work = Path(os.environ['RUNNER_TEMP']) / 'instruction-source-work'
+          output = Path(os.environ['RUNNER_TEMP']) / 'instruction-source-export'
+          work.mkdir()
+          output.mkdir()
+          manifest = {'purpose': 'execution cache; not lifecycle authority', 'repositories': {}}
+          for name, (repository, main, task) in rows.items():
+              root = work / name
+              root.mkdir()
+              def git(*args):
+                  return subprocess.check_output(
+                      ['git', '-c', 'core.hooksPath=/dev/null', '-C', str(root), *args],
+                      text=True, timeout=180,
+                  ).strip()
+              git('init', '--quiet')
+              url = f'https://github.com/Oteryn/{repository}.git'
+              git('fetch', '--no-tags', '--no-recurse-submodules', url, 'refs/heads/main:refs/heads/fetched-main')
+              git('branch', 'admission-main', main)
+              if task:
+                  git('fetch', '--no-tags', '--no-recurse-submodules', url, task)
+                  git('branch', 'task', task)
+              refs = ['refs/heads/admission-main'] + (['refs/heads/task'] if task else [])
+              bundle = output / f'{name}.bundle'
+              git('bundle', 'create', str(bundle), *refs)
+              git('bundle', 'verify', str(bundle))
+              manifest['repositories'][name] = {
+                  'repository': f'Oteryn/{repository}',
+                  'main_sha': git('rev-parse', main + '^{commit}'),
+                  'main_tree': git('rev-parse', main + '^{tree}'),
+                  'task_sha': git('rev-parse', task + '^{commit}') if task else None,
+                  'bundle': bundle.name,
+                  'sha256': hashlib.sha256(bundle.read_bytes()).hexdigest(),
+              }
+          (output / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          print(json.dumps(manifest, indent=2))
+          PY
+      - name: Upload source transport artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: instruction-sources-20260907
+          path: ${{ runner.temp }}/instruction-source-export/
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
