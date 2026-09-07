@@ -1,0 +1,66 @@
+name: META R4 reviewed source preparation
+on:
+  push:
+    branches: [verify/meta-r4-windows-20260907]
+    paths: [.github/workflows/meta-r4-review-source.yml]
+permissions:
+  contents: read
+jobs:
+  verify-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: 414d115695b56f6d79078a7e19cc1b3590e0edd2
+          persist-credentials: false
+      - name: Verify and stage only two reviewed source blobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, pathlib, subprocess, urllib.request
+          API = 'https://api.github.com/repos/Oteryn/Oteryn'
+          def api(path, body=None):
+              if body is not None and path != '/git/trees':
+                  raise ValueError('only source tree object publication is permitted')
+              req = urllib.request.Request(API + path,
+                  data=json.dumps(body).encode() if body is not None else None,
+                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                           'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json'})
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+          def blob(data):
+              return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+          patch_sha = '0dfef4a80cfae1ddf20d5db50ba59e57f132cadd'
+          data = base64.b64decode(api('/git/blobs/' + patch_sha)['content'])
+          assert blob(data) == patch_sha
+          patch = json.loads(data)
+          assert subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip() == patch['base']
+          assert patch['base_tree'] == '14db51a8a66f01455c05879bb4ffc285de045f98'
+          assert {f['path'] for f in patch['files']} == {
+              'tools/governance/agent_execution_routing.py',
+              'tools/governance/test_agent_execution_routing.py'}
+          entries=[]
+          for change in patch['files']:
+              path=pathlib.Path(change['path']);old=path.read_bytes()
+              assert blob(old) == change['old_blob']
+              lines=old.decode().splitlines(keepends=True)
+              for start,end,replacement in reversed(change['edits']):
+                  assert 0 <= start <= end <= len(lines)
+                  lines[start:end]=replacement.splitlines(keepends=True)
+              new=''.join(lines).encode()
+              assert blob(new) == change['new_blob']
+              path.write_bytes(new)
+              entries.append({'path':str(path),'type':'blob','mode':'100644','content':new.decode()})
+          subprocess.run(['git','add','--',*[e['path'] for e in entries]],check=True)
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          tree=subprocess.check_output(['git','write-tree'],text=True).strip()
+          assert tree == patch['expected_tree'] == '9d1d4d6e2819c9636cffc484749f6ef012774a4f'
+          subprocess.run(['python3','tools/governance/test_agent_execution_routing.py'],check=True)
+          staged=api('/git/trees',{'base_tree':patch['base_tree'],'tree':entries})
+          assert staged['sha'] == tree
+          print('REVIEWED_SOURCE_TREE=' + tree)
+          PY
