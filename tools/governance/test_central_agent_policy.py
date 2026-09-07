@@ -151,6 +151,10 @@ def test_provider_binding_is_closed_and_cannot_fork_meta_identity() -> None:
 
     malformed = valid_binding()
     malformed["authority_repository"] = "Oteryn/Oteryn-Game"
+    assert "authority_repository must be OTERYN_ORGANIZATION_AGENT_POLICY" not in central.validate_provider_binding(
+        malformed,
+        authority_resolver=trusted_resolver,
+    )
     assert "authority_repository must be Oteryn/Oteryn" in central.validate_provider_binding(
         malformed,
         authority_resolver=trusted_resolver,
@@ -708,6 +712,38 @@ def test_review_softwrapped_binding_still_requires_affirmative_bootstrap() -> No
     assert central.validate_provider_overlay('Oteryn/Oteryn-Game', f'Resolve\n`{path}`.') == []
     for prefix in ('Never resolve', 'Do not resolve', 'Audit whether agents resolve'):
         assert central.validate_provider_overlay('Oteryn/Oteryn-Game', prefix + '\n' + path), prefix
+
+
+
+def test_review_subject_independent_grants_after_negative_lines() -> None:
+    # All supported positive patterns must retain their result regardless of
+    # subject wording or a preceding independent audit/negative line.
+    directives = (
+        "All agents may invoke Remote_Desktop_Commander.ping.",
+        "The assigned worker can call Remote_Desktop_Commander.ping.",
+        "For this task, always use parallel-first execution.",
+        "For every task, serial work requires an explicit reason.",
+        "For this provider, the local authority is ecosystem/agent-execution-routing-policy.json.",
+    )
+    for directive in directives:
+        assert central.validate_task_prompt_text(directive), directive
+        for prefix in ("Do not copy the old policy", "Audit historical instructions"):
+            for split in range(1, len(directive.split())):
+                words = directive.split()
+                wrapped = " ".join(words[:split]) + "\n" + " ".join(words[split:])
+                candidate = prefix + "\n" + wrapped
+                assert central.validate_task_prompt_text(candidate), candidate
+                assert central.validate_provider_overlay("Oteryn/Oteryn-Game", LEAN_OVERLAY + candidate), candidate
+
+
+def test_review_modals_split_from_subject_are_not_lost() -> None:
+    for directive in (
+        "All agents\nmay invoke Remote_Desktop_Commander.ping.",
+        "All agents may\ninvoke Remote_Desktop_Commander.ping.",
+        "Everyone must\nuse parallel-first execution.",
+    ):
+        assert central.validate_task_prompt_text("Do not copy historical instructions\n" + directive), directive
+
 
 
 def main() -> int:

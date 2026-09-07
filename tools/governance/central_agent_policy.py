@@ -441,6 +441,13 @@ def _statements(text: str) -> list[str]:
         r"(?:the\s+)?local\b|serial\s+(?:work|execution)\b|a\s+substantial\s+task\b)",
         re.IGNORECASE,
     )
+    # Recognize the supported directive tokens independently of their subject.
+    # A prefix such as "All agents may" must split an earlier audit/negation
+    # even when the action or its object is on a soft continuation line.
+    directive = re.compile(
+        r"\b(?:must|shall|may|can|always|use|require|enforce|local|serial)\b|"
+        r"\bparallel[-_ ]first\b|remote_desktop_commander\.\w+", re.IGNORECASE,
+    )
     unfinished = re.compile(r"\b(?:not|never|must|shall|may|can|use|resolve|read|load|follow|invoke|call|is|are|the|an?)\s*$", re.IGNORECASE)
 
     def flush() -> None:
@@ -453,8 +460,12 @@ def _statements(text: str) -> list[str]:
         if not line:
             flush()
             continue
-        if pending and (item.match(line) or (starter.match(line) and not unfinished.search(pending[-1]))):
-            flush()
+        if pending:
+            incomplete = unfinished.search(pending[-1]) and (
+                not _is_audit_or_negative(pending[0]) or unfinished.search(pending[0])
+            )
+            if item.match(line) or ((starter.match(line) or directive.search(line)) and not incomplete):
+                flush()
         pending.append(line)
     flush()
     return result
