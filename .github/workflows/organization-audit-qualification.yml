@@ -1,0 +1,155 @@
+name: Organization audit native evidence (temporary)
+on:
+  pull_request:
+    branches: [main]
+    paths: [.github/workflows/organization-audit-qualification.yml]
+permissions:
+  contents: read
+concurrency:
+  group: audit-185-native-evidence
+  cancel-in-progress: false
+jobs:
+  platform-php:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      mariadb:
+        image: mariadb@sha256:2439dcd7d14010ecd1ff7a4e1c5abe8e208c34fe35290744deeeaac3569043c3
+        env:
+          MARIADB_ROOT_PASSWORD: audit-isolated-fixture-only
+          MARIADB_ROOT_HOST: '%'
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      MAIL_MAILER: array
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: array
+      CACHE_STORE: array
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ':memory:'
+      CANARY_PROVISIONING_INTEGRATION_HOST: 127.0.0.1
+      CANARY_PROVISIONING_INTEGRATION_PORT: '3306'
+      CANARY_PROVISIONING_INTEGRATION_ROOT_PASSWORD: audit-isolated-fixture-only
+      CANARY_CHARACTER_CREATE_INTEGRATION_HOST: 127.0.0.1
+      CANARY_CHARACTER_CREATE_INTEGRATION_PORT: '3306'
+      CANARY_CHARACTER_CREATE_INTEGRATION_ROOT_PASSWORD: audit-isolated-fixture-only
+    steps:
+      - name: Read the immutable Platform source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Oteryn/Oteryn-Platform
+          ref: de917b3477a1de0667531380de3660e8b2ab59aa
+          path: provider
+          persist-credentials: false
+      - name: Set up the source-declared PHP toolchain
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: pcov
+          extensions: pdo_mysql, pcntl, gd
+          tools: composer:v2
+      - name: Verify source identity and install locked test dependencies
+        working-directory: provider
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = de917b3477a1de0667531380de3660e8b2ab59aa
+          test "$(git rev-parse HEAD^{tree})" = ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e
+          test ! -e .env
+          mkdir -p "$RUNNER_TEMP/audit-185-php"
+          { git rev-parse HEAD; git rev-parse HEAD^{tree}; php --version; composer --version; } > "$RUNNER_TEMP/audit-185-php/toolchain.txt"
+          composer validate --strict > "$RUNNER_TEMP/audit-185-php/composer-validate.log" 2>&1
+          composer install --no-interaction --prefer-dist --no-progress > "$RUNNER_TEMP/audit-185-php/composer-install.log" 2>&1
+          composer audit --locked --no-interaction --format=json > "$RUNNER_TEMP/audit-185-php/composer-audit.json"
+      - name: Compare the missing-env baseline with an empty-file control
+        working-directory: provider
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e .env
+          export AUDIT_OUT="$RUNNER_TEMP/audit-185-php"
+          set +e
+          vendor/bin/phpunit --display-warnings --log-junit "$AUDIT_OUT/no-env.junit.xml" > "$AUDIT_OUT/no-env.log" 2>&1
+          baseline_rc=$?
+          set -e
+          test ! -e .env
+          : > .env
+          set +e
+          vendor/bin/phpunit --display-warnings --log-junit "$AUDIT_OUT/empty-env.junit.xml" --coverage-clover "$AUDIT_OUT/empty-env.clover.xml" > "$AUDIT_OUT/empty-env.log" 2>&1
+          control_rc=$?
+          set -e
+          rm -- .env
+          printf '{"baseline_exit":%s,"empty_env_control_exit":%s,"source_sha":"de917b3477a1de0667531380de3660e8b2ab59aa","scope":"Unit and Feature suites; isolated synthetic data; not production or full Integration/Playwright"}\n' "$baseline_rc" "$control_rc" > "$AUDIT_OUT/experiment.json"
+          git diff --exit-code
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          out=Path(os.environ['AUDIT_OUT'])
+          hashes={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.iterdir()) if p.is_file()}
+          (out/'SHA256SUMS.json').write_text(json.dumps(hashes,indent=2)+'\n')
+          print((out/'experiment.json').read_text())
+          for name in ('no-env.log','empty-env.log'):
+              print(name+':\n'+'\n'.join((out/name).read_text().splitlines()[-12:]))
+          PY
+          test "$control_rc" -eq 0
+      - name: Preserve diagnostic evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: audit-185-platform-php-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/audit-185-php
+          if-no-files-found: error
+          retention-days: 7
+  platform-gateway:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Read immutable Gateway source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Oteryn/Oteryn-Platform
+          ref: de917b3477a1de0667531380de3660e8b2ab59aa
+          path: provider
+          persist-credentials: false
+      - name: Set up the source-declared Go toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: provider/services/game-gateway/go.mod
+          cache: false
+      - name: Qualify isolated Gateway tests and build
+        working-directory: provider/services/game-gateway
+        env:
+          GOTOOLCHAIN: local
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = de917b3477a1de0667531380de3660e8b2ab59aa
+          export AUDIT_OUT="$RUNNER_TEMP/audit-185-gateway"
+          mkdir -p "$AUDIT_OUT"
+          { git rev-parse HEAD; go version; } > "$AUDIT_OUT/toolchain.txt"
+          go test -race -count=1 -timeout=120s -json -coverprofile="$AUDIT_OUT/coverage.out" ./... > "$AUDIT_OUT/tests.jsonl" 2>&1
+          go vet ./... > "$AUDIT_OUT/vet.log" 2>&1
+          go build -trimpath -o "$RUNNER_TEMP/audit-only-gateway" ./cmd/game-gateway
+          git diff --exit-code
+          python3 - <<'PY'
+          import hashlib,json,os
+          from pathlib import Path
+          out=Path(os.environ['AUDIT_OUT'])
+          hashes={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(out.iterdir()) if p.is_file()}
+          (out/'SHA256SUMS.json').write_text(json.dumps(hashes,indent=2)+'\n')
+          print('Gateway race tests, vet and build completed; no external producer or production qualification claimed.')
+          PY
+      - name: Preserve Gateway evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: audit-185-platform-gateway-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/audit-185-gateway
+          if-no-files-found: error
+          retention-days: 7
