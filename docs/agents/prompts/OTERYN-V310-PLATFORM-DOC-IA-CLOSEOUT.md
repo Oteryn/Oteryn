@@ -1,8 +1,10 @@
 # OTERYN-V310-PLATFORM-DOC-IA-CLOSEOUT
 
+> TASK TEMPLATE, not standing authority. Refresh the governing live Issue/PR and current explicit owner authorization before invocation; historical permissions, heads and execution procedures below do not override [AGENTS.md](../../../AGENTS.md). This marker does not close or defer the underlying task.
+
 PROMPT_ID: `OTERYN-V310-PLATFORM-DOC-IA-CLOSEOUT`
 PROMPT_VERSION: `1.0`
-STATUS: `READY`
+STATUS: `TEMPLATE_REQUIRES_LIVE_AUTHORIZATION`
 PROGRAMME: `OTERYN-ORG-AUDIT-v3.10`
 
 Repository: `https://github.com/Oteryn/Oteryn-Platform`

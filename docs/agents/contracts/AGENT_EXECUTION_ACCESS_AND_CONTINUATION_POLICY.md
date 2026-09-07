@@ -110,22 +110,30 @@ For active mutating work:
 - durable checkpoints intended to survive a session/agent change are pushed to the authorized remote branch and verified there;
 - path/task ownership remains an overlap detector, not authorization to edit another task.
 
-Once a task branch has been pushed or a PR exists, the organization default is non-destructive **merge-up refresh**, not published-history rewriting. An agent MUST NOT use reset/recreate/rebase/force-push merely to chase a moving `main`.
+Final integration follows ADR 0005 and the live protection configuration. Where
+GitHub Merge Queue owns freshness, an upstream advance alone does **not** require
+a merge-up, rebase, evidence refresh or new task head. Preserve the stable candidate;
+GitHub qualifies its exact `merge_group` head against current `main`.
 
 When the task enters final integration, the agent MUST:
 
-1. refresh live GitHub Issue/PR/protection state and read the current protected default-branch SHA;
-2. record that SHA as `integration_main_sha`;
-3. when it differs from the current integrated base, merge that exact current default branch into the task branch through a normal non-force update;
-4. resolve only conflicts that are inside the task's authorization and reconcile material semantic overlaps against live authority/ownership;
-5. verify the remote branch head equals the intended resulting `task_head_sha`;
-6. review the complete post-refresh changed-file set and diff;
-7. rerun every validation/review layer invalidated by the new task head;
-8. use exact-`task_head_sha` GitHub checks/reviews for merge readiness.
+1. refresh live Issue/PR/protection state and record current `integration_main_sha`;
+2. inspect the upstream delta for changed authority or material semantic conflicts;
+3. reconcile only genuinely invalidated work and authorized conflicts; when source
+   reconciliation is needed, use a normal non-force merge-up rather than rewriting
+   published history, then verify the resulting remote `task_head_sha`;
+4. review the complete candidate diff and run validations invalidated by material
+   changes; retain still-applicable evidence rather than repeating unchanged work;
+5. verify exact-head required checks and use the repository's normal Merge Queue
+   path when integration is authorized. A source PR check does not replace the
+   queue's exact merge-group check.
 
-A merge-up commit on the task branch does not change the repository's normal squash-only integration policy for protected `main`.
-
-If another PR wins the merge race after this refresh and repository protection requires a newer base, the task returns to the integration step. The agent refreshes again, reconciles the new upstream delta and renews invalidated exact-head evidence. It does not return to implementation from scratch unless the work itself was materially invalidated.
+When a repository without canonical Merge Queue has an explicit live strict-base
+requirement, perform the minimum non-force refresh needed to satisfy that requirement.
+Never enable a bypass, weaken protection, force-push, reset or recreate a branch to
+chase `main`. A task-branch reconciliation commit does not change squash-only
+integration on protected `main`. Another disjoint upstream merge is not a reason
+to restart implementation or regenerate a stable candidate.
 
 Agents MUST distinguish:
 
@@ -144,7 +152,7 @@ Agents MUST distinguish:
 
 A textual overlap or changed filename alone is not proof of semantic invalidation, and a disjoint filename set is not proof of semantic independence when shared contracts are involved. When only part of the task is invalidated, preserve unaffected work and rework the smallest affected portion.
 
-Repository-local instructions may impose stricter safety, review, validation or integration rules, but MUST NOT weaken these minimum non-invalidation and late-integration semantics.
+Repository-local safety and validation rules remain applicable; integration freshness is owned by the current accepted integration architecture, not an older generic merge-up instruction.
 
 ## Capability truthfulness and tool discovery before blocking
 

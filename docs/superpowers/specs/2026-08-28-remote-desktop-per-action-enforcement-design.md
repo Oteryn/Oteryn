@@ -1,5 +1,7 @@
 # Remote Desktop per-action enforcement design
 
+> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 **Status:** approved design for implementation planning
 **Governing issue:** `Oteryn/Oteryn#85`
 **Authority repository:** `Oteryn/Oteryn` (META)

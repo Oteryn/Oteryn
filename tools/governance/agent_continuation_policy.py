@@ -132,8 +132,7 @@ _POLICY_KEYS = {
     "resume_mechanisms",
     "automatic_resume_mechanisms",
     "disposition_mechanism_compatibility",
-    "execution_surfaces",
-    "capability_surface_compatibility",
+    "execution_capabilities",
     "capability_snapshot_freshness",
     "context_pressure_values",
     "blocked_result",
@@ -175,14 +174,13 @@ _COMPATIBILITY = {
     "stop_reinvoke_required": ["owner_reinvoke"],
     "terminal": ["none_terminal"],
 }
-_EXECUTION_SURFACES = ["chat", "github_native", "work", "codex"]
-_CAPABILITY_SURFACES = {
-    "chat_tools": ["chat"],
-    "github_deterministic": ["github_native"],
-    "event_triggered_connected_app": ["work"],
-    "persistent_cloud_execution": ["work"],
-    "software_development_loop": ["codex"],
-}
+_EXECUTION_CAPABILITIES = [
+    "interactive_tools",
+    "repository_automation",
+    "event_triggered_execution",
+    "persistent_execution",
+    "software_development_loop",
+]
 _CONTEXT_PRESSURE = ["not_applicable", "normal", "elevated", "rotate_required"]
 _SNAPSHOT_FIELDS = {
     "repository",
@@ -253,9 +251,9 @@ def load_policy(path: Path) -> dict[str, object]:
 def validate_policy(policy: dict[str, object]) -> None:
     if set(policy) != _POLICY_KEYS:
         raise ContinuationPolicyError("continuation policy must use the closed schema")
-    if policy.get("schema_version") != 1 or isinstance(policy.get("schema_version"), bool):
-        raise ContinuationPolicyError("continuation policy schema_version must be 1")
-    if policy.get("policy_id") != "oteryn-agent-continuation-v1":
+    if type(policy.get("schema_version")) is not int or policy["schema_version"] != 2:
+        raise ContinuationPolicyError("continuation policy schema_version must be 2")
+    if policy.get("policy_id") != "oteryn-agent-continuation-v2":
         raise ContinuationPolicyError("unexpected continuation policy id")
     if policy.get("continuation_authority") != "Oteryn/Oteryn#108":
         raise ContinuationPolicyError("continuation authority must be Oteryn/Oteryn#108")
@@ -271,10 +269,8 @@ def validate_policy(policy: dict[str, object]) -> None:
         raise ContinuationPolicyError("automatic resume mechanism set must be canonical")
     if policy.get("disposition_mechanism_compatibility") != _COMPATIBILITY:
         raise ContinuationPolicyError("disposition/mechanism compatibility must be canonical")
-    if policy.get("execution_surfaces") != _EXECUTION_SURFACES:
-        raise ContinuationPolicyError("execution surfaces must be canonical")
-    if policy.get("capability_surface_compatibility") != _CAPABILITY_SURFACES:
-        raise ContinuationPolicyError("capability/surface compatibility must be canonical")
+    if policy.get("execution_capabilities") != _EXECUTION_CAPABILITIES:
+        raise ContinuationPolicyError("execution capabilities must use the canonical capability vocabulary")
     freshness = policy.get("capability_snapshot_freshness")
     if not isinstance(freshness, dict) or set(freshness) != {"max_age_seconds"}:
         raise ContinuationPolicyError("capability snapshot freshness must use the closed schema")
@@ -540,22 +536,18 @@ def _validate_capability_snapshot(
         raise ContinuationPolicyError("capability snapshot is stale")
     if not _unique_nonempty_strings(snapshot.evidence_refs):
         raise ContinuationPolicyError("trusted capability evidence references are required")
-    known = set(policy["execution_surfaces"])
     for name, values in (
         ("compatible", snapshot.compatible_surfaces),
         ("available", snapshot.available_surfaces),
         ("authorized", snapshot.authorized_surfaces),
     ):
-        if not _unique_nonempty_strings(values, allow_empty=True) or not set(values).issubset(known):
+        if (not _unique_nonempty_strings(values, allow_empty=True)
+                or any(value != value.strip() or any(ord(char) < 32 for char in value) for value in values)):
             raise ContinuationPolicyError(f"{name} surface evidence is malformed")
     if not _is_exact_bool(snapshot.safe_fallbacks_exhausted):
         raise ContinuationPolicyError("safe_fallbacks_exhausted must be an exact boolean")
-    if required_capability is not None:
-        mapping = policy["capability_surface_compatibility"]
-        if required_capability not in mapping:
-            raise ContinuationPolicyError("required capability has no policy mapping")
-        if not set(snapshot.compatible_surfaces).issubset(set(mapping[required_capability])):
-            raise ContinuationPolicyError("trusted capability snapshot claims an incompatible surface")
+    if required_capability is not None and required_capability not in policy["execution_capabilities"]:
+        raise ContinuationPolicyError("required capability is not policy-known")
 
 
 def select_execution_surface(
@@ -576,7 +568,8 @@ def select_execution_surface(
         & set(facts.available_surfaces)
         & set(facts.authorized_surfaces)
     )
-    for surface in policy["execution_surfaces"]:
+    # Candidate order is task-specific trusted capability evidence, not a product hierarchy.
+    for surface in facts.compatible_surfaces:
         if surface in eligible:
             return surface
     if facts.safe_fallbacks_exhausted:

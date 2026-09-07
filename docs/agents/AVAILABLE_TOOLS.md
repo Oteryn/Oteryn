@@ -3,7 +3,7 @@
 When they are available in the current execution environment, Oteryn agents may use these tools to improve planning, implementation, verification, and coordination:
 
 - **GitHub** — inspect repository state, branches, commits, pull requests, issues, reviews, and checks.
-- **Superpowers** — use development skills for planning, TDD, systematic debugging, git worktrees, parallel agent work, code review, and verification before completion.
+- **Optional skills** — use only actually available, narrowly relevant implementation or verification aids; they add no approvals, execution authority or mandatory parallelism.
 - **Notion** — use the **Oteryn Command Center** for roadmap, task and agent tracking, backlog, and high-level decision notes.
 - **Synology / host-local tools** — use them for runtime evidence and local execution when the current task calls for them.
 

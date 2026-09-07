@@ -148,12 +148,24 @@ Execution-surface selection uses a trusted current `ExecutionCapabilityAuthority
 
 The trusted capability snapshot must bind the required capability to supported compatible surfaces, current availability/authorization where applicable, current evidence references and whether all safe compatible fallbacks were actually evaluated.
 
-Surface choices remain capability-driven:
+Policy schema 2 names capabilities, not products: `interactive_tools`,
+`repository_automation`, `event_triggered_execution`, `persistent_execution` and
+`software_development_loop`. A trusted current capability adapter supplies an
+ordered list of compatible executor identities for the required capability,
+plus independently verified availability, task authorization, current timestamp,
+evidence references and fallback-exhaustion facts. Selection takes the first
+compatible executor that is also available and authorized. Renaming an executor
+or choosing a Chat/Work/Codex UI label cannot grant, deny or imply a capability.
+The 900-second evidence freshness and fail-closed fallback rules are unchanged.
 
-- Chat for current Chat-safe work;
-- GitHub-native execution for deterministic repository compute/waiting;
-- Work only for a material Work-compatible capability such as event-triggered connected-app or persistent cloud execution;
-- Codex for the software-development repository loop when current capability evidence supports it.
+Consumers upgrading from schema 1 must update capability keys and publish the
+policy/module pair together; legacy product-to-capability maps are not silently
+accepted. No provider adoption is implied by this META change. Checkpoint shape,
+stable lineage and bounded authority are unchanged. Existing `work_event_trigger`
+and `work_persistent` resume identifiers remain wire-compatible legacy names for
+verified event-triggered and persistent-worker mechanisms; they do not require
+or authorize a product named Work. Resume liveness, task/action binding and real
+replacement-worker proof are still verified by the existing trusted adapters.
 
 `BLOCKED_CAPABILITY_UNAVAILABLE` is valid only when trusted evidence proves the safe compatible fallback set is exhausted. Otherwise the decision fails closed as incomplete capability evaluation rather than inventing a blocker or unusable surface.
 

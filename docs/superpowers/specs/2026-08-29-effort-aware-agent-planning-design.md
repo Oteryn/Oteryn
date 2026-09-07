@@ -1,5 +1,7 @@
 # Effort-Aware Agent Execution Planning Design
 
+> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 Status: owner-approved design for Oteryn/Oteryn#94.
 
 ## Context

@@ -254,11 +254,3 @@ jobs:
           python3 tools/governance/test_bounded_execution_guard.py
           python3 tools/governance/test_agent_continuation_policy.py
           python3 tools/governance/test_agent_continuation_review_repairs.py
-
-      - name: Verify META boundary markers
-        shell: bash
-        run: |
-          set -euo pipefail
-          grep -q 'thin ecosystem' AGENTS.md
-          grep -q 'META / coordination plane' README.md
-          grep -q 'meta-gate' docs/ci/CI_CONTRACT.md

@@ -1,8 +1,10 @@
 # OTERYN-FND04-INDEPENDENT-SECURITY-AUDITOR
 
+> RETIRED — historical task evidence, not dispatchable. Oteryn/Oteryn-Game#115 is closed/completed (live readback 2026-09-07; closed 2026-08-25). Past branches, permissions and procedures below do not authorize new work; use the current task and [AGENTS.md](../../../AGENTS.md).
+
 PROMPT_ID: `OTERYN-FND04-INDEPENDENT-SECURITY-AUDITOR`
 PROMPT_VERSION: `1.0`
-STATUS: `READY`
+STATUS: `RETIRED`
 ALIAS: `OTERYN-FND04-INDEPENDENT-SECURITY-AUDITOR`
 STORAGE_REPOSITORY: `Oteryn/Oteryn`
 TARGET_REPOSITORY: `Oteryn/Oteryn-Game`

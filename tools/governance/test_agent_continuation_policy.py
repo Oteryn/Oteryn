@@ -40,7 +40,7 @@ RESUME_MECHANISMS = {
     "owner_reinvoke",
     "none_terminal",
 }
-EXECUTION_SURFACES = {"chat", "github_native", "work", "codex"}
+EXECUTION_CAPABILITIES = {'interactive_tools', 'event_triggered_execution', 'repository_automation', 'software_development_loop', 'persistent_execution'}
 REQUIRED_SNAPSHOT_FIELDS = {
     "repository",
     "task_id",
@@ -278,7 +278,7 @@ class FakeCapabilityAuthority:
 
 def capability_snapshot(
     *,
-    required_capability: str | None = "chat_tools",
+    required_capability: str | None = "interactive_tools",
     compatible: tuple[str, ...] = ("chat",),
     available: tuple[str, ...] = ("chat",),
     authorized: tuple[str, ...] = ("chat",),
@@ -331,13 +331,13 @@ class PersistentContinuationTests(unittest.TestCase):
             self.validate(value, **kwargs)  # type: ignore[arg-type]
 
     def test_policy_is_closed_and_does_not_duplicate_bounded_lifecycle(self) -> None:
-        self.assertEqual(self.policy["schema_version"], 1)
-        self.assertEqual(self.policy["policy_id"], "oteryn-agent-continuation-v1")
+        self.assertEqual(self.policy["schema_version"], 2)
+        self.assertEqual(self.policy["policy_id"], "oteryn-agent-continuation-v2")
         self.assertEqual(self.policy["continuation_authority"], "Oteryn/Oteryn#108")
         self.assertEqual(self.policy["bounded_execution_authority"], "Oteryn/Oteryn#69")
         self.assertEqual(set(self.policy["worker_dispositions"]), WORKER_DISPOSITIONS)
         self.assertEqual(set(self.policy["resume_mechanisms"]), RESUME_MECHANISMS)
-        self.assertEqual(set(self.policy["execution_surfaces"]), EXECUTION_SURFACES)
+        self.assertEqual(set(self.policy["execution_capabilities"]), EXECUTION_CAPABILITIES)
         self.assertEqual(self.policy["blocked_result"], "BLOCKED_CAPABILITY_UNAVAILABLE")
         self.assertEqual(len(self.policy["coordinates"]), 6)
         for forbidden in ("states", "bounded_states", "retry_budgets", "retry_counts"):
@@ -687,7 +687,7 @@ class PersistentContinuationTests(unittest.TestCase):
         selected = select_execution_surface(
             self.policy,
             trusted_task=trusted_task(),
-            required_capability="chat_tools",
+            required_capability="interactive_tools",
             capability_authority=authority,
         )
         self.assertEqual(selected, "chat")
@@ -697,7 +697,7 @@ class PersistentContinuationTests(unittest.TestCase):
     def test_selector_respects_capability_compatibility_and_authorization(self) -> None:
         work = FakeCapabilityAuthority(
             capability_snapshot(
-                required_capability="event_triggered_connected_app",
+                required_capability="event_triggered_execution",
                 compatible=("work",),
                 available=("work", "codex"),
                 authorized=("work", "codex"),
@@ -707,14 +707,14 @@ class PersistentContinuationTests(unittest.TestCase):
             select_execution_surface(
                 self.policy,
                 trusted_task=trusted_task(),
-                required_capability="event_triggered_connected_app",
+                required_capability="event_triggered_execution",
                 capability_authority=work,
             ),
             "work",
         )
         codex_only = FakeCapabilityAuthority(
             capability_snapshot(
-                required_capability="event_triggered_connected_app",
+                required_capability="event_triggered_execution",
                 compatible=("work",),
                 available=("codex",),
                 authorized=("codex",),
@@ -725,9 +725,41 @@ class PersistentContinuationTests(unittest.TestCase):
             select_execution_surface(
                 self.policy,
                 trusted_task=trusted_task(),
-                required_capability="event_triggered_connected_app",
+                required_capability="event_triggered_execution",
                 capability_authority=codex_only,
             )
+
+    def test_selector_accepts_capability_proven_on_differently_named_executors(self) -> None:
+        for surface in ("work", "codex", "isolated-worker-17"):
+            authority = FakeCapabilityAuthority(capability_snapshot(
+                required_capability="software_development_loop", compatible=(surface,),
+                available=(surface,), authorized=(surface,),
+            ))
+            self.assertEqual(select_execution_surface(
+                self.policy, trusted_task=trusted_task(),
+                required_capability="software_development_loop", capability_authority=authority,
+            ), surface)
+
+    def test_selector_uses_trusted_candidate_order_not_a_product_priority(self) -> None:
+        authority = FakeCapabilityAuthority(capability_snapshot(
+            required_capability="software_development_loop",
+            compatible=("work", "codex"), available=("codex", "work"), authorized=("codex", "work"),
+        ))
+        self.assertEqual(select_execution_surface(
+            self.policy, trusted_task=trusted_task(), required_capability="software_development_loop",
+            capability_authority=authority,
+        ), "work")
+
+    def test_new_executor_name_does_not_grant_authorization_or_capability(self) -> None:
+        for facts in (
+            capability_snapshot(required_capability="software_development_loop", compatible=("worker-17",),
+                                available=("worker-17",), authorized=(), exhausted=True),
+            capability_snapshot(required_capability="software_development_loop", compatible=(),
+                                available=("worker-17",), authorized=("worker-17",), exhausted=True),
+        ):
+            with self.assertRaises(ExecutionSurfaceUnavailable):
+                select_execution_surface(self.policy, trusted_task=trusted_task(),
+                    required_capability="software_development_loop", capability_authority=FakeCapabilityAuthority(facts))
 
     def test_selector_blocks_only_after_safe_fallbacks_are_exhausted(self) -> None:
         exhausted = FakeCapabilityAuthority(
@@ -769,7 +801,7 @@ class PersistentContinuationTests(unittest.TestCase):
             select_execution_surface(
                 self.policy,
                 trusted_task=trusted_task(),
-                required_capability="chat_tools",
+                required_capability="interactive_tools",
                 capability_authority=empty_evidence,
             )
 

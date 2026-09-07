@@ -1,5 +1,7 @@
 # Default-deny Remote Desktop and parallel-first task routing
 
+> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 **Status:** proposed
 **Governing issue:** `Oteryn/Oteryn#85`
 **Authority repository:** `Oteryn/Oteryn` (META)

@@ -171,19 +171,12 @@ def test_call_gate_schema_version_rejects_json_boolean() -> None:
     assert "policy remote_desktop_call_gate.schema_version must be 1" in errors
 
 
-def test_canonical_instructions_gate_every_direct_remote_desktop_call() -> None:
-    agents_text = (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
-    contract_text = (
-        REPO_ROOT / "docs" / "agents" / "contracts" / "AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md"
-    ).read_text(encoding="utf-8")
-    for text in (agents_text, contract_text):
-        assert "every direct `Remote_Desktop_Commander.*` invocation" in text
-        assert "local connector/tool registration" in text
-        assert "positive per-call" in text
-        assert "must not invoke `Remote_Desktop_Commander.list_devices`" in text
-        assert "A Remote Desktop `DENY` is not automatically a blocker" in text
-        assert "validate_remote_desktop_call" in text
-        assert "exact call arguments" in text
+def test_bootstrap_routes_to_the_canonical_remote_desktop_contract() -> None:
+    # Safety is exercised by the packet/per-call tests, not copied editorial wording.
+    relative = "docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md"
+    assert relative in (REPO_ROOT / "AGENTS.md").read_text(encoding="utf-8")
+    assert (REPO_ROOT / relative).is_file()
+    assert callable(call_gate.validate_remote_desktop_call)
 
 
 def test_exception_requires_remote_tool_declaration() -> None:

@@ -1,5 +1,7 @@
 # Remote Desktop and Parallel Routing Implementation Plan
 
+> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make META's GitHub-first execution policy machine-checkable, default-deny Remote Desktop/Desktop Commander, and require safe parallel-first planning for substantial task packets.

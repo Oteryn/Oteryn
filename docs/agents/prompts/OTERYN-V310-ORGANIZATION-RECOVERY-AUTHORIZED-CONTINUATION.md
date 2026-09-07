@@ -1,8 +1,10 @@
 # OTERYN-V310-ORGANIZATION-RECOVERY-AUTHORIZED-CONTINUATION
 
+> TASK TEMPLATE, not standing authority. Refresh the governing live Issue/PR and current explicit owner authorization before invocation; historical permissions, heads and execution procedures below do not override [AGENTS.md](../../../AGENTS.md). This marker does not close or defer the underlying task.
+
 PROMPT_ID: `OTERYN-V310-ORGANIZATION-RECOVERY-AUTHORIZED-CONTINUATION`
 PROMPT_VERSION: `1.0`
-STATUS: `READY`
+STATUS: `TEMPLATE_REQUIRES_LIVE_AUTHORIZATION`
 PROGRAMME: `OTERYN-ORG-AUDIT-v3.10`
 CONTINUES: `OTERYN-V310-ORGANIZATION-RECOVERY-CLOSEOUT`
 PRIMARY_LIFECYCLE: `Oteryn/Oteryn#59`
@@ -27,7 +29,7 @@ Required target state:
 
 `GAP-RECOVERY-007` remains terminal historical evidence and MUST NOT be reopened.
 
-## OWNER AUTHORIZATION — CURRENT INVOCATION
+## Historical invocation authorization — not reusable authority
 
 The repository owner has already authorized this recovery implementation with the following exact constraints:
 

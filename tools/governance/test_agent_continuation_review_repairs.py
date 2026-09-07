@@ -152,7 +152,7 @@ class ReviewRepairRegressions(unittest.TestCase):
             select_execution_surface(
                 self.policy,
                 trusted_task=trusted_task(),
-                required_capability="chat_tools",
+                required_capability="interactive_tools",
                 capability_authority=authority,
             )
 

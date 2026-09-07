@@ -1,5 +1,7 @@
 # Chat-first Persistent Autonomy Design
 
+> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
+
 **Status:** owner-approved design for `Oteryn/Oteryn#108`; documentation only until merged to protected `main`.
 
 **Operating principle:**
