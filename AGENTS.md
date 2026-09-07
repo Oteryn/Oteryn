@@ -36,35 +36,17 @@ host exception requires the canonical contract's fresh positive exact-call gate.
 Skills are optional aids, not additional authority or approval lifecycles. Retired
 prompts and `docs/superpowers/` material are evidence, not dispatchable instructions.
 
-## Restricted publishing-credential compatibility
+## Specialist operation routes
 
-This profile applies only after the repository lifecycle has allocated an approved
-task branch and existing PR. It does not grant PR-write permission to a restricted
-publishing credential; PR creation remains a separately authorized control-plane action.
+Before using CLI/Git credential compatibility for an authorized publication, read
+`docs/agents/operations/RESTRICTED_PUBLISHING.md`. Credentials do not expand
+authority. Never embed a token in a remote URL or persist a new credential
+helper to bypass that boundary.
 
-For an authorized write to that branch/PR, when `GH_TOKEN` and `GITHUB_TOKEN` are
-unset but agent-visible `GH` is present, it may be passed transiently as
-`GH_TOKEN="$GH"` to the exact authorized `gh` command. Environment mapping alone
-does not authenticate `git push`: verify that the existing remote/credential path
-can consume the authorized identity without exposing or persisting it. Otherwise
-use another authorized repository-native write path or report the exact limitation.
-Never embed the token in a remote URL or persist a new credential helper to bypass
-that boundary. Credential presence expands no repository/path/task/merge/production
-permission. Do not force-push; verify the remote exact head after publishing.
-
-## Organization runner routing
-
-Product-owned host-local GitHub Actions workloads MUST use the product-isolated organization runner group and product label together:
-
-- Platform: `platform-runners` + `oteryn-platform`;
-- Atlas: `atlas-runners` + `oteryn-atlas`;
-- Game: `game-runners` + `oteryn-game`.
-
-Agents MUST NOT route new workloads by a custom label alone, MUST NOT add generic `self-hosted` eligibility, and MUST NOT introduce new workflow dependencies on the legacy `oteryn-staging` selector. `oteryn-synology-staging` is rollback-only while the organization-runner migration remains open and may be retired only after the provider closeout gates prove that it has no retained workload owner. META remains GitHub-hosted unless a separate host-local META workload is explicitly proven and authorized.
-
-When migrating an existing `oteryn-staging` workflow, replace it with the owning product's group+label selector; do not preserve the legacy selector as a fallback in new code.
-
-The detailed operational contract and live rollout evidence are provider-owned in `Oteryn/Oteryn-Platform/docs/operations/SYNOLOGY_ORGANIZATION_RUNNERS.md`; live GitHub organization state and provider workflow state outrank stale documentation.
+Before selecting or changing an Actions runner, migrating a legacy runner workload,
+or considering a host-local META workload, read
+`docs/agents/operations/RUNNER_ROUTING.md`. META remains GitHub-hosted unless a
+separate host-local workload is explicitly proven and authorized.
 
 ## Authority and repository scope
 
