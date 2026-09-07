@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "execution_targets": [
     "github_actions",
     "isolated_workspace",
@@ -117,13 +117,15 @@
       "id",
       "owned_paths",
       "depends_on",
-      "branch_and_worktree",
+      "branch",
+      "worktree",
       "shared_leases"
     ],
     "one_writer_per_lane": true,
-    "unique_branch_and_worktree": true,
     "overlap_requires_lease": true,
     "constrained_resource_requires_lease": true,
-    "integration_order_required": true
+    "integration_order_required": true,
+    "unique_branch": true,
+    "unique_worktree": true
   }
 }

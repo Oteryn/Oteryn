@@ -60,7 +60,8 @@ def lane(identifier: str, paths: list[str], *, depends_on: list[str] | None = No
         "id": identifier,
         "owned_paths": paths,
         "depends_on": depends_on or [],
-        "branch_and_worktree": f"governance/{identifier}:worktrees/{identifier}",
+        "branch": f"refs/heads/governance/{identifier}",
+        "worktree": f"worker:/worktrees/{identifier}",
         "shared_leases": [],
     }
 
@@ -312,19 +313,65 @@ def test_remote_desktop_exception_requires_no_equivalent_ci() -> None:
     )
 
 
-def test_parallel_lanes_cannot_share_a_writable_branch_and_worktree() -> None:
+def test_parallel_lanes_enforce_branch_and_worktree_independently() -> None:
+    for coordinate in ("branch", "worktree"):
+        packet = default_packet()
+        parallel = packet["parallel_execution"]
+        first = lane("first", ["docs/first/**"])
+        second = lane("second", ["src/second/**"])
+        second[coordinate] = first[coordinate]
+        parallel.update(lane_strategy="parallel_when_beneficial", lanes=[first, second],
+                        integration_order=["first", "second"])
+        errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+        assert f"parallel lanes cannot share {coordinate}" in errors, errors
+
+
+def test_isolation_rejects_ambiguous_or_missing_identities() -> None:
+    for coordinate in ("branch", "worktree"):
+        for invalid in (None, "", " ", " leading-space", "trailing-space ", 1):
+            packet = default_packet()
+            packet["parallel_execution"]["lanes"][0][coordinate] = invalid
+            assert routing.validate_packet(packet, live_state=live_state(), policy=policy())
+    for invalid in ("topic", "refs/heads/"):
+        packet = default_packet()
+        packet["parallel_execution"]["lanes"][0]["branch"] = invalid
+        assert routing.validate_packet(packet, live_state=live_state(), policy=policy())
     packet = default_packet()
-    parallel = packet["parallel_execution"]
-    assert isinstance(parallel, dict)
-    first = lane("first", ["docs/first/**"])
-    second = lane("second", ["src/second/**"])
-    second["branch_and_worktree"] = first["branch_and_worktree"]
-    parallel["lanes"] = [first, second]
-    parallel["integration_order"] = ["first", "second"]
+    current = packet["parallel_execution"]["lanes"][0]
+    current["branch_and_worktree"] = "topic:/workspace"
+    assert any("branch_and_worktree is retired" in error for error in
+               routing.validate_packet(packet, live_state=live_state(), policy=policy()))
+    del current["branch"]
+    del current["worktree"]
+    assert routing.validate_packet(packet, live_state=live_state(), policy=policy())
 
-    errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
 
-    assert "parallel lanes cannot share branch_and_worktree" in errors
+def test_branch_ref_syntax_matches_git_rules() -> None:
+    invalid = (
+        "refs/heads/foo..bar", "refs/heads/foo bar", "refs/heads/foo.lock",
+        "refs/heads/foo.lock/bar", "refs/heads/.hidden", "refs/heads/a/.hidden",
+        "refs/heads/a/", "refs/heads/a//b", "refs/heads/a.", "refs/heads/a@{b",
+        "refs/heads/a~b", "refs/heads/a^b", "refs/heads/a:b", "refs/heads/a?b",
+        "refs/heads/a*b", "refs/heads/a[b", "refs/heads/a\\b", "refs/heads/a\x7fb",
+    )
+    valid = ("refs/heads/topic", "refs/heads/a/b", "refs/heads/a.b", "refs/heads/a@b")
+    for identity in (*invalid, *valid):
+        packet = default_packet()
+        packet["parallel_execution"]["lanes"][0]["branch"] = identity
+        errors = routing.validate_packet(packet, live_state=live_state(), policy=policy())
+        assert bool(errors) == (identity in invalid), (identity, errors)
+        result = subprocess.run(["git", "check-ref-format", identity], capture_output=True)
+        assert bool(result.returncode) == (identity in invalid), identity
+
+
+def test_isolation_policy_cannot_disable_independent_identity_checks() -> None:
+    for key in ("unique_branch", "unique_worktree"):
+        config = policy()
+        config["parallel_lane_rules"][key] = False
+        assert routing.validate_packet(default_packet(), live_state=live_state(), policy=config)
+    config = policy()
+    config["parallel_lane_rules"]["required_lane_fields"] = ["id"]
+    assert routing.validate_packet(default_packet(), live_state=live_state(), policy=config)
 
 
 def test_host_exception_requires_a_non_empty_permitted_action_record() -> None:
@@ -860,13 +907,13 @@ def test_cli_enforces_lane_isolation_and_remote_desktop_action_scope() -> None:
         assert isinstance(parallel, dict)
         first = lane("first", ["docs/first/**"])
         second = lane("second", ["src/second/**"])
-        second["branch_and_worktree"] = first["branch_and_worktree"]
+        second["worktree"] = first["worktree"]
         parallel["lanes"] = [first, second]
         parallel["integration_order"] = ["first", "second"]
         packet_path.write_text(json.dumps(duplicate_worktree), encoding="utf-8")
         duplicate_result = subprocess.run(command, check=False, capture_output=True, text=True)
         assert duplicate_result.returncode == 1
-        assert "parallel lanes cannot share branch_and_worktree" in duplicate_result.stdout
+        assert "parallel lanes cannot share worktree" in duplicate_result.stdout
 
         missing_actions = exception_packet("host_only_service")
         missing_execution = missing_actions["execution_routing"]
