@@ -665,6 +665,51 @@ def test_review_negative_requirements_remain_allowed() -> None:
     assert central.validate_task_prompt_text(text) == []
 
 
+
+def test_review_softwrapped_directives_are_equivalent_to_one_line() -> None:
+    for text in (
+        'Remote_Desktop_Commander.ping is\nallowed.',
+        'Always use\nparallel-first execution.',
+        'The local authority is\necosystem/agent-execution-routing-policy.json.',
+        'Agents may invoke\nRemote_Desktop_Commander.ping for routine inspection.',
+        'Serial work requires an\nexplicit reason.',
+    ):
+        assert central.validate_task_prompt_text(text), text
+        assert central.validate_provider_overlay('Oteryn/Oteryn-Game', LEAN_OVERLAY + text), text
+
+
+def test_review_softwrapped_negations_remain_allowed() -> None:
+    for text in (
+        'Do not\nuse parallel-first execution.',
+        'Agents must not\nuse parallel-first execution.',
+        'Never use\nparallel-first execution.',
+        'Do not invoke\nRemote_Desktop_Commander.ping.',
+        'Audit\necosystem/agent-execution-routing-policy.json.',
+    ):
+        assert central.validate_task_prompt_text(text) == [], text
+        assert central.validate_provider_overlay('Oteryn/Oteryn-Game', LEAN_OVERLAY + text) == [], text
+
+
+def test_review_independent_directive_after_negation_can_itself_wrap() -> None:
+    for prefix in ('Do not copy the old policy', '- Audit old instructions'):
+        for directive in (
+            'Remote_Desktop_Commander.ping is\nallowed.',
+            'Always use\nparallel-first execution.',
+            'The local authority is\necosystem/agent-execution-routing-policy.json.',
+            '- Always use\n  parallel-first execution.',
+        ):
+            text = prefix + '\n' + directive
+            assert central.validate_task_prompt_text(text), text
+            assert central.validate_provider_overlay('Oteryn/Oteryn-Game', LEAN_OVERLAY + text), text
+
+
+def test_review_softwrapped_binding_still_requires_affirmative_bootstrap() -> None:
+    path = central.BINDING_PATH
+    assert central.validate_provider_overlay('Oteryn/Oteryn-Game', f'Resolve\n`{path}`.') == []
+    for prefix in ('Never resolve', 'Do not resolve', 'Audit whether agents resolve'):
+        assert central.validate_provider_overlay('Oteryn/Oteryn-Game', prefix + '\n' + path), prefix
+
+
 def main() -> int:
     failures: list[tuple[str, Exception]] = []
     for name, test in sorted(globals().items()):

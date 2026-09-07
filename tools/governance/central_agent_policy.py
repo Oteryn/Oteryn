@@ -429,11 +429,34 @@ def _section_list(policy: dict[str, Any] | None, key: str) -> list[str] | None:
 def _statements(text: str) -> list[str]:
     body = re.sub(r"(?m)^\s{0,3}#{1,6}\s+.*$", "", _operative_markdown(text))
     result: list[str] = []
-    # A hard line/list-item boundary ends a lint statement even without a full
-    # stop. Otherwise one negative/audit line can hide a following directive.
-    # This is intentionally bounded text lint, not a natural-language parser.
+    pending: list[str] = []
+    # Join soft wraps, but start a new bounded statement at a list item or a
+    # recognizable independent directive. An unfinished modal/negation prefix
+    # continues onto the next line instead of converting its action to a grant.
+    item = re.compile(r"^(?:[-*+]\s+|\d+[.)]\s+)")
+    starter = re.compile(
+        r"^(?:(?:organization|meta)\s+policy:|(?:agents?|workers?|you)\s+|"
+        r"(?:do\s+not|never|must\s+not|remove|retire|audit|inspect|compare|always|"
+        r"use|resolve|read|load|follow|consult)\b|remote_desktop_commander\.\w+|"
+        r"(?:the\s+)?local\b|serial\s+(?:work|execution)\b|a\s+substantial\s+task\b)",
+        re.IGNORECASE,
+    )
+    unfinished = re.compile(r"\b(?:not|never|must|shall|may|can|use|resolve|read|load|follow|invoke|call|is|are|the|an?)\s*$", re.IGNORECASE)
+
+    def flush() -> None:
+        if pending:
+            result.extend(re.split(r"(?<=[.!?;])\s+", " ".join(pending)))
+            pending.clear()
+
     for line in body.splitlines():
-        result.extend(re.split(r"(?<=[.!?;])\s+", " ".join(line.split())))
+        line = " ".join(line.split())
+        if not line:
+            flush()
+            continue
+        if pending and (item.match(line) or (starter.match(line) and not unfinished.search(pending[-1]))):
+            flush()
+        pending.append(line)
+    flush()
     return result
 
 
