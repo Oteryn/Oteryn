@@ -1,156 +1,25 @@
 name: META remediation workspace verification
 
-# Temporary aid for #154. Final reviewed trees exclude this workflow.
+# Temporary #154 verification. Removed from the final remediation tree.
 on:
   push:
     branches: [fix/meta-audit-r4-20260907]
     paths: [.github/workflows/meta-remediation-verification.yml]
-
 permissions:
   contents: read
-
 jobs:
-  prepare-objects:
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    permissions:
-      contents: write
+  windows-portability:
+    runs-on: windows-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: 5f5c321864f7afe3261f49ab3c1fc207a388b402
           persist-credentials: false
-      - name: Prepare exact reviewed Git objects, without changing refs
-        id: prepare
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
+      - name: Verify exact reviewed source tree
+        shell: pwsh
         run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import base64, gzip, hashlib, json, os, pathlib, subprocess, urllib.request
-          API = 'https://api.github.com/repos/Oteryn/Oteryn'
-          BASE = 'd0d5a54c5f06db9423d14b17e7f8eadefd15c6fb'
-          OUT = pathlib.Path(os.environ['RUNNER_TEMP']) / 'r4-object-evidence'
-          OUT.mkdir()
-          def api(path, body=None):
-              # Only Git object writes; this helper has no ref/PR/settings mutation.
-              if body is not None and path not in ('/git/trees', '/git/blobs'):
-                  raise ValueError('non-object mutation denied')
-              request = urllib.request.Request(API + path,
-                  data=json.dumps(body).encode() if body is not None else None,
-                  headers={'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
-                           'Accept': 'application/vnd.github+json',
-                           'X-GitHub-Api-Version': '2026-03-10',
-                           'Content-Type': 'application/json'})
-              with urllib.request.urlopen(request, timeout=30) as response:
-                  return json.load(response)
-          def git(*args, cwd=None):
-              return subprocess.check_output(['git', *args], cwd=cwd)
-          def blob_hash(data):
-              return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
-          parts = ['004df9e98f3b7a345ddd688f224a0be5d052435f',
-                   '31e236fffa10d783c3e78019ff92301264638a38',
-                   'cbabad06470fbe854c99f5e9ec9558c65d063ca1',
-                   'deed869382917bd34fb15f0a181b9ff47c3b0e42']
-          compressed = b''
-          for sha in parts:
-              data = base64.b64decode(api('/git/blobs/' + sha)['content'])
-              assert blob_hash(data) == sha
-              compressed += data
-          assert len(compressed) == 16499
-          assert hashlib.sha256(compressed).hexdigest() == 'efc7b480b55c09a0689c06fd5ba680ef89baa32ca38ab3ded6f48a9cbbd3aef3'
-          raw = gzip.decompress(compressed)
-          assert len(raw) == 54408
-          pack = json.loads(raw)
-          assert pack['schema'] == 1 and pack['repository'] == 'Oteryn/Oteryn' and pack['base'] == BASE
-          git('fetch', '--no-tags', '--depth=1', 'origin', BASE)
-          assert git('rev-parse', BASE + '^{tree}').decode().strip() == pack['base_tree']
-          expected = {
-              'correctness': ('fix/meta-audit-r4-20260907', '14db51a8a66f01455c05879bb4ffc285de045f98'),
-              'release': ('fix/meta-release-contract-r4-20260907', 'dd489ee2280fb6d498ea9c98b0b1385d25c436a0'),
-              'instructions': ('fix/meta-instructions-capabilities-r4-20260907', 'f9d0d4129d88709fdbd572e7071e3ad65dd8bc66'),
-          }
-          assert [g['name'] for g in pack['groups']] == list(expected)
-          results = []
-          for group in pack['groups']:
-              name = group['name']
-              assert (group['branch'], group['expected_tree']) == expected[name]
-              work = pathlib.Path(os.environ['RUNNER_TEMP']) / ('r4-' + name)
-              git('worktree', 'add', '--detach', str(work), BASE)
-              changes = []
-              paths = []
-              for entry in group['files']:
-                  path = entry['path']
-                  relative = pathlib.PurePosixPath(path)
-                  assert not relative.is_absolute() and '..' not in relative.parts and '.git' not in relative.parts
-                  target = work / path
-                  old = target.read_bytes() if target.exists() else b''
-                  assert (blob_hash(old) if target.exists() else None) == entry['base_sha']
-                  lines = old.decode('utf-8').splitlines(keepends=True)
-                  for start, end, replacement in reversed(entry['edits']):
-                      assert 0 <= start <= end <= len(lines)
-                      lines[start:end] = replacement.splitlines(keepends=True)
-                  data = ''.join(lines).encode('utf-8')
-                  assert blob_hash(data) == entry['sha']
-                  target.parent.mkdir(parents=True, exist_ok=True)
-                  target.write_bytes(data)
-                  assert entry['mode'] in ('100644', '100755')
-                  target.chmod(0o755 if entry['mode'] == '100755' else 0o644)
-                  paths.append(path)
-                  changes.append({'path': path, 'mode': entry['mode'], 'type': 'blob', 'content': data.decode('utf-8')})
-              for path in group['deletes']:
-                  assert path in ('tools/governance/test_verify_ai_review_evidence_compat_v1.py',
-                                  'tools/governance/verify_ai_review_evidence_compat_v1.py')
-                  (work / path).unlink()
-                  paths.append(path)
-                  changes.append({'path': path, 'mode': '100644', 'type': 'blob', 'sha': None})
-              assert len(paths) == len(set(paths))
-              git('add', '--', *paths, cwd=work)
-              git('diff', '--cached', '--check', cwd=work)
-              assert git('write-tree', cwd=work).decode().strip() == group['expected_tree']
-              assert sorted(git('diff', '--cached', '--name-only', BASE, cwd=work).decode().splitlines()) == sorted(paths)
-              assert not (work / '.github/workflows/meta-remediation-verification.yml').exists()
-              (OUT / (name + '.diff')).write_bytes(git('diff', '--cached', BASE, cwd=work))
-              workflow_entries = [e for e in changes if e['path'].startswith('.github/workflows/')]
-              for entry in workflow_entries:
-                  blob = api('/git/blobs', {'content': entry.pop('content'), 'encoding': 'utf-8'})
-                  entry['sha'] = blob['sha']
-              tree = api('/git/trees', {'base_tree': pack['base_tree'], 'tree': [e for e in changes if e not in workflow_entries]})
-              # Workflow path assignment requires the connector's existing workflow scope.
-              # Runner creates source objects only; connector finishes trees and refs.
-              results.append({'name': name, 'branch': group['branch'], 'staging_tree': tree['sha'],
-                              'expected_tree': group['expected_tree'], 'workflow_entries': workflow_entries,
-                              'parent': os.environ['GITHUB_SHA'] if name == 'correctness' else BASE,
-                              'paths': paths, 'message': group['message']})
-              if name == 'correctness':
-                  (OUT / 'correctness.tar.gz').write_bytes(git('archive', '--format=tar.gz', group['expected_tree'], cwd=work))
-                  (OUT / 'correctness.tree.txt').write_bytes(git('ls-tree', '-r', group['expected_tree'], cwd=work))
-              print(name, 'staging tree', tree['sha'], 'expected final tree', group['expected_tree'])
-          (OUT / 'candidates.json').write_text(json.dumps(results, indent=2) + '\n')
-          # Supporting source export is read-only and does not alter any provider.
-          overlap = '88d2ea0c978921570d77d1cf4239856e31a2d661'
-          git('fetch', '--no-tags', '--depth=1', 'origin', overlap)
-          (OUT / 'pr145.tar.gz').write_bytes(git('archive', '--format=tar.gz', overlap))
-          (OUT / 'pr145.tree.txt').write_bytes(git('ls-tree', '-r', overlap))
-          (OUT / 'pr145.commit.txt').write_bytes(git('cat-file', 'commit', overlap))
-          sources = [
-              ('Oteryn-Platform', '3b2ea1c7392187d5d22488673073dc8f8305a374',
-               'tools/agents/task_issue_liveness.py', '1634a776976d231b10e8d322c49a2a1ed087eb6b'),
-              ('Oteryn-Atlas', '51623c7dab2346cee39cd51e3caa845bf4b65426',
-               'tools/maintenance/verify-maintenance-diff.mjs', '714fb73fe08b7c741d606c6e5a8ecdf33a3adf10'),
-          ]
-          for repo, sha, path, blob in sources:
-              url = 'https://raw.githubusercontent.com/Oteryn/' + repo + '/' + sha + '/' + path
-              with urllib.request.urlopen(url, timeout=30) as response:
-                  data = response.read()
-              assert blob_hash(data) == blob
-              (OUT / pathlib.PurePosixPath(path).name).write_bytes(data)
-          PY
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        if: always()
-        with:
-          name: r4-object-evidence-${{ github.sha }}
-          path: ${{ runner.temp }}/r4-object-evidence/
-          retention-days: 14
-          if-no-files-found: error
+          $tree = git rev-parse HEAD`^{tree`}
+          if ($tree -ne '14db51a8a66f01455c05879bb4ffc285de045f98') { throw 'Unexpected source tree' }
+      - name: Run bounded harness with PATH-independent child interpreter
+        run: python tools/governance/test_bounded_execution_guard.py
