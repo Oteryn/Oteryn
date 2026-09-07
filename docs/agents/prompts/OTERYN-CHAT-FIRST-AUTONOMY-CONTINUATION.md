@@ -40,6 +40,16 @@ the accepted #108 design and the retained decision handoff.
 - Close the programme only after protected-main readback and provider adoption or
   valid scope decisions prove the remaining #108 scope complete.
 
-Record exact completed/remaining work, evidence, blockers and one next action. Apply
-the canonical resume rules to any worker release; do not claim background execution
-without a verified mechanism.
+Keep active context minimal and durable state in GitHub. Checkpoint after material
+milestones and before long/failure-prone operations, context rotation, external
+waiting or worker release, not after every tool call. Record exact completed/
+remaining work, evidence, blockers and one next action; do not use checkpoint-only
+commits to perturb a frozen candidate. Rotate only with a real successor mechanism.
+
+Keep owner-facing noise low: notify for verified completion, a genuine owner/
+permission/safety decision, or a required owner reinvocation when no automatic
+continuation exists. Report STALLED when no verified mechanism can await changed
+material facts and resume, and report an unavoidable protected-integration capability
+gap after safe alternatives are exhausted. Routine checkpoints and recoverable
+failures are not reasons to interrupt the owner. Apply the canonical resume rules to
+worker release; do not claim background execution without a verified mechanism.
