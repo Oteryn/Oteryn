@@ -2,65 +2,30 @@
 
 Policy: `OTERYN_ORGANIZATION_AGENT_POLICY@3.0.0`
 
-Prompt text, agent instructions, examples, routing descriptions and coordinator contracts are behavioral code. Accept a material change because it performs better on representative evidence, not because it is longer, shorter or more confident.
+Evaluate material instruction/harness changes with the same representative cases before and after the change. Optimize the cost of correctly completed tasks, not Markdown size alone.
 
-## Evaluation rule
+## Three distinct evidence levels
 
-Compare baseline and candidate on the same representative cases. Include normal success, negative/refusal, authority boundary, stale/live-state, prompt-injection, continuation/recovery, vertical-slice and closeout cases when applicable.
+1. **Contract checks:** schemas, source identity, references and specific deterministic regressions. Text lint is not proof of semantic safety.
+2. **Adoption/delivery:** the provider uses the intended consumer, and the actual client receives the required sources for its starting directory and task. A binding alone does not prove delivery.
+3. **Behavior:** real task outcomes, repeated trials when nondeterminism matters, missed invariants, false blockers and unnecessary work. Static checks do not count as model trials.
 
-Separate deterministic contract checks from model/runtime trials. Deterministic checks can prove schema, required/forbidden markers and repository invariants; they do not prove stochastic model adherence.
+Safety-critical regression tolerance is zero. This acceptance rule does not claim that finite trials prove absence of all future regressions. Record unavailable evidence as `NOT_EVALUATED`, not PASS.
 
-Safety-critical regression tolerance is zero.
+## Comparison
 
-## Metrics
+Choose a representative canary before broad migration. Relevant cases include a local fix, a domain-contract change, a high-risk control-plane change, a documentation-only task and a continuation. Include refusal/authority boundaries, stale facts and prompt-injection cases when affected.
 
-Measure what matters for the task:
+Preserve baseline and candidate revisions, task inputs, tools, environment and acceptance criteria. Hold model and effort constant while comparing instructions. Evaluate model, effort, delegation and CI changes separately; otherwise their effects cannot be attributed to instruction cleanup. Use ablation to remove one group at a time where practical.
 
-- outcome correctness/completeness;
-- safety and authority violations;
-- missed domain constraints;
-- false blockers and premature stops;
-- unnecessary owner questions or approval requests;
-- repeated policy reads and unnecessary tool calls;
-- context loaded versus materially used;
-- unnecessary heavy validation/retry loops;
-- token/cost/runtime deltas when observable.
+A small initial comparison is screening, not a statistically established organization-wide saving. Repeat unstable or safety-relevant cases and inspect the resulting code/environment, not just the agent narrative. Keep a useful domain/safety rule unless its role is preserved or adequate evidence supports removal.
 
-Do not optimize token count at the expense of correctness or safety.
+## Cost and evidence
 
-## Ablation
+Record outcome quality and all attempted work, including failed attempts and child agents. Where observable, record input/output/reasoning/cache usage, actual model/effort, tool calls, repeated reads, heavy test runs, elapsed execution/wait time and owner interventions. Measure CI across PR, Merge Queue and main rather than moving expense between them.
 
-Use ablation when simplifying a prompt or instruction surface: remove one class of duplicated rule/example/scaffold, rerun the same representative cases, and keep it removed when the governing authority or machine enforcement still protects the invariant and measured behavior does not regress.
+Report aggregate measured cost divided by accepted tasks with the sample size and uncertainty. Keep owner time separate unless a valuation is agreed. Do not turn subscription usage into a fictional API invoice, defaults into verified hard limits, or reduced bytes into a token-saving percentage.
 
-A rule remains when it protects a documented safety/domain invariant or demonstrates measurable value. Historical presence alone is not evidence.
+Use one compact evaluation record: revisions, actual client/start directory/configuration, case set, checks, model-trial count, outcomes, efficiency observations, regressions and disposition. Do not add a mandatory per-task reporting system. Keep full logs outside the always-loaded instruction surface and redact sensitive data.
 
-## Canary-first migration
-
-For a material provider or prompt-family migration:
-
-1. choose one real representative canary;
-2. preserve the baseline candidate for comparison;
-3. run deterministic checks on the exact candidate;
-4. run repeated model trials when nondeterminism matters;
-5. inspect both trace quality and resulting environment outcome;
-6. repair only demonstrated regressions;
-7. broaden migration only after the canary qualifies.
-
-Multi-agent fanout is evaluated the same way: compare a capable single lead with the proposed fanout on work that actually divides into independent streams. Parallelism is retained only when it improves outcome, coverage or time enough to justify coordination cost.
-
-## Evidence record
-
-For a material evaluation record at least:
-
-- baseline prompt/policy identity;
-- candidate prompt/policy identity;
-- model and reasoning effort;
-- representative case set;
-- deterministic checks run;
-- number of model trials when used;
-- outcome/safety results;
-- efficiency observations;
-- regressions and disposition;
-- final keep/remove decision for the ablated scaffold.
-
-Do not claim model-behavior improvement from deterministic text validation alone.
+Broaden rollout only when applicable checks, actual adoption and representative behavior qualify. Preserve a coherent rollback for binding, instructions and their consumers; no rollback may waive current safety requirements.

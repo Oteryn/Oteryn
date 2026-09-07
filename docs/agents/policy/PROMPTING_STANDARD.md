@@ -2,41 +2,33 @@
 
 Policy: `OTERYN_ORGANIZATION_AGENT_POLICY@3.0.0`
 
-Write prompts as **task-specific deltas** on top of the current governing repository instructions and immutable META policy binding. Do not restate the agent operating system in every prompt.
+Write a **task-specific delta** over applicable repository instructions. Keep the observable objective, important boundaries, unique domain knowledge and acceptance evidence. Do not restate the agent operating system.
 
-A substantial prompt may contain these fields when they materially change execution:
+## Task content
 
-1. `ROLE / OUTCOME` — bounded role and one observable target.
-2. `AUTHORITY / SCOPE DELTA` — exact writable scope and task-specific prohibited effects.
-3. `LIVE LOCATORS` — Issue/task/PR/branch identifiers needed to refresh current truth.
-4. `DOMAIN CONSTRAINTS / DEPENDENCIES` — product/domain invariants and prerequisites unique to this work.
-5. `ACCEPTANCE / VALIDATION DELTA` — observable evidence required specifically for this task.
-6. `STOP / HANDOFF DELTA` — genuine owner/safety/authority blockers and durable next state.
+Use only fields that materially affect the task; these labels are examples, not a required Markdown schema:
 
-Omit a section when it has no task-specific content.
+- `ROLE / OUTCOME`: one observable result and the responsibility needed to deliver it.
+- `AUTHORITY / SCOPE DELTA`: writable scope and task-specific prohibited effects.
+- `LIVE LOCATORS`: identifiers needed to resolve current task/repository facts.
+- `DOMAIN CONSTRAINTS / DEPENDENCIES`: important knowledge and prerequisites not already supplied.
+- `ACCEPTANCE / VALIDATION DELTA`: evidence specific to this result.
+- `STOP / HANDOFF DELTA`: exceptional boundaries or recovery requirements not already governed.
 
-## Inherited policy
+Omit a section when it has no task-specific content. A long specification is appropriate when its details change the correct result; redundant global procedure is not.
 
-Do not copy global GitHub-first, moving-main, branch/worktree, concurrency, Remote Desktop, AI-review, retry/continuation, merge or generic closeout policy into task prompts. Resolve those rules through the provider's immutable META binding and current repository instructions.
+## Inheritance and authority
 
-A task prompt may narrow authority or name a task-specific risk trigger. It must not create a broader permission, a second merge authority, a local Remote Desktop controller, a local Codex controller or a parallelism requirement that conflicts with META.
+A remote META binding identifies a version, not automatic instruction delivery. Rely on the verified local bootstrap and load relevant bound sources when needed. Do not copy full GitHub, concurrency, Remote Desktop, review, retry or merge procedures into each prompt. A plain source locator for a relevant task is allowed.
 
-## Live state and authority
+Aliases provide discovery, not authority. Refresh changing lifecycle facts rather than treating a pasted SHA/status as current truth. Do not ask the owner for a fact that an authorized read can resolve. State safe, reversible assumptions; never assume permission, destructive intent or waived acceptance.
 
-Use identifiers as locators, not frozen truth. Refresh material live state before relying on it for mutation or integration. Do not ask the owner for facts that an authorized live-state read can resolve.
+## Execution guidance
 
-Prompt aliases and reusable prompt lifecycle entries grant discoverability, not write authority. Mutation still requires the current task/repository allocation or explicit owner authorization required by the governing repository.
+Give direct instructions and a concrete success target. Prescribe a sequence only when ordering protects correctness/safety or evaluation demonstrates a need. Avoid generic expert praise, routine requests for exposed chain-of-thought, and examples that add no useful distinction.
 
-## Outcome-first instructions
+One worker is normal; delegate only independent work with clear boundaries and worthwhile benefit. Keep model/effort settings outside the task's semantic contract and verify the actual configuration where supported. Do not invent a control merely by adding metadata or request the highest effort by template.
 
-Prefer one observable objective and success criteria over a detailed step-by-step procedure. Prescribe steps only when order is itself a correctness/safety invariant or when evaluation has shown that the model otherwise fails materially.
+Create a skill for a repeatable specialized procedure, not generic engineering advice. Put a precise selection trigger in its description and load details on demand. Use explicit-only invocation where supported when accidental activation has no value; verify behavior on the actual client.
 
-Keep domain constraints that are easy to violate and costly to rediscover. Remove generic reminders already supplied by higher authority or deterministic enforcement.
-
-## Parallelism
-
-Do not make multi-agent execution mandatory by template. Use one worker when it is sufficient. Use parallel analysis or implementation only when independent workstreams have clear ownership boundaries and measurable value.
-
-## Handoffs
-
-A handoff is state, not policy. Keep only durable coordinates, completed/remaining material work, evidence, blocker/disposition and one next safe action. Never paste the global policy bundle into a handoff.
+A handoff stores coordinates, material completed/remaining work, evidence, disposition and the next safe action. It is not another policy copy, a new authorization or a claim of background execution.

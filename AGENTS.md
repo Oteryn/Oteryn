@@ -36,6 +36,14 @@ Agents MUST complete the GitHub preflight defined in `docs/agents/contracts/AGEN
 
 Host-local filesystems, clones, worktrees, containers and shells are execution/cache planes only. They MUST NOT be used to select authoritative repository state or bypass GitHub lifecycle. Durable local changes receive no completion credit until committed, pushed to the approved GitHub branch/PR and verified against the remote exact head.
 
+## Codex GitHub publishing credential compatibility
+
+This compatibility path applies only after the repository lifecycle has already allocated an approved task branch and existing PR. PR creation remains a coordinator/repository-control-plane action; this rule does not authorize creating a replacement PR or granting the Codex credential pull-request write permission.
+
+For an already-authorized GitHub write to that existing branch/PR, if `GH_TOKEN` and `GITHUB_TOKEN` are unset but agent-visible `GH` is present, the agent MAY pass it transiently as `GH_TOKEN="$GH"` to the exact authorized `gh` command. For `git push`, do not assume that environment mapping alone authenticates Git: first verify that the existing remote/credential path can consume the authorized GitHub identity without exposing or persisting the credential. If it cannot, use another already-authorized repository-native write path or report the precise publishing blocker; do not embed the token in a remote URL or persist a new credential helper merely to bypass this boundary.
+
+Credential presence never expands repository, branch, path, task, merge, production, or secret authority. The agent MUST update only the approved existing task branch/PR, MUST NOT force-push, and MUST verify the remote exact head after publication. If no authorized credential is present, report the precise unauthenticated operation after capability discovery instead of generalizing that GitHub is read-only.
+
 ## Execution-routing policy
 
 `ecosystem/agent-execution-routing-policy.json` is the canonical machine-readable policy for substantial new or resumed task packets. Validate a packet against a freshly obtained GitHub snapshot with:

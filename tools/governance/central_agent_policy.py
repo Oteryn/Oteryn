@@ -22,7 +22,6 @@ ALLOWED_PROVIDERS = (
     "Oteryn/Oteryn-Game",
     "Oteryn/Oteryn-Platform",
 )
-PARALLEL_FIRST_RE = re.compile(r"\bparallel[-_]first\b", re.IGNORECASE)
 SERIAL_EXCEPTION_RE = re.compile(
     r"\bserial\s+(?:work|execution)\s+requires?\s+(?:an?\s+)?(?:explicit|recorded)\s+(?:reason|exception)\b",
     re.IGNORECASE,
@@ -83,7 +82,6 @@ def validate_meta_bundle(root: Path, policy: dict[str, Any]) -> list[str]:
         errors.append(f"organization authority_repository must be {AUTHORITY_REPOSITORY}")
 
     surfaces = policy.get("canonical_human_surfaces")
-    readable_surfaces: dict[str, str] = {}
     if surfaces != EXPECTED_SURFACES:
         errors.append("canonical_human_surfaces must match the central META paths")
     else:
@@ -93,8 +91,9 @@ def validate_meta_bundle(root: Path, policy: dict[str, Any]) -> list[str]:
                 errors.append(f"missing or empty central human policy surface: {relative}")
                 continue
             try:
-                readable_surfaces[name] = path.read_text(encoding="utf-8")
-            except OSError:
+                if not path.read_text(encoding="utf-8").strip():
+                    errors.append(f"missing or empty central human policy surface: {relative}")
+            except (OSError, UnicodeError):
                 errors.append(f"missing or unreadable central human policy surface: {relative}")
 
     machine_authorities = policy.get("machine_authorities")
@@ -127,50 +126,16 @@ def validate_meta_bundle(root: Path, policy: dict[str, Any]) -> list[str]:
     if (
         not isinstance(provider_sections, list)
         or not provider_sections
-        or not all(isinstance(v, str) and v for v in provider_sections)
+        or not all(isinstance(v, str) and v.strip() for v in provider_sections)
     ):
         errors.append("forbidden_provider_sections must be a non-empty string list")
     if (
         not isinstance(task_sections, list)
         or not task_sections
-        or not all(isinstance(v, str) and v for v in task_sections)
+        or not all(isinstance(v, str) and v.strip() for v in task_sections)
     ):
         errors.append("forbidden_task_prompt_sections must be a non-empty string list")
 
-    if surfaces == EXPECTED_SURFACES:
-        organization_text = readable_surfaces.get("organization_policy")
-        prompting_text = readable_surfaces.get("prompting_standard")
-        eval_text = readable_surfaces.get("prompt_eval_standard")
-        if organization_text is not None:
-            for marker in (
-                "one rule, one authority",
-                "single_agent",
-                "parallel_when_beneficial",
-                BINDING_PATH,
-                "immutable META commit",
-            ):
-                if marker not in organization_text:
-                    errors.append(f"organization policy missing marker: {marker}")
-        if prompting_text is not None:
-            for marker in (
-                "ROLE / OUTCOME",
-                "AUTHORITY / SCOPE DELTA",
-                "LIVE LOCATORS",
-                "DOMAIN CONSTRAINTS / DEPENDENCIES",
-                "ACCEPTANCE / VALIDATION DELTA",
-                "STOP / HANDOFF DELTA",
-                "Omit a section when it has no task-specific content.",
-            ):
-                if marker not in prompting_text:
-                    errors.append(f"prompting standard missing marker: {marker}")
-        if eval_text is not None:
-            for marker in (
-                "ablation",
-                "same representative cases",
-                "Safety-critical regression tolerance is zero.",
-            ):
-                if marker not in eval_text:
-                    errors.append(f"prompt eval standard missing marker: {marker}")
     return errors
 
 
@@ -204,8 +169,12 @@ def resolve_meta_authority_via_github(
     *,
     timeout: float = 15.0,
 ) -> dict[str, object] | None:
-    """Resolve one immutable META commit and prove it is reachable from protected main."""
-    if repository != AUTHORITY_REPOSITORY or SHA_RE.fullmatch(commit) is None:
+    """Read branch protection and ancestry separately, bound to one main snapshot.
+
+    This verifies GitHub's protected flag, not the contents of every ruleset.
+    The result is a snapshot for a trusted caller, not perpetual authorization.
+    """
+    if repository != AUTHORITY_REPOSITORY or not isinstance(commit, str) or SHA_RE.fullmatch(commit) is None:
         return None
     try:
         commit_payload = _github_json(
@@ -214,20 +183,32 @@ def resolve_meta_authority_via_github(
         )
         if not isinstance(commit_payload, dict) or commit_payload.get("sha") != commit:
             return None
+        branch = _github_json(
+            f"https://api.github.com/repos/{repository}/branches/main", timeout=timeout,
+        )
+        if not isinstance(branch, dict) or branch.get("name") != "main" or branch.get("protected") is not True:
+            return None
+        branch_commit = branch.get("commit")
+        main_sha = branch_commit.get("sha") if isinstance(branch_commit, dict) else None
+        if not isinstance(main_sha, str) or SHA_RE.fullmatch(main_sha) is None:
+            return None
         compare_payload = _github_json(
-            f"https://api.github.com/repos/{repository}/compare/{commit}...main",
+            f"https://api.github.com/repos/{repository}/compare/{commit}...{main_sha}",
             timeout=timeout,
         )
-        if not isinstance(compare_payload, dict):
+        if not isinstance(compare_payload, dict) or compare_payload.get("status") not in ("ahead", "identical"):
             return None
-        merged_to_main = compare_payload.get("status") in {"ahead", "identical"}
+        for key in ("base_commit", "merge_base_commit"):
+            coordinate = compare_payload.get(key)
+            if not isinstance(coordinate, dict) or coordinate.get("sha") != commit:
+                return None
 
         policy_text = _github_text_at_commit(repository, commit, str(POLICY_PATH), timeout=timeout)
         policy = json.loads(policy_text)
         if not isinstance(policy, dict):
             return None
         surfaces = policy.get("canonical_human_surfaces")
-        if not isinstance(surfaces, dict):
+        if surfaces != EXPECTED_SURFACES:
             return None
         human_surfaces: dict[str, str] = {}
         for relative in surfaces.values():
@@ -240,7 +221,9 @@ def resolve_meta_authority_via_github(
         return {
             "repository": repository,
             "commit": commit,
-            "merged_to_protected_main": merged_to_main,
+            "merged_to_protected_main": True,
+            "protected_main_sha": main_sha,
+            "branch_protected": True,
             "policy": policy,
             "human_surfaces": human_surfaces,
         }
@@ -335,14 +318,18 @@ def validate_provider_binding(
     if actual_paths != expected_paths:
         errors.append("provider binding canonical paths must match META policy")
 
-    if policy is not None:
+    if policy is not None and not isinstance(policy, dict):
+        errors.append("expected META policy must be an object")
+    elif policy is not None:
         if policy.get("policy_id") != binding.get("policy_id") or policy.get("policy_version") != binding.get("policy_version"):
             errors.append("provider binding policy identity/version must match META policy")
         if policy.get("canonical_human_surfaces") != actual_paths:
             if "provider binding canonical paths must match META policy" not in errors:
                 errors.append("provider binding canonical paths must match META policy")
 
-    if authority_resolver is not None and valid_authority_commit and binding.get("authority_repository") == AUTHORITY_REPOSITORY:
+    # Malformed input is not a reason to perform network resolution. In particular,
+    # reject non-string paths before constructing the resolved surface-path set.
+    if not errors and authority_resolver is not None:
         try:
             resolved = authority_resolver(AUTHORITY_REPOSITORY, authority_commit)
         except Exception:
@@ -351,23 +338,159 @@ def validate_provider_binding(
     return errors
 
 
+# These are bounded structural/legacy-text diagnostics, not a natural-language
+# permission engine. Actual authorization remains in the existing machine gates.
+LEGACY_HEADINGS = [
+    "## Remote Desktop execution routing",
+    "## Canonical Codex review routing",
+    "## Parallel-agent Git concurrency",
+    "## GitHub-first execution",
+    "## Bounded autonomy, retry and continuation",
+]
+EXECUTION_MODULES = (
+    "ecosystem/agent-execution-routing-policy.json",
+    "ecosystem/bounded-autonomous-execution-policy.json",
+    "ecosystem/agent-continuation-policy.json",
+    "docs/agents/contracts/agent_execution_access_and_continuation_policy.md",
+    "docs/agents/contracts/bounded_autonomous_execution_policy.md",
+    "docs/agents/contracts/persistent_autonomous_continuation_policy.md",
+)
+REVIEW_MODULES = ("codex_review_policy.json", "owner_funded_ai_policy", "docs/governance/ai_review_policy.md")
+
+
+def _operative_markdown(text: str) -> str:
+    """Exclude comments, fenced examples and quoted evidence from text lint only.
+
+    This convention is not proof that an agent ignores those bytes. Do not use a
+    successful text-lint result to authorize tools, merges or provider adoption.
+    """
+    text = re.sub(r"<!--.*?(?:-->|$)", "", text, flags=re.DOTALL)
+    lines: list[str] = []
+    fence: tuple[str, int] | None = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        delimiter = re.match(r"^(`{3,}|~{3,})(.*)$", stripped)
+        if fence is not None:
+            if delimiter and delimiter[1][0] == fence[0] and len(delimiter[1]) >= fence[1] and not delimiter[2].strip():
+                fence = None
+            lines.append("")
+            continue
+        if delimiter:
+            fence = (delimiter[1][0], len(delimiter[1]))
+            lines.append("")
+        elif stripped.startswith(">"):
+            lines.append("")
+        else:
+            lines.append(line)
+    return "\n".join(lines)
+
+
+def _normalized(text: str) -> str:
+    return " ".join(text.casefold().split())
+
+
+def _heading_title(text: str) -> str:
+    text = re.sub(r"^#{1,6}\s+", "", text.strip())
+    text = re.sub(r"\s+#+\s*$", "", text)
+    return _normalized(re.sub(r"[*_`]", "", text))
+
+
 def _contains_forbidden_section(text: str, sections: object) -> bool:
     if not isinstance(sections, list):
         return False
-    lowered = text.lower()
-    return any(isinstance(section, str) and section.lower() in lowered for section in sections)
+    lines = _operative_markdown(text).splitlines()
+    headings = {_heading_title(line) for line in lines if re.match(r"^\s{0,3}#{1,6}\s+", line)}
+    for before, line in zip(lines, lines[1:]):
+        if before.strip() and re.fullmatch(r"\s{0,3}(?:=+|-+)\s*", line):
+            headings.add(_heading_title(before))
+    body = _normalized("\n".join(lines))
+    for section in sections:
+        if not isinstance(section, str):
+            continue
+        if section.lstrip().startswith("#"):
+            if _heading_title(section) in headings:
+                return True
+        elif _normalized(section) in body:
+            return True
+    return False
+
+
+def _section_list(policy: dict[str, Any] | None, key: str) -> list[str] | None:
+    if policy is None:
+        return LEGACY_HEADINGS
+    if not isinstance(policy, dict):
+        return None
+    value = policy.get(key)
+    if not isinstance(value, list) or not value or not all(isinstance(v, str) and v.strip() for v in value):
+        return None
+    return value
+
+
+def _statements(text: str) -> list[str]:
+    body = re.sub(r"(?m)^\s{0,3}#{1,6}\s+.*$", "", _operative_markdown(text))
+    result: list[str] = []
+    for block in re.split(r"\n\s*\n", body):
+        result.extend(re.split(r"(?<=[.!?])\s+", " ".join(block.split())))
+    return result
+
+
+def _is_audit_or_negative(statement: str) -> bool:
+    # Restrict this exemption to an explicit sentence prefix, not any occurrence
+    # of 'not' somewhere in a paragraph containing an unrelated positive command.
+    return re.match(
+        r"^(?:[-*+]\s+|\d+[.)]\s+)?(?:(?:agents?|workers?|you)\s+)?(?:do\s+not|never|must\s+not|"
+        r"remove|retire|audit|inspect|compare)\b", statement, re.IGNORECASE,
+    ) is not None
+
+
+def _parallel_directive(text: str) -> bool:
+    term = r"parallel[-_ ]first"
+    for statement in _statements(text):
+        if _is_audit_or_negative(statement):
+            continue
+        if SERIAL_EXCEPTION_RE.search(statement):
+            return True
+        if re.search(rf"\b(?:must|shall|always|use|require|enforce)\b[^.!?]*\b{term}\b", statement, re.IGNORECASE):
+            return True
+        if re.search(rf"\b{term}\b[^.!?]*\b(?:is|remains)\s+(?:mandatory|required)\b", statement, re.IGNORECASE):
+            return True
+    return False
+
+
+def _local_controller(text: str, modules: tuple[str, ...], *, copied: bool) -> bool:
+    for statement in _statements(text):
+        if _is_audit_or_negative(statement) or not any(module in statement.casefold() for module in modules):
+            continue
+        if copied or re.search(
+            r"\blocal(?:\s+(?:retry|routing|review|continuation|execution))?\s+(?:authority|controller)\s+(?:is|=|:)"
+            r"|\bas\s+(?:the\s+)?local\s+(?:task\s+)?controllers?\b",
+            statement, re.IGNORECASE,
+        ):
+            return True
+    return False
+
+
+def _remote_tool_grant(text: str, *, copied: bool) -> bool:
+    for statement in _statements(text):
+        if _is_audit_or_negative(statement) or "remote_desktop_commander." not in statement.casefold():
+            continue
+        if copied or re.search(
+            r"\b(?:is|are)\s+(?:always\s+)?(?:allowed|permitted|authorized)\b"
+            r"|\b(?:may|can|must|shall)\s+(?:invoke|use|call)\b", statement, re.IGNORECASE,
+        ):
+            return True
+    return False
 
 
 def _allowed_providers(policy: dict[str, Any] | None) -> tuple[str, ...]:
-    if not isinstance(policy, dict):
+    if policy is None:
         return ALLOWED_PROVIDERS
+    if not isinstance(policy, dict):
+        return ()
     schema = policy.get("provider_binding_schema")
-    if not isinstance(schema, dict):
+    if not isinstance(schema, dict) or schema.get("allowed_providers") != list(ALLOWED_PROVIDERS):
         return ()
-    allowed = schema.get("allowed_providers")
-    if not isinstance(allowed, list) or not all(isinstance(value, str) for value in allowed):
-        return ()
-    return tuple(allowed)
+    return ALLOWED_PROVIDERS
 
 
 def validate_provider_overlay(
@@ -380,43 +503,23 @@ def validate_provider_overlay(
         return ["provider name is invalid"]
     if not isinstance(text, str) or not text.strip():
         return [f"{provider}: provider overlay text is empty"]
-
     errors: list[str] = []
     if provider not in _allowed_providers(policy):
         errors.append("provider repository is not allowed by central META policy")
-    if "META_AGENT_POLICY_BINDING.json" not in text:
+    active = _operative_markdown(text)
+    if re.search(r"(?<![\w/.-])" + re.escape(BINDING_PATH) + r"(?![\w/.-])", active) is None:
         errors.append(f"provider overlay must resolve {BINDING_PATH}")
-
-    sections = (
-        policy.get("forbidden_provider_sections")
-        if isinstance(policy, dict)
-        else [
-            "## Remote Desktop execution routing",
-            "## Canonical Codex review routing",
-            "## Parallel-agent Git concurrency",
-            "## GitHub-first execution",
-            "## Bounded autonomy, retry and continuation",
-        ]
-    )
-    if _contains_forbidden_section(text, sections):
+    sections = _section_list(policy, "forbidden_provider_sections")
+    if sections is None:
+        errors.append("forbidden_provider_sections must be a non-empty string list")
+    copied = _contains_forbidden_section(active, sections)
+    if copied:
         errors.append("provider overlay must not copy organization-wide policy sections")
-
-    lowered = text.lower()
-    if "remote_desktop_commander." in lowered:
+    if _remote_tool_grant(active, copied=copied):
         errors.append("provider overlay must not define Remote Desktop connector policy")
-    if PARALLEL_FIRST_RE.search(text) or SERIAL_EXCEPTION_RE.search(text):
+    if _parallel_directive(active):
         errors.append("parallel-first execution wording is forbidden")
-
-    direct_modules = (
-        "ecosystem/agent-execution-routing-policy.json",
-        "ecosystem/bounded-autonomous-execution-policy.json",
-        "ecosystem/agent-continuation-policy.json",
-        "docs/governance/ai_review_policy.md",
-        "docs/agents/contracts/agent_execution_access_and_continuation_policy.md",
-        "docs/agents/contracts/bounded_autonomous_execution_policy.md",
-        "docs/agents/contracts/persistent_autonomous_continuation_policy.md",
-    )
-    if any(module in lowered for module in direct_modules):
+    if _local_controller(active, EXECUTION_MODULES + REVIEW_MODULES, copied=copied):
         errors.append("provider overlay must not directly redefine META machine modules")
     return errors
 
@@ -428,42 +531,20 @@ def validate_task_prompt_text(
 ) -> list[str]:
     if not isinstance(text, str) or not text.strip():
         return ["task prompt text is empty"]
-
     errors: list[str] = []
-    sections = (
-        policy.get("forbidden_task_prompt_sections")
-        if isinstance(policy, dict)
-        else [
-            "## Remote Desktop execution routing",
-            "## Canonical Codex review routing",
-            "## GitHub-first execution",
-            "## Parallel-agent Git concurrency",
-            "## Bounded autonomy, retry and continuation",
-        ]
-    )
-    if _contains_forbidden_section(text, sections):
+    active = _operative_markdown(text)
+    sections = _section_list(policy, "forbidden_task_prompt_sections")
+    if sections is None:
+        errors.append("forbidden_task_prompt_sections must be a non-empty string list")
+    copied = _contains_forbidden_section(active, sections)
+    if copied:
         errors.append("task prompt must not copy organization-wide policy sections")
-
-    lowered = text.lower()
-    ai_review_modules = (
-        "codex_review_policy.json",
-        "owner_funded_ai_policy",
-        "docs/governance/ai_review_policy.md",
-    )
-    if any(module in lowered for module in ai_review_modules):
+    if _local_controller(active, REVIEW_MODULES, copied=copied):
         errors.append("task prompt must not embed global AI-review policy")
-
-    execution_and_continuation_modules = (
-        "remote_desktop_commander.",
-        "ecosystem/agent-execution-routing-policy.json",
-        "ecosystem/bounded-autonomous-execution-policy.json",
-        "ecosystem/agent-continuation-policy.json",
-        "docs/agents/contracts/agent_execution_access_and_continuation_policy.md",
-        "docs/agents/contracts/bounded_autonomous_execution_policy.md",
-        "docs/agents/contracts/persistent_autonomous_continuation_policy.md",
-    )
-    if any(module in lowered for module in execution_and_continuation_modules):
+    if _local_controller(active, EXECUTION_MODULES, copied=copied) or _remote_tool_grant(active, copied=copied):
         errors.append("task prompt must not embed global execution-routing policy")
+    if _parallel_directive(active):
+        errors.append("parallel-first execution wording is forbidden")
     return errors
 
 

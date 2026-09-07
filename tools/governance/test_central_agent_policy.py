@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
+from unittest import mock
+import urllib.error
 
 MODULE_PATH = Path(__file__).with_name("central_agent_policy.py")
 SPEC = importlib.util.spec_from_file_location("central_agent_policy", MODULE_PATH)
@@ -357,6 +360,256 @@ def test_binding_paths_must_match_central_policy() -> None:
         authority_resolver=trusted_resolver,
     )
     assert "provider binding canonical paths must match META policy" in errors
+
+
+# Instruction-debt audit D15/D19/D20 and input-boundary regressions.
+# Markdown lint is deliberately not an authorization or model-behavior proof.
+LEAN_OVERLAY = "# Provider\nResolve `docs/agents/META_AGENT_POLICY_BINDING.json`.\n"
+MAIN_SHA = "abcdef01" * 5
+
+
+def test_optimization_detects_legacy_headings_without_a_fixed_heading_level() -> None:
+    for heading in (
+        "# Remote Desktop execution routing",
+        "### Remote Desktop execution routing",
+        "###### REMOTE DESKTOP EXECUTION ROUTING ######",
+        "## **Remote Desktop execution routing**",
+        "Remote Desktop execution routing\n--------------------------------",
+    ):
+        text = LEAN_OVERLAY + "\n" + heading + "\nLocal procedure.\n"
+        assert "provider overlay must not copy organization-wide policy sections" in central.validate_provider_overlay("Oteryn/Oteryn-Game", text), heading
+        assert "task prompt must not copy organization-wide policy sections" in central.validate_task_prompt_text(text), heading
+
+
+def test_optimization_accepts_inert_examples_and_audit_references() -> None:
+    examples = (
+        "Remove the historical heading `## Remote Desktop execution routing`.\n",
+        "```markdown\n## Remote Desktop execution routing\nRemote_Desktop_Commander.ping is allowed.\n```\n",
+        "~~~markdown\n## Canonical Codex review routing\nRead CODEX_REVIEW_POLICY.json.\n~~~\n",
+        "> ## Remote Desktop execution routing\n> Old example, not active instructions.\n",
+        "<!--\n## Parallel-agent Git concurrency\nA task must plan parallel-first.\n-->\n",
+        "Audit `docs/governance/AI_REVIEW_POLICY.md` and `ecosystem/agent-execution-routing-policy.json`.\n",
+        "When investigating continuation, consult `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md`.\n",
+        "Audit calls to `Remote_Desktop_Commander.ping`; do not invoke it.\n",
+    )
+    for example in examples:
+        assert central.validate_provider_overlay("Oteryn/Oteryn-Game", LEAN_OVERLAY + example) == [], example
+        assert central.validate_task_prompt_text("Audit instruction debt.\n" + example) == [], example
+
+
+def test_optimization_binding_reference_must_be_active_and_exact() -> None:
+    for text in (
+        "# Provider\n```\ndocs/agents/META_AGENT_POLICY_BINDING.json\n```\n",
+        "# Provider\n<!-- docs/agents/META_AGENT_POLICY_BINDING.json -->\n",
+        "# Provider\n> docs/agents/META_AGENT_POLICY_BINDING.json\n",
+        "# Provider\nUse `other/META_AGENT_POLICY_BINDING.json`.\n",
+    ):
+        assert central.validate_provider_overlay("Oteryn/Oteryn-Game", text), text
+
+
+def test_optimization_distinguishes_parallel_directives_from_removal_and_negation() -> None:
+    for text in (
+        "Do not use parallel-first execution.",
+        "Never require parallel-first execution.",
+        "Remove the historical parallel-first requirement.",
+        "Audit whether serial work requires an explicit reason in the old prompt.",
+    ):
+        assert central.validate_provider_overlay("Oteryn/Oteryn-Game", LEAN_OVERLAY + text) == [], text
+        assert central.validate_task_prompt_text(text) == [], text
+    for text in (
+        "A substantial task must plan parallel-first.",
+        "Always use parallel first execution.",
+        "Use parallel_first execution.",
+        "Parallel-first execution is mandatory.",
+        "Serial work requires an explicit reason.",
+    ):
+        assert "parallel-first execution wording is forbidden" in central.validate_provider_overlay("Oteryn/Oteryn-Game", LEAN_OVERLAY + text), text
+        assert "parallel-first execution wording is forbidden" in central.validate_task_prompt_text(text), text
+
+
+def test_optimization_retains_rejection_of_local_controllers_and_tool_grants() -> None:
+    for text in (
+        "The local authority is ecosystem/agent-execution-routing-policy.json.",
+        "Local retry authority is docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md.",
+        "Follow docs/governance/AI_REVIEW_POLICY.md as local task controllers.",
+        "Remote_Desktop_Commander.ping is allowed for routine inspection.",
+        "Agents may invoke Remote_Desktop_Commander.ping for routine inspection.",
+    ):
+        assert central.validate_provider_overlay("Oteryn/Oteryn-Game", LEAN_OVERLAY + text), text
+        assert central.validate_task_prompt_text(text), text
+
+
+def test_optimization_invalid_binding_fails_before_resolver_or_unhashable_path() -> None:
+    for field, value in (
+        ("organization_policy_path", []),
+        ("prompting_standard_path", {}),
+        ("prompt_eval_standard_path", ["bad"]),
+        ("schema_version", True),
+        ("extra_key", "unexpected"),
+    ):
+        binding = valid_binding()
+        binding[field] = value
+        resolver = mock.Mock(return_value=resolved_authority())
+        errors = central.validate_provider_binding(binding, authority_resolver=resolver)
+        assert errors, field
+        resolver.assert_not_called()
+
+
+def test_optimization_overlay_cannot_expand_the_canonical_provider_allowlist() -> None:
+    policy = copy.deepcopy(central.load_policy(REPO_ROOT))
+    policy["provider_binding_schema"]["allowed_providers"].append("Oteryn/Unallocated")
+    assert central.validate_provider_overlay("Oteryn/Unallocated", LEAN_OVERLAY, policy=policy)
+
+
+def test_optimization_invalid_policy_lists_fail_closed_in_standalone_checks() -> None:
+    for value in ([], None, [""], ["   "], "not-a-list"):
+        policy = copy.deepcopy(central.load_policy(REPO_ROOT))
+        policy["forbidden_provider_sections"] = value
+        policy["forbidden_task_prompt_sections"] = value
+        assert central.validate_provider_overlay("Oteryn/Oteryn-Game", LEAN_OVERLAY, policy=policy), value
+        assert central.validate_task_prompt_text("Repair a small bug.", policy=policy), value
+
+
+def _mock_github_resolution(*, protected: object = True, status: str = "ahead", malformed_surfaces: bool = False):
+    """Mock API protocol inputs only; this is not live GitHub adoption evidence."""
+    policy = copy.deepcopy(central.load_policy(REPO_ROOT))
+    if malformed_surfaces:
+        policy["canonical_human_surfaces"] = {"organization_policy": "../../unexpected"}
+    seen: list[str] = []
+
+    def read_json(url: str, *, timeout: float) -> object:
+        seen.append(url)
+        if url.endswith("/commits/" + FULL_SHA):
+            return {"sha": FULL_SHA}
+        if url.endswith("/branches/main"):
+            return {"name": "main", "protected": protected, "commit": {"sha": MAIN_SHA}}
+        if "/compare/" in url:
+            return {"status": status, "base_commit": {"sha": FULL_SHA}, "merge_base_commit": {"sha": FULL_SHA}}
+        raise AssertionError("unexpected API request: " + url)
+
+    def read_text(repository: str, commit: str, relative: str, *, timeout: float) -> str:
+        assert repository == "Oteryn/Oteryn" and commit == FULL_SHA
+        if relative == str(central.POLICY_PATH):
+            return json.dumps(policy)
+        return "Immutable policy fixture.\n"
+
+    return read_json, read_text, seen
+
+
+def test_optimization_resolver_checks_protection_and_pins_the_ancestry_read() -> None:
+    read_json, read_text, seen = _mock_github_resolution()
+    with mock.patch.object(central, "_github_json", side_effect=read_json), mock.patch.object(central, "_github_text_at_commit", side_effect=read_text):
+        resolved = central.resolve_meta_authority_via_github("Oteryn/Oteryn", FULL_SHA)
+    assert resolved is not None
+    assert resolved["merged_to_protected_main"] is True
+    assert resolved["protected_main_sha"] == MAIN_SHA
+    assert resolved["branch_protected"] is True
+    assert f"https://api.github.com/repos/Oteryn/Oteryn/compare/{FULL_SHA}...{MAIN_SHA}" in seen
+    assert not any(url.endswith("...main") for url in seen)
+
+
+def test_optimization_ancestry_alone_cannot_attest_branch_protection() -> None:
+    for protected in (False, None, 1, "true"):
+        read_json, read_text, _seen = _mock_github_resolution(protected=protected)
+        with mock.patch.object(central, "_github_json", side_effect=read_json), mock.patch.object(central, "_github_text_at_commit", side_effect=read_text) as text_reader:
+            assert central.resolve_meta_authority_via_github("Oteryn/Oteryn", FULL_SHA) is None, protected
+            text_reader.assert_not_called()
+
+
+def test_optimization_nonancestor_does_not_fetch_policy_bodies() -> None:
+    for status in ("behind", "diverged", "unknown"):
+        read_json, read_text, _seen = _mock_github_resolution(status=status)
+        with mock.patch.object(central, "_github_json", side_effect=read_json), mock.patch.object(central, "_github_text_at_commit", side_effect=read_text) as text_reader:
+            assert central.resolve_meta_authority_via_github("Oteryn/Oteryn", FULL_SHA) is None, status
+            text_reader.assert_not_called()
+
+
+def test_optimization_resolver_handles_bad_coordinates_and_network_failure() -> None:
+    for commit in (None, [], 1, "main", "g" * 40):
+        with mock.patch.object(central, "_github_json") as reader:
+            assert central.resolve_meta_authority_via_github("Oteryn/Oteryn", commit) is None
+            reader.assert_not_called()
+    with mock.patch.object(central, "_github_json", side_effect=urllib.error.URLError("unavailable")):
+        assert central.resolve_meta_authority_via_github("Oteryn/Oteryn", FULL_SHA) is None
+
+
+def test_optimization_resolver_rejects_noncanonical_policy_paths_before_reading_them() -> None:
+    read_json, read_text, _seen = _mock_github_resolution(malformed_surfaces=True)
+    with mock.patch.object(central, "_github_json", side_effect=read_json), mock.patch.object(central, "_github_text_at_commit", side_effect=read_text) as text_reader:
+        assert central.resolve_meta_authority_via_github("Oteryn/Oteryn", FULL_SHA) is None
+        assert text_reader.call_count == 1
+
+
+def test_optimization_invalid_utf8_policy_surface_is_a_validation_error() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        relative = policy["canonical_human_surfaces"]["organization_policy"]
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"\xff")
+        errors = central.validate_meta_bundle(root, policy)
+        assert any(relative in error for error in errors)
+
+
+def test_optimization_minimal_local_bootstrap_is_not_a_copied_controller() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    bootstrap = LEAN_OVERLAY + "Use `single_agent` when one capable worker is proportionate.\n"
+    assert central.validate_provider_overlay("Oteryn/Oteryn-Game", bootstrap, policy=policy) == []
+
+
+def test_optimization_document_wording_is_not_a_machine_schema() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        for relative in policy["machine_authorities"]:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("test fixture, not live policy\n", encoding="utf-8")
+        for relative in policy["canonical_human_surfaces"].values():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# Alternative human wording\n\nNon-empty documentation, no mandatory section template.\n", encoding="utf-8")
+        assert central.validate_meta_bundle(root, policy) == []
+        for relative in policy["canonical_human_surfaces"].values():
+            (root / relative).write_text(" \n\t\n", encoding="utf-8")
+        assert central.validate_meta_bundle(root, policy)
+
+
+def test_optimization_binding_rejects_nonobject_expected_policy() -> None:
+    for value in ([], "invalid", 1):
+        resolver = mock.Mock(return_value=resolved_authority())
+        assert central.validate_provider_binding(valid_binding(), policy=value, authority_resolver=resolver)
+        resolver.assert_not_called()
+
+
+def test_optimization_protection_snapshot_and_compare_identity_fail_closed() -> None:
+    read_json, read_text, _seen = _mock_github_resolution()
+    variants = (
+        ("compare", {"status": [], "base_commit": {"sha": FULL_SHA}, "merge_base_commit": {"sha": FULL_SHA}}),
+        ("branch", {"name": "other", "protected": True, "commit": {"sha": MAIN_SHA}}),
+        ("branch", {"name": "main", "protected": True, "commit": {"sha": "a" * 42}}),
+        ("branch", {"name": "main", "protected": True, "commit": []}),
+        ("compare", {"status": "ahead", "base_commit": {"sha": MAIN_SHA}, "merge_base_commit": {"sha": FULL_SHA}}),
+        ("compare", {"status": "ahead", "base_commit": {"sha": FULL_SHA}, "merge_base_commit": {"sha": MAIN_SHA}}),
+    )
+    for target, payload in variants:
+        def corrupt(url: str, *, timeout: float) -> object:
+            if target == "branch" and url.endswith("/branches/main"):
+                return payload
+            if target == "compare" and "/compare/" in url:
+                return payload
+            return read_json(url, timeout=timeout)
+        with mock.patch.object(central, "_github_json", side_effect=corrupt), mock.patch.object(central, "_github_text_at_commit", side_effect=read_text) as reader:
+            assert central.resolve_meta_authority_via_github("Oteryn/Oteryn", FULL_SHA) is None, payload
+            reader.assert_not_called()
+
+
+def test_optimization_negation_does_not_hide_a_following_positive_requirement() -> None:
+    for text in ("Agents must not use parallel-first.", "Parallel-first execution is not required."):
+        assert central.validate_task_prompt_text(text) == [], text
+    text = "Do not copy old policy. Always use parallel-first."
+    assert "parallel-first execution wording is forbidden" in central.validate_task_prompt_text(text)
 
 
 def main() -> int:
