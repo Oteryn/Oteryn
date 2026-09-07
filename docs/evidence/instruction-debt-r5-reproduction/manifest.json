@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "R5-C1 new reproduction replacement",
+  "executed_on": "2026-09-07",
+  "original_pack": "NOT_AUTHENTICATED",
+  "sources": {
+    "platform": {
+      "repository": "Oteryn/Oteryn-Platform",
+      "commit": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+      "path": "tools/agents/task_issue_liveness.py",
+      "blob": "1634a776976d231b10e8d322c49a2a1ed087eb6b"
+    },
+    "atlas": {
+      "repository": "Oteryn/Oteryn-Atlas",
+      "commit": "51623c7dab2346cee39cd51e3caa845bf4b65426",
+      "path": "tools/maintenance/verify-maintenance-diff.mjs",
+      "blob": "714fb73fe08b7c741d606c6e5a8ecdf33a3adf10"
+    }
+  },
+  "files": {
+    "README.md": "8018e5e523199a1fa9aac74d89165cb07461558dd9ec0bd16fe6d3a3fa916743",
+    "reproduce.py": "8cf88f7591f30b64f23309debf9b9a0a6b17c64d180ad4f82ac4dee669bf73a4",
+    "results.json": "05a1851e516217041d973a91b4b8f414ab2825ebfe3e7eede017784e5fd2ba69"
+  }
+}
