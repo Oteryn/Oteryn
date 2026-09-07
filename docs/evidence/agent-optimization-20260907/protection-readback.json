@@ -1,0 +1,297 @@
+{
+  "observed_at": "2026-09-07T10:04:09.458Z",
+  "note": "Read-only snapshot. Branch summary protection.enabled=false does not mean unprotected when active rulesets protect main. No bypass used; normal queue timelines and runs are separate proof.",
+  "branches": [
+    {
+      "protected": true,
+      "raw_protection_summary": {
+        "enabled": true,
+        "required_status_checks": {
+          "checks": [
+            {
+              "app_id": 15368,
+              "context": "meta-gate"
+            }
+          ],
+          "contexts": [
+            "meta-gate"
+          ],
+          "enforcement_level": "everyone"
+        }
+      },
+      "repo": "Oteryn",
+      "sha": "da4cbbceab286ac9ea350a9748eb7e570870851e"
+    },
+    {
+      "protected": true,
+      "raw_protection_summary": {
+        "enabled": false,
+        "required_status_checks": {
+          "checks": [],
+          "contexts": [],
+          "enforcement_level": "off"
+        }
+      },
+      "repo": "Oteryn-Game",
+      "sha": "10446c31b2508ccf6b65cc609a35246bf2666567"
+    },
+    {
+      "protected": true,
+      "raw_protection_summary": {
+        "enabled": true,
+        "required_status_checks": {
+          "checks": [
+            {
+              "app_id": 15368,
+              "context": "platform-gate"
+            }
+          ],
+          "contexts": [
+            "platform-gate"
+          ],
+          "enforcement_level": "everyone"
+        }
+      },
+      "repo": "Oteryn-Platform",
+      "sha": "907546f193e91b0bed2f5f077ab5b874771929ef"
+    },
+    {
+      "protected": true,
+      "raw_protection_summary": {
+        "enabled": false,
+        "required_status_checks": {
+          "checks": [],
+          "contexts": [],
+          "enforcement_level": "off"
+        }
+      },
+      "repo": "Oteryn-Atlas",
+      "sha": "53527271db3c49fc44bf548f8934addf7dd695b4"
+    }
+  ],
+  "rulesets": [
+    {
+      "_links": {
+        "html": {
+          "href": "https://github.com/Oteryn/Oteryn-Game/rules/20991995"
+        },
+        "self": {
+          "href": "https://api.github.com/repos/Oteryn/Oteryn-Game/rulesets/20991995"
+        }
+      },
+      "bypass_actors": [],
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ]
+        }
+      },
+      "created_at": "2026-08-18T15:40:49.741+02:00",
+      "current_user_can_bypass": "never",
+      "enforcement": "active",
+      "id": 20991995,
+      "name": "Protect main",
+      "node_id": "RRS_lACqUmVwb3NpdG9yec5PxLPEzgFAT_s",
+      "rules": [
+        {
+          "type": "deletion"
+        },
+        {
+          "type": "required_linear_history"
+        },
+        {
+          "parameters": {
+            "allowed_merge_methods": [
+              "squash"
+            ],
+            "dismiss_stale_reviews_on_push": true,
+            "dismissal_restriction": {
+              "allowed_actors": [],
+              "enabled": false
+            },
+            "require_code_owner_review": false,
+            "require_extra_approval_for_unattributed_changes": true,
+            "require_last_push_approval": false,
+            "required_approving_review_count": 0,
+            "required_review_thread_resolution": true,
+            "required_reviewers": []
+          },
+          "type": "pull_request"
+        },
+        {
+          "parameters": {
+            "do_not_enforce_on_create": false,
+            "required_status_checks": [
+              {
+                "context": "game-gate"
+              }
+            ],
+            "strict_required_status_checks_policy": false
+          },
+          "type": "required_status_checks"
+        },
+        {
+          "type": "non_fast_forward"
+        },
+        {
+          "parameters": {
+            "check_response_timeout_minutes": 60,
+            "grouping_strategy": "ALLGREEN",
+            "max_entries_to_build": 5,
+            "max_entries_to_merge": 5,
+            "merge_method": "SQUASH",
+            "min_entries_to_merge": 1,
+            "min_entries_to_merge_wait_minutes": 0
+          },
+          "type": "merge_queue"
+        }
+      ],
+      "source": "Oteryn/Oteryn-Game",
+      "source_type": "Repository",
+      "target": "branch",
+      "updated_at": "2026-09-01T17:52:38.095+02:00"
+    },
+    {
+      "_links": {
+        "html": {
+          "href": "https://github.com/Oteryn/Oteryn-Atlas/rules/22352928"
+        },
+        "self": {
+          "href": "https://api.github.com/repos/Oteryn/Oteryn-Atlas/rulesets/22352928"
+        }
+      },
+      "bypass_actors": [
+        {
+          "actor_id": null,
+          "actor_type": "OrganizationAdmin",
+          "bypass_mode": "pull_request"
+        }
+      ],
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ]
+        }
+      },
+      "created_at": "2026-09-05T22:29:59.162+02:00",
+      "current_user_can_bypass": "pull_requests_only",
+      "enforcement": "active",
+      "id": 22352928,
+      "name": "Protected Atlas authority",
+      "node_id": "RRS_lACkVXNlcs4S9hJhzgFVFCA",
+      "rules": [
+        {
+          "parameters": {
+            "do_not_enforce_on_create": false,
+            "workflows": [
+              {
+                "path": ".github/workflows/merge-authority-audit.yml",
+                "ref": "refs/heads/main",
+                "repository_id": 1337995824
+              }
+            ]
+          },
+          "type": "workflows"
+        }
+      ],
+      "source": "Oteryn",
+      "source_type": "Organization",
+      "target": "branch",
+      "updated_at": "2026-09-06T10:33:27.334+02:00"
+    },
+    {
+      "_links": {
+        "html": {
+          "href": "https://github.com/Oteryn/Oteryn-Atlas/rules/22103758"
+        },
+        "self": {
+          "href": "https://api.github.com/repos/Oteryn/Oteryn-Atlas/rulesets/22103758"
+        }
+      },
+      "bypass_actors": [
+        {
+          "actor_id": 75369544,
+          "actor_type": "User",
+          "bypass_mode": "pull_request"
+        }
+      ],
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "~DEFAULT_BRANCH"
+          ]
+        }
+      },
+      "created_at": "2026-09-02T13:52:29.697+02:00",
+      "current_user_can_bypass": "pull_requests_only",
+      "enforcement": "active",
+      "id": 22103758,
+      "name": "Protect main",
+      "node_id": "RRS_lACqUmVwb3NpdG9yec5PwDIwzgFRRs4",
+      "rules": [
+        {
+          "type": "deletion"
+        },
+        {
+          "type": "required_linear_history"
+        },
+        {
+          "parameters": {
+            "allowed_merge_methods": [
+              "squash"
+            ],
+            "dismiss_stale_reviews_on_push": true,
+            "dismissal_restriction": {
+              "allowed_actors": [],
+              "enabled": false
+            },
+            "require_code_owner_review": false,
+            "require_extra_approval_for_unattributed_changes": true,
+            "require_last_push_approval": false,
+            "required_approving_review_count": 0,
+            "required_review_thread_resolution": true,
+            "required_reviewers": []
+          },
+          "type": "pull_request"
+        },
+        {
+          "type": "non_fast_forward"
+        },
+        {
+          "parameters": {
+            "do_not_enforce_on_create": false,
+            "required_status_checks": [
+              {
+                "context": "Merge authority audit / protected-base validate",
+                "integration_id": 15368
+              }
+            ],
+            "strict_required_status_checks_policy": true
+          },
+          "type": "required_status_checks"
+        },
+        {
+          "parameters": {
+            "check_response_timeout_minutes": 60,
+            "grouping_strategy": "ALLGREEN",
+            "max_entries_to_build": 5,
+            "max_entries_to_merge": 5,
+            "merge_method": "SQUASH",
+            "min_entries_to_merge": 1,
+            "min_entries_to_merge_wait_minutes": 0
+          },
+          "type": "merge_queue"
+        }
+      ],
+      "source": "Oteryn/Oteryn-Atlas",
+      "source_type": "Repository",
+      "target": "branch",
+      "updated_at": "2026-09-06T16:25:27.864+02:00"
+    }
+  ]
+}

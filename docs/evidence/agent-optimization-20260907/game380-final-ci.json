@@ -1,0 +1,785 @@
+{
+  "schema_version": 1,
+  "repository": "Oteryn/Oteryn-Game",
+  "issue": 375,
+  "delivery_pr": 378,
+  "closeout_pr": 380,
+  "measurement_kind": "single matched natural docs-only observation",
+  "metric": "sum of GitHub job API completed_at minus started_at for executed jobs; skipped jobs contribute zero; concurrent jobs are summed",
+  "baseline": {
+    "pr": 365,
+    "pr_seconds": 972,
+    "merge_queue_seconds": 895,
+    "main_seconds": 966,
+    "terminal_seconds": 2,
+    "aggregate_seconds": 2835
+  },
+  "candidate": {
+    "base_sha": "65a204ea284c54188b13c4c41cf7411b1a003c61",
+    "pr_head_sha": "1c3481693961618ef02c985b69a487d55fca7236",
+    "pr_tree_sha": "b59af37e02f565cf82c181899e589dfd83719d82",
+    "merge_sha": "10b6be51551af5d70d45b4f56c2f6d3e8f6dc528",
+    "merge_tree_sha": "b59af37e02f565cf82c181899e589dfd83719d82",
+    "classifier_jobs": [
+      101705133508,
+      101705474869
+    ],
+    "classifier_result": {
+      "reason": "neutral-documentation",
+      "rust": false,
+      "windows": false
+    },
+    "stages": {
+      "pr": {
+        "run_ids": [
+          34110420075,
+          34110420051,
+          34110421080,
+          34110420261,
+          34110519942,
+          34110519876,
+          34110520334,
+          34110701525
+        ],
+        "executed_job_seconds": 291,
+        "skipped_jobs": 8,
+        "runs": [
+          {
+            "run": {
+              "id": 34110420075,
+              "name": "Agent governance • pull_request • 380",
+              "event": "pull_request",
+              "status": "completed",
+              "conclusion": "failure",
+              "head_sha": "1c3481693961618ef02c985b69a487d55fca7236",
+              "created_at": "2026-09-07T10:14:36Z",
+              "run_started_at": "2026-09-07T10:14:36Z",
+              "updated_at": "2026-09-07T10:14:44Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101705103267,
+                "name": "Agent governance / validate",
+                "status": "completed",
+                "conclusion": "failure",
+                "started_at": "2026-09-07T10:14:39Z",
+                "completed_at": "2026-09-07T10:14:43Z",
+                "executed_seconds": 4
+              }
+            ]
+          },
+          {
+            "run": {
+              "id": 34110420051,
+              "name": "Architecture semantic audit • pull_request • 380",
+              "event": "pull_request",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "1c3481693961618ef02c985b69a487d55fca7236",
+              "created_at": "2026-09-07T10:14:36Z",
+              "run_started_at": "2026-09-07T10:14:36Z",
+              "updated_at": "2026-09-07T10:14:47Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101705102989,
+                "name": "Architecture semantic audit / validate",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:14:39Z",
+                "completed_at": "2026-09-07T10:14:47Z",
+                "executed_seconds": 8
+              }
+            ]
+          },
+          {
+            "run": {
+              "id": 34110421080,
+              "name": "Merge authority audit",
+              "event": "pull_request_target",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "1c3481693961618ef02c985b69a487d55fca7236",
+              "created_at": "2026-09-07T10:14:37Z",
+              "run_started_at": "2026-09-07T10:14:37Z",
+              "updated_at": "2026-09-07T10:14:45Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101705106308,
+                "name": "Merge authority audit / protected-base validate",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:14:40Z",
+                "completed_at": "2026-09-07T10:14:44Z",
+                "executed_seconds": 4
+              }
+            ]
+          },
+          {
+            "run": {
+              "id": 34110420261,
+              "name": "Merge gate • pull_request • 380",
+              "event": "pull_request",
+              "status": "completed",
+              "conclusion": "cancelled",
+              "head_sha": "1c3481693961618ef02c985b69a487d55fca7236",
+              "created_at": "2026-09-07T10:14:36Z",
+              "run_started_at": "2026-09-07T10:14:36Z",
+              "updated_at": "2026-09-07T10:15:47Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101705104267,
+                "name": "Merge gate / scope",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:14:39Z",
+                "completed_at": "2026-09-07T10:14:43Z",
+                "executed_seconds": 4
+              },
+              {
+                "id": 101705133225,
+                "name": "Merge gate / CodeQL (actions)",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:14:46Z",
+                "completed_at": "2026-09-07T10:15:27Z",
+                "executed_seconds": 41
+              },
+              {
+                "id": 101705133253,
+                "name": "Merge gate / CodeQL (python)",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:14:45Z",
+                "completed_at": "2026-09-07T10:15:36Z",
+                "executed_seconds": 51
+              },
+              {
+                "id": 101705133278,
+                "name": "Merge gate / dependency review",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:14:45Z",
+                "completed_at": "2026-09-07T10:14:49Z",
+                "executed_seconds": 4
+              },
+              {
+                "id": 101705133464,
+                "name": "Merge gate / governance",
+                "status": "completed",
+                "conclusion": "failure",
+                "started_at": "2026-09-07T10:14:46Z",
+                "completed_at": "2026-09-07T10:14:49Z",
+                "executed_seconds": 3
+              },
+              {
+                "id": 101705133508,
+                "name": "Merge gate / trusted-base risk lanes",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:14:45Z",
+                "completed_at": "2026-09-07T10:14:59Z",
+                "executed_seconds": 14
+              },
+              {
+                "id": 101705209357,
+                "name": "Merge gate / Rust Windows client",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:14:59Z",
+                "completed_at": "2026-09-07T10:14:59Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101705209413,
+                "name": "Merge gate / Rust policy and metadata",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:14:59Z",
+                "completed_at": "2026-09-07T10:14:59Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101705209568,
+                "name": "Merge gate / Rust supply chain",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:14:59Z",
+                "completed_at": "2026-09-07T10:14:59Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101705209981,
+                "name": "Merge gate / Rust Linux workspace",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:14:59Z",
+                "completed_at": "2026-09-07T10:14:59Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101705392295,
+                "name": "Merge gate / validate",
+                "status": "completed",
+                "conclusion": "failure",
+                "started_at": "2026-09-07T10:15:38Z",
+                "completed_at": "2026-09-07T10:15:41Z",
+                "executed_seconds": 3
+              },
+              {
+                "id": 101705417813,
+                "name": "game-gate",
+                "status": "completed",
+                "conclusion": "failure",
+                "started_at": "2026-09-07T10:15:43Z",
+                "completed_at": "2026-09-07T10:15:46Z",
+                "executed_seconds": 3
+              }
+            ]
+          },
+          {
+            "run": {
+              "id": 34110519942,
+              "name": "Agent governance • pull_request • 380",
+              "event": "pull_request",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "1c3481693961618ef02c985b69a487d55fca7236",
+              "created_at": "2026-09-07T10:15:41Z",
+              "run_started_at": "2026-09-07T10:15:41Z",
+              "updated_at": "2026-09-07T10:15:56Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101705417582,
+                "name": "Agent governance / validate",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:15:44Z",
+                "completed_at": "2026-09-07T10:15:55Z",
+                "executed_seconds": 11
+              }
+            ]
+          },
+          {
+            "run": {
+              "id": 34110519876,
+              "name": "Merge gate • pull_request • 380",
+              "event": "pull_request",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "1c3481693961618ef02c985b69a487d55fca7236",
+              "created_at": "2026-09-07T10:15:41Z",
+              "run_started_at": "2026-09-07T10:15:41Z",
+              "updated_at": "2026-09-07T10:16:58Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101705441717,
+                "name": "Merge gate / scope",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:15:49Z",
+                "completed_at": "2026-09-07T10:15:53Z",
+                "executed_seconds": 4
+              },
+              {
+                "id": 101705474621,
+                "name": "Merge gate / governance",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:15:56Z",
+                "completed_at": "2026-09-07T10:16:05Z",
+                "executed_seconds": 9
+              },
+              {
+                "id": 101705474719,
+                "name": "Merge gate / CodeQL (actions)",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:15:56Z",
+                "completed_at": "2026-09-07T10:16:41Z",
+                "executed_seconds": 45
+              },
+              {
+                "id": 101705474753,
+                "name": "Merge gate / dependency review",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:15:56Z",
+                "completed_at": "2026-09-07T10:16:01Z",
+                "executed_seconds": 5
+              },
+              {
+                "id": 101705474862,
+                "name": "Merge gate / CodeQL (python)",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:15:56Z",
+                "completed_at": "2026-09-07T10:16:47Z",
+                "executed_seconds": 51
+              },
+              {
+                "id": 101705474869,
+                "name": "Merge gate / trusted-base risk lanes",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:15:56Z",
+                "completed_at": "2026-09-07T10:16:08Z",
+                "executed_seconds": 12
+              },
+              {
+                "id": 101705542501,
+                "name": "Merge gate / Rust policy and metadata",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:16:08Z",
+                "completed_at": "2026-09-07T10:16:08Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101705542708,
+                "name": "Merge gate / Rust supply chain",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:16:08Z",
+                "completed_at": "2026-09-07T10:16:08Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101705543073,
+                "name": "Merge gate / Rust Linux workspace",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:16:08Z",
+                "completed_at": "2026-09-07T10:16:08Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101705543535,
+                "name": "Merge gate / Rust Windows client",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:16:08Z",
+                "completed_at": "2026-09-07T10:16:08Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101705732752,
+                "name": "Merge gate / validate",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:16:50Z",
+                "completed_at": "2026-09-07T10:16:53Z",
+                "executed_seconds": 3
+              },
+              {
+                "id": 101705755799,
+                "name": "game-gate",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:16:55Z",
+                "completed_at": "2026-09-07T10:16:58Z",
+                "executed_seconds": 3
+              }
+            ]
+          },
+          {
+            "run": {
+              "id": 34110520334,
+              "name": "Merge authority audit",
+              "event": "pull_request_target",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "1c3481693961618ef02c985b69a487d55fca7236",
+              "created_at": "2026-09-07T10:15:41Z",
+              "run_started_at": "2026-09-07T10:15:41Z",
+              "updated_at": "2026-09-07T10:15:49Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101705418090,
+                "name": "Merge authority audit / protected-base validate",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:15:44Z",
+                "completed_at": "2026-09-07T10:15:48Z",
+                "executed_seconds": 4
+              }
+            ]
+          },
+          {
+            "run": {
+              "id": 34110701525,
+              "name": "Architecture semantic audit • pull_request • 380",
+              "event": "pull_request",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "1c3481693961618ef02c985b69a487d55fca7236",
+              "created_at": "2026-09-07T10:17:46Z",
+              "run_started_at": "2026-09-07T10:17:46Z",
+              "updated_at": "2026-09-07T10:17:54Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101706005938,
+                "name": "Architecture semantic audit / validate",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:17:48Z",
+                "completed_at": "2026-09-07T10:17:53Z",
+                "executed_seconds": 5
+              }
+            ]
+          }
+        ]
+      },
+      "merge_queue": {
+        "run_ids": [
+          34110731737
+        ],
+        "executed_job_seconds": 915,
+        "skipped_jobs": 0,
+        "runs": [
+          {
+            "run": {
+              "id": 34110731737,
+              "name": "Game Merge Queue gate",
+              "event": "merge_group",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "10b6be51551af5d70d45b4f56c2f6d3e8f6dc528",
+              "created_at": "2026-09-07T10:18:08Z",
+              "run_started_at": "2026-09-07T10:18:08Z",
+              "updated_at": "2026-09-07T10:27:08Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101706108957,
+                "name": "Merge Queue / Rust supply chain",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:18:11Z",
+                "completed_at": "2026-09-07T10:18:58Z",
+                "executed_seconds": 47
+              },
+              {
+                "id": 101706109207,
+                "name": "Merge Queue / Rust Windows client",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:18:11Z",
+                "completed_at": "2026-09-07T10:26:27Z",
+                "executed_seconds": 496
+              },
+              {
+                "id": 101706109213,
+                "name": "Merge Queue / CodeQL (actions)",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:18:11Z",
+                "completed_at": "2026-09-07T10:18:50Z",
+                "executed_seconds": 39
+              },
+              {
+                "id": 101706109232,
+                "name": "Merge Queue / Rust Linux workspace",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:18:11Z",
+                "completed_at": "2026-09-07T10:20:43Z",
+                "executed_seconds": 152
+              },
+              {
+                "id": 101706109269,
+                "name": "Merge Queue / dependency review",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:18:11Z",
+                "completed_at": "2026-09-07T10:18:16Z",
+                "executed_seconds": 5
+              },
+              {
+                "id": 101706109300,
+                "name": "Merge Queue / candidate and governance",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:18:11Z",
+                "completed_at": "2026-09-07T10:18:19Z",
+                "executed_seconds": 8
+              },
+              {
+                "id": 101706109338,
+                "name": "Merge Queue / CodeQL (python)",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:18:12Z",
+                "completed_at": "2026-09-07T10:19:13Z",
+                "executed_seconds": 61
+              },
+              {
+                "id": 101706109375,
+                "name": "Merge Queue / Durability PostgreSQL harness",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:19:20Z",
+                "completed_at": "2026-09-07T10:21:05Z",
+                "executed_seconds": 105
+              },
+              {
+                "id": 101708408245,
+                "name": "game-gate",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:27:05Z",
+                "completed_at": "2026-09-07T10:27:07Z",
+                "executed_seconds": 2
+              }
+            ]
+          }
+        ]
+      },
+      "main": {
+        "run_ids": [
+          34111555582,
+          34111555586,
+          34111555608
+        ],
+        "executed_job_seconds": 208,
+        "skipped_jobs": 3,
+        "runs": [
+          {
+            "run": {
+              "id": 34111555582,
+              "name": "Agent governance • push • main",
+              "event": "push",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "10b6be51551af5d70d45b4f56c2f6d3e8f6dc528",
+              "created_at": "2026-09-07T10:27:39Z",
+              "run_started_at": "2026-09-07T10:27:39Z",
+              "updated_at": "2026-09-07T10:27:52Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101708737877,
+                "name": "Agent governance / validate",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:27:43Z",
+                "completed_at": "2026-09-07T10:27:52Z",
+                "executed_seconds": 9
+              }
+            ]
+          },
+          {
+            "run": {
+              "id": 34111555586,
+              "name": "CodeQL",
+              "event": "push",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "10b6be51551af5d70d45b4f56c2f6d3e8f6dc528",
+              "created_at": "2026-09-07T10:27:39Z",
+              "run_started_at": "2026-09-07T10:27:39Z",
+              "updated_at": "2026-09-07T10:28:49Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101708737873,
+                "name": "analyze (actions)",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:27:42Z",
+                "completed_at": "2026-09-07T10:28:30Z",
+                "executed_seconds": 48
+              },
+              {
+                "id": 101708738198,
+                "name": "analyze (python)",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:27:42Z",
+                "completed_at": "2026-09-07T10:28:48Z",
+                "executed_seconds": 66
+              }
+            ]
+          },
+          {
+            "run": {
+              "id": 34111555608,
+              "name": "Rust workspace",
+              "event": "push",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "10b6be51551af5d70d45b4f56c2f6d3e8f6dc528",
+              "created_at": "2026-09-07T10:27:39Z",
+              "run_started_at": "2026-09-07T10:27:39Z",
+              "updated_at": "2026-09-07T10:28:28Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101708737552,
+                "name": "Rust / policy and metadata",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:27:43Z",
+                "completed_at": "2026-09-07T10:28:09Z",
+                "executed_seconds": 26
+              },
+              {
+                "id": 101708737653,
+                "name": "Rust / supply chain",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:27:42Z",
+                "completed_at": "2026-09-07T10:28:28Z",
+                "executed_seconds": 46
+              },
+              {
+                "id": 101708738109,
+                "name": "Rust / protected-main risk lanes",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:27:42Z",
+                "completed_at": "2026-09-07T10:27:55Z",
+                "executed_seconds": 13
+              },
+              {
+                "id": 101708807209,
+                "name": "Rust / Linux shared workspace",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:27:55Z",
+                "completed_at": "2026-09-07T10:27:55Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101708807526,
+                "name": "Rust / Windows pre-native client",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:27:55Z",
+                "completed_at": "2026-09-07T10:27:55Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101708807839,
+                "name": "Rust / Durability PostgreSQL harness",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:27:55Z",
+                "completed_at": "2026-09-07T10:27:55Z",
+                "executed_seconds": 0
+              }
+            ]
+          }
+        ]
+      },
+      "terminal": {
+        "run_ids": [
+          34111557570
+        ],
+        "executed_job_seconds": 3,
+        "skipped_jobs": 4,
+        "runs": [
+          {
+            "run": {
+              "id": 34111557570,
+              "name": "Terminal Branch Lifecycle",
+              "event": "pull_request_target",
+              "status": "completed",
+              "conclusion": "success",
+              "head_sha": "1c3481693961618ef02c985b69a487d55fca7236",
+              "created_at": "2026-09-07T10:27:41Z",
+              "run_started_at": "2026-09-07T10:27:41Z",
+              "updated_at": "2026-09-07T10:27:47Z",
+              "run_attempt": 1
+            },
+            "jobs": [
+              {
+                "id": 101708744617,
+                "name": "close / validate-operation",
+                "status": "completed",
+                "conclusion": "success",
+                "started_at": "2026-09-07T10:27:43Z",
+                "completed_at": "2026-09-07T10:27:46Z",
+                "executed_seconds": 3
+              },
+              {
+                "id": 101708745810,
+                "name": "read",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:27:42Z",
+                "completed_at": "2026-09-07T10:27:41Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101708745991,
+                "name": "apply",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:27:42Z",
+                "completed_at": "2026-09-07T10:27:41Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101708767977,
+                "name": "close / close-event-cleanup",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:27:47Z",
+                "completed_at": "2026-09-07T10:27:46Z",
+                "executed_seconds": 0
+              },
+              {
+                "id": 101708768715,
+                "name": "close / apply-reviewed-manifest",
+                "status": "completed",
+                "conclusion": "skipped",
+                "started_at": "2026-09-07T10:27:47Z",
+                "completed_at": "2026-09-07T10:27:46Z",
+                "executed_seconds": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "aggregate_executed_job_seconds": 1417
+  },
+  "observed_difference": {
+    "pr_seconds": -681,
+    "merge_queue_seconds": 20,
+    "main_seconds": -758,
+    "terminal_seconds": 1,
+    "aggregate_seconds": -1418,
+    "aggregate_percent": -50.01763668430335
+  },
+  "limitations": [
+    "single non-randomized observation",
+    "job seconds sum concurrent executions and are not elapsed wall time",
+    "runner, cache, repository state, and document content differ",
+    "no causal time, token, API-cost, runner-cost, or billing claim"
+  ],
+  "first_generation": {
+    "failure": "PR body omitted required Scope and Validation headings",
+    "exact_head_unchanged": true,
+    "included_in_totals": true
+  }
+}

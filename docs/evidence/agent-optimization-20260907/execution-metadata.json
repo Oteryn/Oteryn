@@ -1,0 +1,95 @@
+{
+  "configuration_source": "Explicit child model/effort parameters on the execution surface; not model billing telemetry",
+  "unique_child_agent_identities": 14,
+  "fresh_w5_threads": 8,
+  "agents": [
+    {
+      "agent": "game",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "W1Gameadoption;W4cleanup;W6GameCI"
+    },
+    {
+      "agent": "platform",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "W2Platformadoption;W4cleanup;W6Platformqualification"
+    },
+    {
+      "agent": "atlas",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "W3Atlasmaintenanceadoption;W4cleanup;W3Bdisposition"
+    },
+    {
+      "agent": "review",
+      "model": "gpt-5.6-sol",
+      "effort": "high",
+      "scope": "Independentauthorization/domainreviewsMETAPlatformAtlas;finalevidence"
+    },
+    {
+      "agent": "game_review",
+      "model": "gpt-5.6-sol",
+      "effort": "high",
+      "scope": "IndependentGameinstructionandCIsafetyreview"
+    },
+    {
+      "agent": "ci_evidence",
+      "model": "gpt-5.6-sol",
+      "effort": "low",
+      "scope": "Read-onlyCIevidenceandfinalsourceinventory"
+    },
+    {
+      "agent": "game_baseline_trial",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "IndependentfreshW5screeningarm"
+    },
+    {
+      "agent": "game_candidate_trial",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "IndependentfreshW5screeningarm"
+    },
+    {
+      "agent": "game_safety_repeat",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "IndependentfreshW5screeningarm"
+    },
+    {
+      "agent": "game_baseline_safety_repeat",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "IndependentfreshW5screeningarm"
+    },
+    {
+      "agent": "platform_baseline_trial",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "IndependentfreshW5screeningarm"
+    },
+    {
+      "agent": "platform_candidate_trial",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "IndependentfreshW5screeningarm"
+    },
+    {
+      "agent": "platform_baseline_safety_repeat",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "IndependentfreshW5screeningarm"
+    },
+    {
+      "agent": "platform_candidate_safety_repeat",
+      "model": "gpt-5.6-sol",
+      "effort": "medium",
+      "scope": "IndependentfreshW5screeningarm"
+    }
+  ],
+  "parent": "Programmelead;parentmodelbilling/usageidentitynotexposedbytools",
+  "usage_cost": "UNAVAILABLE for parent and ALL children; no childworkexcludedfromqualitativeresourceaccounting",
+  "owner_confirmations_requested_after_initial_authorization": 0,
+  "total_agent_turns_and_tool_call_count": "NOT_INSTRUMENTED globally; individual rawtrialreportspreserveobservedcalls/failedattempts"
+}

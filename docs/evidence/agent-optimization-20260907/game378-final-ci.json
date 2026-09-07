@@ -1,0 +1,238 @@
+{
+  "metric": "Sum executed job API completed_at-started_at seconds; skipped=0; not billing",
+  "observed_at": "2026-09-07T10:13:48.082Z",
+  "supplements": "programme-ci-overhead.json omitted pending #378 MQ by known-SHA-only discovery; this file covers its completed MQ and main, without double counting earlier PR runs",
+  "pr": 378,
+  "merged_at": "2026-09-07T10:03:16Z",
+  "merge_sha": "65a204ea284c54188b13c4c41cf7411b1a003c61",
+  "runs": [
+    {
+      "id": 34109380333,
+      "name": "Agent governance • push • main",
+      "event": "push",
+      "head_sha": "65a204ea284c54188b13c4c41cf7411b1a003c61",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34109380333",
+      "jobs": [
+        {
+          "id": 101701813022,
+          "name": "Agent governance / validate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T10:03:19Z",
+          "completed_at": "2026-09-07T10:03:28Z",
+          "raw_span_seconds": 9,
+          "executed_span_seconds": 9
+        }
+      ],
+      "executed_job_seconds": 9
+    },
+    {
+      "id": 34109380326,
+      "name": "CodeQL",
+      "event": "push",
+      "head_sha": "65a204ea284c54188b13c4c41cf7411b1a003c61",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34109380326",
+      "jobs": [
+        {
+          "id": 101701812461,
+          "name": "analyze (python)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T10:03:20Z",
+          "completed_at": "2026-09-07T10:04:28Z",
+          "raw_span_seconds": 68,
+          "executed_span_seconds": 68
+        },
+        {
+          "id": 101701812993,
+          "name": "analyze (actions)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T10:03:20Z",
+          "completed_at": "2026-09-07T10:04:08Z",
+          "raw_span_seconds": 48,
+          "executed_span_seconds": 48
+        }
+      ],
+      "executed_job_seconds": 116
+    },
+    {
+      "id": 34109380351,
+      "name": "Rust workspace",
+      "event": "push",
+      "head_sha": "65a204ea284c54188b13c4c41cf7411b1a003c61",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34109380351",
+      "jobs": [
+        {
+          "id": 101701812219,
+          "name": "Rust / supply chain",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T10:03:20Z",
+          "completed_at": "2026-09-07T10:04:04Z",
+          "raw_span_seconds": 44,
+          "executed_span_seconds": 44
+        },
+        {
+          "id": 101701812379,
+          "name": "Rust / policy and metadata",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T10:03:20Z",
+          "completed_at": "2026-09-07T10:03:40Z",
+          "raw_span_seconds": 20,
+          "executed_span_seconds": 20
+        },
+        {
+          "id": 101701812538,
+          "name": "Rust / protected-main risk lanes",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T10:03:55Z",
+          "completed_at": "2026-09-07T10:04:07Z",
+          "raw_span_seconds": 12,
+          "executed_span_seconds": 12
+        },
+        {
+          "id": 101702049908,
+          "name": "Rust / Linux shared workspace",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T10:04:10Z",
+          "completed_at": "2026-09-07T10:06:47Z",
+          "raw_span_seconds": 157,
+          "executed_span_seconds": 157
+        },
+        {
+          "id": 101702049923,
+          "name": "Rust / Windows pre-native client",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T10:04:10Z",
+          "completed_at": "2026-09-07T10:12:20Z",
+          "raw_span_seconds": 490,
+          "executed_span_seconds": 490
+        },
+        {
+          "id": 101702049961,
+          "name": "Rust / Durability PostgreSQL harness",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T10:04:09Z",
+          "completed_at": "2026-09-07T10:05:54Z",
+          "raw_span_seconds": 105,
+          "executed_span_seconds": 105
+        }
+      ],
+      "executed_job_seconds": 828
+    },
+    {
+      "id": 34108577361,
+      "name": "Game Merge Queue gate",
+      "event": "merge_group",
+      "head_sha": "65a204ea284c54188b13c4c41cf7411b1a003c61",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34108577361",
+      "jobs": [
+        {
+          "id": 101699235315,
+          "name": "Merge Queue / Rust Windows client",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T09:54:12Z",
+          "completed_at": "2026-09-07T10:02:43Z",
+          "raw_span_seconds": 511,
+          "executed_span_seconds": 511
+        },
+        {
+          "id": 101699235577,
+          "name": "Merge Queue / Durability PostgreSQL harness",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T09:54:12Z",
+          "completed_at": "2026-09-07T09:55:55Z",
+          "raw_span_seconds": 103,
+          "executed_span_seconds": 103
+        },
+        {
+          "id": 101699235588,
+          "name": "Merge Queue / Rust supply chain",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T09:54:12Z",
+          "completed_at": "2026-09-07T09:54:51Z",
+          "raw_span_seconds": 39,
+          "executed_span_seconds": 39
+        },
+        {
+          "id": 101699235656,
+          "name": "Merge Queue / candidate and governance",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T09:54:13Z",
+          "completed_at": "2026-09-07T09:54:18Z",
+          "raw_span_seconds": 5,
+          "executed_span_seconds": 5
+        },
+        {
+          "id": 101699235667,
+          "name": "Merge Queue / CodeQL (python)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T09:54:13Z",
+          "completed_at": "2026-09-07T09:55:03Z",
+          "raw_span_seconds": 50,
+          "executed_span_seconds": 50
+        },
+        {
+          "id": 101699235692,
+          "name": "Merge Queue / Rust Linux workspace",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T09:54:13Z",
+          "completed_at": "2026-09-07T09:57:29Z",
+          "raw_span_seconds": 196,
+          "executed_span_seconds": 196
+        },
+        {
+          "id": 101699235808,
+          "name": "Merge Queue / dependency review",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T09:54:12Z",
+          "completed_at": "2026-09-07T09:54:16Z",
+          "raw_span_seconds": 4,
+          "executed_span_seconds": 4
+        },
+        {
+          "id": 101699235820,
+          "name": "Merge Queue / CodeQL (actions)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T09:54:12Z",
+          "completed_at": "2026-09-07T09:54:51Z",
+          "raw_span_seconds": 39,
+          "executed_span_seconds": 39
+        },
+        {
+          "id": 101701647045,
+          "name": "game-gate",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-09-07T10:02:45Z",
+          "completed_at": "2026-09-07T10:02:48Z",
+          "raw_span_seconds": 3,
+          "executed_span_seconds": 3
+        }
+      ],
+      "executed_job_seconds": 950
+    }
+  ]
+}

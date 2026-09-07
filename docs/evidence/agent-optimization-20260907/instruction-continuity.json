@@ -1,0 +1,44 @@
+{
+  "observed_at": "2026-09-07T10:11:51.148605+00:00",
+  "instruction_snapshot_continuity": [
+    {
+      "repository": "Game",
+      "tested_instruction_snapshot": "6f9378e2dcfd00ac44cf3a973792c43d683c2ac4",
+      "merged_main_snapshot": "10446c31b2508ccf6b65cc609a35246bf2666567",
+      "all_changed_paths_between": [
+        "apps/client/src/windows_shell.rs",
+        "apps/game-server/src/ability/commit.rs",
+        "apps/game-server/src/ability/effects.rs",
+        "apps/game-server/src/ability/plan.rs",
+        "apps/game-server/src/ai/perception.rs",
+        "apps/game-server/src/ai/tests.rs",
+        "apps/game-server/tests/ability_engine.rs",
+        "crates/identity/src/lib.rs",
+        "docs/agents/evidence/OTV2-20260907-meta-agent-policy-v3/evaluation.json",
+        "docs/agents/tasks/active/OTV2-20260907-doc-consumer-snapshot-refresh.md",
+        "docs/agents/tasks/active/OTV2-20260907-meta-agent-policy-v3.md",
+        "docs/agents/tasks/active/OTV2-20260907-remediation-wp1-workspace-paths.md",
+        "docs/agents/tasks/active/OTV2-20260907-remediation-wp6a-native-client.md",
+        "docs/agents/tasks/active/OTV2-20260907-remediation-wp7-ability.md",
+        "docs/agents/tasks/active/OTV2-20260907-remediation-wp7-ai.md",
+        "tools/architecture-check/src/lib.rs",
+        "tools/repository/classify_pr_test_lanes.py",
+        "tools/repository/test_classify_pr_test_lanes.py"
+      ],
+      "scope": "No root, bootstrap, active reusable prompt, prompt standards, central binding, or local central-consumer blob changes; workflow/lifecycle/evidence changes separately qualified; Game concurrent product changes are external"
+    },
+    {
+      "repository": "Platform",
+      "tested_instruction_snapshot": "bad2e5a2bcf5193ecb6418a21526d062e49115bc",
+      "merged_main_snapshot": "907546f193e91b0bed2f5f077ab5b874771929ef",
+      "all_changed_paths_between": [
+        ".github/workflows/agent-governance.yml",
+        "docs/agents/evidence/OTERYN-20260907-meta-agent-policy-v3-adoption.md",
+        "docs/agents/tasks/active/OTERYN-20260907-meta-agent-policy-v3-adoption.md",
+        "docs/agents/tasks/archive/OTERYN-20260907-task-inventory-path-d26.md"
+      ],
+      "scope": "No root, bootstrap, active reusable prompt, prompt standards, central binding, or local central-consumer blob changes; workflow/lifecycle/evidence changes separately qualified; No Platform product/runtime changes in this interval"
+    }
+  ],
+  "central_bundle_diff_5ed3_to_da4": "No diff under ecosystem,tools/governance,docs/agents/contracts,docs/agents/policy,docs/governance/AI_REVIEW_POLICY.md"
+}

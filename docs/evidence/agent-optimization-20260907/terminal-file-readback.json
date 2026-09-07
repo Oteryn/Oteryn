@@ -1,0 +1,32 @@
+[
+  {
+    "repository": "game-w6",
+    "sha": "10b6be51551af5d70d45b4f56c2f6d3e8f6dc528",
+    "path": "docs/agents/tasks/active/OTV2-20260907-doc-consumer-snapshot-refresh.md",
+    "present": false
+  },
+  {
+    "repository": "game-w6",
+    "sha": "10b6be51551af5d70d45b4f56c2f6d3e8f6dc528",
+    "path": "docs/agents/tasks/archive/OTV2-20260907-doc-consumer-snapshot-refresh.md",
+    "present": true
+  },
+  {
+    "repository": "platform-live",
+    "sha": "b0f268d682b1f9117140168a3a9d9b86c56ba9cc",
+    "path": "docs/agents/TERMINAL_BRANCH_DELETION_APPROVAL.json",
+    "present": false
+  },
+  {
+    "repository": "platform-live",
+    "sha": "b0f268d682b1f9117140168a3a9d9b86c56ba9cc",
+    "path": "docs/agents/tasks/active/OTERYN-20260907-terminal-canary-cleanup.md",
+    "present": false
+  },
+  {
+    "repository": "platform-live",
+    "sha": "b0f268d682b1f9117140168a3a9d9b86c56ba9cc",
+    "path": "docs/agents/tasks/archive/OTERYN-20260907-terminal-canary-cleanup.md",
+    "present": true
+  }
+]

@@ -1,0 +1,467 @@
+{
+  "metric": "GitHub job API completed_at minus started_at, summed across executed jobs; skipped=0; not billing",
+  "collection_failures_first_attempt": "Incorrect repository spelling Oteryn.Game rejected; corrected to canonical Oteryn-Game jobs_url; no workflow reruns",
+  "runs": [
+    {
+      "conclusion": "success",
+      "event": "pull_request_target",
+      "executed_job_seconds": 2,
+      "head_sha": "137a91c61b2d097bb986a16f6fa229cb0230467c",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34088303472",
+      "id": 34088303472,
+      "jobs": [
+        {
+          "completed_at": "2026-09-07T05:49:59Z",
+          "conclusion": "success",
+          "executed_span_seconds": 2,
+          "id": 101636513976,
+          "name": "close / validate-operation",
+          "raw_span_seconds": 2,
+          "started_at": "2026-09-07T05:49:57Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:49:55Z",
+          "conclusion": "skipped",
+          "executed_span_seconds": 0,
+          "id": 101636514670,
+          "name": "read",
+          "raw_span_seconds": -1,
+          "started_at": "2026-09-07T05:49:56Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:49:59Z",
+          "conclusion": "skipped",
+          "executed_span_seconds": 0,
+          "id": 101636525604,
+          "name": "close / close-event-cleanup",
+          "raw_span_seconds": -1,
+          "started_at": "2026-09-07T05:50:00Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:49:59Z",
+          "conclusion": "skipped",
+          "executed_span_seconds": 0,
+          "id": 101636525794,
+          "name": "close / apply-reviewed-manifest",
+          "raw_span_seconds": -1,
+          "started_at": "2026-09-07T05:50:00Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:49:55Z",
+          "conclusion": "skipped",
+          "executed_span_seconds": 0,
+          "id": 101636528512,
+          "name": "apply",
+          "raw_span_seconds": -6,
+          "started_at": "2026-09-07T05:50:01Z"
+        }
+      ],
+      "name": "Terminal Branch Lifecycle"
+    },
+    {
+      "conclusion": "success",
+      "event": "pull_request",
+      "executed_job_seconds": 7,
+      "head_sha": "137a91c61b2d097bb986a16f6fa229cb0230467c",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34087739858",
+      "id": 34087739858,
+      "jobs": [
+        {
+          "completed_at": "2026-09-07T05:41:14Z",
+          "conclusion": "success",
+          "executed_span_seconds": 7,
+          "id": 101634923798,
+          "name": "Architecture semantic audit / validate",
+          "raw_span_seconds": 7,
+          "started_at": "2026-09-07T05:41:07Z"
+        }
+      ],
+      "name": "Architecture semantic audit • pull_request • 365"
+    },
+    {
+      "conclusion": "success",
+      "event": "pull_request_target",
+      "executed_job_seconds": 4,
+      "head_sha": "137a91c61b2d097bb986a16f6fa229cb0230467c",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34085685296",
+      "id": 34085685296,
+      "jobs": [
+        {
+          "completed_at": "2026-09-07T05:09:14Z",
+          "conclusion": "success",
+          "executed_span_seconds": 4,
+          "id": 101629160744,
+          "name": "Merge authority audit / protected-base validate",
+          "raw_span_seconds": 4,
+          "started_at": "2026-09-07T05:09:10Z"
+        }
+      ],
+      "name": "Merge authority audit"
+    },
+    {
+      "conclusion": "success",
+      "event": "pull_request",
+      "executed_job_seconds": 7,
+      "head_sha": "137a91c61b2d097bb986a16f6fa229cb0230467c",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34085685158",
+      "id": 34085685158,
+      "jobs": [
+        {
+          "completed_at": "2026-09-07T05:09:17Z",
+          "conclusion": "success",
+          "executed_span_seconds": 7,
+          "id": 101629160294,
+          "name": "Architecture semantic audit / validate",
+          "raw_span_seconds": 7,
+          "started_at": "2026-09-07T05:09:10Z"
+        }
+      ],
+      "name": "Architecture semantic audit • pull_request • 365"
+    },
+    {
+      "conclusion": "success",
+      "event": "pull_request",
+      "executed_job_seconds": 9,
+      "head_sha": "137a91c61b2d097bb986a16f6fa229cb0230467c",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34085685205",
+      "id": 34085685205,
+      "jobs": [
+        {
+          "completed_at": "2026-09-07T05:09:18Z",
+          "conclusion": "success",
+          "executed_span_seconds": 9,
+          "id": 101629160452,
+          "name": "Agent governance / validate",
+          "raw_span_seconds": 9,
+          "started_at": "2026-09-07T05:09:09Z"
+        }
+      ],
+      "name": "Agent governance • pull_request • 365"
+    },
+    {
+      "conclusion": "success",
+      "event": "pull_request",
+      "executed_job_seconds": 945,
+      "head_sha": "137a91c61b2d097bb986a16f6fa229cb0230467c",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34085685254",
+      "id": 34085685254,
+      "jobs": [
+        {
+          "completed_at": "2026-09-07T05:09:15Z",
+          "conclusion": "success",
+          "executed_span_seconds": 5,
+          "id": 101629160919,
+          "name": "Merge gate / scope",
+          "raw_span_seconds": 5,
+          "started_at": "2026-09-07T05:09:10Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:09:21Z",
+          "conclusion": "success",
+          "executed_span_seconds": 4,
+          "id": 101629184356,
+          "name": "Merge gate / dependency review",
+          "raw_span_seconds": 4,
+          "started_at": "2026-09-07T05:09:17Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:09:59Z",
+          "conclusion": "success",
+          "executed_span_seconds": 41,
+          "id": 101629184365,
+          "name": "Merge gate / CodeQL (actions)",
+          "raw_span_seconds": 41,
+          "started_at": "2026-09-07T05:09:18Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:10:11Z",
+          "conclusion": "success",
+          "executed_span_seconds": 53,
+          "id": 101629184373,
+          "name": "Merge gate / CodeQL (python)",
+          "raw_span_seconds": 53,
+          "started_at": "2026-09-07T05:09:18Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:09:27Z",
+          "conclusion": "success",
+          "executed_span_seconds": 9,
+          "id": 101629184381,
+          "name": "Merge gate / governance",
+          "raw_span_seconds": 9,
+          "started_at": "2026-09-07T05:09:18Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:09:30Z",
+          "conclusion": "success",
+          "executed_span_seconds": 13,
+          "id": 101629184402,
+          "name": "Merge gate / trusted-base risk lanes",
+          "raw_span_seconds": 13,
+          "started_at": "2026-09-07T05:09:17Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:18:09Z",
+          "conclusion": "success",
+          "executed_span_seconds": 517,
+          "id": 101629227047,
+          "name": "Merge gate / Rust Windows client",
+          "raw_span_seconds": 517,
+          "started_at": "2026-09-07T05:09:32Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:13:30Z",
+          "conclusion": "success",
+          "executed_span_seconds": 237,
+          "id": 101629227048,
+          "name": "Merge gate / Rust Linux workspace",
+          "raw_span_seconds": 237,
+          "started_at": "2026-09-07T05:09:33Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:09:56Z",
+          "conclusion": "success",
+          "executed_span_seconds": 23,
+          "id": 101629227050,
+          "name": "Merge gate / Rust policy and metadata",
+          "raw_span_seconds": 23,
+          "started_at": "2026-09-07T05:09:33Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:10:07Z",
+          "conclusion": "success",
+          "executed_span_seconds": 34,
+          "id": 101629227063,
+          "name": "Merge gate / Rust supply chain",
+          "raw_span_seconds": 34,
+          "started_at": "2026-09-07T05:09:33Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:18:15Z",
+          "conclusion": "success",
+          "executed_span_seconds": 4,
+          "id": 101630834903,
+          "name": "Merge gate / validate",
+          "raw_span_seconds": 4,
+          "started_at": "2026-09-07T05:18:11Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:18:22Z",
+          "conclusion": "success",
+          "executed_span_seconds": 5,
+          "id": 101630852614,
+          "name": "game-gate",
+          "raw_span_seconds": 5,
+          "started_at": "2026-09-07T05:18:17Z"
+        }
+      ],
+      "name": "Merge gate • pull_request • 365"
+    },
+    {
+      "conclusion": "success",
+      "event": "push",
+      "executed_job_seconds": 810,
+      "head_sha": "afa6a94ebbbff94ec9fd5eb487ed4e30db900079",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34088302134",
+      "id": 34088302134,
+      "jobs": [
+        {
+          "completed_at": "2026-09-07T05:50:32Z",
+          "conclusion": "success",
+          "executed_span_seconds": 36,
+          "id": 101636509836,
+          "name": "Rust / supply chain",
+          "raw_span_seconds": 36,
+          "started_at": "2026-09-07T05:49:56Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:50:10Z",
+          "conclusion": "success",
+          "executed_span_seconds": 12,
+          "id": 101636509916,
+          "name": "Rust / protected-main risk lanes",
+          "raw_span_seconds": 12,
+          "started_at": "2026-09-07T05:49:58Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:50:16Z",
+          "conclusion": "success",
+          "executed_span_seconds": 21,
+          "id": 101636509947,
+          "name": "Rust / policy and metadata",
+          "raw_span_seconds": 21,
+          "started_at": "2026-09-07T05:49:55Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:58:32Z",
+          "conclusion": "success",
+          "executed_span_seconds": 499,
+          "id": 101636559654,
+          "name": "Rust / Windows pre-native client",
+          "raw_span_seconds": 499,
+          "started_at": "2026-09-07T05:50:13Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:52:01Z",
+          "conclusion": "success",
+          "executed_span_seconds": 107,
+          "id": 101636559658,
+          "name": "Rust / Durability PostgreSQL harness",
+          "raw_span_seconds": 107,
+          "started_at": "2026-09-07T05:50:14Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:52:28Z",
+          "conclusion": "success",
+          "executed_span_seconds": 135,
+          "id": 101636559734,
+          "name": "Rust / Linux shared workspace",
+          "raw_span_seconds": 135,
+          "started_at": "2026-09-07T05:50:13Z"
+        }
+      ],
+      "name": "Rust workspace"
+    },
+    {
+      "conclusion": "success",
+      "event": "push",
+      "executed_job_seconds": 44,
+      "head_sha": "afa6a94ebbbff94ec9fd5eb487ed4e30db900079",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34088302119",
+      "id": 34088302119,
+      "jobs": [
+        {
+          "completed_at": "2026-09-07T05:50:40Z",
+          "conclusion": "success",
+          "executed_span_seconds": 44,
+          "id": 101636510055,
+          "name": "Agent governance / validate",
+          "raw_span_seconds": 44,
+          "started_at": "2026-09-07T05:49:56Z"
+        }
+      ],
+      "name": "Agent governance • push • main"
+    },
+    {
+      "conclusion": "success",
+      "event": "push",
+      "executed_job_seconds": 112,
+      "head_sha": "afa6a94ebbbff94ec9fd5eb487ed4e30db900079",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34088302170",
+      "id": 34088302170,
+      "jobs": [
+        {
+          "completed_at": "2026-09-07T05:50:36Z",
+          "conclusion": "success",
+          "executed_span_seconds": 40,
+          "id": 101636510101,
+          "name": "analyze (actions)",
+          "raw_span_seconds": 40,
+          "started_at": "2026-09-07T05:49:56Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:51:09Z",
+          "conclusion": "success",
+          "executed_span_seconds": 72,
+          "id": 101636510213,
+          "name": "analyze (python)",
+          "raw_span_seconds": 72,
+          "started_at": "2026-09-07T05:49:57Z"
+        }
+      ],
+      "name": "CodeQL"
+    },
+    {
+      "conclusion": "success",
+      "event": "merge_group",
+      "executed_job_seconds": 895,
+      "head_sha": "afa6a94ebbbff94ec9fd5eb487ed4e30db900079",
+      "html_url": "https://github.com/Oteryn/Oteryn-Game/actions/runs/34087763406",
+      "id": 34087763406,
+      "jobs": [
+        {
+          "completed_at": "2026-09-07T05:42:06Z",
+          "conclusion": "success",
+          "executed_span_seconds": 34,
+          "id": 101634988823,
+          "name": "Merge Queue / Rust supply chain",
+          "raw_span_seconds": 34,
+          "started_at": "2026-09-07T05:41:32Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:42:20Z",
+          "conclusion": "success",
+          "executed_span_seconds": 52,
+          "id": 101634988925,
+          "name": "Merge Queue / CodeQL (python)",
+          "raw_span_seconds": 52,
+          "started_at": "2026-09-07T05:41:28Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:41:32Z",
+          "conclusion": "success",
+          "executed_span_seconds": 4,
+          "id": 101634988990,
+          "name": "Merge Queue / dependency review",
+          "raw_span_seconds": 4,
+          "started_at": "2026-09-07T05:41:28Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:42:08Z",
+          "conclusion": "success",
+          "executed_span_seconds": 40,
+          "id": 101634989028,
+          "name": "Merge Queue / CodeQL (actions)",
+          "raw_span_seconds": 40,
+          "started_at": "2026-09-07T05:41:28Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:41:36Z",
+          "conclusion": "success",
+          "executed_span_seconds": 7,
+          "id": 101634989067,
+          "name": "Merge Queue / candidate and governance",
+          "raw_span_seconds": 7,
+          "started_at": "2026-09-07T05:41:29Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:49:19Z",
+          "conclusion": "success",
+          "executed_span_seconds": 470,
+          "id": 101634989088,
+          "name": "Merge Queue / Rust Windows client",
+          "raw_span_seconds": 470,
+          "started_at": "2026-09-07T05:41:29Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:44:36Z",
+          "conclusion": "success",
+          "executed_span_seconds": 188,
+          "id": 101634989102,
+          "name": "Merge Queue / Rust Linux workspace",
+          "raw_span_seconds": 188,
+          "started_at": "2026-09-07T05:41:28Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:43:06Z",
+          "conclusion": "success",
+          "executed_span_seconds": 97,
+          "id": 101634989106,
+          "name": "Merge Queue / Durability PostgreSQL harness",
+          "raw_span_seconds": 97,
+          "started_at": "2026-09-07T05:41:29Z"
+        },
+        {
+          "completed_at": "2026-09-07T05:49:25Z",
+          "conclusion": "success",
+          "executed_span_seconds": 3,
+          "id": 101636411713,
+          "name": "game-gate",
+          "raw_span_seconds": 3,
+          "started_at": "2026-09-07T05:49:22Z"
+        }
+      ],
+      "name": "Game Merge Queue gate"
+    }
+  ]
+}
