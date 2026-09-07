@@ -23,5 +23,3 @@ For section E reproductions, also read `docs/evidence/instruction-debt-r5-reprod
 ## Acceptance and handoff
 
 Distinguish FACT, INFERENCE, ASSUMPTION, UNKNOWN and RECOMMENDATION. Cite exact source revisions or live Issue/PR/check evidence. Report material changes since the audit and one next action if requested. No tests, writes, external messages, deployment or cleanup are authorized by this alias.
-
-Before this file reaches main, resolve it from the exact audit PR branch or commit supplied by the user; do not claim that the alias is available on main.
