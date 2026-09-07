@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "scope": "Immutable source generation from PR185; prior audit publications are evidence, not current provider authority. No provider code is executed.",
+  "scope": "Verified immutable source snapshots. The original PR185 Game coordinate could not be resolved; its replacement is not silent evidence carry-forward. Prior audit publications are historical evidence, not current provider authority. No provider code is executed.",
   "snapshots": [
     {
       "id": "meta",
@@ -12,8 +12,8 @@
     {
       "id": "game",
       "repository": "Oteryn/Oteryn-Game",
-      "commit_sha": "3327db49c0c3e2d90afe6a74954c579a36aba2a5",
-      "expected_tree_sha": "fc0f18e4b67a2df16c4fb24ebf8933cf4c1714bf",
+      "commit_sha": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "expected_tree_sha": "49cabfccf7d4876e5bc9276fc5963caa33dab8a5",
       "role": "audited_source"
     },
     {
@@ -57,6 +57,15 @@
       "commit_sha": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
       "expected_tree_sha": null,
       "role": "historical_evidence"
+    }
+  ],
+  "coordinate_corrections": [
+    {
+      "repository": "Oteryn/Oteryn-Game",
+      "original_report_sha": "3327db49c0c3e2d90afe6a74954c579a36aba2a5",
+      "observed_result": "Git fetch exit 128 in run 34165374247; native GitHub Git-commit GET returned 404. Current main ref and replacement commit/tree resolved successfully.",
+      "replacement_sha": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "semantic_carry_forward": "REQUIRES_RECONCILIATION"
     }
   ]
 }
