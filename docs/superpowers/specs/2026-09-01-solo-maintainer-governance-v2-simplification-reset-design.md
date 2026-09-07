@@ -1,7 +1,5 @@
 # Solo-Maintainer Governance V2 Simplification Reset
 
-> HISTORICAL planning evidence — not dispatchable execution authority. Current rules: [AGENTS.md](../../../AGENTS.md).
-
 ## Status
 
 Approved by the repository owner for implementation in PR #125 on 2026-09-01; canonical upon merge to protected `main`.
