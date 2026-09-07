@@ -7,3 +7,9 @@ updates:
     labels:
       - dependencies
       - github-actions
+  - package-ecosystem: pip
+    directory: "/tools/governance"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies

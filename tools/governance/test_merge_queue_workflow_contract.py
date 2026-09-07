@@ -3,8 +3,12 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import re
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 from governance_drift_audit import audit_snapshot
@@ -33,6 +37,79 @@ ENFORCEMENT_FIELDS = (
     "deletions",
     "broad_bypass",
 )
+
+
+def _release_record() -> dict:
+    return {
+        "schema_version": 1, "release_id": "example",
+        "components": {
+            name: {"repository": f"Oteryn/Oteryn-{name.title()}", "commit_sha": "a" * 40,
+                   "evidence": [f"fixture:{name}:exact-head-ci"]}
+            for name in ("game", "platform", "atlas")
+        },
+        "contracts": [{"name": "semantic-export", "version": "1", "provider": "game",
+                       "consumer": "atlas", "status": "compatible",
+                       "evidence": ["fixture:provider-and-consumer-contract-tests"]}],
+    }
+
+
+def test_release_validation_uses_full_schema_and_admission_rules() -> None:
+    from validate_release_manifests import load_validator, validate_manifest
+    validator = load_validator(ROOT / "ecosystem/compatibility.schema.json")
+    validate_manifest(_release_record(), Path("example.json"), validator)
+    mutations = (
+        lambda x: x.update(unexpected=True),
+        lambda x: x.update(contracts=[]),
+        lambda x: x["components"]["game"].update(unexpected=True),
+        lambda x: x["components"]["game"].update(commit_sha="a" * 40 + "\n"),
+        lambda x: x["components"]["game"].update(repository="Oteryn/other"),
+        lambda x: x["components"]["game"].update(evidence=[]),
+        lambda x: x["components"]["game"].update(artifact_digests=["sha256:" + "a" * 64] * 2),
+        lambda x: x["components"]["game"].update(artifact_digests=["sha256:" + "a" * 64 + "\n"]),
+        lambda x: x["contracts"][0].pop("evidence"),
+        lambda x: x["contracts"][0].update(evidence=["   "]),
+        lambda x: x["contracts"][0].update(status="pending"),
+        lambda x: x.update(release_id="different"),
+    )
+    for mutate in mutations:
+        invalid = _release_record()
+        mutate(invalid)
+        try:
+            validate_manifest(invalid, Path("example.json"), validator)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid release was accepted: {invalid}")
+
+
+def test_release_schema_is_authoritative_and_never_fetches_remote_references() -> None:
+    from validate_release_manifests import load_validator, validate_manifest
+    schema = json.loads((ROOT / "ecosystem/compatibility.schema.json").read_text(encoding="utf-8"))
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "schema.json"
+        changed = copy.deepcopy(schema)
+        changed["properties"]["release_id"]["maxLength"] = 2
+        path.write_text(json.dumps(changed), encoding="utf-8")
+        try:
+            validate_manifest(_release_record(), Path("example.json"), load_validator(path))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("the validator ignored a constraint in the supplied schema")
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "tools/governance/validate_release_manifests.py"),
+             "--release-dir", str(path)], capture_output=True, text=True, check=False, timeout=30,
+        )
+        assert result.returncode == 1 and json.loads(result.stdout)["status"] == "INVALID"
+        changed = copy.deepcopy(schema)
+        changed["$defs"]["component"]["properties"]["commit_sha"] = {"$ref": "https://example.invalid/schema.json"}
+        path.write_text(json.dumps(changed), encoding="utf-8")
+        try:
+            load_validator(path)
+        except ValueError as exc:
+            assert "reference" in str(exc)
+        else:
+            raise AssertionError("META must not resolve provider/remote schemas over the network")
 
 
 def _job_body(workflow: str, job_name: str) -> str:
@@ -222,6 +299,8 @@ def test_drift_audit_rejects_duplicate_repository_snapshot() -> None:
 
 
 if __name__ == "__main__":
+    test_release_validation_uses_full_schema_and_admission_rules()
+    test_release_schema_is_authoritative_and_never_fetches_remote_references()
     test_meta_gate_qualifies_pull_requests_and_exact_merge_group_candidates()
     test_meta_gate_executes_bounded_execution_guard_regressions()
     test_meta_gate_executes_persistent_continuation_regressions()

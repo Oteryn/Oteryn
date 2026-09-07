@@ -53,13 +53,18 @@ jobs:
             git diff-tree --check --root "$HEAD_SHA"
           fi
 
+      - name: Install validation dependencies
+        run: python3 -m pip install --disable-pip-version-check -r tools/governance/requirements-validation.txt
+
+      - name: Validate release manifest schema
+        run: python3 tools/governance/validate_release_manifests.py
+
       - name: Validate META repository contract
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           import json
-          import re
           from pathlib import Path
 
           required = [
@@ -80,6 +85,8 @@ jobs:
               Path('ecosystem/repositories.json'),
               Path('ecosystem/governance-desired-state.json'),
               Path('ecosystem/compatibility.schema.json'),
+              Path('tools/governance/validate_release_manifests.py'),
+              Path('tools/governance/requirements-validation.txt'),
               Path('ecosystem/agent-execution-routing-policy.json'),
               Path('ecosystem/bounded-autonomous-execution-policy.json'),
               Path('ecosystem/agent-continuation-policy.json'),
@@ -126,12 +133,6 @@ jobs:
                   if not isinstance(entry.get(key), str) or not entry[key].strip():
                       raise SystemExit(f'missing {key!r} in repository entry: {entry}')
 
-          schema = json.loads(Path('ecosystem/compatibility.schema.json').read_text(encoding='utf-8'))
-          if schema.get('$schema') != 'https://json-schema.org/draft/2020-12/schema':
-              raise SystemExit('compatibility schema must use JSON Schema draft 2020-12')
-          if schema.get('type') != 'object':
-              raise SystemExit('compatibility schema root must be an object')
-
           forbidden_names = {'.env'}
           forbidden_suffixes = {'.otbm', '.otb', '.spr', '.dat', '.sql', '.sqlite', '.db'}
           violations = []
@@ -143,56 +144,7 @@ jobs:
           if violations:
               raise SystemExit(f'raw runtime, database or sensitive files are forbidden in META: {violations}')
 
-          component_repositories = {
-              'game': 'Oteryn/Oteryn-Game',
-              'platform': 'Oteryn/Oteryn-Platform',
-              'atlas': 'Oteryn/Oteryn-Atlas',
-          }
-          sha_re = re.compile(r'^[0-9a-f]{40}$')
-          digest_re = re.compile(r'^sha256:[0-9a-f]{64}$')
-          allowed_parties = set(component_repositories)
-
-          release_dir = Path('ecosystem/releases')
-          release_files = sorted(release_dir.glob('*.json')) if release_dir.is_dir() else []
-          for path in release_files:
-              release = json.loads(path.read_text(encoding='utf-8'))
-              if release.get('schema_version') != 1:
-                  raise SystemExit(f'{path}: schema_version must be 1')
-              release_id = release.get('release_id')
-              if not isinstance(release_id, str) or not release_id.strip() or path.stem != release_id:
-                  raise SystemExit(f'{path}: release_id must be non-empty and equal the filename stem')
-              components = release.get('components')
-              if not isinstance(components, dict) or set(components) != allowed_parties:
-                  raise SystemExit(f'{path}: components must be exactly game/platform/atlas')
-              for name, expected_repository in component_repositories.items():
-                  component = components.get(name)
-                  if not isinstance(component, dict):
-                      raise SystemExit(f'{path}: component {name} must be an object')
-                  if component.get('repository') != expected_repository:
-                      raise SystemExit(f'{path}: component {name} must use {expected_repository}')
-                  if not isinstance(component.get('commit_sha'), str) or not sha_re.fullmatch(component['commit_sha']):
-                      raise SystemExit(f'{path}: component {name} commit_sha must be a lowercase 40-hex SHA')
-                  for digest in component.get('artifact_digests', []):
-                      if not isinstance(digest, str) or not digest_re.fullmatch(digest):
-                          raise SystemExit(f'{path}: invalid artifact digest for {name}: {digest!r}')
-              contracts = release.get('contracts')
-              if not isinstance(contracts, list):
-                  raise SystemExit(f'{path}: contracts must be an array')
-              for contract in contracts:
-                  if not isinstance(contract, dict):
-                      raise SystemExit(f'{path}: contract entry must be an object')
-                  for key in ('name', 'version'):
-                      if not isinstance(contract.get(key), str) or not contract[key].strip():
-                          raise SystemExit(f'{path}: contract {key} must be non-empty')
-                  if contract.get('provider') not in allowed_parties or contract.get('consumer') not in allowed_parties:
-                      raise SystemExit(f'{path}: contract provider/consumer must be game/platform/atlas')
-                  if contract.get('status') != 'compatible':
-                      raise SystemExit(f'{path}: merged release contracts must have status compatible')
-
-          print(
-              f'Validated {len(json_files)} JSON files, '
-              f'{len(repositories)} repository entries and {len(release_files)} release manifests.'
-          )
+          print(f'Validated {len(json_files)} JSON files and {len(repositories)} repository entries.')
           PY
 
       - name: Validate simplified governance desired state
