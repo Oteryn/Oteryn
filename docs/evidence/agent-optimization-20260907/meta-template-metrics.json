@@ -1,0 +1,52 @@
+{
+  "baseline": "1dedfc0f264fe0e23e5365dbe9280c2d96df50c5",
+  "candidate_local": "678d696",
+  "candidate_remote": "ab2538efe60b0d2903098bdc9563a6abed6b3e48",
+  "files": [
+    {
+      "path": "docs/agents/prompts/OTERYN-V310-ATLAS-DOC-IA-CLOSEOUT.md",
+      "before_bytes": 6863,
+      "after_bytes": 6725,
+      "before_lines": 137,
+      "after_lines": 139
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-V310-GAME-DOC-IA-AND-GAME-GATE-CLOSEOUT.md",
+      "before_bytes": 7746,
+      "after_bytes": 7401,
+      "before_lines": 132,
+      "after_lines": 131
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-V310-ORGANIZATION-RECOVERY-AUTHORIZED-CONTINUATION.md",
+      "before_bytes": 16570,
+      "after_bytes": 16539,
+      "before_lines": 334,
+      "after_lines": 336
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-V310-ORGANIZATION-RECOVERY-CLOSEOUT.md",
+      "before_bytes": 8760,
+      "after_bytes": 8604,
+      "before_lines": 140,
+      "after_lines": 141
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-V310-PLATFORM-DOC-IA-CLOSEOUT.md",
+      "before_bytes": 6377,
+      "after_bytes": 6095,
+      "before_lines": 123,
+      "after_lines": 122
+    }
+  ],
+  "before_bytes": 46316,
+  "after_bytes": 45364,
+  "interpretation": "Task-specific detail retained; no token/cost claim.",
+  "pr": 162,
+  "merged": "da4cbbceab286ac9ea350a9748eb7e570870851e",
+  "required_pr_run": 34104913326,
+  "merge_queue_run": 34105327131,
+  "main_push_run": 34105378085,
+  "protected_main_verified": true,
+  "terminal_branch_deleted": true
+}

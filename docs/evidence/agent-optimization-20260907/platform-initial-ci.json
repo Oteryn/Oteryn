@@ -1,0 +1,320 @@
+{
+  "metric": "Observed executed job timestamp spans; skipped jobs zero. Not billed runner time or monetary cost.",
+  "rows": [
+    {
+      "run_id": 34104877270,
+      "name": "Edge Security Emulation",
+      "head": "48c19ad5c74ca933e057e705ade7b5b4a1acec12",
+      "event": "pull_request",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 101687493751,
+          "name": "classify-changes",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:21Z",
+          "completed": "2026-09-07T09:14:28Z",
+          "reported_timestamp_delta_seconds": 7,
+          "executed_job_span_seconds": 7
+        },
+        {
+          "id": 101687552859,
+          "name": "validate",
+          "conclusion": "skipped",
+          "started": "2026-09-07T09:14:29Z",
+          "completed": "2026-09-07T09:14:29Z",
+          "reported_timestamp_delta_seconds": 0,
+          "executed_job_span_seconds": 0
+        }
+      ]
+    },
+    {
+      "run_id": 34104877251,
+      "name": "Agent Governance",
+      "head": "48c19ad5c74ca933e057e705ade7b5b4a1acec12",
+      "event": "pull_request",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 101687493539,
+          "name": "checkpoint-validation",
+          "conclusion": "failure",
+          "started": "2026-09-07T09:14:18Z",
+          "completed": "2026-09-07T09:14:29Z",
+          "reported_timestamp_delta_seconds": 11,
+          "executed_job_span_seconds": 11
+        }
+      ]
+    },
+    {
+      "run_id": 34104877208,
+      "name": "Parallel Coordinator Prompt Eval",
+      "head": "48c19ad5c74ca933e057e705ade7b5b4a1acec12",
+      "event": "pull_request",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 101687493708,
+          "name": "prompt-eval",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:20Z",
+          "completed": "2026-09-07T09:14:30Z",
+          "reported_timestamp_delta_seconds": 10,
+          "executed_job_span_seconds": 10
+        }
+      ]
+    },
+    {
+      "run_id": 34104877215,
+      "name": "Historical Branch Audit",
+      "head": "48c19ad5c74ca933e057e705ade7b5b4a1acec12",
+      "event": "pull_request_target",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 101687493437,
+          "name": "steady-state-read-only",
+          "conclusion": "failure",
+          "started": "2026-09-07T09:14:19Z",
+          "completed": "2026-09-07T09:14:25Z",
+          "reported_timestamp_delta_seconds": 6,
+          "executed_job_span_seconds": 6
+        },
+        {
+          "id": 101687494381,
+          "name": "validate",
+          "conclusion": "skipped",
+          "started": "2026-09-07T09:14:17Z",
+          "completed": "2026-09-07T09:14:17Z",
+          "reported_timestamp_delta_seconds": 0,
+          "executed_job_span_seconds": 0
+        },
+        {
+          "id": 101687494747,
+          "name": "live-dry-run",
+          "conclusion": "skipped",
+          "started": "2026-09-07T09:14:17Z",
+          "completed": "2026-09-07T09:14:17Z",
+          "reported_timestamp_delta_seconds": 0,
+          "executed_job_span_seconds": 0
+        },
+        {
+          "id": 101687496295,
+          "name": "apply-reviewed-historical-reconciliation",
+          "conclusion": "skipped",
+          "started": "2026-09-07T09:14:17Z",
+          "completed": "2026-09-07T09:14:17Z",
+          "reported_timestamp_delta_seconds": 0,
+          "executed_job_span_seconds": 0
+        }
+      ]
+    },
+    {
+      "run_id": 34104877246,
+      "name": "Phase 7 Production-Like Validation",
+      "head": "48c19ad5c74ca933e057e705ade7b5b4a1acec12",
+      "event": "pull_request",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 101687493606,
+          "name": "classify-changes",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:19Z",
+          "completed": "2026-09-07T09:14:25Z",
+          "reported_timestamp_delta_seconds": 6,
+          "executed_job_span_seconds": 6
+        },
+        {
+          "id": 101687538828,
+          "name": "validate",
+          "conclusion": "skipped",
+          "started": "2026-09-07T09:14:26Z",
+          "completed": "2026-09-07T09:14:26Z",
+          "reported_timestamp_delta_seconds": 0,
+          "executed_job_span_seconds": 0
+        }
+      ]
+    },
+    {
+      "run_id": 34104877261,
+      "name": "Game Auth Ticket Concurrency",
+      "head": "48c19ad5c74ca933e057e705ade7b5b4a1acec12",
+      "event": "pull_request",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 101687493510,
+          "name": "classify-changes",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:19Z",
+          "completed": "2026-09-07T09:14:24Z",
+          "reported_timestamp_delta_seconds": 5,
+          "executed_job_span_seconds": 5
+        },
+        {
+          "id": 101687533206,
+          "name": "concurrency-proof",
+          "conclusion": "skipped",
+          "started": "2026-09-07T09:14:25Z",
+          "completed": "2026-09-07T09:14:24Z",
+          "reported_timestamp_delta_seconds": -1,
+          "executed_job_span_seconds": 0
+        }
+      ]
+    },
+    {
+      "run_id": 34104877269,
+      "name": "Platform DB Outage Validation",
+      "head": "48c19ad5c74ca933e057e705ade7b5b4a1acec12",
+      "event": "pull_request",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 101687493950,
+          "name": "classify-changes",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:19Z",
+          "completed": "2026-09-07T09:14:25Z",
+          "reported_timestamp_delta_seconds": 6,
+          "executed_job_span_seconds": 6
+        },
+        {
+          "id": 101687537666,
+          "name": "validate",
+          "conclusion": "skipped",
+          "started": "2026-09-07T09:14:26Z",
+          "completed": "2026-09-07T09:14:25Z",
+          "reported_timestamp_delta_seconds": -1,
+          "executed_job_span_seconds": 0
+        }
+      ]
+    },
+    {
+      "run_id": 34104877213,
+      "name": "Synology Container Hygiene",
+      "head": "48c19ad5c74ca933e057e705ade7b5b4a1acec12",
+      "event": "pull_request",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 101687494400,
+          "name": "static-validation",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:19Z",
+          "completed": "2026-09-07T09:14:26Z",
+          "reported_timestamp_delta_seconds": 7,
+          "executed_job_span_seconds": 7
+        },
+        {
+          "id": 101687496202,
+          "name": "live-hygiene",
+          "conclusion": "skipped",
+          "started": "2026-09-07T09:14:17Z",
+          "completed": "2026-09-07T09:14:17Z",
+          "reported_timestamp_delta_seconds": 0,
+          "executed_job_span_seconds": 0
+        }
+      ]
+    },
+    {
+      "run_id": 34104877254,
+      "name": "CodeQL",
+      "head": "48c19ad5c74ca933e057e705ade7b5b4a1acec12",
+      "event": "pull_request",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 101687493575,
+          "name": "analyze (actions)",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:19Z",
+          "completed": "2026-09-07T09:15:01Z",
+          "reported_timestamp_delta_seconds": 42,
+          "executed_job_span_seconds": 42
+        },
+        {
+          "id": 101687493779,
+          "name": "analyze (javascript-typescript)",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:19Z",
+          "completed": "2026-09-07T09:15:12Z",
+          "reported_timestamp_delta_seconds": 53,
+          "executed_job_span_seconds": 53
+        },
+        {
+          "id": 101687493876,
+          "name": "analyze (python)",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:19Z",
+          "completed": "2026-09-07T09:15:09Z",
+          "reported_timestamp_delta_seconds": 50,
+          "executed_job_span_seconds": 50
+        },
+        {
+          "id": 101687493884,
+          "name": "analyze (go)",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:19Z",
+          "completed": "2026-09-07T09:15:10Z",
+          "reported_timestamp_delta_seconds": 51,
+          "executed_job_span_seconds": 51
+        }
+      ]
+    },
+    {
+      "run_id": 34104877320,
+      "name": "CI",
+      "head": "48c19ad5c74ca933e057e705ade7b5b4a1acec12",
+      "event": "pull_request",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 101687494287,
+          "name": "classify-changes",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:19Z",
+          "completed": "2026-09-07T09:14:25Z",
+          "reported_timestamp_delta_seconds": 6,
+          "executed_job_span_seconds": 6
+        },
+        {
+          "id": 101687536891,
+          "name": "test",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:28Z",
+          "completed": "2026-09-07T09:14:34Z",
+          "reported_timestamp_delta_seconds": 6,
+          "executed_job_span_seconds": 6
+        },
+        {
+          "id": 101687537103,
+          "name": "php-coverage-report",
+          "conclusion": "skipped",
+          "started": "2026-09-07T09:14:26Z",
+          "completed": "2026-09-07T09:14:25Z",
+          "reported_timestamp_delta_seconds": -1,
+          "executed_job_span_seconds": 0
+        },
+        {
+          "id": 101687537560,
+          "name": "runtime-tests",
+          "conclusion": "skipped",
+          "started": "2026-09-07T09:14:26Z",
+          "completed": "2026-09-07T09:14:25Z",
+          "reported_timestamp_delta_seconds": -1,
+          "executed_job_span_seconds": 0
+        },
+        {
+          "id": 101687581152,
+          "name": "platform-gate",
+          "conclusion": "success",
+          "started": "2026-09-07T09:14:37Z",
+          "completed": "2026-09-07T09:14:41Z",
+          "reported_timestamp_delta_seconds": 4,
+          "executed_job_span_seconds": 4
+        }
+      ]
+    }
+  ]
+}
