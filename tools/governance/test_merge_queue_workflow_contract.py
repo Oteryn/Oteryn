@@ -112,6 +112,49 @@ def test_release_schema_is_authoritative_and_never_fetches_remote_references() -
             raise AssertionError("META must not resolve provider/remote schemas over the network")
 
 
+def test_release_schema_rejects_unused_dangling_references() -> None:
+    from validate_release_manifests import load_validator
+    original = json.loads((ROOT / "ecosystem/compatibility.schema.json").read_text())
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "schema.json"
+        for reference in ({"$ref": "#/$defs/typo"}, {"$dynamicRef": "#missing"}):
+            schema = copy.deepcopy(original)
+            schema["properties"]["optional_future_field"] = reference
+            path.write_text(json.dumps(schema))
+            try:
+                load_validator(path)
+            except ValueError as exc:
+                assert "reference" in str(exc)
+            else:
+                raise AssertionError(f"unused dangling reference was accepted: {reference}")
+        schema = copy.deepcopy(original)
+        schema["$defs"]["nested"] = {"$id": "urn:example:nested", "$defs": {"local": True},
+                                   "properties": {"value": {"$ref": "#/$defs/local"}}}
+        path.write_text(json.dumps(schema))
+        load_validator(path)  # Valid references retain their resource-local scope.
+        schema["$defs"]["nested"]["properties"]["value"]["$ref"] = "#/$defs/component"
+        path.write_text(json.dumps(schema))
+        try:
+            load_validator(path)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("nested resource resolved a reference against the wrong root")
+
+
+def test_release_cli_rejects_missing_explicit_directory() -> None:
+    with tempfile.TemporaryDirectory() as directory:
+        command = [sys.executable, str(ROOT / "tools/governance/validate_release_manifests.py")]
+        missing = subprocess.run(command + ["--release-dir", str(Path(directory) / "typo")],
+                                 capture_output=True, text=True, timeout=30)
+        assert missing.returncode == 1 and json.loads(missing.stdout)["status"] == "INVALID"
+        empty = subprocess.run(command + ["--release-dir", directory],
+                               capture_output=True, text=True, timeout=30)
+        assert empty.returncode == 0 and json.loads(empty.stdout)["release_manifests"] == 0
+        default = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        assert default.returncode == 0  # No committed release directory is permitted.
+
+
 def _job_body(workflow: str, job_name: str) -> str:
     match = re.search(
         rf"(?ms)^  {re.escape(job_name)}:\n(?P<body>.*?)(?=^  [A-Za-z][^\n]*:\n|\Z)",
@@ -299,6 +342,8 @@ def test_drift_audit_rejects_duplicate_repository_snapshot() -> None:
 
 
 if __name__ == "__main__":
+    test_release_schema_rejects_unused_dangling_references()
+    test_release_cli_rejects_missing_explicit_directory()
     test_release_validation_uses_full_schema_and_admission_rules()
     test_release_schema_is_authoritative_and_never_fetches_remote_references()
     test_meta_gate_qualifies_pull_requests_and_exact_merge_group_candidates()

@@ -9,34 +9,46 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError, ValidationError
-from referencing import Registry
+from referencing import Registry, Resource
+from referencing.exceptions import Unresolvable
 
 ROOT = Path(__file__).resolve().parents[2]
 DRAFT = "https://json-schema.org/draft/2020-12/schema"
 
 
-def _check_local_references(value: Any) -> None:
-    if isinstance(value, dict):
-        for key, child in value.items():
-            if key in {"$ref", "$dynamicRef"} and (not isinstance(child, str) or not child.startswith("#")):
+def _check_local_references(resource: Resource, resolver: Any) -> None:
+    # Resolve all schema references, including unused optional/definition paths.
+    # The library preserves nested $id and anchor scope; no URI is fetched.
+    if isinstance(resource.contents, dict):
+        for key in ("$ref", "$dynamicRef"):
+            if key not in resource.contents:
+                continue
+            reference = resource.contents[key]
+            if not isinstance(reference, str) or not reference.startswith("#"):
                 raise ValueError("compatibility schema references must be document-local")
-            _check_local_references(child)
-    elif isinstance(value, list):
-        for child in value:
-            _check_local_references(child)
+            try:
+                resolved = resolver.lookup(reference)
+                Draft202012Validator.check_schema(resolved.contents)
+            except (Unresolvable, SchemaError) as exc:
+                raise ValueError(f"invalid local schema reference {reference!r}: {exc}") from exc
+    for child in resource.subresources():
+        _check_local_references(child, resolver.in_subresource(child))
 
 
 def load_validator(path: Path) -> Draft202012Validator:
     schema = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(schema, dict) or schema.get("$schema") != DRAFT or schema.get("type") != "object":
         raise ValueError("compatibility schema must be a draft 2020-12 object")
-    _check_local_references(schema)
     try:
         Draft202012Validator.check_schema(schema)
     except SchemaError as exc:
         raise ValueError(f"invalid compatibility schema: {exc.message}") from exc
-    # Explicit empty registry has no network retrieval; provider schemas stay provider-owned.
-    return Draft202012Validator(schema, registry=Registry())
+    # Registry has no network retrieval; provider schemas stay provider-owned.
+    resource = Resource.from_contents(schema)
+    uri = resource.id() or "urn:oteryn:compatibility-schema"
+    registry = Registry().with_resource(uri, resource).crawl()
+    _check_local_references(resource, registry.resolver(uri))
+    return Draft202012Validator(schema, registry=registry)
 
 
 def validate_manifest(document: Any, path: Path, validator: Draft202012Validator) -> None:
@@ -54,13 +66,14 @@ def validate_manifest(document: Any, path: Path, validator: Draft202012Validator
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--schema", type=Path, default=ROOT / "ecosystem/compatibility.schema.json")
-    parser.add_argument("--release-dir", type=Path, default=ROOT / "ecosystem/releases")
+    parser.add_argument("--release-dir", type=Path, default=None)
     args = parser.parse_args()
     try:
         validator = load_validator(args.schema)
-        if args.release_dir.exists() and not args.release_dir.is_dir():
-            raise ValueError("release-dir must be a directory, not a regular file")
-        files = sorted(args.release_dir.glob("*.json"))
+        release_dir = args.release_dir if args.release_dir is not None else ROOT / "ecosystem/releases"
+        if (args.release_dir is not None or release_dir.exists()) and not release_dir.is_dir():
+            raise ValueError("release-dir must be an existing directory")
+        files = sorted(release_dir.glob("*.json"))
         for path in files:
             validate_manifest(json.loads(path.read_text(encoding="utf-8")), path, validator)
     except (OSError, ValueError) as exc:
