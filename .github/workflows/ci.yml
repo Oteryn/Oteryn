@@ -77,19 +77,25 @@ jobs:
               Path('docs/governance/AI_REVIEW_POLICY.md'),
               Path('docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md'),
               Path('docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md'),
+              Path('docs/agents/policy/ORGANIZATION_AGENT_POLICY.md'),
+              Path('docs/agents/policy/PROMPTING_STANDARD.md'),
+              Path('docs/agents/policy/PROMPT_EVAL_STANDARD.md'),
               Path('ecosystem/repositories.json'),
               Path('ecosystem/governance-desired-state.json'),
               Path('ecosystem/compatibility.schema.json'),
               Path('ecosystem/agent-execution-routing-policy.json'),
               Path('ecosystem/bounded-autonomous-execution-policy.json'),
               Path('ecosystem/agent-continuation-policy.json'),
+              Path('ecosystem/organization-agent-policy.json'),
               Path('tools/governance/agent_execution_routing.py'),
               Path('tools/governance/bounded_execution_guard.py'),
               Path('tools/governance/agent_continuation_policy.py'),
+              Path('tools/governance/central_agent_policy.py'),
               Path('tools/governance/test_agent_execution_routing.py'),
               Path('tools/governance/test_bounded_execution_guard.py'),
               Path('tools/governance/test_agent_continuation_policy.py'),
               Path('tools/governance/test_agent_continuation_review_repairs.py'),
+              Path('tools/governance/test_central_agent_policy.py'),
               Path('tools/governance/test_remote_desktop_action_gate.py'),
               Path('tools/governance/test_merge_queue_workflow_contract.py'),
           ]
@@ -254,6 +260,8 @@ jobs:
           python3 tools/governance/test_bounded_execution_guard.py
           python3 tools/governance/test_agent_continuation_policy.py
           python3 tools/governance/test_agent_continuation_review_repairs.py
+          python3 tools/governance/test_central_agent_policy.py
+          python3 tools/governance/central_agent_policy.py
 
       - name: Verify META boundary markers
         shell: bash
