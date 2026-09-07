@@ -24,6 +24,7 @@ Repository protection requires only `meta-gate`. The same gate runs on normal pu
 - META authority is no longer `Oteryn/Oteryn` without an accepted architecture change;
 - a repository entry lacks product, current/target coordinate, migration state or authority owner;
 - the compatibility schema is malformed or changes JSON Schema generation unexpectedly;
+- a release violates any local JSON Schema constraint, has an empty contract/evidence list or has a release ID different from its filename;
 - a merged ecosystem release does not pin exact Game/Platform/Atlas repository coordinates and 40-hex commit SHAs;
 - a release artifact digest is not an immutable `sha256:<64-hex>` value;
 - a merged release contract is not explicitly `compatible`;
@@ -48,7 +49,7 @@ META records compatible product identities but does not duplicate provider CI:
 - Platform owns web/application, identity, persistence and browser/system validation.
 - Atlas owns semantic-consumer, browser-map, search/index and derived-data validation.
 
-A compatible ecosystem release may reference successful provider evidence by immutable SHA, tag, artifact ID and digest, but META CI must not convert missing provider evidence into a pass.
+A compatible ecosystem release may reference successful provider evidence by immutable SHA, tag, artifact ID and digest, but META CI must not convert missing provider evidence into a pass. Its offline schema validator reports only `STRUCTURE_VALID`; authenticating the referenced exact-head provider evidence remains a release-specific prerequisite in `docs/release/RELEASE_COORDINATION.md`.
 
 ## Branch protection target
 

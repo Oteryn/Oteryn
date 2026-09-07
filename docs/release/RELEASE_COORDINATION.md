@@ -12,7 +12,7 @@ Future ecosystem release records belong under:
 ecosystem/releases/<release-id>.json
 ```
 
-Each release record should validate against `ecosystem/compatibility.schema.json` and pin the exact participating component commit SHA. Tags are human-friendly aliases only; artifact digests are preferred whenever an external artifact is part of the compatibility boundary.
+Each release record must validate against `ecosystem/compatibility.schema.json` and pin the exact participating component commit SHA. Tags are human-friendly aliases only; artifact digests are preferred whenever an external artifact is part of the compatibility boundary.
 
 ## Minimum release record
 
@@ -26,6 +26,30 @@ A release set must identify:
 - immutable artifact digests when artifacts cross repository boundaries;
 - explicit provider/consumer contracts and their versions;
 - evidence references sufficient to locate the exact provider validation used for the release decision.
+
+## Structure is not release approval
+
+`tools/governance/validate_release_manifests.py` applies the complete local JSON
+Schema draft 2020-12 contract, including unknown-property rejection. Committed
+records also require a matching filename/release ID and `compatible` status for
+every declared contract. Contracts and evidence lists must be non-empty. No
+release manifests existed when this minimum was introduced; there is no legacy
+release record migration.
+
+The validator is offline and reports `STRUCTURE_VALID`, never provider adoption,
+compatibility verification or deployment readiness. It does not fetch schemas,
+run product E2E, authenticate evidence references or assert that a referenced
+check passed. A string in an evidence list is only a locator.
+
+Before approving a release, its owner must read back: (1) each component's required
+provider checks on its recorded exact SHA; (2) producer and consumer contract-test
+evidence for each declared boundary/version; (3) artifact IDs and SHA-256 digests
+when artifacts cross that boundary; and (4) rollout/rollback evidence for any
+non-backward-compatible change. Evidence must identify repository, exact tested
+revision and durable run/check/artifact or committed-file locator. A moved tag,
+older-head result, unverified summary or missing provider-side proof is not a pass.
+Record that review in the release PR. This is a release-specific owner action,
+not another META service, copied provider schema, global test or required status.
 
 ## Provider/consumer examples
 
