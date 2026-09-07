@@ -1,9 +1,12 @@
 # OTERYN-V310-ORGANIZATION-RECOVERY-AUTHORIZED-CONTINUATION
 
-> TASK TEMPLATE, not standing authority. Refresh the governing live Issue/PR and current explicit owner authorization before invocation; historical permissions, heads and execution procedures below do not override [AGENTS.md](../../../AGENTS.md). This marker does not close or defer the underlying task.
+> Task template, not authority. Use the target root/nearest `AGENTS.md`, bound
+> META procedures and current authorization for execution, review and integration.
+> Scope lists are ceilings narrowed by live provider restrictions. Reverify all
+> historical permissions, heads and external facts. This does not close the task.
 
 PROMPT_ID: `OTERYN-V310-ORGANIZATION-RECOVERY-AUTHORIZED-CONTINUATION`
-PROMPT_VERSION: `1.0`
+PROMPT_VERSION: `1.1`
 STATUS: `TEMPLATE_REQUIRES_LIVE_AUTHORIZATION`
 PROGRAMME: `OTERYN-ORG-AUDIT-v3.10`
 CONTINUES: `OTERYN-V310-ORGANIZATION-RECOVERY-CLOSEOUT`
@@ -22,7 +25,7 @@ Required target state:
 - `GAP-RECOVERY-002`: `PASS`;
 - `GAP-RECOVERY-003`: `PASS`;
 - `GAP-RECOVERY-004`: `PASS` if recoverable secret-value source exists or can be established safely from an already authorized readable source; otherwise report the exact additional blocker without exposing any value;
-- `GAP-RECOVERY-005`: `BLOCKED_EXTERNAL_PREREQUISITE` because only one organization owner/account currently exists;
+- `GAP-RECOVERY-005`: `BLOCKED_EXTERNAL_PREREQUISITE` if the historical single-owner prerequisite remains unresolved on current evidence;
 - `GAP-RECOVERY-006`: `PASS` using non-destructive production backup/restore evidence.
 
 `GAP-RECOVERY-005` is a known external prerequisite. DO NOT stop the whole invocation merely because it cannot pass. Finish `001..004` and `006` first.
@@ -31,7 +34,8 @@ Required target state:
 
 ## Historical invocation authorization — not reusable authority
 
-The repository owner has already authorized this recovery implementation with the following exact constraints:
+The prior invocation recorded the following constraints. They describe its
+historical scope and must be matched to current explicit authorization before use:
 
 1. Implement recovery work for `GAP-RECOVERY-001..006`.
 2. Use Synology as independent recovery storage where appropriate.
@@ -72,17 +76,14 @@ and continue every other independent recovery GAP that remains executable.
 - Preserve the existing fail-closed evidence; update/supersede stale blocker statements only with new direct evidence.
 - Do not modify the separate v3.10 final audit successor/report PR. Final coordination happens later.
 
-## Capability discovery — mandatory
+## Recovery capability delta
 
-Before declaring any recovery GAP blocked by access:
-
-- inspect GitHub connector/actions and current authenticated capabilities;
-- inspect authorized Remote Desktop / Synology execution paths;
-- inspect repository-owned recovery tooling and current host-local capabilities;
-- distinguish missing tool, missing permission, missing secret source, policy restriction and genuinely absent recovery asset;
-- use the safest available authorized path.
-
-Do not say `NO ACCESS` or `BLOCKED` while a safe authorized execution path remains untested.
+For a recovery access failure, distinguish missing tool, permission, readable
+secret source, policy authority and absent recovery asset. Use the routed access
+policy for capability discovery; an advertised host tool or historical recovery
+grant does not authorize a Remote Desktop call. Repository recovery tooling and
+an already authorized recovery plane are relevant candidates, not mandatory
+probes into every available system.
 
 ## Mutation boundaries
 
@@ -217,7 +218,8 @@ If one or more required values exist only in a non-readable destination and no r
 
 ## GAP-RECOVERY-005 — second-owner redundancy
 
-Known current fact: only one organization owner/account exists.
+Historical starting observation: only one organization owner/account existed.
+Reverify the prerequisite; this template does not attest current ownership.
 
 Therefore the required disposition for this invocation is:
 
@@ -272,16 +274,11 @@ Never promote `UNKNOWN` or policy prose to PASS.
 ## Validation and security
 
 Before finalizing:
-- inspect the complete changed-file list and diff in every touched repository;
 - run deterministic recovery validators and their regression tests;
 - verify recurring jobs have fail-closed behavior;
 - verify no secret values/private payloads entered Git history, Issue/PR bodies, Actions logs or artifacts;
 - perform high-signal credential/secret leakage scans without printing matches containing values;
-- verify exact protected-main and candidate heads;
 - run repository-required exact-head checks;
-- obtain required external review under each repository's current policy;
-- inspect PR comments, reviews and unresolved threads;
-- merge only by normal protected policy, no bypass;
 - verify resulting main heads and branch cleanup.
 
 ## Closeout semantics

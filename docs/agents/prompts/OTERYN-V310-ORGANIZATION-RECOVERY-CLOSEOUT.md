@@ -1,9 +1,12 @@
 # OTERYN-V310-ORGANIZATION-RECOVERY-CLOSEOUT
 
-> TASK TEMPLATE, not standing authority. Refresh the governing live Issue/PR and current explicit owner authorization before invocation; historical permissions, heads and execution procedures below do not override [AGENTS.md](../../../AGENTS.md). This marker does not close or defer the underlying task.
+> Task template, not authority. Use the target root/nearest `AGENTS.md`, bound
+> META procedures and current authorization for execution, review and integration.
+> Scope lists are ceilings narrowed by live provider restrictions. Reverify all
+> historical permissions, heads and external facts. This does not close the task.
 
 PROMPT_ID: `OTERYN-V310-ORGANIZATION-RECOVERY-CLOSEOUT`
-PROMPT_VERSION: `1.0`
+PROMPT_VERSION: `1.1`
 STATUS: `TEMPLATE_REQUIRES_LIVE_AUTHORIZATION`
 PROGRAMME: `OTERYN-ORG-AUDIT-v3.10`
 
@@ -89,11 +92,11 @@ Verify actual second-owner/account-recovery redundancy. If adding/changing organ
 ### GAP-RECOVERY-006
 Read Platform provider recovery authority and verify whether production backup mechanism, retention, restore test, RPO and RTO are directly proven. Do not run destructive production restore tests. If production RPO/RTO targets or backup mechanism require owner/provider operational decisions, report the exact decision and leave the GAP fail-closed.
 
-## Parallel-work safety
+## Ownership delta
 
-Game, Platform and Atlas Documentation/Agent IA agents may run concurrently. This Recovery agent must not edit their repositories or their task records. Read-only provider evidence is allowed only for recovery facts.
-
-Use one META Issue/task, one branch and one PR for this work. Do not modify v3.10 PR #43 or its branch.
+Other provider IA and Recovery lanes may be active. Preserve their owned paths and
+records; this template does not allocate a second writer or reopen their tasks.
+Do not modify the separate v3.10 final audit report branch (historical locator #43).
 
 ## Validation
 
@@ -102,9 +105,7 @@ Before completion:
 - run deterministic validators for every machine-readable recovery artifact;
 - verify no secrets/private payloads are committed or printed;
 - verify any backup/restore claim includes both generation and restore/reconstruction evidence;
-- inspect full diff and exact changed paths;
 - run normal META required checks on the exact final head;
-- obtain required review under current META policy;
 - squash merge only if no material recovery `UNKNOWN` required for the claimed task completion remains;
 - verify resulting `main` and branch cleanup.
 
