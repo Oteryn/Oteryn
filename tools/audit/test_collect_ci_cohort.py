@@ -1,5 +1,8 @@
+import os
+from pathlib import Path
+import tempfile
 import unittest
-from collect_ci_cohort import elapsed, select_runs, job_metrics, ReadOnlyAPI, PLAN, collect
+from collect_ci_cohort import elapsed, select_runs, job_metrics, ReadOnlyAPI, PLAN, collect, write_new
 
 
 def run(n=1, **kw):
@@ -87,6 +90,28 @@ class Tests(unittest.TestCase):
 
     def test_all_plan_coordinates_are_closed(self):
         self.assertEqual(len(PLAN), 4); self.assertEqual(sum(map(len, PLAN.values())), 7)
+
+    def test_write_new_refuses_existing_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'collection-error.json'
+            path.write_bytes(b'preserve')
+            with self.assertRaises(FileExistsError):
+                write_new(path, b'new')
+            self.assertEqual(path.read_bytes(), b'preserve')
+
+    def test_write_new_refuses_final_path_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / 'target.json'
+            target.write_bytes(b'preserve')
+            link = root / 'collection-error.json'
+            try:
+                link.symlink_to(target.name)
+            except (OSError, NotImplementedError):
+                self.skipTest('symlink unavailable')
+            with self.assertRaises(FileExistsError):
+                write_new(link, b'new')
+            self.assertEqual(target.read_bytes(), b'preserve')
 
 
 if __name__ == '__main__': unittest.main()
