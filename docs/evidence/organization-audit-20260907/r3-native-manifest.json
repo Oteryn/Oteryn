@@ -81,5 +81,5 @@
       }
     }
   ],
-  "scope": "Exact pinned Platform source for native tests; CI cohort has separate per-run immutable identities and mutable time-of-read main refs. Artifacts are retained in the owner delivery ZIP, independently of hosted expiry. Restricted security materials are not part of this public manifest."
+  "scope": "Exact pinned Platform source for native tests; CI cohort has separate per-run immutable identities and mutable time-of-read main refs. Artifacts are retained in the owner delivery ZIP independently of hosted expiry. Security characterization archives/scripts are intentionally absent from this public manifest, but that omission does not imply historical confidentiality: independent review established public ancestor commits/artifacts containing mechanism details, which must be treated as disclosed until deletion/expiry is independently verified."
 }
