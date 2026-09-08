@@ -34,7 +34,7 @@ jobs:
           [[ "$GITHUB_SHA" == "$MERGE_GROUP_HEAD_SHA" ]]
           [[ "$MERGE_GROUP_BASE_REF" == "refs/heads/main" ]]
 
-      - name: Verify live Merge Queue rule
+      - name: Verify live Merge Queue configuration
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -44,46 +44,87 @@ jobs:
         run: |
           set -euo pipefail
           observed_at="$(date +%s)"
-          rules_file="${RUNNER_TEMP}/active-branch-rules.json"
+          queue_file="${RUNNER_TEMP}/merge-queue.json"
+          owner="${TARGET_REPOSITORY%%/*}"
+          name="${TARGET_REPOSITORY#*/}"
+          python3 - "${owner}" "${name}" > "${RUNNER_TEMP}/merge-queue-query.json" <<'PY'
+          import json
+          import sys
+
+          owner, name = sys.argv[1:]
+          query = """
+          query($owner: String!, $name: String!) {
+            repository(owner: $owner, name: $name) {
+              mergeQueue {
+                id
+                resourcePath
+                url
+                configuration {
+                  mergeMethod
+                  maximumEntriesToBuild
+                  maximumEntriesToMerge
+                  minimumEntriesToMerge
+                }
+              }
+            }
+          }
+          """
+          print(json.dumps({"query": query, "variables": {"owner": owner, "name": name}}))
+          PY
           curl --fail-with-body --silent --show-error \
             --retry 2 \
             --header "Accept: application/vnd.github+json" \
             --header "Authorization: Bearer ${GH_TOKEN}" \
             --header "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${TARGET_REPOSITORY}/rules/branches/${TARGET_BRANCH}" \
-            > "${rules_file}"
-          python3 - "${rules_file}" "${TARGET_REPOSITORY}" "${TARGET_BRANCH}" "${CANDIDATE_SHA}" "${observed_at}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" <<'PY'
+            --header "Content-Type: application/json" \
+            --data-binary "@${RUNNER_TEMP}/merge-queue-query.json" \
+            "https://api.github.com/graphql" \
+            > "${queue_file}"
+          python3 - "${queue_file}" "${TARGET_REPOSITORY}" "${TARGET_BRANCH}" "${CANDIDATE_SHA}" "${observed_at}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" <<'PY'
           import json
           import re
           import sys
 
           path, repository, branch, candidate_sha, observed_at, run_id, run_attempt = sys.argv[1:]
           if repository != "Oteryn/Oteryn" or branch != "main":
-              raise SystemExit("live branch-rule observation targeted an unexpected repository or branch")
+              raise SystemExit("live merge-queue observation targeted an unexpected repository or branch")
           if re.fullmatch(r"[0-9a-f]{40}", candidate_sha) is None:
               raise SystemExit("candidate SHA is invalid")
           payload = json.loads(open(path, encoding="utf-8").read())
-          if not isinstance(payload, list):
-              raise SystemExit("active branch-rules response is not a JSON array")
-          rule_types = sorted(
-              rule.get("type")
-              for rule in payload
-              if isinstance(rule, dict) and isinstance(rule.get("type"), str)
-          )
-          if "merge_queue" not in rule_types:
-              raise SystemExit(f"protected main does not currently expose an active merge_queue rule: {rule_types}")
+          errors = payload.get("errors") if isinstance(payload, dict) else None
+          if errors:
+              raise SystemExit(f"GraphQL merge-queue query failed: {errors}")
+          repository_data = payload.get("data", {}).get("repository") if isinstance(payload, dict) else None
+          queue = repository_data.get("mergeQueue") if isinstance(repository_data, dict) else None
+          if not isinstance(queue, dict):
+              raise SystemExit("repository does not currently expose a Merge Queue")
+          queue_id = queue.get("id")
+          resource_path = queue.get("resourcePath")
+          url = queue.get("url")
+          configuration = queue.get("configuration")
+          if not isinstance(queue_id, str) or not queue_id.startswith("MQ_"):
+              raise SystemExit("Merge Queue id is missing or invalid")
+          if not isinstance(resource_path, str) or not resource_path:
+              raise SystemExit("Merge Queue resourcePath is missing")
+          if not isinstance(url, str) or not url:
+              raise SystemExit("Merge Queue URL is missing")
+          if not isinstance(configuration, dict) or not isinstance(configuration.get("mergeMethod"), str):
+              raise SystemExit("Merge Queue configuration is missing")
           observation = {
               "repository": repository,
               "base_ref": branch,
               "candidate_sha": candidate_sha,
               "merge_queue_required": True,
               "observed_at_epoch_seconds": int(observed_at),
-              "source": "branch_rules",
+              "source": "graphql_queue_config",
               "workflow_run_id": int(run_id),
               "workflow_run_attempt": int(run_attempt),
-              "rule_types": rule_types,
+              "queue_id": queue_id,
+              "resource_path": resource_path,
+              "url": url,
+              "configuration": configuration,
           }
-          print("LIVE_MQ_RULE_OBSERVATION=" + json.dumps(observation, sort_keys=True, separators=(",", ":")))
+          print("LIVE_MQ_QUEUE_OBSERVATION=" + json.dumps(observation, sort_keys=True, separators=(",", ":")))
           PY
 
       - name: Checkout exact candidate
