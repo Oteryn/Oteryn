@@ -4,13 +4,13 @@ This is audit-author work on the five immutable generations in the main JSON, no
 
 ## Scope keys used by the compact ledger
 
-`R3-WF`: only the workflow control declarations described below, not all step bodies or live enforcement. `R3-DB`: entire migration source for the listed schema/data/rollback concerns, not down execution or data-conservation proof. `R3-ID`: identity/session component boundaries, with private characterization and no live/full acceptance. `R3-F17`: only the recorded Announcements translation-consumer/profile/assertion ranges; not full locale or browser qualification. Each row binds its exact source blob and inspected line ranges; these keys are expanded here instead of duplicating the same paragraph in every row.
+`R3-WF`: only the workflow control declarations described below, not all step bodies or live enforcement. `R3-DB`: entire migration source for the listed schema/data/rollback concerns, not down execution or data-conservation proof. `R3-ID`: identity/session component boundaries, including a controlled characterization whose mechanism must now be treated as publicly disclosed because it appeared in public ancestor history/artifacts; no live/full acceptance. `R3-F17`: only the recorded Announcements translation-consumer/profile/assertion ranges; not full locale or browser qualification. Each row binds its exact source blob and inspected line ranges; these keys are expanded here instead of duplicating the same paragraph in every row.
 
 ## Platform persistence: all 50 migrations
 
 Read all authored `database/migrations/*.php` up/down bodies. Assessed creation/removal ordering, foreign keys and deletion behavior, uniqueness/idempotency constraints, nullable/default states, generation/replay fields, data conversions, and explicit refusal of lossy reverse transformations. `r3-migration-review.json` binds the complete 50-path/blob ledger subset and total line count.
 
-All 50 migration names occur in the successful `migrations.log` from the isolated SQLite public-UI fixture, native artifact 10043048175. This demonstrates fresh-schema up execution only. No down execution, current-data upgrade, production/MariaDB schema matrix, rollback data conservation, or RPO/RTO is claimed.
+All 50 migration names occur in the successful `migrations.log` from the isolated SQLite public-UI fixture, native artifact 10043048175. Post-review hardening makes this claim reproducible: `verify_r3_evidence.py` reconstructs the exact 50 Platform migration paths/blobs from `coverage-review.tsv`, validates their committed digest, parses the bound log and requires exactly 50 unique `DONE` names equal to that source set. This demonstrates fresh-schema up execution only. No down execution, current-data upgrade, production/MariaDB schema matrix, rollback data conservation, or RPO/RTO is claimed.
 
 Important observations: game-catalog reverse ordering respects declared dependencies; verified-content/loot conversion reverse paths explicitly reject incompatible data; refund/reconciliation reverse paths guard retained settlement/resolution evidence. Passport migration field declarations do not all imply constrained foreign keys. SQL uniqueness alone does not prove cross-service exactly-once behavior. RBAC seed reversal is migration behavior, not proof that arbitrary later operator edits are preserved.
 
@@ -24,7 +24,7 @@ Game's declaration graph distinguishes PR impact selection from its full merge-g
 
 ## Identity/session and public UI contracts
 
-Read the nine named identity/session component sources in the path ledger. Restricted characterization is routed privately under Platform SECURITY.md; final public source removes the two prior synthetic security-characterization scripts. Earlier Git history and Actions artifacts are not erased. No private-advisory submission, exploitation on live systems or completed remediation is claimed.
+Read the nine named identity/session component sources in the path ledger. A controlled source-pinned characterization exists, but independent review established that its mechanism was present in public ancestor commits and public Actions artifacts. It must therefore be handled as already disclosed; the current report intentionally does not repeat the mechanism or PoC. Further assessment/remediation is routed through Platform `SECURITY.md` private vulnerability reporting. Current live reachability, artifact deletion/expiry, private-advisory submission and remediation remain unverified. Deleting the scripts from the final tree does not erase Git history or restore confidentiality.
 
 Read the Announcements ticker, browser profile, acceptance spec and only the relevant EN/PL translation ranges. The static trigger probe binds six exact source blobs. No fresh Announcements full-browser suite is inferred from the unrelated anonymous 48-case UI acquisition.
 
@@ -32,9 +32,11 @@ Eight actual full images from the corrected public-UI artifact were inspected by
 
 ## Evidence-tool defects fixed before accepting the recount
 
-The browser oracle now rejects another local route and credential-bearing URLs and checks complete source bindings for current-schema evidence. The results parser independently recomputes raw DOM criteria rather than trusting recorded green flags. Negative per-case assertions cannot cancel positive counts. Go event histories must have one package lifecycle, bound test-package identity and correctly ordered starts/ends; duplicate starts and out-of-order terminals fail. RED and GREEN regression logs are supplied with the delivery.
+The browser oracle rejects another local route and credential-bearing URLs and checks complete source bindings for current-schema evidence. The results parser independently recomputes raw DOM criteria rather than trusting recorded green flags. After independent review, the original failed browser capture is also parsed directly: the matrix must be exactly 48 cases and the failure signature exactly eight `http_ok` failures for `/support` and `/legal/privacy` across four viewports, with no hidden ninth failure; its replay is explicitly offline/legacy, not a new browser execution.
 
-These checks protect accounting and evidence interpretation. They are not proof that no application defect exists, nor a second independent reviewer. The final accounting test deliberately refuses exhaustive completion, a self-awarded score, a fabricated product PASS or hiding unverified coverage.
+Negative per-case assertions cannot cancel positive counts. Go event histories must have one package lifecycle, bound test-package identity and correctly ordered starts/ends; duplicate starts and out-of-order terminals fail. The migration log must equal the exact 50-path source ledger, and the entire recomputed native summary must equal committed `r3-native-results.json` or verification fails. The CI collector creates result/error files exclusively so existing files and final-path symlinks cannot be overwritten. RED/GREEN regression evidence is supplied with the delivery.
+
+These checks protect accounting and evidence interpretation. They are not proof that no application defect exists, nor a substitute for another independent reviewer. The final accounting test deliberately refuses exhaustive completion, a self-awarded score, a fabricated product PASS or hiding unverified coverage.
 
 ## Reuse and missing coverage
 
