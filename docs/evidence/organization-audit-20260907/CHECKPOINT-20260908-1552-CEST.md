@@ -2,6 +2,8 @@
 
 Checkpoint time: **2026-09-08 15:52 CEST**
 
+> **Digest correction (2026-09-08):** deterministic 4,325-row ledger reproduction on head `783673fbb5c849b035cc49976c6099e7655b39b0`, run `34239677668`, artifact `10061390705`, proved that the pre-adoption 27-GROUPED digest is `db82a3bfa333521a4a21bf5e5e90ea816613186214ca92d59b6ce3394b0b7354`. The `db82a3bf425…` value originally written below was a checkpoint transcription error and is superseded; the checkpoint remains a historical pre-adoption state.
+
 This is a continuation checkpoint for `Oteryn/Oteryn` PR **#185** and Issue **#186**. Do not restart the audit, create a competing programme, or mutate provider repositories from this META task.
 
 ## Live coordination state at checkpoint cut
@@ -23,7 +25,7 @@ The canonical ledger is still deliberately **not** semantic completion:
 - DIRECT: **221**
 - GROUPED: **27**
 - UNVERIFIED: **4,077**
-- current ledger SHA-256: `db82a3bf4256459bba548649211c6d3f9b435003ebf2fa2a2586aefcc771b283`
+- current ledger SHA-256: `db82a3bfa333521a4a21bf5e5e90ea816613186214ca92d59b6ce3394b0b7354` (corrected by deterministic reproduction; see note above)
 - verifier state: `ACCOUNTING_VALID_NOT_SEMANTIC_PASS`
 
 The only currently adopted GROUPED family remains frozen Platform `app/GameAuth/**` (27 leaves). Its verifier was hardened after independent review; the two P2 evidence-integrity findings were fixed and resolved after clean exact-head re-review.

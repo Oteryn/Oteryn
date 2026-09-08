@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "report_id": "OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907",
-  "revision": "R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-ROUTES-GAMEAUTH-RECONCILIATION",
+  "revision": "R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-ROUTES-GAMEAUTH-ACCOUNT-CHARACTER-RECONCILIATION",
   "status": "QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE",
   "governing_issue": "Oteryn/Oteryn#186",
   "pull_request": "Oteryn/Oteryn#185",
@@ -118,8 +118,8 @@
     "GAME-CANDIDATE-361"
   ],
   "scoped_review_paths": 221,
-  "grouped_revalidated_paths": 27,
-  "semantically_classified_paths": 248,
+  "grouped_revalidated_paths": 58,
+  "semantically_classified_paths": 279,
   "r3_native_results": "organization-audit-20260907/r3-native-results.json",
   "r3_source_review": "organization-audit-20260907/r3-source-review.md",
   "r3_visual_review": "organization-audit-20260907/r3-visual-review.json",
@@ -134,20 +134,22 @@
     "latest_repair_rereview_requested_head": "e242a68a9df73304cbb6ba8bd3cfebbb36a2197b",
     "security_disclosure_state": "PUBLIC_ANCESTOR_HISTORY_AND_ARTIFACTS_TREATED_AS_DISCLOSED; current report does not repeat mechanism details; deletion/expiry not established",
     "latest_completed_rereview": {
-      "reviewed_head": "d72356adccf5600dc2fc2a075f215a6b071a21df",
-      "completed_at_utc": "2026-09-08T11:39:15.902085Z",
+      "reviewed_head": "21c02cac9cbb4e114741bab83985b48a817dfd35",
+      "completed_at_utc": "2026-09-08T13:01:16.293440Z",
       "result": "PASS_NO_NEW_P0_P1_P2",
       "p1": 0,
       "p2": 0,
       "new_material_findings": [],
-      "historical_review_threads_resolved_after_readback": 15
+      "historical_review_threads_resolved_after_readback": 15,
+      "gameauth_review_threads_resolved_after_readback": 2
     },
-    "fresh_rereview_reason": "Platform routes/GameAuth coverage reconciliation is material evidence added after the clean d72356ad review."
+    "fresh_rereview_reason": "The 31-path Platform Accounts/CanaryIntegration/CharacterProfiles/Characters GROUPED expansion is material evidence added after the clean 21c02cac GameAuth verifier-hardening re-review."
   },
   "audit_completion": "NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial",
   "source_cut_policy": "Immutable original pinned generations are retained. Later lifecycle observations are separate evidence; this is not an all-repositories current-main acceptance snapshot.",
   "rejected_group_candidates": 1,
   "atlas_grouped_revalidation": "organization-audit-20260907/r3-atlas-grouped-revalidation.json",
   "r3_platform_gameauth_candidate": "organization-audit-20260907/r3-platform-gameauth-candidate.json",
-  "r3_continuation_checkpoint": "organization-audit-20260907/r3-continuation-checkpoint-20260908.json"
+  "r3_continuation_checkpoint": "organization-audit-20260907/r3-continuation-checkpoint-20260908.json",
+  "r3_platform_account_character_candidate": "organization-audit-20260907/r3-platform-account-character-candidate.json"
 }
