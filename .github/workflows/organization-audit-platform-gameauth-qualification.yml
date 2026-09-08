@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/organization-audit-platform-gameauth-qualification.yml
       - docs/evidence/organization-audit-20260907/r3-platform-gameauth-candidate.json
+      - docs/evidence/organization-audit-20260907/coverage-groups.json
       - tools/audit/verify_platform_gameauth_group.py
       - tools/audit/test_verify_platform_gameauth_group.py
 
@@ -70,15 +71,22 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/audit/verify_platform_gameauth_group.py --audit-root . --platform-root ../platform --evidence-root ../platform-audit-evidence | tee "$RUNNER_TEMP/gameauth-revalidation.json"
-          python3 - "$RUNNER_TEMP/gameauth-revalidation.json" <<'PY'
+          python3 - "$RUNNER_TEMP/gameauth-revalidation.json" docs/evidence/organization-audit-20260907/r3-platform-gameauth-candidate.json <<'PY'
           import json,sys
-          d=json.load(open(sys.argv[1],encoding='utf-8'))
-          assert d['result']=='GAMEAUTH_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED'
+          d=json.load(open(sys.argv[1],encoding='utf-8')); c=json.load(open(sys.argv[2],encoding='utf-8'))
           assert d['paths']==27 and d['path_blob_identity'] is True
           assert d['historical_direct_read_statement_bound'] is True
           assert d['dependent_blobs_verified']==23 and d['focused_test_files_bound']==14
-          assert d['coverage_adopted'] is False
-          print('GameAuth identity/history gate PASS; semantic adoption still blocked on focused tests.')
+          if c['coverage_adopted']:
+              assert c['state']=='QUALIFIED_ADOPTED_AS_GROUPED'
+              assert d['result']=='GAMEAUTH_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS'
+              assert d['coverage_adopted'] is True
+              print('GameAuth canonical GROUPED adoption revalidates.')
+          else:
+              assert c['state']=='CANDIDATE_PENDING_QUALIFICATION'
+              assert d['result']=='GAMEAUTH_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED'
+              assert d['coverage_adopted'] is False
+              print('GameAuth identity/history gate PASS; semantic adoption still blocked on focused tests.')
           PY
       - name: Setup PHP 8.5
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
@@ -120,8 +128,7 @@ jobs:
             --log-junit="$RUNNER_TEMP/gameauth-tests/junit.xml"
           python3 - "$RUNNER_TEMP/gameauth-tests/junit.xml" <<'PY'
           import sys,xml.etree.ElementTree as ET
-          root=ET.parse(sys.argv[1]).getroot()
-          cases=root.findall('.//testcase'); failures=root.findall('.//failure'); errors=root.findall('.//error'); skipped=root.findall('.//skipped')
+          root=ET.parse(sys.argv[1]).getroot(); cases=root.findall('.//testcase'); failures=root.findall('.//failure'); errors=root.findall('.//error'); skipped=root.findall('.//skipped')
           if not cases or failures or errors or skipped:
               raise SystemExit(f'focused GameAuth qualification not all-green: cases={len(cases)} failures={len(failures)} errors={len(errors)} skipped={len(skipped)}')
           print(f'Focused GameAuth tests PASS: {len(cases)} cases, 0 failures/errors/skips.')
