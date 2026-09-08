@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "provider_source_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
+  "provider_tree_sha": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+  "artifact_repository": "Oteryn/Oteryn",
+  "artifacts": [
+    {
+      "name": "php",
+      "filename": "audit185-r3-platform-php.zip",
+      "run_id": 34169555626,
+      "artifact_id": 10035282589,
+      "collector_commit": "80cead1298de6ba7b409880d6da2609a73c84aa7",
+      "zip_sha256": "969cf1209ea0f056e4a0f0e0ef8567788aec77feda179403b5df7f1485184e96",
+      "evidence_files": {
+        "experiment.json": "152c8dc32e201934a67f9dd08f95a8447d4c5770e9290186dce05d9acf1c67ab",
+        "no-env.junit.xml": "840e6a6920a4ac7b2c62fd42f14f596f005645fb2ae9012079b39aa1bddd9bcd",
+        "empty-env.junit.xml": "cc64368e1ef8d0d7702da1b860f1619e68f64d7eb3c103263fb1fe03342d4e6d",
+        "empty-env.clover.xml": "cdce084096a95f587f60d2073dd70e7a6cd088a3500de3579659e076675f72d2",
+        "composer-audit.json": "3d68c4566587606c21e4bcd82b55d322ddb79158f657d9fb90bf0d24ab5bccdf",
+        "toolchain.txt": "8f923bb92f1c088771dc6054e72aa48cf95c716a576577328080f3c89bd57958"
+      }
+    },
+    {
+      "name": "gateway",
+      "filename": "audit185-r3-platform-gateway.zip",
+      "run_id": 34169555626,
+      "artifact_id": 10035263247,
+      "collector_commit": "80cead1298de6ba7b409880d6da2609a73c84aa7",
+      "zip_sha256": "a0f3201217a1262bb95662ec23fdde9b31638265d348bf271574133e1dbc3e51",
+      "evidence_files": {
+        "tests.jsonl": "9a99c0107d8714455142c5537e618b5edbdb1a3709241a6456a1279e8cbc8fce",
+        "coverage.out": "1e2210a19ddbd187191185b69e4fa34cb8516370524183d9f145cf564850ab95",
+        "vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "toolchain.txt": "1d8e6b9bb7e19e5635d7aa7b5d186666411751d471ca9b03896052b393e6f2c0"
+      }
+    },
+    {
+      "name": "concurrency",
+      "filename": "audit185-r3-concurrency.zip",
+      "run_id": 34171157669,
+      "artifact_id": 10035749457,
+      "collector_commit": "bec2a0f9d5465129bf22d4cbbcee9a1fdd55fe47",
+      "zip_sha256": "22080086f3dab61fbe8abc0cb35a1015475e5255017dec9ce2236fb47ba1a9c5",
+      "evidence_files": {
+        "junit.xml": "7f39e0a82d25a31f6c30215e3711a0e6f7e6efe07e30d0aa2c4e7d6efd3490e8",
+        "tests.log": "9bf9e5ffd2dd428b0c936ea4cb7249dba52ef4cc034f617679fee2203c86b9f8"
+      }
+    },
+    {
+      "name": "public_ui_original",
+      "filename": "audit185-r3-public-ui.zip",
+      "run_id": 34171157669,
+      "artifact_id": 10035760115,
+      "collector_commit": "bec2a0f9d5465129bf22d4cbbcee9a1fdd55fe47",
+      "zip_sha256": "39739576f0540e9219227ff28251c0fa730b43479d4b846496feb8532739c620",
+      "evidence_files": {
+        "browser/result.json": "1c859129d4e9ba3a0d7102db542e00495d08bc14056cc32495acf72e46f6e256"
+      }
+    },
+    {
+      "name": "public_ui",
+      "filename": "audit185-r3-public-ui-corrected.zip",
+      "run_id": 34193488547,
+      "artifact_id": 10043048175,
+      "collector_commit": "9a1383652aac31f0524f83e2dabf79bace40b73e",
+      "zip_sha256": "e716ef8818fdac42ba9ae9859d623867520ae95663f8abbb4042b62b3a5d4625",
+      "evidence_files": {
+        "browser/result.json": "44337c21ecd3814825f3e1036f5df98815e4ef5f5cc8a364f870cd065c1c6b1c",
+        "migrations.log": "3d770caef3303b17b7dfd6191638c22b8e82984cff8ede30a4ee4983594e3f1d"
+      }
+    },
+    {
+      "name": "ci_metadata",
+      "filename": "audit185-r3-ci-metadata.zip",
+      "run_id": 34194662737,
+      "artifact_id": 10043441892,
+      "collector_commit": "1204831962d9f6ff88ca8984028f6721f63889eb",
+      "zip_sha256": "90333cd2a912213c34b911f494c13a25c13310a0e60a771bc1ee074f67aac4c1",
+      "evidence_files": {
+        "cohort.json": "695a9f2ddbef3175127b25af9c6454e1d7bfd5a7f84d24ab8f2b369d023a9478"
+      }
+    }
+  ],
+  "scope": "Exact pinned Platform source for native tests; CI cohort has separate per-run immutable identities and mutable time-of-read main refs. Artifacts are retained in the owner delivery ZIP, independently of hosted expiry. Restricted security materials are not part of this public manifest."
+}

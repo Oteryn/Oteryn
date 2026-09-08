@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "Oteryn/Oteryn-Platform",
+  "source_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
+  "method": "Every authored migration read in full for described bounded concerns; no blanket semantic or reverse-migration PASS",
+  "execution_artifact_id": 10043048175,
+  "execution_log_sha256": "3d770caef3303b17b7dfd6191638c22b8e82984cff8ede30a4ee4983594e3f1d",
+  "count": 50,
+  "source_lines": 2774,
+  "path_set": {
+    "ledger": "coverage-review.tsv",
+    "repository": "platform",
+    "exact_prefix": "database/migrations/",
+    "exact_suffix": ".php",
+    "sha256_of_path_and_blob_tsv": "d1f500a384637143b317a395beb9bf64c55d02540eb48fc03c2308fcca20e78d"
+  },
+  "up_execution": "All50 migration names occur in the bound successful log; synthetic SQLite only",
+  "down_execution": "NOT_EXECUTED"
+}

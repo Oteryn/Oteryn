@@ -4,7 +4,7 @@
     {
       "id": "SEMANTIC-COVERAGE",
       "missing": "Unreviewed/currently unbound repository semantics",
-      "reason": "Full source bytes available; fresh scoped ledger does not adopt unsupported all-line historical coverage.",
+      "reason": "Source bytes available; 202 explicitly scoped path reviews are bound, not full behavior approval; 4123 paths retain UNVERIFIED. No automatic import from maintenance N/A or unproven historical summaries.",
       "effect": "Original exhaustive completeness cannot be claimed.",
       "owner_route": "META186 plus provider audit owners",
       "closure_condition": "Import exact historical disposition ledgers with bounded validity, review changed/uncovered authored families, and retain justified grouping/N/A."
@@ -13,7 +13,7 @@
       "id": "HISTORY-REVALIDATION",
       "missing": "Current outcome of explicitly unverified historical findings",
       "reason": "Source changed, live PR/ref state not read or runtime condition unexecuted.",
-      "effect": "76 rows means reconciliation accounting, not 76 verified outcomes.",
+      "effect": "77 individual records are accounted, not77 proven current outcomes; later metadata reconciliation is separate from source/regression qualification.",
       "owner_route": "META153/Game364/Platform451/Atlas315",
       "closure_condition": "Resolve each REQUIRES/UNKNOWN/OPEN_INHERITED row with exact source/runtime/live evidence."
     },
@@ -36,16 +36,16 @@
     {
       "id": "RECOVERY",
       "missing": "Current release/data restore/rollback",
-      "reason": "Historical migration restore is not current product recovery.",
+      "reason": "All50 Platform migration up paths ran on the synthetic SQLite UI fixture and up/down source was read; current-data upgrade/down/restore and measured RPO/RTO remain unexecuted.",
       "effect": "RPO/RTO and live data recovery not qualified.",
       "owner_route": "META59/60 and provider operations",
       "closure_condition": "Isolated approved current-release/data restore with measured RPO/RTO, smoke, rollback and cleanup."
     },
     {
       "id": "COST-CI",
-      "missing": "Actual CI cost/latency/flake dataset",
-      "reason": "Only static77-workflow census and task-local executions available.",
-      "effect": "No measured organization cost reduction or routing efficiency claim.",
+      "missing": "Representative complete candidate cost/latency/cache/retry and billed-usage evidence",
+      "reason": "R3 acquires84 completed runs/418 jobs across seven newest12-run strata;16 anomalous job times remain unknown. No random/full candidate cohort or earlier-attempt/billing history.",
+      "effect": "Measured observations exist, but no organization savings, flake rate or pure queue-time claim follows.",
       "owner_route": "Provider CI programmes",
       "closure_condition": "Collect representative recent PR/MQ/push cohort, sample criteria and timestamps; measure queue/run/capacity/cache/retry/yield before changes."
     },
@@ -60,7 +60,7 @@
     {
       "id": "SUPPLY-CHAIN",
       "missing": "Fresh CVE/SBOM/history/provenance assessment",
-      "reason": "No live advisory/complete secret-history scan executed.",
+      "reason": "Locked Platform Composer audit at recorded execution returned0 advisories/0 abandoned; remaining ecosystems, full SBOM/provenance/secret-history and freshness are not established.",
       "effect": "Lockfiles and Dependabot do not establish clean supply chain.",
       "owner_route": "Provider security owners",
       "closure_condition": "Authorized advisory/SBOM/provenance scans with source/lock/time/scope/exclusion and triage; keep sensitive findings private."
@@ -68,7 +68,7 @@
     {
       "id": "NATIVE-G1",
       "missing": "Game native durable user journey",
-      "reason": "No Rust runtime here; programme G1 remains outstanding.",
+      "reason": "No actual native/durable G1 user journey was executed in this audit continuation; provider programme state must be read separately rather than inferred from component CI.",
       "effect": "Component/source tests cannot establish actual gameplay composition.",
       "owner_route": "Game364/162",
       "closure_condition": "Real producer/native command -> logical owner -> durable effect -> visible projection through reconnect/restart with no duplicate effect/rollback."
@@ -76,7 +76,7 @@
     {
       "id": "UI-343",
       "missing": "Initialized Atlas product/UI acceptance",
-      "reason": "Issue343/PR344 records shell-only evidence and pending runtime acceptance.",
+      "reason": "Platform public fixture now has48 scoped cases/eight author-reviewed screenshots. This does not supply initialized Atlas world/renderer or native Game acceptance; Atlas maintenance authority remains separate.",
       "effect": "No full product UX, renderer synchronization or accessibility PASS.",
       "owner_route": "Atlas343/344; maintenance315",
       "closure_condition": "Qualified minimum-data browser environment, pinned Playwright, real journeys/screenshots/keyboard/accessibility checks and independent acceptance."
@@ -84,7 +84,7 @@
     {
       "id": "PORTABILITY",
       "missing": "Complete supported OS/runtime matrix",
-      "reason": "Linux Python/Node tests only; PHP version mismatched and Rust unavailable.",
+      "reason": "R3 adds supported PHP8.5 and Go Gateway execution on isolated hosted Linux, plus prior Python/Node. Complete Windows/GPU/native-Game and production-supported matrix not executed.",
       "effect": "No current Windows/GPU/full supported runtime qualification.",
       "owner_route": "Provider build owners",
       "closure_condition": "Execute bounded required native/OS matrix with exact source/toolchain identities."
@@ -107,11 +107,11 @@
     },
     {
       "id": "PLATFORM-H02",
-      "missing": "Login/revocation interleaving",
-      "reason": "Hypothesis remains unexecuted.",
-      "effect": "Cannot promote to a confirmed exploit or silently drop it.",
+      "missing": "Private maintainer security disposition and current-generation regression/remediation",
+      "reason": "Controlled source-pinned characterization now exists; previous unexecuted label is superseded. Details retained for owner-private handling under Platform SECURITY.md.",
+      "effect": "Cannot claim private advisory submission, live exploitation or completed security remediation.",
       "owner_route": "Platform451",
-      "closure_condition": "Controlled current-generation concurrency reproduction with positive and negative controls."
+      "closure_condition": "Private security maintainer must assess severity/reachability on the relevant current source, bind a deterministic regression and disposition/remediation evidence; private submission and full resolution are not claimed by this audit."
     },
     {
       "id": "INDEPENDENT-REVIEW",

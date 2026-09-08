@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "report_id": "OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907",
-  "revision": "R2-EVIDENCE-RECONCILIATION",
+  "revision": "R3-NATIVE-EVIDENCE-AND-SCOPED-REVIEW",
   "status": "QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE",
   "governing_issue": "Oteryn/Oteryn#186",
   "pull_request": "Oteryn/Oteryn#185",
@@ -50,21 +50,11 @@
   "semantic_coverage": "PARTIAL_EXPLICIT_NOT_ALL_LINE",
   "production_readiness_claimed": false,
   "independent_score": null,
-  "known_current_main_p1_ids": [
-    "GAME-F20",
-    "PLATFORM-F01",
-    "PLATFORM-F02",
-    "PLATFORM-F16"
-  ],
-  "known_current_main_p1_count": 4,
-  "candidate_only_reported_p1_ids": [
-    "GAME-CANDIDATE-361"
-  ],
   "confirmed_p0_in_scoped_review": 0,
   "severity_counts_exhaustive": false,
-  "reconciled_register_rows": 76,
+  "reconciled_register_rows": 77,
   "historical_source_ids_accounted": 74,
-  "additional_followup_ids": 2,
+  "additional_followup_ids": 3,
   "unresolved_unknowns": 15,
   "audit_domains_accounted": 23,
   "audit_domains_all_pass": false,
@@ -113,5 +103,22 @@
   "workflow_inventory": "organization-audit-20260907/workflow-inventory.tsv",
   "verification": "organization-audit-20260907/verification-index.json",
   "unknown_register": "organization-audit-20260907/unknowns.json",
-  "authority_note": "Provider implementation and live lifecycle authority remain in their repositories. Evidence is source-pinned; later source/config/consumer/Issue/PR changes can invalidate it. No provider writes, production actions, protection changes, new required gates or restored Atlas workflows are authorized by this report."
+  "authority_note": "Provider implementation and live lifecycle authority remain in their repositories. Evidence is source-pinned; later source/config/consumer/Issue/PR changes can invalidate it. No provider writes, production actions, protection changes, new required gates or restored Atlas workflows are authorized by this report.",
+  "known_source_snapshot_p1_ids": [
+    "GAME-F20",
+    "PLATFORM-F01",
+    "PLATFORM-F02",
+    "PLATFORM-F16"
+  ],
+  "known_source_snapshot_p1_count": 4,
+  "historical_candidate_p1_ids_not_counted_as_source_snapshot": [
+    "GAME-CANDIDATE-361"
+  ],
+  "scoped_review_paths": 202,
+  "r3_native_results": "organization-audit-20260907/r3-native-results.json",
+  "r3_source_review": "organization-audit-20260907/r3-source-review.md",
+  "r3_visual_review": "organization-audit-20260907/r3-visual-review.json",
+  "r3_lifecycle": "organization-audit-20260907/r3-lifecycle.json",
+  "audit_completion": "NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial",
+  "source_cut_policy": "Immutable original pinned generations are retained. Later lifecycle observations are separate evidence; this is not an all-repositories current-main acceptance snapshot."
 }

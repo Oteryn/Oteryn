@@ -24,7 +24,7 @@ export function expectedStatus(route) {
   return ['/support', '/legal/privacy'].includes(route) ? 404 : 200;
 }
 export function requestAllowed(method, raw) {
-  try { return ['GET', 'HEAD'].includes(method) && new URL(raw).origin === ORIGIN; }
+  try { const url = new URL(raw); return ['GET', 'HEAD'].includes(method) && url.origin === ORIGIN && !url.username && !url.password; }
   catch { return false; }
 }
 const empty = value => Array.isArray(value) && value.length === 0;
@@ -35,7 +35,7 @@ export function caseCriteria(row, { legacy = false } = {}) {
   return {
     fixture_identity: known && SIZES.some(([w, h]) => row.width === w && row.height === h),
     http_ok: known && row.status === expectedStatus(row.route),
-    local_response: requestAllowed('GET', row?.final_url),
+    local_response: known && requestAllowed('GET', row?.final_url) && row.final_url === ORIGIN + row.route,
     main: d.main_count === 1,
     heading: Array.isArray(d.h1) && d.h1.length === 1 && nonempty(d.h1[0]),
     language: d.lang === 'en', title: nonempty(d.title),
@@ -49,6 +49,7 @@ export function evaluateReport(report, { legacy = false } = {}) {
   const errors = [];
   if (report?.source_sha !== SOURCE_SHA) errors.push('source_sha');
   if (!legacy && (report?.schema_version !== 2 || report?.source_tree !== SOURCE_TREE)) errors.push('schema/source_tree');
+  if (!legacy && (Object.keys(report?.source_bindings ?? {}).length !== Object.keys(SOURCE_BINDINGS).length || Object.entries(SOURCE_BINDINGS).some(([path, sha]) => report?.source_bindings?.[path] !== sha))) errors.push('source_bindings');
   if (report?.playwright !== PLAYWRIGHT || !nonempty(report?.browser)) errors.push('browser/toolchain');
   const cases = Array.isArray(report?.cases) ? report.cases : [];
   const expected = new Set(SIZES.flatMap(([w, h]) => ROUTES.map(r => `${w}:${h}:${r}`)));
@@ -63,6 +64,7 @@ export function evaluateReport(report, { legacy = false } = {}) {
   }
   if (cases.length !== expected.size || [...expected].some(key => !seen.has(key))) errors.push('incomplete matrix');
   const noJS = report?.no_javascript;
+  if (!legacy && !empty(noJS?.blocked_requests)) errors.push('no-javascript network boundary');
   if (noJS?.route !== '/login' || noJS.status !== 200 || noJS.email_visible !== true || noJS.password_visible !== true) errors.push('no-javascript control');
   return { verdict: errors.length ? 'FAIL' : 'PASS_SCOPED_PUBLIC_FIXTURE', cases: cases.length,
     mode: legacy ? 'REPLAY_OF_CAPTURED_OBSERVATIONS_NOT_NEW_BROWSER_EXECUTION' : 'CAPTURED_BROWSER_OBSERVATIONS',

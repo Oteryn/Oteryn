@@ -1,52 +1,35 @@
-# Organization audit R2 evidence
+# Organization audit R3 evidence
 
-Governing continuation: META #186, existing PR #185. This directory is evidence, not a new approval framework. The main report/JSON one directory above owns the opinion. TSV registers are canonical compact records; expanded JSON, full logs and the 4,325-row CSV are included in the accompanying audit-only delivery.
+Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; this is not another approval programme. R3 contains 77 finding records, 23 A–W domains, 15 residual obligations and 202 explicit scoped path reviews out of 4325 immutable leaves. `4123` leaves retain UNVERIFIED semantics. Full-file, control-field and translation-range reviews are intentionally distinguished.
 
-## Offline checks
+## Local checks
 
-From the META repository root:
-
-```sh
-python3 tools/audit/test_organization_audit.py -v
-python3 tools/audit/test_verify_report.py -v
-python3 tools/audit/verify_report.py \
-  --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
-```
-
-The result is `ACCOUNTING_VALID_NOT_SEMANTIC_PASS`, never product readiness.
-
-## Reproduce the complete path ledger
-
-On an authorized GitHub-hosted or isolated plane with read-only access to the pinned public repositories:
+From the META repository root with Python 3 and Node available:
 
 ```sh
-python3 tools/audit/organization_audit.py \
-  --plan docs/evidence/organization-audit-20260907/collection-plan.json \
-  --output /tmp/oteryn-audit-new-inventory
-python3 tools/audit/verify_report.py \
-  --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json \
-  --inventory-dir /tmp/oteryn-audit-new-inventory/inventories \
-  --ledger-output /tmp/oteryn-audit-new-ledger.csv
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools/audit -p 'test_*.py' -v
+node --test tools/audit/test-public-surface-contract.mjs tools/audit/test-public-surface-evidence-hardening.mjs
+python3 tools/audit/verify_report.py --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
 ```
 
-Use new output paths: both tools refuse destructive overwrite. The verifier reconstructs each Git tree, checks exact review blob identities, emits one row per leaf and matches the committed ledger SHA-256. All unmatched paths are UNVERIFIED. Existing historical review evidence is not discarded, but its full validity is not automatically adopted.
-
-The original temporary source artifact was transport only and expires. Immutable Git coordinates, collector code, review rules and the ledger digest reproduce the ledger without that artifact. No provider source is copied into META as product authority.
-
-## Reproduce the Platform finding
-
-With an isolated checkout of Platform at `de917b3477a1de0667531380de3660e8b2ab59aa`:
+The accounting result is `ACCOUNTING_VALID_NOT_SEMANTIC_PASS`. Source and raw-evidence validation are separate:
 
 ```sh
-python3 tools/audit/reproduce_platform_routing.py \
-  --source-root /path/to/exact-platform-checkout \
-  --output /tmp/platform-routing-reproduction.json
+python3 tools/audit/organization_audit.py --plan docs/evidence/organization-audit-20260907/collection-plan.json --output /tmp/audit-new-inventory
+python3 tools/audit/verify_report.py --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json --inventory-dir /tmp/audit-new-inventory/inventories --ledger-output /tmp/audit-new-ledger.csv
+python3 tools/audit/reproduce_platform_routing.py --source-root /path/to/exact-platform-de917b3 --output /tmp/audit-new-routing.json
+python3 tools/audit/verify_announcement_trigger.py --source-root /path/to/exact-platform-de917b3
+python3 tools/audit/verify_r3_evidence.py --manifest docs/evidence/organization-audit-20260907/r3-native-manifest.json --archive-dir /path/to/public-native-archives
 ```
 
-The script first verifies the three source blobs, uses temporary repositories without a remote, and records eight cases. A successful characterization currently means **two product routing failures reproduced**, not that runtime tests ran or a real merge bypass occurred.
+Use new output paths; acquisition requires its documented read-only consent/access. The routing characterization exits successfully when two product failures are reproduced, not when the product passes. The static Announcements probe is not a new browser run. Native raw ZIP filenames must match the manifest. The R3 parser rechecks raw observations and source identity, package/test event ordering, per-case counts and retained anomalies.
 
-## Interpretation
+## Evidence map and durability
 
-`finding-register.tsv` accounts for 76 identifiers and their existing owner routes/closure conditions. `domain-matrix.tsv` records all A–W criteria and qualified opinions. `coverage-review.tsv` contains 65 newly scoped review entries, not a 65-file claim about the total history of previous audits. `workflow-inventory.tsv` is a complete static census, not 77 semantic workflow approvals. `verification-index.json` records actual commands/source/log digests; `unknowns.json` retains missing evidence and its effect.
+`r3-native-manifest.json` binds six public native archives; `r3-native-results.json` stores the independently recalculated summary. `r3-trigger-evidence.json` binds the locale-trigger finding. `r3-migration-review.json` binds the closed 50-path ledger subset and synthetic-up observation. `r3-visual-review.json` records eight actually inspected screenshot digests and limits. `r3-lifecycle.json` records later native state without rebasing the source cut. `r3-source-review.md` explains precise scope and negative evidence.
 
-No self-awarded score, background continuation, product deployment, provider mutation or new required gate is implied. The temporary acquisition workflow is absent from the final task tree.
+Full 4325-row CSV, native archives, original and corrected captures, red/green tool-regression logs and expanded checks accompany the downloadable audit delivery. Actions archives expire (dates in manifest); preserve the delivery. Committed immutable Git coordinates plus the collector reproduce source inventories, not historical runtime outputs after those outputs expire. Do not treat a digest alone as the raw evidence.
+
+Restricted security details follow Platform SECURITY.md and are supplied separately to the owner, not in this public evidence directory. The final effective diff excludes the earlier two characterization scripts; historical commits/artifacts are not erased. No private advisory submission is claimed.
+
+The temporary hosted collector is absent from the final task tree. No provider writes, deployment, new required gate, automatic background worker, full semantic completion or self-awarded score is implied.

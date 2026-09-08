@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SOURCE_SHA, SOURCE_TREE, ORIGIN, PLAYWRIGHT, ROUTES, SIZES, expectedStatus, requestAllowed, evaluateReport } from './public-surface-contract.mjs';
+import { SOURCE_SHA, SOURCE_TREE, SOURCE_BINDINGS, ORIGIN, PLAYWRIGHT, ROUTES, SIZES, expectedStatus, requestAllowed, evaluateReport } from './public-surface-contract.mjs';
 function fixture() {
-  return { schema_version: 2, source_sha: SOURCE_SHA, source_tree: SOURCE_TREE, playwright: PLAYWRIGHT, browser: 'test-double',
+  return { schema_version: 2, source_sha: SOURCE_SHA, source_tree: SOURCE_TREE, source_bindings: { ...SOURCE_BINDINGS }, playwright: PLAYWRIGHT, browser: 'test-double',
     cases: SIZES.flatMap(([width, height]) => ROUTES.map(route => ({ route, width, height,
       status: expectedStatus(route), final_url: ORIGIN + route, observed_errors: [],
       dom: { title: 'fixture', lang: 'en', main_count: 1, h1: ['fixture'], horizontal_overflow: false,
         unlabelled_inputs: [], broken_images: [], duplicate_ids: [], editorial_unconfigured: expectedStatus(route) === 404 } }))),
-    no_javascript: { route: '/login', status: 200, email_visible: true, password_visible: true } };
+    no_javascript: { route: '/login', status: 200, email_visible: true, password_visible: true, blocked_requests: [] } };
 }
 const pass = r => evaluateReport(r).errors.length === 0;
 test('closed fixture includes exactly eight justified 404 observations', () => {

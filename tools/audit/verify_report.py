@@ -96,8 +96,8 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
         require(row['repository'] in repo,'unknown finding repository')
         require(row['priority'] in {'P0','P1','P2','P3','NOTE','UNRATED'},'invalid priority')
         require(all(row[k].strip() for k in ['title','evidence','owner_route','closure_condition']),'missing finding evidence/closure')
-    p1=[r['id']for r in findings if r['priority']=='P1'and r['scope']=='current_main'and r['state']in {'CONFIRMED_SOURCE','REPRODUCED'}]
-    require(p1==doc['known_current_main_p1_ids'] and len(p1)==doc['known_current_main_p1_count'],'current-main P1 mismatch')
+    p1=[r['id']for r in findings if r['priority']=='P1'and r['scope']=='source_snapshot'and r['state']in {'CONFIRMED_SOURCE','REPRODUCED'}]
+    require(p1==doc['known_source_snapshot_p1_ids'] and len(p1)==doc['known_source_snapshot_p1_count'],'source-snapshot P1 mismatch')
     domains=read_tsv(base/'domain-matrix.tsv');unique(domains,lambda r:r['domain'],'domain')
     require({r['domain']for r in domains}==set('ABCDEFGHIJKLMNOPQRSTUVW'),'A-W matrix incomplete')
     require(len(domains)==doc['audit_domains_accounted'],'domain count')
@@ -110,6 +110,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
         require(row['depth']=='SCOPED_SEMANTIC_REVIEW' and row['scope'].strip(),'unsupported review depth')
         ranges=json.loads(row['line_ranges'])
         require(isinstance(ranges,list) and all(isinstance(x,list)and len(x)==2 and all(type(n)is int for n in x)and 1<=x[0]<=x[1] for x in ranges),'invalid source range')
+    require(doc['scoped_review_paths']==len(review),'report scoped review count mismatch')
     coverage=read_json(base/'coverage-summary.json')
     require(coverage['semantic_completion_claimed'] is False,'unsupported semantic completion')
     require(coverage['source_leaf_total']==sum(r['leaf_count']for r in repo.values()),'leaf total mismatch')
@@ -148,7 +149,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
             require(not ledger_output.exists(),'refusing ledger overwrite');ledger_output.write_bytes(raw)
     elif ledger_output is not None:
         raise ValueError('inventories required for ledger output')
-    return {'result':'ACCOUNTING_VALID_NOT_SEMANTIC_PASS','findings':len(findings),'domains':len(domains),'source_leaves':coverage['source_leaf_total'],'current_main_p1':len(p1),'scoped_review_paths':len(review),'tree_and_ledger_verified':inventory_dir is not None,'semantic_coverage':doc['semantic_coverage']}
+    return {'result':'ACCOUNTING_VALID_NOT_SEMANTIC_PASS','findings':len(findings),'domains':len(domains),'source_leaves':coverage['source_leaf_total'],'source_snapshot_p1':len(p1),'scoped_review_paths':len(review),'tree_and_ledger_verified':inventory_dir is not None,'semantic_coverage':doc['semantic_coverage']}
 
 
 def main():

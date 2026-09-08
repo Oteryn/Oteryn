@@ -30,7 +30,7 @@ class AuditValidationTest(unittest.TestCase):
     def test_current_report_validates_as_accounting_only(self):
         result=audit.validate(self.path)
         self.assertEqual(result['result'],'ACCOUNTING_VALID_NOT_SEMANTIC_PASS')
-        self.assertEqual(result['findings'],76)
+        self.assertEqual(result['findings'],77)
         self.assertFalse(result['tree_and_ledger_verified'])
     def test_boolean_schema_rejected(self):
         self.mutate(self.path,lambda d:d.update(schema_version=True));self.reject()
@@ -46,8 +46,8 @@ class AuditValidationTest(unittest.TestCase):
         p=self.base/'finding-register.tsv';lines=p.read_text().splitlines();p.write_text('\n'.join(lines+[lines[1]])+'\n');self.reject()
     def test_missing_domain_rejected(self):
         p=self.base/'domain-matrix.tsv';p.write_text('\n'.join(p.read_text().splitlines()[:-1])+'\n');self.reject()
-    def test_candidate_counted_as_main_rejected(self):
-        self.mutate(self.path,lambda d:d['known_current_main_p1_ids'].append('GAME-CANDIDATE-361'));self.reject()
+    def test_historical_candidate_counted_as_snapshot_rejected(self):
+        self.mutate(self.path,lambda d:d['known_source_snapshot_p1_ids'].append('GAME-CANDIDATE-361'));self.reject()
     def test_hidden_unverified_paths_rejected(self):
         self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['platform'].update(unverified_semantics=0));self.reject()
     def test_reproduction_called_pass_rejected(self):

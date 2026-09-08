@@ -179,7 +179,13 @@
     "source_object_bytes": 55462229,
     "independent_blob_and_tree_integrity": "PASS_8_ROOT_TREES_AND_ALL_OBJECTS"
   },
-  "environment": {
+  "interpretation": "Test success is scoped to executed assertions. Two false-negative routing cases are reproduced product failures, not product PASS. Full source identities do not imply full review. Initial interrupted META batch was not counted; per-command reruns have durable results.",
+  "r3_native_manifest": "r3-native-manifest.json",
+  "r3_native_results": "r3-native-results.json",
+  "r3_trigger_evidence": "r3-trigger-evidence.json",
+  "r3_verification_boundary": "Immutable native archives are independently parsed offline; collector success is not product PASS. Audit-author self-review is not independent semantic acceptance. Original failing UI capture is retained; changed offline oracle is not a new browser run.",
+  "r3_sensitive_material": "Two characterization scripts removed from final effective diff; owner-private handoff, not a public exploit or proof of remediation. Earlier commits and historical Actions artifacts are not erased by removal.",
+  "r2_execution_environment": {
     "python": "3.13.5",
     "git": "2.47.3",
     "node": "22.16.0",
@@ -187,7 +193,7 @@
     "rust": "NOT_AVAILABLE",
     "internet": "sandbox DNS unavailable; approved GitHub-hosted read-only collection used"
   },
-  "not_executed": [
+  "not_executed_in_r2": [
     "Full Laravel/PHP8.5 runtime/migration suite",
     "Native Rust build/test/Windows/G1",
     "Actual Atlas product E2E, UI visual/accessibility qualification and restoration",
@@ -196,5 +202,16 @@
     "Fresh complete dependency/CVE/SBOM/secret-history scan",
     "Paid agent/token/cost benchmark"
   ],
-  "interpretation": "Test success is scoped to executed assertions. Two false-negative routing cases are reproduced product failures, not product PASS. Full source identities do not imply full review. Initial interrupted META batch was not counted; per-command reruns have durable results."
+  "results_provenance": "The results array, original test counts and acquisition fields preserve executed R2 source-pinned evidence. They are not presented as new R3 executions. R3 native execution identities/results are bound by r3-native-manifest.json and r3-native-results.json.",
+  "r3_not_executed": [
+    "One combined full Integration/native Game journey",
+    "Migration down/current-data upgrade, rollback data conservation and current production restore",
+    "Full supported OS/runtime/Windows/GPU matrix",
+    "Initialized Atlas product E2E and workflow restoration",
+    "Authenticated/admin/payment/multibrowser/Polish or complete accessibility UI qualification",
+    "Current live SMTP/admin/security/production configuration verification",
+    "Complete all-ecosystem CVE/SBOM/provenance/secret-history assessment",
+    "Actual billed usage and agent token/cost comparison",
+    "Independent semantic acceptance"
+  ]
 }

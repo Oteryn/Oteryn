@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "review_date": "2026-09-08",
+  "reviewer_role": "This audit author; not an independent reviewer",
+  "source_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
+  "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+  "collector_sha": "9a1383652aac31f0524f83e2dabf79bace40b73e",
+  "workflow_run_id": 34193488547,
+  "browser": "Chromium151.0.7922.34",
+  "playwright": "1.62.1",
+  "images": [
+    {
+      "artifact_id": 10043048175,
+      "filename": "1440-home.png",
+      "sha256": "0b07034f318f5ca2a570b7d9c3958e8b6c5513f452dd0afc6b054f524a7c009a",
+      "reviewed": "FULL_IMAGE_INSPECTED_BY_AUDIT_AUTHOR",
+      "assessment": "Anonymous home and unavailable-Canary presentation; mobile cards wrap and captured desktop columns remain legible. Not game status accuracy.",
+      "obvious_clipping_in_captured_state": false
+    },
+    {
+      "artifact_id": 10043048175,
+      "filename": "1440-login.png",
+      "sha256": "214c89334107bfa153d96e5d689cc837fa72fb85669a765eed3ad4672d05bdb9",
+      "reviewed": "FULL_IMAGE_INSPECTED_BY_AUDIT_AUTHOR",
+      "assessment": "Anonymous login form and label/layout visibility; no submission/authenticated or recovery journey.",
+      "obvious_clipping_in_captured_state": false
+    },
+    {
+      "artifact_id": 10043048175,
+      "filename": "1440-news.png",
+      "sha256": "aa0c665efe7f84eb93a5f71b0801d145c72245d467e882a83a0ac9a08f761375",
+      "reviewed": "FULL_IMAGE_INSPECTED_BY_AUDIT_AUTHOR",
+      "assessment": "Synthetic news list/pagination presentation; no pagination interaction or editorial workflow acceptance.",
+      "obvious_clipping_in_captured_state": false
+    },
+    {
+      "artifact_id": 10043048175,
+      "filename": "1440-wiki.png",
+      "sha256": "54fce1387bfe000991276fc14cf136d50eda013108a495cece63744a61a7d9e5",
+      "reviewed": "FULL_IMAGE_INSPECTED_BY_AUDIT_AUTHOR",
+      "assessment": "Empty/unpublished catalogue shell only; not actual searchable Wiki/content acceptance.",
+      "obvious_clipping_in_captured_state": false
+    },
+    {
+      "artifact_id": 10043048175,
+      "filename": "390-home.png",
+      "sha256": "df11c3b76bd3534749906861dbce9ea20053a54266ecd982ca1040adcb3bc279",
+      "reviewed": "FULL_IMAGE_INSPECTED_BY_AUDIT_AUTHOR",
+      "assessment": "Anonymous home and unavailable-Canary presentation; mobile cards wrap and captured desktop columns remain legible. Not game status accuracy.",
+      "obvious_clipping_in_captured_state": false
+    },
+    {
+      "artifact_id": 10043048175,
+      "filename": "390-login.png",
+      "sha256": "5699bab77dd9b20ab8912c159b6b2d4d1f0ed11ec39bdd093b6677e259994760",
+      "reviewed": "FULL_IMAGE_INSPECTED_BY_AUDIT_AUTHOR",
+      "assessment": "Anonymous login form and label/layout visibility; no submission/authenticated or recovery journey.",
+      "obvious_clipping_in_captured_state": false
+    },
+    {
+      "artifact_id": 10043048175,
+      "filename": "390-news.png",
+      "sha256": "75eaaf2e13fe55020b86ac5a306471ca4f48f5f22f7dd3778b1a400defb42c21",
+      "reviewed": "FULL_IMAGE_INSPECTED_BY_AUDIT_AUTHOR",
+      "assessment": "Synthetic news list/pagination presentation; no pagination interaction or editorial workflow acceptance.",
+      "obvious_clipping_in_captured_state": false
+    },
+    {
+      "artifact_id": 10043048175,
+      "filename": "390-wiki.png",
+      "sha256": "0e814a230c7b24fafc47596ab45fb9928d4e3781df4e81a7bf7ddd47f5e70a34",
+      "reviewed": "FULL_IMAGE_INSPECTED_BY_AUDIT_AUTHOR",
+      "assessment": "Empty/unpublished catalogue shell only; not actual searchable Wiki/content acceptance.",
+      "obvious_clipping_in_captured_state": false
+    }
+  ],
+  "limitations": "Eight actual fixed-state images plus48 machine-observed cases. No full WCAG/contrast/screen-reader/mobile-menu-open/PL/authenticated/native-world/production/multibrowser qualification; no independent visual acceptance."
+}
