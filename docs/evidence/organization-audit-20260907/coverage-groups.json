@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "groups": [
+    {
+      "id": "ATLAS-CREATURE-GAMEPLAY-SHARDS",
+      "repository": "atlas",
+      "disposition": "GROUPED",
+      "path_prefix": "web/creature-gameplay/shards/",
+      "expected_count": 508,
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Atlas",
+        "publication_commit": "0f62cba3fdbb56af0a01ae7c0b4587b66d1923fc",
+        "coverage_rules_path": "docs/evidence/repository-audit-2026-09-06/round-4/coverage-rules.json",
+        "coverage_rules_blob": "0c3b86dd143a1ffd4523b4472c4782a8f9a73e76",
+        "audited_main_sha": "5ea38a62fe1af8b8068adcb84350e9644905943c",
+        "audited_main_tree": "1024b0a7c32cab87e74655fba2a8cb7463cb3d44",
+        "pattern": "web/creature-gameplay/shards/**",
+        "count": 508,
+        "basis": "manifest+digest+bounded-schema+consumer+4 edge samples"
+      },
+      "current_revalidation": {
+        "source_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+        "source_tree": "a1009378f8d3950a5ee62fb3ee65041f7d53a1e0",
+        "historical_to_current_compare_status": "ahead",
+        "changed_paths_under_group_prefix": 0,
+        "current_blobs": {
+          "web/creature-gameplay/manifest.json": "9a338a50dd9cba5643c0b662170d796fa8689604",
+          "src/browser/creature-gameplay-profiles.mjs": "bfc19092d5393842cbb814f32882377eeedfe809",
+          "src/browser/loader.mjs": "2ef07afddf4102be6cc67d418180343ebecafcf1",
+          "tests/fullworld-runtime/creature-gameplay-runtime-safety.test.mjs": "cfe1cbc46502fd16cfbc190eee989ce8f8fd7eca",
+          "tests/verification/qualification-gameplay-contract.test.mjs": "993130738cb7834d63ed9a97b0944acdbe943c4c"
+        },
+        "required_checks": [
+          "historical coverage rule blob and count match exactly",
+          "git diff historical audited main to current source is empty under the grouped prefix and manifest",
+          "current grouped prefix contains exactly 508 regular-file leaves",
+          "current manifest, consumer, loader and focused test blobs match this record",
+          "focused current consumer/runtime tests pass on the exact current source"
+        ]
+      },
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Generated creature-gameplay shard products only. Historical grouped semantics are carried forward because the exact shard prefix and manifest are unchanged, while the changed current consumer/loader contract is separately source-bound and requalified.",
+      "limitations": "This does not make the 508 generated shards DIRECT reviews, restore Atlas verification, approve every gameplay value, qualify a real browser/fullworld run, or establish current product readiness."
+    }
+  ]
+}
