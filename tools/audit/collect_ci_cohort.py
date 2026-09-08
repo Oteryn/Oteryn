@@ -85,10 +85,16 @@ def job_metrics(job, run):
     anomalies = []
     duration = measured_interval(start, finish, 'execution', anomalies)
     delay = measured_interval(run['created_at'], start, 'start delay', anomalies)
-    # Missing evidence remains null, including skipped job timestamps.
     return {'id': job['id'], 'name': job['name'], 'conclusion': job.get('conclusion'),
             'started_at': start, 'completed_at': finish, 'execution_seconds': duration,
             'start_delay_from_run_creation_seconds': delay, 'timestamp_anomalies': anomalies}
+
+
+def write_new(path: Path, raw: bytes) -> None:
+    """Create one evidence file exclusively; never overwrite or follow a final-path symlink."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open('xb') as handle:
+        handle.write(raw)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -115,7 +121,6 @@ class ReadOnlyAPI:
                 require(len(raw) <= 8_000_000, 'response too large')
                 return json.loads(raw)
         except HTTPError as exc:
-            # Deliberately omit headers, credentials and response bodies.
             raise ValueError(f'GitHub HTTP {exc.code} for bounded metadata endpoint') from None
 
 
@@ -182,10 +187,14 @@ def main():
         result = collect(ReadOnlyAPI(os.environ.get('GH_TOKEN')))
     except Exception as exc:
         diagnostic = {'collection_failed': True, 'error_type': type(exc).__name__, 'message': str(exc)[:300], 'qualification': 'NO_COMPLETE_COHORT'}
-        (args.output.parent / 'collection-error.json').write_text(json.dumps(diagnostic, indent=2) + '\n')
+        diagnostic_path = args.output.parent / 'collection-error.json'
+        try:
+            write_new(diagnostic_path, (json.dumps(diagnostic, indent=2) + '\n').encode())
+        except FileExistsError:
+            raise RuntimeError('collection failed; existing collection-error.json preserved without overwrite') from exc
         raise
     raw = (json.dumps(result, indent=2) + '\n').encode()
-    args.output.parent.mkdir(parents=True, exist_ok=True); args.output.write_bytes(raw)
+    write_new(args.output, raw)
     print(json.dumps({'runs': len(result['runs']), 'unique_event_candidates': result['unique_event_candidates'], 'api_calls': result['api_calls'], 'sha256': hashlib.sha256(raw).hexdigest()}))
 
 
