@@ -59,12 +59,6 @@ jobs:
                 id
                 resourcePath
                 url
-                configuration {
-                  mergeMethod
-                  maximumEntriesToBuild
-                  maximumEntriesToMerge
-                  minimumEntriesToMerge
-                }
               }
             }
           }
@@ -101,15 +95,12 @@ jobs:
           queue_id = queue.get("id")
           resource_path = queue.get("resourcePath")
           url = queue.get("url")
-          configuration = queue.get("configuration")
           if not isinstance(queue_id, str) or not queue_id.startswith("MQ_"):
               raise SystemExit("Merge Queue id is missing or invalid")
           if not isinstance(resource_path, str) or not resource_path:
               raise SystemExit("Merge Queue resourcePath is missing")
           if not isinstance(url, str) or not url:
               raise SystemExit("Merge Queue URL is missing")
-          if not isinstance(configuration, dict) or not isinstance(configuration.get("mergeMethod"), str):
-              raise SystemExit("Merge Queue configuration is missing")
           observation = {
               "repository": repository,
               "base_ref": branch,
@@ -122,7 +113,6 @@ jobs:
               "queue_id": queue_id,
               "resource_path": resource_path,
               "url": url,
-              "configuration": configuration,
           }
           print("LIVE_MQ_QUEUE_OBSERVATION=" + json.dumps(observation, sort_keys=True, separators=(",", ":")))
           PY
