@@ -122,17 +122,17 @@ platform	.github/workflows/tibia-linux-live-reference.yml	9660f835392e716d6530b3
 platform	.github/workflows/wiki-reconciliation-acceptance.yml	219344788ae1e9abd9848648d7d9343064a086f7	SCOPED_SEMANTIC_REVIEW	R3-WF	[[3,59],[60,62],[63,66],[70,70]]	SOURCE_REVIEW_ONLY; selected CI cohort separate
 platform	AGENTS.md	d89b3b81f6679fab5f4c6ec90a48e673b8e573b3	SCOPED_SEMANTIC_REVIEW	Repository authority, scope and lifecycle restrictions; no inference of runtime qualification	[]	NOT_EXECUTED
 platform	README.md	1cf2256fa2bf72950f75aac68349ac6493b50f0b	SCOPED_SEMANTIC_REVIEW	Local setup and phase-aware capability/licensing assertions	[]	NOT_EXECUTED
-platform	app/Http/Controllers/Identity/SessionController.php	61cef9ccaa8bcb466c057281ceb292927fc185af	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,58]]	PLATFORM-H02 (restricted owner evidence)
-platform	app/Http/Middleware/EnsureIdentitySessionIsCurrent.php	904b03b374cd738bf335d34377f4fe9454b6fefc	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,100]]	PLATFORM-H02 (restricted owner evidence)
-platform	app/Http/Requests/Identity/LoginIdentityRequest.php	8a11a00fa07d8af1c98ac3c00b0ef5e76f8f0e2d	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,104]]	PLATFORM-H02 (restricted owner evidence)
-platform	app/Identity/Actions/RevokeIdentityWebSessions.php	c0bd3ae0f32725f2959961da5eff0d850c0501e2	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,31]]	PLATFORM-H02 (restricted owner evidence)
-platform	app/Identity/Credentials/IdentityCredentialUpdater.php	af2a1aeb67dc40c4f176ba0c49ed7f6373d299b7	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,46]]	PLATFORM-H02 (restricted owner evidence)
-platform	app/Identity/Credentials/PasswordResetCompleter.php	47f73e6e832098eed773d48cf9ff8e6f75e06327	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,41]]	PLATFORM-H02 (restricted owner evidence)
+platform	app/Http/Controllers/Identity/SessionController.php	61cef9ccaa8bcb466c057281ceb292927fc185af	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,58]]	PLATFORM-H02 (mechanism publicly disclosed; details intentionally not repeated)
+platform	app/Http/Middleware/EnsureIdentitySessionIsCurrent.php	904b03b374cd738bf335d34377f4fe9454b6fefc	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,100]]	PLATFORM-H02 (mechanism publicly disclosed; details intentionally not repeated)
+platform	app/Http/Requests/Identity/LoginIdentityRequest.php	8a11a00fa07d8af1c98ac3c00b0ef5e76f8f0e2d	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,104]]	PLATFORM-H02 (mechanism publicly disclosed; details intentionally not repeated)
+platform	app/Identity/Actions/RevokeIdentityWebSessions.php	c0bd3ae0f32725f2959961da5eff0d850c0501e2	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,31]]	PLATFORM-H02 (mechanism publicly disclosed; details intentionally not repeated)
+platform	app/Identity/Credentials/IdentityCredentialUpdater.php	af2a1aeb67dc40c4f176ba0c49ed7f6373d299b7	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,46]]	PLATFORM-H02 (mechanism publicly disclosed; details intentionally not repeated)
+platform	app/Identity/Credentials/PasswordResetCompleter.php	47f73e6e832098eed773d48cf9ff8e6f75e06327	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,41]]	PLATFORM-H02 (mechanism publicly disclosed; details intentionally not repeated)
 platform	app/Identity/Email/RequestIdentityEmailChange.php	06f81e0db11405233b15f056dc3d7cb1cd35e133	SCOPED_SEMANTIC_REVIEW	Security operation commit versus subsequent notifications	[[30,100]]	NOT_EXECUTED
 platform	app/Identity/Recovery/IdentityRecoveryKeyService.php	60ce2e43123d4b6880422794991a9cf0dd3f28de	SCOPED_SEMANTIC_REVIEW	Password hashing boundary and service validation	[[66,102]]	NOT_EXECUTED
-platform	app/Identity/Sessions/IdentityWebSessionManager.php	029bb496a09dd232a58c5066901db088961862dd	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,49]]	PLATFORM-H02 (restricted owner evidence)
-platform	app/Identity/Sessions/IdentityWebSessionRegistry.php	2058d99a3d72c794e3b03e256b1e27ca7c671ee7	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,148]]	PLATFORM-H02 (restricted owner evidence)
-platform	app/Identity/Sessions/WebSessionState.php	3d5040c0269b9a0d6b1af80c44959dd10e14978c	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,10]]	PLATFORM-H02 (restricted owner evidence)
+platform	app/Identity/Sessions/IdentityWebSessionManager.php	029bb496a09dd232a58c5066901db088961862dd	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,49]]	PLATFORM-H02 (mechanism publicly disclosed; details intentionally not repeated)
+platform	app/Identity/Sessions/IdentityWebSessionRegistry.php	2058d99a3d72c794e3b03e256b1e27ca7c671ee7	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,148]]	PLATFORM-H02 (mechanism publicly disclosed; details intentionally not repeated)
+platform	app/Identity/Sessions/WebSessionState.php	3d5040c0269b9a0d6b1af80c44959dd10e14978c	SCOPED_SEMANTIC_REVIEW	R3-ID	[[1,10]]	PLATFORM-H02 (mechanism publicly disclosed; details intentionally not repeated)
 platform	app/Notifications/Identity/IdentityEmailChangeNotice.php	53b3c500361fd9896d0a8063b8d2922b4f385dac	SCOPED_SEMANTIC_REVIEW	Synchronous mail notification interfaces; Queueable is not durable per-message outbox	[]	NOT_EXECUTED
 platform	app/Notifications/Identity/VerifyIdentityEmailChange.php	d94e9eec5b35cd93223a5acf73fc0e86b3e00050	SCOPED_SEMANTIC_REVIEW	Synchronous mail notification interfaces; Queueable is not durable per-message outbox	[]	NOT_EXECUTED
 platform	composer.json	6bfd2d8018fb40ce4df9aef11ab715b5210d508d	SCOPED_SEMANTIC_REVIEW	Declared update/toolchain/build scope only; no current advisory scan or full build inferred	[]	NOT_EXECUTED

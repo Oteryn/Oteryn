@@ -87,7 +87,18 @@ def load_groups(base, repo):
     require(type(doc.get('schema_version')) is int and doc['schema_version']==1,'coverage group schema')
     groups=doc.get('groups')
     require(isinstance(groups,list),'coverage groups missing')
-    unique(groups,lambda row:row.get('id'),'coverage group id')
+    rejected=doc.get('rejected_candidates',[])
+    require(isinstance(rejected,list),'rejected coverage candidates invalid')
+    unique(groups+rejected,lambda row:row.get('id'),'coverage group/candidate id')
+    for row in rejected:
+        require(row.get('repository') in repo,'rejected coverage repository')
+        require(row.get('disposition')=='REVALIDATION_FAILED_NOT_ADOPTED','rejected coverage disposition')
+        require(type(row.get('expected_count')) is int and row['expected_count']>0,'rejected coverage count')
+        evaluation=row.get('evaluation') or {}
+        require(evaluation.get('outcome')=='REJECTED_NOT_COUNTED_AS_GROUPED','rejected coverage outcome')
+        require(type(evaluation.get('qualification_run')) is int and type(evaluation.get('qualification_job')) is int,'rejected coverage execution identity')
+        tests=evaluation.get('focused_current_consumer_tests') or {}
+        require(type(tests.get('passed')) is int and type(tests.get('failed')) is int and tests.get('failed',0)>0,'rejected coverage failure evidence')
     prefixes=[]
     for row in groups:
         require(row.get('repository') in repo,'coverage group repository')

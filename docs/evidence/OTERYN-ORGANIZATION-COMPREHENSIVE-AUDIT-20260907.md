@@ -49,7 +49,7 @@ The earlier chat's broad warning-cause explanation is not adopted: this pinned P
 
 ## 3. Findings, not inflated risk counts
 
-`finding-register.tsv` accounts individually for **77 records**: 74 historical source IDs plus three explicit follow-ups/additions. A row is not necessarily a new defect; statuses distinguish repaired source, inherited allegations, live metadata, hypotheses/obligations and regressions. Full priority counts are not claimed exhaustive.
+`finding-register.tsv` accounts individually for **78 records**: 74 historical source IDs plus four explicit follow-ups/additions. A row is not necessarily a new defect; statuses distinguish repaired source, inherited allegations, live metadata, hypotheses/obligations and regressions. Full priority counts are not claimed exhaustive.
 
 Four P1s remain documented on the **pinned source snapshot**, not automatically on later main revisions:
 
@@ -61,6 +61,8 @@ Four P1s remain documented on the **pinned source snapshot**, not automatically 
 | PLATFORM-F16 | Two unsafe runtime-skip decisions reproduced with actual Git type/rename fixtures | Platform 451 / audit 1294. |
 
 **PLATFORM-F17 (P2):** Announcements' dedicated workflow excludes EN/PL locale files used by its ticker and browser assertions. `r3-trigger-evidence.json` binds six source blobs; eight static probes include four positive controls and four locale-selection counterexamples. This is a dedicated trigger gap, not a fresh Announcements-browser failure or demonstrated bypass of protected merging. Other workflows may still run.
+
+**ATLAS-F17 (P2):** on the pinned Atlas `f008158…` source, the existing gameplay impact-routing qualification test fails because `src/browser/creature-gameplay-profiles.mjs` has no dedicated impact rule. A proposed carry-forward of the historical 508 generated gameplay shards passed exact shard/manifest identity checks but was therefore rejected; those 508 leaves remain UNVERIFIED. This is not a claim about later Atlas main, restored verification or a runtime gameplay incident.
 
 **PLATFORM-H02 security handling correction:** a controlled source-pinned characterization exists. Independent review established that mechanism details were committed in public ancestor commits and exposed in public Actions artifacts. That material must therefore be treated as **already disclosed**. Removing characterization scripts from the final tree does not erase public Git history or restore confidentiality. The current report intentionally does not repeat mechanism/PoC details. Current live reachability, historical artifact deletion/expiry, private-advisory submission and remediation are NOT established. Further assessment/remediation must use the private vulnerability reporting route defined by Platform `SECURITY.md`. Until deletion/expiry is independently verified, historical artifacts must be treated as potentially downloadable/public.
 
@@ -85,6 +87,8 @@ Platform 1270 is closed **without merge**, with recorded successor 1304; 1304 is
 ## 6. Independent review correction pass
 
 Independent review of stable R3 head `9096edd135d42f31da4824f4c4fb50ee187de2c9` completed with four P1 and one P2 audit/evidence findings. They are preserved in `r3-independent-review-corrections.json`; author remediation is not itself independent acceptance.
+
+A later independent re-review of `e242a68a9df73304cbb6ba8bd3cfebbb36a2197b` found one remaining canonical disclosure-label P1 and two strict-JSON-type P2 evidence defects. This revision corrects those items, but the resulting new head still requires fresh independent re-review; author remediation is not independent acceptance.
 
 The correction pass does five things:
 

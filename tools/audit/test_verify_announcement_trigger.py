@@ -35,4 +35,12 @@ class Tests(unittest.TestCase):
     def test_committed_map_rejects_duplicate_json_keys(self):
         with self.assertRaisesRegex(ValueError,'duplicate JSON key'):
             require_committed_result({'schema_version':1},b'{"schema_version":1,"schema_version":1}')
+
+    def test_committed_map_rejects_bool_int_type_drift(self):
+        from verify_announcement_trigger import require_committed_result
+        with self.assertRaises(ValueError):
+            require_committed_result({'selected': False}, b'{"selected":0}')
+        with self.assertRaises(ValueError):
+            require_committed_result({'schema_version': 1}, b'{"schema_version":true}')
+
 if __name__=='__main__':unittest.main()

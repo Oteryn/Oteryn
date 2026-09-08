@@ -194,4 +194,11 @@ class Tests(unittest.TestCase):
             require_committed_results(summary,b'{"a":1,"nested":{"x":3}}')
 
 
+    def test_committed_results_reject_bool_int_type_drift(self):
+        with self.assertRaises(ValueError):
+            require_committed_results({'missing_editorial_text_checked': True}, b'{"missing_editorial_text_checked":1}')
+        with self.assertRaises(ValueError):
+            require_committed_results({'schema_version': 1}, b'{"schema_version":true}')
+
+
 if __name__ == '__main__': unittest.main()

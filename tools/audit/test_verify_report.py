@@ -29,10 +29,10 @@ class AuditValidationTest(unittest.TestCase):
     def test_current_report_validates_as_accounting_only(self):
         result=audit.validate(self.path)
         self.assertEqual(result['result'],'ACCOUNTING_VALID_NOT_SEMANTIC_PASS')
-        self.assertEqual(result['findings'],77)
-        self.assertEqual(result['grouped_revalidated_paths'],508)
-        self.assertEqual(result['semantically_classified_paths'],710)
-        self.assertEqual(result['unverified_semantics'],3615)
+        self.assertEqual(result['findings'],78)
+        self.assertEqual(result['grouped_revalidated_paths'],0)
+        self.assertEqual(result['semantically_classified_paths'],202)
+        self.assertEqual(result['unverified_semantics'],4123)
         self.assertFalse(result['tree_and_ledger_verified'])
     def test_boolean_schema_rejected(self):
         self.mutate(self.path,lambda d:d.update(schema_version=True));self.reject()
@@ -52,21 +52,16 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.path,lambda d:d['known_source_snapshot_p1_ids'].append('GAME-CANDIDATE-361'));self.reject()
     def test_hidden_unverified_paths_rejected(self):
         self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['platform'].update(unverified_semantics=0));self.reject()
-    def test_grouped_count_cannot_be_hidden(self):
-        self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['atlas'].update(grouped=0));self.reject()
-    def test_group_source_cut_must_match(self):
-        self.mutate(self.base/'coverage-groups.json',lambda d:d['groups'][0]['current_revalidation'].update(source_commit='0'*40));self.reject()
-    def test_overlapping_group_prefix_rejected(self):
-        def mutate(d):
-            copy=dict(d['groups'][0]);copy['id']='OVERLAP';copy['path_prefix']='web/creature-gameplay/shards/nested/';copy['historical_evidence']=dict(copy['historical_evidence']);copy['historical_evidence']['pattern']='web/creature-gameplay/shards/nested/**';d['groups'].append(copy)
-        self.mutate(self.base/'coverage-groups.json',mutate);self.reject()
-    def test_direct_group_overlap_rejected(self):
-        p=self.base/'coverage-review.tsv'
-        p.write_text(p.read_text()+"atlas\tweb/creature-gameplay/shards/fake.json\t"+'a'*40+"\tSCOPED_SEMANTIC_REVIEW\toverlap-negative\t[]\tNOT_EXECUTED\n")
-        self.mutate(self.path,lambda d:d.update(scoped_review_paths=d['scoped_review_paths']+1,semantically_classified_paths=d['semantically_classified_paths']+1))
-        def adjust(d):
-            d['scoped_review_paths']+=1;d['semantically_classified_paths']+=1;d['per_repository']['atlas']['direct_scoped']+=1;d['per_repository']['atlas']['unverified_semantics']-=1;d['unverified_semantics_total']-=1
-        self.mutate(self.base/'coverage-summary.json',adjust);self.reject()
+    def test_rejected_group_is_not_promoted_by_summary(self):
+        self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['atlas'].update(grouped=508,unverified_semantics=637))
+        self.reject()
+
+    def test_rejected_candidate_is_preserved_but_not_counted(self):
+        data=audit.read_json(self.base/'coverage-groups.json')
+        self.assertEqual(data['groups'],[])
+        self.assertEqual(len(data['rejected_candidates']),1)
+        self.assertEqual(data['rejected_candidates'][0]['evaluation']['outcome'],'REJECTED_NOT_COUNTED_AS_GROUPED')
+
     def test_reproduction_called_pass_rejected(self):
         self.mutate(self.base/'verification-index.json',lambda d:d.update(routing_product_verdict='PASS'));self.reject()
     def test_unbound_execution_source_rejected(self):

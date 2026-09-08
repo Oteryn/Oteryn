@@ -52,7 +52,8 @@ def tree_entries(root,ref,prefix):
 
 
 def verify(audit_root:Path,atlas_root:Path,evidence_root:Path):
-    groups=read_json(audit_root/'docs/evidence/organization-audit-20260907/coverage-groups.json')['groups']
+    group_doc=read_json(audit_root/'docs/evidence/organization-audit-20260907/coverage-groups.json')
+    groups=group_doc.get('groups',[])+group_doc.get('rejected_candidates',[])
     selected=[g for g in groups if g['id']==GROUP_ID]
     require(len(selected)==1,'Atlas grouped rule missing/duplicated')
     group=selected[0];hist=group['historical_evidence'];current=group['current_revalidation']

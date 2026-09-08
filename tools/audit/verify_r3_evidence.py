@@ -239,9 +239,19 @@ def migration_execution(log_raw, migration_review_raw, coverage_review_raw, mani
     return {'migrations': 50, 'mode': 'SYNTHETIC_SQLITE_UP_ONLY'}
 
 
+def strict_json_equal(left, right):
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(strict_json_equal(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(strict_json_equal(a, b) for a, b in zip(left, right))
+    return left == right
+
+
 def require_committed_results(summary, raw):
     committed = json_bytes(raw)
-    require(summary == committed, 'recount differs from committed r3-native-results.json')
+    require(strict_json_equal(summary, committed), 'recount differs from committed r3-native-results.json')
     return committed
 
 

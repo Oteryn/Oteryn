@@ -3,7 +3,7 @@
   "reviewed_head": "9096edd135d42f31da4824f4c4fb50ee187de2c9",
   "review_summary_comment": 5582123653,
   "review_completed_at_utc": "2026-09-08T09:00:42Z",
-  "status": "AUTHOR_REMEDIATION_VERIFIED_AWAITING_FRESH_INDEPENDENT_REREVIEW",
+  "status": "AUTHOR_REMEDIATION_ACTIVE_AFTER_REREVIEW3",
   "findings": [
     {
       "thread_id": "PRRT_kwDOT8KVrs6gKtn7",
@@ -64,6 +64,28 @@
     "hosted_meta_ci_run": 34212229295,
     "hosted_meta_ci_result": "SUCCESS",
     "temporary_workflow_retired_by": "62e9d88d3ae3ade414aab4814412a3268c2f8785",
-    "limits": "These remain author remediation checks. Subsequent evidence-metadata-only updates require exact-head canonical CI, and a fresh independent review of the final stable head is required before the original review findings may be treated as independently accepted."
+    "limits": "Author remediation remains non-independent. A fresh review is required after the exact corrected head is stable."
+  },
+  "latest_rereview": {
+    "reviewed_head": "e242a68a9df73304cbb6ba8bd3cfebbb36a2197b",
+    "completed_at_utc": "2026-09-08T10:54:10Z",
+    "result": "CHANGES_REQUIRED",
+    "findings": [
+      {
+        "thread_id": "PRRT_kwDOT8KVrs6gNOM7",
+        "priority": "P1",
+        "subject": "Canonical coverage ledger disclosure labels"
+      },
+      {
+        "thread_id": "PRRT_kwDOT8KVrs6gNONA",
+        "priority": "P2",
+        "subject": "Native result strict JSON types"
+      },
+      {
+        "thread_id": "PRRT_kwDOT8KVrs6gNOND",
+        "priority": "P2",
+        "subject": "Trigger evidence strict JSON types"
+      }
+    ]
   }
 }

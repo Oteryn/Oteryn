@@ -32,9 +32,19 @@ def json_bytes(raw):
     return json.loads(raw,object_pairs_hook=pairs)
 
 
+def strict_json_equal(left, right):
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(strict_json_equal(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(strict_json_equal(a, b) for a, b in zip(left, right))
+    return left == right
+
+
 def require_committed_result(generated, raw):
     committed=json_bytes(raw)
-    require(generated==committed,'generated F17 trigger evidence differs from committed r3-trigger-evidence.json')
+    require(strict_json_equal(generated,committed),'generated F17 trigger evidence differs from committed r3-trigger-evidence.json')
     return committed
 
 

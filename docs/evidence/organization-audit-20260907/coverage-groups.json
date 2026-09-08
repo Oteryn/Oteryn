@@ -1,10 +1,11 @@
 {
   "schema_version": 1,
-  "groups": [
+  "groups": [],
+  "rejected_candidates": [
     {
       "id": "ATLAS-CREATURE-GAMEPLAY-SHARDS",
       "repository": "atlas",
-      "disposition": "GROUPED",
+      "disposition": "REVALIDATION_FAILED_NOT_ADOPTED",
       "path_prefix": "web/creature-gameplay/shards/",
       "expected_count": 508,
       "historical_evidence": {
@@ -38,9 +39,24 @@
           "focused current consumer/runtime tests pass on the exact current source"
         ]
       },
-      "depth": "GROUPED_REVALIDATED",
+      "depth": "GROUPED_REVALIDATION_CANDIDATE_REJECTED",
       "scope": "Generated creature-gameplay shard products only. Historical grouped semantics are carried forward because the exact shard prefix and manifest are unchanged, while the changed current consumer/loader contract is separately source-bound and requalified.",
-      "limitations": "This does not make the 508 generated shards DIRECT reviews, restore Atlas verification, approve every gameplay value, qualify a real browser/fullworld run, or establish current product readiness."
+      "limitations": "This does not make the 508 generated shards DIRECT reviews, restore Atlas verification, approve every gameplay value, qualify a real browser/fullworld run, or establish current product readiness.",
+      "evaluation": {
+        "qualification_run": 34218265762,
+        "qualification_job": 102035087439,
+        "audit_python_tests_passed": 103,
+        "audit_node_tests_passed": 37,
+        "identity_revalidation": "PASS_508_EXACT_SHARDS_MANIFEST_UNCHANGED_AND_5_DEPENDENT_BLOBS_BOUND",
+        "focused_current_consumer_tests": {
+          "passed": 4,
+          "failed": 1
+        },
+        "failing_test": "gameplay impact routing executes both functional fixture and bounded source-contract coverage",
+        "failure_location": "tests/verification/qualification-gameplay-contract.test.mjs:77",
+        "failure_reason": "gameplay runtime requires a dedicated impact rule",
+        "outcome": "REJECTED_NOT_COUNTED_AS_GROUPED"
+      }
     }
   ]
 }

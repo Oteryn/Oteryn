@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "report_id": "OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907",
-  "revision": "R3-NATIVE-EVIDENCE-SCOPED-REVIEW-POST-INDEPENDENT-HARDENING-ATLAS-GROUPED",
+  "revision": "R3-NATIVE-EVIDENCE-SCOPED-REVIEW-POST-INDEPENDENT-HARDENING-ATLAS-GROUP-REJECTED",
   "status": "QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE",
   "governing_issue": "Oteryn/Oteryn#186",
   "pull_request": "Oteryn/Oteryn#185",
@@ -52,17 +52,33 @@
   "independent_score": null,
   "confirmed_p0_in_scoped_review": 0,
   "severity_counts_exhaustive": false,
-  "reconciled_register_rows": 77,
+  "reconciled_register_rows": 78,
   "historical_source_ids_accounted": 74,
-  "additional_followup_ids": 3,
+  "additional_followup_ids": 4,
   "unresolved_unknowns": 15,
   "audit_domains_accounted": 23,
   "audit_domains_all_pass": false,
   "workflow_census": {
-    "meta": {"workflows": 2, "jobs": 4, "merge_group_workflows": 1},
-    "game": {"workflows": 17, "jobs": 41, "merge_group_workflows": 1},
-    "platform": {"workflows": 55, "jobs": 100, "merge_group_workflows": 1},
-    "atlas": {"workflows": 3, "jobs": 5, "merge_group_workflows": 2},
+    "meta": {
+      "workflows": 2,
+      "jobs": 4,
+      "merge_group_workflows": 1
+    },
+    "game": {
+      "workflows": 17,
+      "jobs": 41,
+      "merge_group_workflows": 1
+    },
+    "platform": {
+      "workflows": 55,
+      "jobs": 100,
+      "merge_group_workflows": 1
+    },
+    "atlas": {
+      "workflows": 3,
+      "jobs": 5,
+      "merge_group_workflows": 2
+    },
     "total_workflows": 77,
     "total_declared_jobs": 150,
     "matrix_expanded": false,
@@ -91,12 +107,19 @@
   "verification": "organization-audit-20260907/verification-index.json",
   "unknown_register": "organization-audit-20260907/unknowns.json",
   "authority_note": "Provider implementation and live lifecycle authority remain in their repositories. Evidence is source-pinned; later source/config/consumer/Issue/PR changes can invalidate it. No provider writes, production actions, protection changes, new required gates or restored Atlas workflows are authorized by this report.",
-  "known_source_snapshot_p1_ids": ["GAME-F20", "PLATFORM-F01", "PLATFORM-F02", "PLATFORM-F16"],
+  "known_source_snapshot_p1_ids": [
+    "GAME-F20",
+    "PLATFORM-F01",
+    "PLATFORM-F02",
+    "PLATFORM-F16"
+  ],
   "known_source_snapshot_p1_count": 4,
-  "historical_candidate_p1_ids_not_counted_as_source_snapshot": ["GAME-CANDIDATE-361"],
+  "historical_candidate_p1_ids_not_counted_as_source_snapshot": [
+    "GAME-CANDIDATE-361"
+  ],
   "scoped_review_paths": 202,
-  "grouped_revalidated_paths": 508,
-  "semantically_classified_paths": 710,
+  "grouped_revalidated_paths": 0,
+  "semantically_classified_paths": 202,
   "r3_native_results": "organization-audit-20260907/r3-native-results.json",
   "r3_source_review": "organization-audit-20260907/r3-source-review.md",
   "r3_visual_review": "organization-audit-20260907/r3-visual-review.json",
@@ -109,8 +132,22 @@
     "author_remediation": "PUBLISHED_AND_SUBSEQUENTLY_HARDENED",
     "fresh_independent_rereview_required": true,
     "latest_repair_rereview_requested_head": "e242a68a9df73304cbb6ba8bd3cfebbb36a2197b",
-    "security_disclosure_state": "PUBLIC_ANCESTOR_HISTORY_AND_ARTIFACTS_TREATED_AS_DISCLOSED; current report does not repeat mechanism details; deletion/expiry not established"
+    "security_disclosure_state": "PUBLIC_ANCESTOR_HISTORY_AND_ARTIFACTS_TREATED_AS_DISCLOSED; current report does not repeat mechanism details; deletion/expiry not established",
+    "latest_completed_rereview": {
+      "reviewed_head": "e242a68a9df73304cbb6ba8bd3cfebbb36a2197b",
+      "completed_at_utc": "2026-09-08T10:54:10Z",
+      "result": "CHANGES_REQUIRED",
+      "p1": 1,
+      "p2": 2,
+      "new_material_findings": [
+        "coverage ledger disclosure labels",
+        "native-result strict JSON type equality",
+        "trigger-map strict JSON type equality"
+      ]
+    }
   },
   "audit_completion": "NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial",
-  "source_cut_policy": "Immutable original pinned generations are retained. Later lifecycle observations are separate evidence; this is not an all-repositories current-main acceptance snapshot."
+  "source_cut_policy": "Immutable original pinned generations are retained. Later lifecycle observations are separate evidence; this is not an all-repositories current-main acceptance snapshot.",
+  "rejected_group_candidates": 1,
+  "atlas_grouped_revalidation": "organization-audit-20260907/r3-atlas-grouped-revalidation.json"
 }
