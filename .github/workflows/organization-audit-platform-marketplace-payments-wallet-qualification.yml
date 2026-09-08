@@ -90,13 +90,13 @@ jobs:
           git -C audit diff --exit-code
           git -C platform diff --exit-code
           git -C evidence diff --exit-code
-      - name: Run exact hardened verifier unit tests
+      - name: Run exact adopted verifier unit tests
         working-directory: audit/tools/audit
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest -v test_verify_platform_marketplace_payments_wallet_group.py
-      - name: Revalidate exact primary qualification binding and 49 path/blob identities
+      - name: Revalidate exact adopted primary proof and 49 path/blob identities
         working-directory: audit
         shell: bash
         run: |
@@ -105,16 +105,16 @@ jobs:
           python3 - "$RUNNER_TEMP/mpw-primary.json" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
-          assert d['result']=='MARKETPLACE_PAYMENTS_WALLET_PRIMARY_QUALIFIED_NOT_ADOPTED'
+          assert d['result']=='MARKETPLACE_PAYMENTS_WALLET_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS'
           assert d['paths']==49 and [x['paths'] for x in d['families']]==[21,24,4]
           assert d['dependent_blobs_verified']==23 and d['focused_test_files_bound']==13
-          assert d['coverage_adopted'] is False
+          assert d['coverage_adopted'] is True
           q=d['primary_qualification']
           assert q['qualification_head']=='13f6933c543db98848450e063e61f8c0dd2fa3d3'
           assert q['workflow_run']==34283717767 and q['job']==102254287765
           assert q['focused_current_tests']['cases']==45 and q['focused_current_tests']['assertions']==444
           assert q['focused_current_tests']['failures']==q['focused_current_tests']['errors']==q['focused_current_tests']['skipped']==0
-          print('49-path exact primary qualification binding PASS; coverage remains unadopted.')
+          print('49-path adopted primary qualification binding PASS; post-adoption proof still required.')
           PY
       - name: Setup PHP 8.5.10
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240

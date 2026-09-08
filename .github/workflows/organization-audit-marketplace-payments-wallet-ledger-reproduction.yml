@@ -1,4 +1,4 @@
-name: Organization audit Marketplace-Payments-Wallet ledger reproduction (temporary)
+name: Organization audit Marketplace-Payments-Wallet adopted ledger reproduction (temporary)
 
 on:
   pull_request:
@@ -18,21 +18,21 @@ permissions:
   contents: read
 
 concurrency:
-  group: audit-185-marketplace-payments-wallet-ledger-reproduction
+  group: audit-185-marketplace-payments-wallet-adopted-ledger-reproduction
   cancel-in-progress: false
 
 jobs:
-  reproduce-ledgers:
+  reproduce-adopted-ledger:
     if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Checkout exact qualified audit candidate
+      - name: Checkout exact adopted audit candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
-      - name: Verify exact candidate and clean tree
+      - name: Verify exact adopted candidate and clean tree
         shell: bash
         run: |
           set -euo pipefail
@@ -44,14 +44,13 @@ jobs:
           sys.path.insert(0,'tools/audit')
           import verify_platform_marketplace_payments_wallet_group as v
           c=v.read_json(v.CANDIDATE)
-          adopted=v.validate_candidate_shape(c)
-          assert adopted is False
-          v.validate_group_state(c,v.read_json(v.GROUPS),False)
+          assert v.validate_candidate_shape(c) is True
+          v.validate_group_state(c,v.read_json(v.GROUPS),True)
           q=c['qualification']
           assert q['qualification_head']=='13f6933c543db98848450e063e61f8c0dd2fa3d3'
           assert q['workflow_run']==34283717767 and q['job']==102254287765
           assert q['focused_current_tests']['cases']==45 and q['focused_current_tests']['assertions']==444
-          print('QUALIFIED_PENDING_ADOPTION_EXACT_PRIMARY_PROOF_PASS')
+          print('ADOPTED_EXACT_PRIMARY_PROOF_PASS')
           PY
       - name: Rebuild immutable source inventories
         shell: bash
@@ -60,71 +59,43 @@ jobs:
           python3 tools/audit/organization_audit.py \
             --plan docs/evidence/organization-audit-20260907/collection-plan.json \
             --output "$RUNNER_TEMP/audit-inventory"
-      - name: Reproduce current and projected 4,325-row ledgers
+      - name: Reproduce exact adopted 4,325-row ledger
         shell: bash
         run: |
           set -euo pipefail
-          python3 - "$RUNNER_TEMP/audit-inventory/inventories" "$RUNNER_TEMP/ledger-proof" <<'PY'
-          from copy import deepcopy
-          import hashlib
-          import json
-          from pathlib import Path
-          import sys
-
-          root=Path.cwd()
-          sys.path.insert(0,str(root/'tools'/'audit'))
-          import verify_report as report
-          import verify_platform_marketplace_payments_wallet_group as mpw
-
-          inventory_dir=Path(sys.argv[1]); output=Path(sys.argv[2]); output.mkdir()
-          report_path=root/'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'
-          doc=report.read_json(report_path)
-          evidence=report_path.parent/doc['evidence_directory']
-          review=report.read_tsv(evidence/'coverage-review.tsv')
-          groups_doc=report.read_json(evidence/'coverage-groups.json')
-          candidate=mpw.read_json(root/mpw.CANDIDATE)
-          assert mpw.validate_candidate_shape(candidate) is False
-          mpw.validate_group_state(candidate,groups_doc,False)
-
-          current_raw,current_counts=report.build_ledger(doc,review,groups_doc['groups'],inventory_dir)
-          current_digest=hashlib.sha256(current_raw).hexdigest()
-          coverage=report.read_json(evidence/'coverage-summary.json')
-          if current_digest != coverage['ledger_sha256']:
-              raise SystemExit('current ledger digest mismatch: '+json.dumps({'reproduced':current_digest,'committed':coverage['ledger_sha256']},sort_keys=True))
-
-          projected_groups=deepcopy(groups_doc['groups'])
-          projected_groups.extend(mpw.expected_group(candidate,spec) for spec in mpw.EXPECTED_FAMILIES)
-          projected_raw,projected_counts=report.build_ledger(doc,review,projected_groups,inventory_dir)
-          projected_digest=hashlib.sha256(projected_raw).hexdigest()
-
-          expected_current={'meta':0,'game':0,'platform':58,'atlas':0,'migration_archive':0}
-          expected_projected={'meta':0,'game':0,'platform':107,'atlas':0,'migration_archive':0}
-          if current_counts != expected_current:
-              raise SystemExit('unexpected current grouped counts: '+json.dumps(current_counts,sort_keys=True))
-          if projected_counts != expected_projected:
-              raise SystemExit('unexpected projected grouped counts: '+json.dumps(projected_counts,sort_keys=True))
-          if len(current_raw.splitlines()) != 4326 or len(projected_raw.splitlines()) != 4326:
-              raise SystemExit('ledger must contain header plus exactly 4,325 rows')
-
-          (output/'current-ledger.csv').write_bytes(current_raw)
-          (output/'projected-ledger.csv').write_bytes(projected_raw)
+          python3 tools/audit/verify_report.py \
+            --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json \
+            --inventory-dir "$RUNNER_TEMP/audit-inventory/inventories" \
+            --ledger-output "$RUNNER_TEMP/adopted-ledger.csv"
+          python3 - "$RUNNER_TEMP/adopted-ledger.csv" "$RUNNER_TEMP/adopted-proof.json" <<'PY'
+          import csv,hashlib,json,sys
+          from collections import Counter
+          raw=open(sys.argv[1],'rb').read()
+          rows=list(csv.DictReader(raw.decode().splitlines()))
+          counts=Counter(r['disposition'] for r in rows)
+          digest=hashlib.sha256(raw).hexdigest()
+          expected={'DIRECT':221,'GROUPED':107,'UNVERIFIED':3997}
+          if len(rows)!=4325 or dict(counts)!=expected:
+              raise SystemExit(f'adopted ledger count drift: rows={len(rows)} counts={dict(counts)}')
+          if digest!='742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406':
+              raise SystemExit('adopted ledger digest drift: '+digest)
           proof={
               'schema_version':1,
               'audit_head':'${{ github.event.pull_request.head.sha }}',
-              'source_rows':4325,
-              'direct_paths':221,
-              'current':{'grouped_paths':58,'unverified_paths':4046,'ledger_sha256':current_digest},
-              'projected_after_mpw_adoption':{'grouped_paths':107,'unverified_paths':3997,'ledger_sha256':projected_digest},
+              'source_rows':4325,'direct_paths':221,'grouped_paths':107,'unverified_paths':3997,
+              'ledger_sha256':digest,
               'candidate_primary':{'head':'13f6933c543db98848450e063e61f8c0dd2fa3d3','run':34283717767,'job':102254287765,'cases':45,'assertions':444},
           }
-          (output/'digests.json').write_text(json.dumps(proof,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          open(sys.argv[2],'w',encoding='utf-8').write(json.dumps(proof,indent=2,sort_keys=True)+'\n')
           print(json.dumps(proof,sort_keys=True))
           PY
-      - name: Upload bounded ledger reproduction proof
+      - name: Upload bounded adopted ledger proof
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: audit185-mpw-ledger-reproduction-${{ github.run_id }}
-          path: ${{ runner.temp }}/ledger-proof
+          name: audit185-mpw-adopted-ledger-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/adopted-proof.json
+            ${{ runner.temp }}/adopted-ledger.csv
           if-no-files-found: error
           retention-days: 1
       - name: Final tracked-source cleanliness

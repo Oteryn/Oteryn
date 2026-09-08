@@ -18,31 +18,33 @@ class PlatformMarketplacePaymentsWalletCandidateTests(unittest.TestCase):
     def groups_fixture(self):
         return deepcopy(json.loads(GROUPS.read_text(encoding='utf-8')))
 
-    def adopted_fixture(self):
+    def pending_fixture(self):
         data = self.fixture()
-        data['state'] = verifier.ADOPTED
-        data['coverage_adopted'] = True
+        data['state'] = verifier.QUALIFIED_PENDING
+        data['coverage_adopted'] = False
+        data.pop('post_adoption_revalidation', None)
         return data
 
-    def adopted_groups_fixture(self, candidate):
+    def pending_groups_fixture(self):
         groups = self.groups_fixture()
-        groups['groups'].extend(verifier.expected_group(candidate, spec) for spec in verifier.EXPECTED_FAMILIES)
+        ids = {spec[0] for spec in verifier.EXPECTED_FAMILIES}
+        groups['groups'] = [row for row in groups['groups'] if row.get('id') not in ids]
         return groups
 
-    def test_committed_qualified_candidate_shape_is_exact(self):
+    def test_committed_adopted_candidate_shape_is_exact(self):
         data = self.fixture()
-        self.assertFalse(verifier.validate_candidate_shape(data))
-        verifier.validate_group_state(data, self.groups_fixture(), False)
+        self.assertTrue(verifier.validate_candidate_shape(data))
+        verifier.validate_group_state(data, self.groups_fixture(), True)
         self.assertEqual(sum(row['expected_count'] for row in data['current_revalidation']['families']), 49)
         self.assertEqual(len(data['current_revalidation']['dependent_blobs']), 23)
         self.assertEqual(len(data['current_revalidation']['focused_test_files']), 13)
         self.assertEqual(data['qualification']['focused_current_tests']['cases'], 45)
         self.assertEqual(data['qualification']['focused_current_tests']['assertions'], 444)
 
-    def test_exact_primary_qualification_can_be_adopted(self):
-        data = self.adopted_fixture()
-        self.assertTrue(verifier.validate_candidate_shape(data))
-        verifier.validate_group_state(data, self.adopted_groups_fixture(data), True)
+    def test_exact_primary_qualification_can_remain_pending(self):
+        data = self.pending_fixture()
+        self.assertFalse(verifier.validate_candidate_shape(data))
+        verifier.validate_group_state(data, self.pending_groups_fixture(), False)
 
     def test_missing_family_fails_closed(self):
         data = self.fixture(); data['current_revalidation']['families'].pop()
@@ -112,24 +114,29 @@ class PlatformMarketplacePaymentsWalletCandidateTests(unittest.TestCase):
             verifier.validate_candidate_shape(data)
 
     def test_adoption_state_and_post_adoption_preclaim_fail_closed(self):
-        data = self.fixture(); data['coverage_adopted'] = True
+        data = self.pending_fixture(); data['coverage_adopted'] = True
         with self.assertRaisesRegex(ValueError, 'adoption/state mismatch'):
             verifier.validate_candidate_shape(data)
         data = self.fixture(); data['post_adoption_revalidation'] = {'result':'PASS'}
-        with self.assertRaisesRegex(ValueError, 'cannot carry post-adoption'):
+        with self.assertRaisesRegex(ValueError, 'post-adoption evidence must be bound only after'):
             verifier.validate_candidate_shape(data)
 
     def test_group_state_subset_or_evidence_drift_fails_closed(self):
-        data = self.adopted_fixture()
-        groups = self.adopted_groups_fixture(data)
-        groups['groups'].pop()
+        data = self.fixture()
+        groups = self.groups_fixture()
+        groups['groups'] = [row for row in groups['groups'] if row.get('id') != verifier.EXPECTED_FAMILIES[-1][0]]
         with self.assertRaisesRegex(ValueError, 'missing/duplicated canonical groups'):
             verifier.validate_group_state(data, groups, True)
-        groups = self.adopted_groups_fixture(data)
+        groups = self.groups_fixture()
         row = next(r for r in groups['groups'] if r.get('id') == verifier.EXPECTED_FAMILIES[0][0])
         row['evaluation']['qualification_run'] += 1
         with self.assertRaisesRegex(ValueError, 'adopted group drift'):
             verifier.validate_group_state(data, groups, True)
+
+    def test_pending_candidate_rejects_premature_group_records(self):
+        data = self.pending_fixture()
+        with self.assertRaisesRegex(ValueError, 'qualified pending .* already has accepted group records'):
+            verifier.validate_group_state(data, self.groups_fixture(), False)
 
     def test_bool_total_is_not_integer_49(self):
         data = self.fixture(); data['expected_total'] = True
