@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "candidate_id": "PLATFORM-ACCOUNT-CHARACTER-HISTORICAL-DIRECT-CARRYFORWARD",
+  "repository": "Oteryn/Oteryn-Platform",
+  "state": "CANDIDATE_PENDING_QUALIFICATION",
+  "expected_total": 31,
+  "historical_evidence": {
+    "repository": "Oteryn/Oteryn-Platform",
+    "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+    "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+    "evidence_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+    "evidence_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+    "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+    "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+    "exact_scope_lines": [
+      "**FACT.** A 31-file batch was read covering:",
+      "- `app/Accounts/**`;",
+      "- `app/CanaryIntegration/**` relevant to account provisioning, character creation, character transfer, database privilege verification and runtime Redis reads;",
+      "- `app/CharacterProfiles/**`;",
+      "- `app/Characters/**`."
+    ],
+    "basis": "historical direct read of the documented 31-file account/Canary/profile/character batch"
+  },
+  "current_revalidation": {
+    "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+    "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+    "current_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+    "families": [
+      {
+        "id": "PLATFORM-ACCOUNTS-HISTORICAL-DIRECT-CARRYFORWARD",
+        "path_prefix": "app/Accounts/",
+        "expected_count": 7,
+        "tree_sha": "7505ff7d6836c667e0354622616ba2673e1ff9f2"
+      },
+      {
+        "id": "PLATFORM-CANARY-INTEGRATION-HISTORICAL-DIRECT-CARRYFORWARD",
+        "path_prefix": "app/CanaryIntegration/",
+        "expected_count": 8,
+        "tree_sha": "f37ac5641d49dbc7f419c69ffc0ae852af655baa"
+      },
+      {
+        "id": "PLATFORM-CHARACTER-PROFILES-HISTORICAL-DIRECT-CARRYFORWARD",
+        "path_prefix": "app/CharacterProfiles/",
+        "expected_count": 4,
+        "tree_sha": "677b67618fa5155c8e0e33b1baed097c8afce8e3"
+      },
+      {
+        "id": "PLATFORM-CHARACTERS-HISTORICAL-DIRECT-CARRYFORWARD",
+        "path_prefix": "app/Characters/",
+        "expected_count": 12,
+        "tree_sha": "cee6097116aea56865cfa54406c0be150e1f3f97"
+      }
+    ],
+    "dependent_blobs": {
+      "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+      "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7",
+      "config/marketplace.php": "0ed3d3d29827c801f2d72e8aee12b4b23ff0ef75",
+      "routes/web.php": "339e7573b2bc04c7bdd9183cd739c099448d8421",
+      "routes/modules/marketplace.php": "6ead81fecf5d99eb231413bea98d8bf097fa05b5",
+      "composer.json": "6bfd2d8018fb40ce4df9aef11ab715b5210d508d",
+      "composer.lock": "9de0c6c04944b771ccd0072ea08f72dc90fff123",
+      "phpunit.xml": "5ee5e6c596a08b758922fdc30ba650f5301d7a34",
+      "tests/Feature/Accounts/AccountOverviewTest.php": "e41d2eaa6672c8e12c5a3ea08371b3fcb0eb8925",
+      "tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php": "e0e453a15c154a1cb05b531a226b3d6dd35efe9d",
+      "tests/Feature/Accounts/ProvisionCanaryAccountTest.php": "81425a0d6aecaf01b329ca3f3e11ba9df1f86729",
+      "tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php": "007ec50001bb53273a66a2f85eb932e25dceea6c",
+      "tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php": "ba1be31b1dd7d10c39d28193e683e6cd4ad5d9a6",
+      "tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php": "fa11ef6c3721a266dfc43682ca20a50556194698",
+      "tests/Feature/Characters/CharacterCreationTest.php": "bae4a241f08f60dff6efd3bc25ff1b1f72572ea7",
+      "tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php": "9517868e1cc0a9996ca839ee6e14c2d96af1fbbe",
+      "tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php": "81c10eda199e600bde7f4fa867d20b12c46c30e8",
+      "tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php": "15a2d81bf44b5c2086154834e52270760e1390ff",
+      "tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php": "9d2eefc286d276d2a41ad5fbbf09b10fee12d1d1",
+      "tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php": "e0a339e1bc2a21b9e745035333b17dbf1504a236",
+      "tests/Unit/Characters/CharacterNamePolicyTest.php": "b17ed4f75fecd99e58fcb7049fe5be264d0b6bc4",
+      "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php": "f9b9a17d34003132acf877a9755b998d6cfa5403",
+      "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php": "14aa475be873476523eae72775b02acad956c8df"
+    },
+    "focused_test_files": [
+      "tests/Feature/Accounts/AccountOverviewTest.php",
+      "tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php",
+      "tests/Feature/Accounts/ProvisionCanaryAccountTest.php",
+      "tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php",
+      "tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php",
+      "tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php",
+      "tests/Feature/Characters/CharacterCreationTest.php",
+      "tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php",
+      "tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php",
+      "tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php",
+      "tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php",
+      "tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php",
+      "tests/Unit/Characters/CharacterNamePolicyTest.php",
+      "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php",
+      "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php"
+    ],
+    "required_checks": [
+      "historical audit publication commit/tree and report blob match exactly",
+      "all five historical scope lines occur exactly once in the bound report",
+      "historical and frozen current app trees are byte-identical",
+      "each of the four family trees matches its exact tree SHA and exact regular-file count on both historical and frozen source",
+      "each family has identical historical/current path/blob entries and no changed path under its prefix",
+      "the dependent binding map is exactly the required 23 paths and contains all 15 focused test files",
+      "frozen-current focused test qualification passes, including real MariaDB provisioning/create/transfer/concurrency and profile concurrency"
+    ]
+  },
+  "coverage_adopted": false,
+  "limitations": "Candidate only. Historical direct-read evidence plus byte identity does not establish current product readiness. All 31 leaves remain UNVERIFIED until the exact verifier and frozen-current behavioral qualification pass; provider runtime remains read-only."
+}
