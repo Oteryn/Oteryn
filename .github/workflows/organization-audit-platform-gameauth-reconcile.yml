@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/organization-audit-platform-gameauth-reconcile.yml
       - tools/audit/apply_platform_gameauth_coverage.py
+      - tools/audit/test_verify_report.py
       - docs/evidence/organization-audit-20260907/r3-platform-gameauth-candidate.json
 
 permissions:
