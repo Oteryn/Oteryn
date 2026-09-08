@@ -14,6 +14,10 @@ SPEC.loader.exec_module(routing)
 
 ROOT = Path(__file__).resolve().parents[2]
 POLICY = ROOT / "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md"
+REPOSITORY = "Oteryn/Oteryn"
+PR_NUMBER = 188
+PR_HEAD = "a" * 40
+INTEGRATION_HEAD = "b" * 40
 
 
 def capabilities(**overrides: bool):
@@ -26,6 +30,28 @@ def capabilities(**overrides: bool):
     }
     values.update(overrides)
     return routing.SubmissionCapabilities(**values)
+
+
+def evidence(kind: str, **overrides):
+    values = {
+        "kind": kind,
+        "repository": REPOSITORY,
+        "pr_number": PR_NUMBER,
+        "pr_head_sha": PR_HEAD,
+        "integration_head_sha": INTEGRATION_HEAD if kind == "merge_group" else None,
+    }
+    values.update(overrides)
+    return routing.QueueAdmissionEvidence(**values)
+
+
+def verify(route: str, items) -> str:
+    return routing.verify_queue_admission(
+        route,
+        items,
+        expected_repository=REPOSITORY,
+        expected_pr_number=PR_NUMBER,
+        expected_pr_head_sha=PR_HEAD,
+    )
 
 
 def test_explicit_enqueue_is_preferred_when_exposed() -> None:
@@ -50,22 +76,58 @@ def test_missing_native_submission_capability_fails_closed() -> None:
     assert route == routing.BLOCKED_CAPABILITY_UNAVAILABLE
 
 
-def test_queue_admission_requires_direct_github_evidence() -> None:
+def test_queue_admission_requires_direct_same_pr_same_head_github_evidence() -> None:
     for route in (routing.EXPLICIT_ENQUEUE, routing.AUTO_MERGE_MQ_SUBMISSION):
-        assert routing.verify_queue_admission(route, []) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
-        assert routing.verify_queue_admission(route, ["checks_green"]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
-        for evidence in routing.QUEUE_ADMISSION_EVIDENCE:
-            assert routing.verify_queue_admission(route, [evidence]) == routing.ENQUEUED
+        assert verify(route, []) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+        for kind in routing.QUEUE_ADMISSION_EVIDENCE:
+            assert verify(route, [evidence(kind)]) == routing.ENQUEUED
+            assert verify(route, [evidence(kind, repository="Oteryn/Oteryn-Platform")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+            assert verify(route, [evidence(kind, pr_number=999)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+            assert verify(route, [evidence(kind, pr_head_sha="c" * 40)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
 
 
-def test_non_mq_or_blocked_routes_cannot_be_promoted_by_queue_like_text() -> None:
+def test_merge_group_requires_valid_exact_integration_head() -> None:
+    route = routing.AUTO_MERGE_MQ_SUBMISSION
+    assert verify(route, [evidence("merge_group", integration_head_sha=None)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify(route, [evidence("merge_group", integration_head_sha="not-a-sha")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify(route, [evidence("merge_group")]) == routing.ENQUEUED
+
+
+def test_malformed_expected_identity_fails_closed() -> None:
+    route = routing.AUTO_MERGE_MQ_SUBMISSION
+    good = [evidence("added_to_merge_queue")]
+    assert routing.verify_queue_admission(
+        route,
+        good,
+        expected_repository="",
+        expected_pr_number=PR_NUMBER,
+        expected_pr_head_sha=PR_HEAD,
+    ) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert routing.verify_queue_admission(
+        route,
+        good,
+        expected_repository=REPOSITORY,
+        expected_pr_number=0,
+        expected_pr_head_sha=PR_HEAD,
+    ) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert routing.verify_queue_admission(
+        route,
+        good,
+        expected_repository=REPOSITORY,
+        expected_pr_number=PR_NUMBER,
+        expected_pr_head_sha="bad",
+    ) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+
+
+def test_non_mq_or_blocked_routes_cannot_be_promoted_by_queue_evidence() -> None:
+    item = evidence("added_to_merge_queue")
     for route in (
         routing.NOT_MQ_TARGET,
         routing.BLOCKED_NOT_AUTHORIZED,
         routing.BLOCKED_NOT_ELIGIBLE,
         routing.BLOCKED_CAPABILITY_UNAVAILABLE,
     ):
-        assert routing.verify_queue_admission(route, ["added_to_merge_queue"]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+        assert verify(route, [item]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
 
 
 def test_no_direct_merge_route_exists() -> None:
@@ -86,6 +148,7 @@ def test_canonical_policy_explains_verified_auto_merge_to_mq_boundary() -> None:
         "`added_to_merge_queue`",
         "`merge_group` candidate",
         "not a direct-merge fallback or protection bypass",
+        "same repository, PR number and current head SHA",
         "No bypass or direct merge substitutes for an unavailable enqueue tool",
     ):
         assert marker in text
