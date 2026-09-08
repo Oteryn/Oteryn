@@ -1,4 +1,3 @@
-import copy
 import unittest
 from collect_ci_cohort import elapsed, select_runs, job_metrics, ReadOnlyAPI, PLAN, collect
 
@@ -23,6 +22,22 @@ class Tests(unittest.TestCase):
 
     def test_wrong_time_order(self):
         with self.assertRaises(ValueError): elapsed('2026-09-08T00:01:00Z', '2026-09-08T00:00:00Z')
+
+    def test_negative_job_time_is_preserved_as_anomaly_not_clamped(self):
+        row = job_metrics(job(started_at='2026-09-08T00:00:50Z'), run())
+        self.assertIsNone(row['execution_seconds'])
+        self.assertEqual(row['started_at'], '2026-09-08T00:00:50Z')
+        self.assertEqual(row['completed_at'], '2026-09-08T00:00:40Z')
+        self.assertIn('execution: negative interval', row['timestamp_anomalies'])
+
+    def test_job_clock_before_run_creation_is_not_negative_queue_time(self):
+        row = job_metrics(job(started_at='2026-09-07T23:59:59Z'), run())
+        self.assertIsNone(row['start_delay_from_run_creation_seconds'])
+        self.assertIn('start delay: negative interval', row['timestamp_anomalies'])
+
+    def test_malformed_job_time_does_not_discard_other_evidence(self):
+        row = job_metrics(job(started_at='invalid'), run())
+        self.assertIsNone(row['execution_seconds']); self.assertEqual(len(row['timestamp_anomalies']), 2)
 
     def test_timezone_required(self):
         with self.assertRaises(ValueError): elapsed('2026-09-08T00:00:00', '2026-09-08T00:01:00')

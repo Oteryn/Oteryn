@@ -48,6 +48,17 @@ def elapsed(start, finish):
     return seconds
 
 
+def measured_interval(start, finish, label, anomalies):
+    try:
+        value = elapsed(start, finish)
+        if value is None:
+            anomalies.append(label + ': missing timestamp')
+        return value
+    except (ValueError, TypeError) as exc:
+        anomalies.append(label + ': ' + str(exc)[:160])
+        return None
+
+
 def select_runs(rows, workflow, limit=12):
     require(type(limit) is int and 1 <= limit <= 12, 'sample limit')
     selected, seen = [], set()
@@ -71,11 +82,13 @@ def job_metrics(job, run):
     if job.get('run_attempt') is not None:
         require(job['run_attempt'] == run['run_attempt'], 'job attempt mismatch')
     start, finish = job.get('started_at'), job.get('completed_at')
-    duration = elapsed(start, finish)
+    anomalies = []
+    duration = measured_interval(start, finish, 'execution', anomalies)
+    delay = measured_interval(run['created_at'], start, 'start delay', anomalies)
     # Missing evidence remains null, including skipped job timestamps.
     return {'id': job['id'], 'name': job['name'], 'conclusion': job.get('conclusion'),
             'started_at': start, 'completed_at': finish, 'execution_seconds': duration,
-            'start_delay_from_run_creation_seconds': elapsed(run['created_at'], start)}
+            'start_delay_from_run_creation_seconds': delay, 'timestamp_anomalies': anomalies}
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -141,7 +154,8 @@ def collect(api):
         result['observed_job_seconds'] = sum(t for t in times if t is not None)
         result['jobs_with_missing_times'] = sum(t is None for t in times)
         completions = [j['completed_at'] for j in result['jobs'] if j['completed_at'] is not None]
-        result['wall_from_run_creation_seconds'] = elapsed(run['created_at'], max(completions)) if completions else None
+        result['timestamp_anomalies'] = []
+        result['wall_from_run_creation_seconds'] = measured_interval(run['created_at'], max(completions) if completions else None, 'wall', result['timestamp_anomalies'])
         return result
 
     with ThreadPoolExecutor(max_workers=4) as pool:
@@ -163,7 +177,13 @@ def main():
     args = parser.parse_args()
     require(os.environ.get('OTERYN_AUDIT185_CI_COHORT') == '1', 'explicit bounded metadata collection consent required')
     require(not args.output.exists(), 'refusing output overwrite')
-    result = collect(ReadOnlyAPI(os.environ.get('GH_TOKEN')))
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        result = collect(ReadOnlyAPI(os.environ.get('GH_TOKEN')))
+    except Exception as exc:
+        diagnostic = {'collection_failed': True, 'error_type': type(exc).__name__, 'message': str(exc)[:300], 'qualification': 'NO_COMPLETE_COHORT'}
+        (args.output.parent / 'collection-error.json').write_text(json.dumps(diagnostic, indent=2) + '\n')
+        raise
     raw = (json.dumps(result, indent=2) + '\n').encode()
     args.output.parent.mkdir(parents=True, exist_ok=True); args.output.write_bytes(raw)
     print(json.dumps({'runs': len(result['runs']), 'unique_event_candidates': result['unique_event_candidates'], 'api_calls': result['api_calls'], 'sha256': hashlib.sha256(raw).hexdigest()}))
