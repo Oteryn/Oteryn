@@ -1,0 +1,43 @@
+name: Organization audit delete accidental helper ref (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-delete-accidental-ref.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: audit-185-delete-accidental-helper-ref
+  cancel-in-progress: false
+
+jobs:
+  delete-ref:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      EXPECTED_PARENT: 7b1b26587b3553d24110b884b479894b7918b15d
+      TARGET_REF: refs/heads/tmp/audit185-cleanup-proofs
+      EXPECTED_TARGET_SHA: f7f200bd4ef4822cdfab450c628bdf76864cedba
+    steps:
+      - name: Checkout exact cleanup trigger
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: true
+      - name: Delete only the exact accidental ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          mapfile -t changed < <(git diff --name-only "$EXPECTED_PARENT" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = '.github/workflows/organization-audit-delete-accidental-ref.yml'
+          remote_sha="$(git ls-remote --heads origin "$TARGET_REF" | awk '{print $1}')"
+          test "$remote_sha" = "$EXPECTED_TARGET_SHA"
+          git push origin --delete "$TARGET_REF"
+          test -z "$(git ls-remote --heads origin "$TARGET_REF")"
