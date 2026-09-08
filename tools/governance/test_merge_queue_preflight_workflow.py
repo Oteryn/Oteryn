@@ -17,6 +17,7 @@ def test_wrapper_is_default_branch_issue_comment_only() -> None:
         "startsWith(github.event.comment.body, '/oteryn-mq-preflight ')",
         "uses: ./.github/workflows/merge-queue-preflight-reusable.yml",
         "command_body: ${{ github.event.comment.body }}",
+        "author_association: ${{ github.event.comment.author_association }}",
         "repository: ${{ github.repository }}",
         "pr_number: ${{ github.event.issue.number }}",
         "trigger_comment_id: ${{ github.event.comment.id }}",
@@ -54,6 +55,28 @@ def test_reusable_never_submits_or_merges() -> None:
         assert forbidden not in text
 
 
+def test_reusable_binds_inputs_to_actual_caller_issue_comment() -> None:
+    text = REUSABLE.read_text(encoding="utf-8")
+    for marker in (
+        "EVENT_NAME: ${{ github.event_name }}",
+        "EVENT_REPOSITORY: ${{ github.repository }}",
+        "EVENT_PR_NUMBER: ${{ github.event.issue.number || 0 }}",
+        "EVENT_COMMENT_ID: ${{ github.event.comment.id || 0 }}",
+        "EVENT_COMMENT_BODY: ${{ github.event.comment.body || '' }}",
+        "EVENT_AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association || '' }}",
+        "EVENT_HAS_PR: ${{ github.event.issue.pull_request && 'true' || 'false' }}",
+        'EVENT_NAME != "issue_comment"',
+        'EVENT_HAS_PR != "true"',
+        "EVENT_REPOSITORY != REPOSITORY",
+        "EVENT_PR_NUMBER != PR_NUMBER",
+        "EVENT_COMMENT_ID != COMMENT_ID",
+        "EVENT_COMMENT_BODY != COMMAND_BODY",
+        "EVENT_AUTHOR_ASSOCIATION != AUTHOR_ASSOCIATION",
+        "reusable preflight inputs are not bound to the caller issue_comment event",
+    ):
+        assert marker in text
+
+
 def test_reusable_binds_comment_pr_head_and_queue_identity() -> None:
     text = REUSABLE.read_text(encoding="utf-8")
     for marker in (
@@ -79,6 +102,7 @@ def test_reusable_binds_comment_pr_head_and_queue_identity() -> None:
         '"workflow_run_attempt": RUN_ATTEMPT',
         '"expires_at_epoch_seconds": observed_at + MAX_AGE_SECONDS',
         "OTERYN_MQ_PREFLIGHT_V1=",
+        "OTERYN_MQ_PREFLIGHT_PROOF_COMMENT_ID=",
     ):
         assert marker in text
 
@@ -90,7 +114,8 @@ def test_preflight_observation_is_minted_after_live_reads() -> None:
     observed_at = text.index('observed_at = int(time.time())')
     proof = text.index('proof = {')
     post_comment = text.index('payload={"body": comment_body}')
-    assert queue_read < queue_identity < observed_at < proof < post_comment
+    proof_comment_id = text.index('proof_comment_id = result.get("id")')
+    assert queue_read < queue_identity < observed_at < proof < post_comment < proof_comment_id
 
 
 def main() -> int:
