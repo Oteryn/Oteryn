@@ -27,6 +27,7 @@ def capabilities(**overrides: bool):
         "auto_merge_available": True,
         "integration_authorized": True,
         "pr_eligible": True,
+        "candidate_frozen": True,
     }
     values.update(overrides)
     return routing.SubmissionCapabilities(**values)
@@ -64,9 +65,10 @@ def test_auto_merge_is_valid_only_as_required_mq_submission_route() -> None:
     assert routing.choose_submission_route(capabilities(merge_queue_required=False)) == routing.NOT_MQ_TARGET
 
 
-def test_missing_authority_or_eligibility_fails_before_tool_choice() -> None:
+def test_missing_authority_eligibility_or_freeze_fails_before_tool_choice() -> None:
     assert routing.choose_submission_route(capabilities(integration_authorized=False)) == routing.BLOCKED_NOT_AUTHORIZED
     assert routing.choose_submission_route(capabilities(pr_eligible=False)) == routing.BLOCKED_NOT_ELIGIBLE
+    assert routing.choose_submission_route(capabilities(candidate_frozen=False)) == routing.BLOCKED_NOT_ELIGIBLE
 
 
 def test_missing_native_submission_capability_fails_closed() -> None:
@@ -147,6 +149,7 @@ def test_canonical_policy_explains_verified_auto_merge_to_mq_boundary() -> None:
         "`enablePullRequestAutoMerge`",
         "`added_to_merge_queue`",
         "`merge_group` candidate",
+        "authorized, eligible and frozen PR",
         "not a direct-merge fallback or protection bypass",
         "same repository, PR number and current head SHA",
         "No bypass or direct merge substitutes for an unavailable enqueue tool",
