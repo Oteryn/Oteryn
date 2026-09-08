@@ -183,8 +183,22 @@
   "r3_native_manifest": "r3-native-manifest.json",
   "r3_native_results": "r3-native-results.json",
   "r3_trigger_evidence": "r3-trigger-evidence.json",
-  "r3_verification_boundary": "Immutable native archives are independently parsed offline; collector success is not product PASS. Audit-author self-review is not independent semantic acceptance. Original failing UI capture is retained; changed offline oracle is not a new browser run.",
-  "r3_sensitive_material": "Two characterization scripts removed from final effective diff; owner-private handoff, not a public exploit or proof of remediation. Earlier commits and historical Actions artifacts are not erased by removal.",
+  "r3_verification_boundary": "Immutable native archives are independently parsed offline; collector success is not product PASS. Post-review verification parses the original failed browser capture and the exact 50-migration log/source binding, requires semantic equality with committed r3-native-results.json and labels legacy replay as not a new browser execution. Audit-author checks are not independent semantic acceptance.",
+  "r3_sensitive_material": "Independent review established that characterization mechanism details existed in public ancestor commits and public Actions artifacts. Treat that historical mechanism as disclosed; removing scripts from the final effective diff does not restore confidentiality. Current public audit text intentionally avoids repeating mechanism/PoC details. Historical artifact deletion/expiry, current reachability, private-advisory submission and remediation are not established; provider handling follows Oteryn-Platform SECURITY.md.",
+  "r3_post_review_qualification": {
+    "qualified_head": "81b5c7c8986123774cd6a4169e934a197d640be2",
+    "temporary_workflow_run": 34212229245,
+    "job": 102015652696,
+    "python_tests": 92,
+    "python_result": "PASS",
+    "node_tests": 34,
+    "node_result": "PASS",
+    "six_public_archive_recount": "PASS_AND_EQUALS_COMMITTED_R3_NATIVE_RESULTS",
+    "meta_ci_run": 34212229295,
+    "meta_ci_result": "SUCCESS",
+    "post_qualification_delta": "Commit 62e9d88d3ae3ade414aab4814412a3268c2f8785 deletes only the temporary read-only qualification workflow; audit docs/evidence/tooling bytes qualified at 81b5c7c remain unchanged until subsequent evidence-metadata updates.",
+    "independent_rereview": "REQUIRED_ON_FINAL_STABLE_HEAD"
+  },
   "r2_execution_environment": {
     "python": "3.13.5",
     "git": "2.47.3",
@@ -202,7 +216,7 @@
     "Fresh complete dependency/CVE/SBOM/secret-history scan",
     "Paid agent/token/cost benchmark"
   ],
-  "results_provenance": "The results array, original test counts and acquisition fields preserve executed R2 source-pinned evidence. They are not presented as new R3 executions. R3 native execution identities/results are bound by r3-native-manifest.json and r3-native-results.json.",
+  "results_provenance": "The results array, original test counts and acquisition fields preserve executed R2 source-pinned evidence. They are not presented as new R3 executions. R3 native execution identities/results are bound by r3-native-manifest.json and r3-native-results.json. The post-review qualification at 81b5c7c re-executed the current audit tests and recounted all six public archives against the committed map before the temporary workflow was deleted.",
   "r3_not_executed": [
     "One combined full Integration/native Game journey",
     "Migration down/current-data upgrade, rollback data conservation and current production restore",
