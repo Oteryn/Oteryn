@@ -19,7 +19,6 @@ BLOCKED_QUEUE_ADMISSION_UNPROVEN = "BLOCKED_QUEUE_ADMISSION_UNPROVEN"
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-REF_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
 ATTEMPT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
 OBSERVATION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
 MAX_PREMUTATION_RULE_AGE_SECONDS = 30
@@ -95,14 +94,33 @@ def _boolean_fields(value: object, names: tuple[str, ...]) -> bool:
     return all(isinstance(getattr(value, name, None), bool) for name in names)
 
 
+def _valid_branch_name(value: object) -> bool:
+    """Apply git-check-ref-format full-ref constraints to a branch shorthand."""
+    if not isinstance(value, str) or not value or value == "@":
+        return False
+    identity = f"refs/heads/{value}"
+    return (
+        not identity.endswith(".")
+        and not any(
+            part == "" or part.startswith(".") or part.endswith(".lock")
+            for part in identity.split("/")
+        )
+        and ".." not in identity
+        and "@{" not in identity
+        and not any(
+            ord(char) <= 32 or ord(char) == 127 or char in "~^:?*[\\"
+            for char in identity
+        )
+    )
+
+
 def _valid_attempt(attempt: SubmissionAttempt) -> bool:
     return (
         isinstance(attempt, SubmissionAttempt)
         and _fullmatch(ATTEMPT_RE, attempt.attempt_id)
         and _fullmatch(REPOSITORY_RE, attempt.repository)
         and _positive_int(attempt.pr_number)
-        and _fullmatch(REF_RE, attempt.base_ref)
-        and ".." not in attempt.base_ref.split("/")
+        and _valid_branch_name(attempt.base_ref)
         and _fullmatch(SHA_RE, attempt.live_pr_head_sha)
     )
 
@@ -131,6 +149,7 @@ def _branch_observation_matches(
         isinstance(observation, BranchQueueObservation)
         and observation.attempt_id == attempt.attempt_id
         and _fullmatch(OBSERVATION_RE, observation.observation_id)
+        and isinstance(observation.source, str)
         and observation.source in SUPPORTED_BRANCH_RULE_SOURCES
         and observation.repository == attempt.repository
         and observation.base_ref == attempt.base_ref
@@ -292,7 +311,10 @@ def verify_queue_admission(
     now_epoch_seconds: int,
 ) -> str:
     """Accept only fresh current queue state or same-observation merge-group membership."""
-    if route not in {EXPLICIT_ENQUEUE, AUTO_MERGE_MQ_SUBMISSION}:
+    if not isinstance(route, str) or route not in {
+        EXPLICIT_ENQUEUE,
+        AUTO_MERGE_MQ_SUBMISSION,
+    }:
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
     if not _valid_attempt(attempt):
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
