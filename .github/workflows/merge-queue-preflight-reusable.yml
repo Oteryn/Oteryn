@@ -39,6 +39,13 @@ jobs:
           TRIGGER_COMMENT_ID: ${{ inputs.trigger_comment_id }}
           WORKFLOW_RUN_ID: ${{ github.run_id }}
           WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REPOSITORY: ${{ github.repository }}
+          EVENT_PR_NUMBER: ${{ github.event.issue.number || 0 }}
+          EVENT_COMMENT_ID: ${{ github.event.comment.id || 0 }}
+          EVENT_COMMENT_BODY: ${{ github.event.comment.body || '' }}
+          EVENT_AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association || '' }}
+          EVENT_HAS_PR: ${{ github.event.issue.pull_request && 'true' || 'false' }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -57,6 +64,13 @@ jobs:
           COMMENT_ID = int(os.environ["TRIGGER_COMMENT_ID"])
           RUN_ID = int(os.environ["WORKFLOW_RUN_ID"])
           RUN_ATTEMPT = int(os.environ["WORKFLOW_RUN_ATTEMPT"])
+          EVENT_NAME = os.environ["EVENT_NAME"]
+          EVENT_REPOSITORY = os.environ["EVENT_REPOSITORY"]
+          EVENT_PR_NUMBER = int(os.environ["EVENT_PR_NUMBER"])
+          EVENT_COMMENT_ID = int(os.environ["EVENT_COMMENT_ID"])
+          EVENT_COMMENT_BODY = os.environ["EVENT_COMMENT_BODY"]
+          EVENT_AUTHOR_ASSOCIATION = os.environ["EVENT_AUTHOR_ASSOCIATION"]
+          EVENT_HAS_PR = os.environ["EVENT_HAS_PR"]
           COMMAND_RE = re.compile(
               r"^/oteryn-mq-preflight ([A-Za-z0-9][A-Za-z0-9._:-]{15,127}) ([0-9a-f]{40})$"
           )
@@ -83,6 +97,16 @@ jobs:
                   body = exc.read().decode("utf-8", errors="replace")
                   raise SystemExit(f"GitHub API {method} {url} failed: HTTP {exc.code}: {body[:500]}") from exc
 
+          if (
+              EVENT_NAME != "issue_comment"
+              or EVENT_HAS_PR != "true"
+              or EVENT_REPOSITORY != REPOSITORY
+              or EVENT_PR_NUMBER != PR_NUMBER
+              or EVENT_COMMENT_ID != COMMENT_ID
+              or EVENT_COMMENT_BODY != COMMAND_BODY
+              or EVENT_AUTHOR_ASSOCIATION != AUTHOR_ASSOCIATION
+          ):
+              raise SystemExit("reusable preflight inputs are not bound to the caller issue_comment event")
           if AUTHOR_ASSOCIATION not in ALLOWED_ASSOCIATIONS:
               raise SystemExit(f"comment author association is not authorized: {AUTHOR_ASSOCIATION!r}")
           if REPOSITORY_RE.fullmatch(REPOSITORY) is None:
@@ -172,9 +196,13 @@ jobs:
           canonical = json.dumps(proof, sort_keys=True, separators=(",", ":"))
           print("OTERYN_MQ_PREFLIGHT_V1=" + canonical)
           comment_body = "OTERYN_MQ_PREFLIGHT_V1\n```json\n" + canonical + "\n```"
-          request_json(
+          result = request_json(
               f"https://api.github.com/repos/{REPOSITORY}/issues/{PR_NUMBER}/comments",
               method="POST",
               payload={"body": comment_body},
           )
+          proof_comment_id = result.get("id") if isinstance(result, dict) else None
+          if not isinstance(proof_comment_id, int) or proof_comment_id < 1:
+              raise SystemExit("GitHub did not return a proof comment id")
+          print(f"OTERYN_MQ_PREFLIGHT_PROOF_COMMENT_ID={proof_comment_id}")
           PY
