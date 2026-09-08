@@ -1,0 +1,21 @@
+name: Merge Queue Submission Preflight
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  preflight:
+    if: ${{ github.event.issue.pull_request && startsWith(github.event.comment.body, '/oteryn-mq-preflight ') }}
+    uses: ./.github/workflows/merge-queue-preflight-reusable.yml
+    with:
+      command_body: ${{ github.event.comment.body }}
+      author_association: ${{ github.event.comment.author_association }}
+      repository: ${{ github.repository }}
+      pr_number: ${{ github.event.issue.number }}
+      trigger_comment_id: ${{ github.event.comment.id }}
