@@ -1,0 +1,192 @@
+name: Organization audit Platform account-character qualification (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-platform-account-character-qualification.yml
+      - docs/evidence/organization-audit-20260907/r3-platform-account-character-candidate.json
+      - tools/audit/verify_platform_account_character_group.py
+      - tools/audit/test_verify_platform_account_character_group.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-185-platform-account-character-qualification
+  cancel-in-progress: false
+
+jobs:
+  qualify-account-character:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_ROOT_PASSWORD: oteryn-audit31-root
+          MARIADB_DATABASE: oteryn_audit31
+          MARIADB_ROOT_HOST: "%"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: oteryn_audit31
+      DB_USERNAME: root
+      DB_PASSWORD: oteryn-audit31-root
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+      CHARACTER_PROFILE_CONCURRENCY_TEST: '1'
+      CANARY_PROVISIONING_INTEGRATION_HOST: 127.0.0.1
+      CANARY_PROVISIONING_INTEGRATION_PORT: '3306'
+      CANARY_PROVISIONING_INTEGRATION_ROOT_PASSWORD: oteryn-audit31-root
+      CANARY_CHARACTER_CREATE_INTEGRATION_HOST: 127.0.0.1
+      CANARY_CHARACTER_CREATE_INTEGRATION_PORT: '3306'
+      CANARY_CHARACTER_CREATE_INTEGRATION_ROOT_PASSWORD: oteryn-audit31-root
+    steps:
+      - name: Checkout exact audit candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: audit
+          persist-credentials: false
+      - name: Checkout frozen Platform source with history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Oteryn/Oteryn-Platform
+          ref: de917b3477a1de0667531380de3660e8b2ab59aa
+          path: platform
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout immutable Platform audit publication
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Oteryn/Oteryn-Platform
+          ref: 3fe7df5330deb9ed38cc17ae1710f0cb4159019b
+          path: evidence
+          persist-credentials: false
+      - name: Verify exact coordinates and clean trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C audit rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git -C platform rev-parse HEAD)" = de917b3477a1de0667531380de3660e8b2ab59aa
+          test "$(git -C platform rev-parse HEAD^{tree})" = ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e
+          test "$(git -C evidence rev-parse HEAD)" = 3fe7df5330deb9ed38cc17ae1710f0cb4159019b
+          test "$(git -C evidence rev-parse HEAD^{tree})" = c6ac8cb7cbff069d7ac7303b3472d992da254774
+          git -C audit diff --check
+          git -C audit diff --exit-code
+          git -C platform diff --exit-code
+          git -C evidence diff --exit-code
+      - name: Run exact candidate verifier unit tests
+        working-directory: audit/tools/audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest -v test_verify_platform_account_character_group.py
+      - name: Revalidate historical direct-read and exact 31 path/blob identities
+        working-directory: audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/audit/verify_platform_account_character_group.py --audit-root . --platform-root ../platform --evidence-root ../evidence | tee "$RUNNER_TEMP/account-character-identity.json"
+          python3 - "$RUNNER_TEMP/account-character-identity.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert d['result']=='ACCOUNT_CHARACTER_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED'
+          assert d['paths']==31 and [x['paths'] for x in d['families']]==[7,8,4,12]
+          assert d['dependent_blobs_verified']==23 and d['focused_test_files_bound']==15
+          assert d['coverage_adopted'] is False
+          print('31-path identity/history gate PASS; coverage remains pending tests.')
+          PY
+      - name: Setup PHP 8.5
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
+          extensions: pdo_mysql, pdo_sqlite, pcntl, gd
+          tools: composer:v2
+      - name: Install frozen Platform dependencies
+        working-directory: platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          composer validate --strict
+          composer install --no-interaction --prefer-dist --no-progress
+          : > .env
+          php artisan config:clear --ansi
+          mkdir -p "$RUNNER_TEMP/audit31-junit"
+      - name: Run ordinary account/profile/character and privilege tests
+        working-directory: platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          php artisan test \
+            tests/Feature/Accounts/AccountOverviewTest.php \
+            tests/Feature/Accounts/ProvisionCanaryAccountTest.php \
+            tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php \
+            tests/Feature/Characters/CharacterCreationTest.php \
+            tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php \
+            tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php \
+            tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php \
+            tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php \
+            tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php \
+            tests/Unit/Characters/CharacterNamePolicyTest.php \
+            --log-junit="$RUNNER_TEMP/audit31-junit/ordinary.xml"
+      - name: Run real MariaDB/profile concurrency and integration qualification
+        working-directory: platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          php artisan test tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php --log-junit="$RUNNER_TEMP/audit31-junit/profile-concurrency.xml"
+          php artisan test tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php --log-junit="$RUNNER_TEMP/audit31-junit/provisioning.xml"
+          php artisan test tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php --log-junit="$RUNNER_TEMP/audit31-junit/character-create.xml"
+          php artisan test tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php --log-junit="$RUNNER_TEMP/audit31-junit/transfer.xml"
+          php artisan test tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php --log-junit="$RUNNER_TEMP/audit31-junit/transfer-concurrency.xml"
+      - name: Recount exact qualification JUnit results
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/audit31-junit" <<'PY'
+          from pathlib import Path
+          import json,sys,xml.etree.ElementTree as ET
+          root=Path(sys.argv[1]); files=sorted(root.glob('*.xml'))
+          if len(files)!=6: raise SystemExit(f'expected six JUnit files, got {len(files)}')
+          total={'test_files':15,'junit_files':len(files),'cases':0,'assertions':0,'failures':0,'errors':0,'skipped':0}
+          identities=set()
+          per_file=[]
+          for path in files:
+              tree=ET.parse(path).getroot(); cases=tree.findall('.//testcase')
+              row={'file':path.name,'cases':len(cases),'assertions':0,'failures':0,'errors':0,'skipped':0}
+              for case in cases:
+                  identity=(case.attrib.get('classname'),case.attrib.get('name'))
+                  if not all(identity) or identity in identities: raise SystemExit(f'duplicate/missing JUnit identity: {identity}')
+                  identities.add(identity)
+                  row['assertions']+=int(case.attrib.get('assertions','0'))
+                  row['failures']+=len(case.findall('failure')); row['errors']+=len(case.findall('error')); row['skipped']+=len(case.findall('skipped'))
+              for key in ('cases','assertions','failures','errors','skipped'): total[key]+=row[key]
+              per_file.append(row)
+          if total['cases']<=0 or total['assertions']<=0 or total['failures'] or total['errors'] or total['skipped']:
+              raise SystemExit('qualification is not all-green/no-skip: '+json.dumps(total))
+          print(json.dumps({'total':total,'junit':per_file},sort_keys=True))
+          PY
+      - name: Final tracked-source cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C audit diff --exit-code
+          git -C evidence diff --exit-code
+          git -C platform diff --exit-code
