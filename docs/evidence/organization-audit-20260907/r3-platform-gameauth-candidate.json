@@ -57,7 +57,7 @@
       "historical and frozen current app trees are byte-identical",
       "historical and frozen current app/GameAuth trees contain exactly the same 27 regular-file leaves and blob identities",
       "all named frozen-current dependent config/route/test/toolchain blobs match exactly",
-      "focused frozen-current GameAuth tests pass before any GROUPED adoption"
+      "focused frozen-current GameAuth tests pass as a prerequisite to GROUPED adoption"
     ],
     "focused_test_files": [
       "tests/Feature/GameAuth/EnsureGameWorldCommandTest.php",
@@ -82,7 +82,7 @@
     }
   },
   "coverage_adopted": true,
-  "limitations": "Candidate only. Exact byte identity can carry historical source-reading evidence, but does not establish production security, current-main status, provider remediation, full Identity/session correctness, real-world Gateway connectivity, or organization-wide audit completion.",
+  "limitations": "Adopted only as bounded GROUPED carry-forward. Exact byte identity and focused qualification do not establish production security, later-current-main status, provider remediation, full Identity/session correctness, real-world Gateway connectivity, or organization-wide audit completion.",
   "qualification": {
     "qualification_head": "261c3838cd4806ef29bd9e0e1808049be4bdf809",
     "workflow_run": 34225490543,
@@ -101,6 +101,22 @@
     "composer_validate": "PASS",
     "tracked_source_clean_after_execution": true,
     "existing_exact_source_concurrency_artifact": 10035749457,
-    "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
+    "outcome": "ADOPTED_GROUPED_CARRY_FORWARD",
+    "post_adoption_revalidation": {
+      "audit_head": "34c037154d1861ab0f1995ce4dc3ee9a36ebbb65",
+      "workflow_run": 34227110039,
+      "job": 102063808556,
+      "result": "PASS",
+      "canonical_group_state": "GAMEAUTH_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS",
+      "focused_current_tests": {
+        "cases": 61,
+        "assertions": 565,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "meta_ci_run": 34227109946,
+      "meta_ci_result": "SUCCESS"
+    }
   }
 }
