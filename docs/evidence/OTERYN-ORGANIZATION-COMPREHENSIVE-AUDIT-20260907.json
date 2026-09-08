@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "report_id": "OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907",
-  "revision": "R3-NATIVE-EVIDENCE-AND-SCOPED-REVIEW",
+  "revision": "R3-NATIVE-EVIDENCE-SCOPED-REVIEW-POST-INDEPENDENT-HARDENING",
   "status": "QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE",
   "governing_issue": "Oteryn/Oteryn#186",
   "pull_request": "Oteryn/Oteryn#185",
@@ -59,26 +59,10 @@
   "audit_domains_accounted": 23,
   "audit_domains_all_pass": false,
   "workflow_census": {
-    "meta": {
-      "workflows": 2,
-      "jobs": 4,
-      "merge_group_workflows": 1
-    },
-    "game": {
-      "workflows": 17,
-      "jobs": 41,
-      "merge_group_workflows": 1
-    },
-    "platform": {
-      "workflows": 55,
-      "jobs": 100,
-      "merge_group_workflows": 1
-    },
-    "atlas": {
-      "workflows": 3,
-      "jobs": 5,
-      "merge_group_workflows": 2
-    },
+    "meta": {"workflows": 2, "jobs": 4, "merge_group_workflows": 1},
+    "game": {"workflows": 17, "jobs": 41, "merge_group_workflows": 1},
+    "platform": {"workflows": 55, "jobs": 100, "merge_group_workflows": 1},
+    "atlas": {"workflows": 3, "jobs": 5, "merge_group_workflows": 2},
     "total_workflows": 77,
     "total_declared_jobs": 150,
     "matrix_expanded": false,
@@ -97,6 +81,8 @@
   },
   "evidence_directory": "organization-audit-20260907",
   "canonical_register": "organization-audit-20260907/finding-register.tsv",
+  "post_review_corrections": "organization-audit-20260907/r3-independent-review-corrections.json",
+  "post_review_correction_precedence": "Statements explicitly named in r3-independent-review-corrections.json supersede their prior R3 wording until canonical compact records are normalized consistently.",
   "coverage_review": "organization-audit-20260907/coverage-review.tsv",
   "coverage_summary": "organization-audit-20260907/coverage-summary.json",
   "domain_matrix": "organization-audit-20260907/domain-matrix.tsv",
@@ -104,21 +90,23 @@
   "verification": "organization-audit-20260907/verification-index.json",
   "unknown_register": "organization-audit-20260907/unknowns.json",
   "authority_note": "Provider implementation and live lifecycle authority remain in their repositories. Evidence is source-pinned; later source/config/consumer/Issue/PR changes can invalidate it. No provider writes, production actions, protection changes, new required gates or restored Atlas workflows are authorized by this report.",
-  "known_source_snapshot_p1_ids": [
-    "GAME-F20",
-    "PLATFORM-F01",
-    "PLATFORM-F02",
-    "PLATFORM-F16"
-  ],
+  "known_source_snapshot_p1_ids": ["GAME-F20", "PLATFORM-F01", "PLATFORM-F02", "PLATFORM-F16"],
   "known_source_snapshot_p1_count": 4,
-  "historical_candidate_p1_ids_not_counted_as_source_snapshot": [
-    "GAME-CANDIDATE-361"
-  ],
+  "historical_candidate_p1_ids_not_counted_as_source_snapshot": ["GAME-CANDIDATE-361"],
   "scoped_review_paths": 202,
   "r3_native_results": "organization-audit-20260907/r3-native-results.json",
   "r3_source_review": "organization-audit-20260907/r3-source-review.md",
   "r3_visual_review": "organization-audit-20260907/r3-visual-review.json",
   "r3_lifecycle": "organization-audit-20260907/r3-lifecycle.json",
+  "r3_review": {
+    "reviewed_head": "9096edd135d42f31da4824f4c4fb50ee187de2c9",
+    "result": "CHANGES_REQUIRED",
+    "p1": 4,
+    "p2": 1,
+    "author_remediation": "PUBLISHED_IN_PROGRESS",
+    "fresh_independent_rereview_required": true,
+    "security_disclosure_state": "PUBLIC_ANCESTOR_HISTORY_AND_ARTIFACTS_TREATED_AS_DISCLOSED; current report does not repeat mechanism details; deletion/expiry not established"
+  },
   "audit_completion": "NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial",
   "source_cut_policy": "Immutable original pinned generations are retained. Later lifecycle observations are separate evidence; this is not an all-repositories current-main acceptance snapshot."
 }
