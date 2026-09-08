@@ -279,6 +279,15 @@
     "ledger_reproduction_artifact": 10061390705,
     "pre_adoption_ledger_sha256": "db82a3bfa333521a4a21bf5e5e90ea816613186214ca92d59b6ce3394b0b7354",
     "projected_adopted_ledger_sha256": "b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459",
-    "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS"
+    "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS",
+    "post_adoption_head": "3b05f71a331da8c06fd0f5d6a0557590004ce5c5",
+    "post_adoption_run": 34281059173,
+    "post_adoption_job": 102245648440,
+    "post_adoption_verifier_unit_tests": 16,
+    "post_adoption_meta_ci_run": 34281059174,
+    "post_adoption_ledger_run": 34281059142,
+    "post_adoption_ledger_artifact": 10077605747,
+    "post_adoption_ledger_sha256": "b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459",
+    "post_adoption_result": "ACCOUNT_CHARACTER_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS"
   }
 }

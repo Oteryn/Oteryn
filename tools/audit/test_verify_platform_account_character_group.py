@@ -24,6 +24,7 @@ class PlatformAccountCharacterCandidateTests(unittest.TestCase):
         data['state'] = verifier.PENDING
         data['coverage_adopted'] = False
         data.pop('qualification', None)
+        data.pop('post_adoption_revalidation', None)
         return data
 
     def pending_groups_fixture(self):
@@ -36,6 +37,7 @@ class PlatformAccountCharacterCandidateTests(unittest.TestCase):
         data['state'] = verifier.ADOPTED
         data['coverage_adopted'] = True
         data['qualification'] = deepcopy(verifier.PRIMARY_QUALIFICATION)
+        data['post_adoption_revalidation'] = deepcopy(verifier.POST_ADOPTION)
         return data
 
     def adopted_groups_fixture(self, candidate):
@@ -131,6 +133,13 @@ class PlatformAccountCharacterCandidateTests(unittest.TestCase):
             data = self.adopted_fixture()
             data['qualification']['focused_current_tests'][key] = value
             with self.assertRaisesRegex(ValueError, 'exact bound run/result'):
+                verifier.validate_candidate_shape(data)
+
+    def test_post_adoption_run_or_result_drift_fails_closed(self):
+        for key, value in (('workflow_run', 34281059172), ('job', 102245648439), ('meta_ci_run', 34281059173), ('ledger_reproduction_run', 34281059141), ('ledger_sha256', '0' * 64)):
+            data = self.adopted_fixture()
+            data['post_adoption_revalidation'][key] = value
+            with self.assertRaisesRegex(ValueError, 'post-adoption revalidation must equal exact bound run/result'):
                 verifier.validate_candidate_shape(data)
 
     def test_adopted_missing_group_fails_closed(self):

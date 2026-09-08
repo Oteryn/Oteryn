@@ -91,6 +91,7 @@ PRIMARY_QUALIFICATION = {
     'tracked_source_clean_after_execution': True,
     'outcome': OUTCOME,
 }
+POST_ADOPTION = {'audit_head': '3b05f71a331da8c06fd0f5d6a0557590004ce5c5', 'workflow_run': 34281059173, 'job': 102245648440, 'result': 'PASS', 'canonical_group_state': 'ACCOUNT_CHARACTER_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS', 'verifier_unit_tests': 16, 'focused_current_tests': {'test_files': 15, 'cases': 86, 'assertions': 586, 'failures': 0, 'errors': 0, 'skipped': 0}, 'php': '8.5.10', 'mariadb': '11.8.9', 'meta_ci_run': 34281059174, 'meta_ci_result': 'SUCCESS', 'ledger_reproduction_run': 34281059142, 'ledger_reproduction_artifact': 10077605747, 'ledger_sha256': 'b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459'}
 GROUP_SCOPE = (
     'Historical direct-read evidence for the documented 31-file account/Canary/profile/character batch '
     'is carried forward only for this exact byte-identical family. Adoption is bounded by exact family '
@@ -255,8 +256,10 @@ def validate_candidate_shape(candidate) -> bool:
         qualification = candidate.get('qualification')
         require(isinstance(qualification, dict), 'adopted candidate qualification missing')
         require(json_exact(qualification, PRIMARY_QUALIFICATION), 'candidate qualification must equal exact bound run/result')
+        require(json_exact(candidate.get('post_adoption_revalidation'), POST_ADOPTION), 'candidate post-adoption revalidation must equal exact bound run/result')
     else:
         require('qualification' not in candidate, 'pending candidate must not carry adoption qualification')
+        require('post_adoption_revalidation' not in candidate, 'pending candidate must not carry post-adoption revalidation')
     return adopted
 
 
@@ -325,8 +328,8 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
         require(actual == expected, 'frozen-current dependent blob mismatch: ' + path)
 
     if adopted:
-        result = 'ACCOUNT_CHARACTER_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS'
-        next_gate = 'run exact-head adopted-state hosted requalification and bind that post-adoption run before cleanup'
+        result = 'ACCOUNT_CHARACTER_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS'
+        next_gate = 'fresh independent exact-head review; retain temporary qualification evidence until review completes'
     else:
         result = 'ACCOUNT_CHARACTER_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED'
         next_gate = 'exact frozen-current 15-file behavioral qualification must be bound before GROUPED adoption'

@@ -106,7 +106,7 @@ jobs:
           python3 - "$RUNNER_TEMP/account-character-identity.json" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
-          assert d['result']=='ACCOUNT_CHARACTER_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS'
+          assert d['result']=='ACCOUNT_CHARACTER_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS'
           assert d['paths']==31 and [x['paths'] for x in d['families']]==[7,8,4,12]
           assert d['dependent_blobs_verified']==23 and d['focused_test_files_bound']==15
           assert d['coverage_adopted'] is True

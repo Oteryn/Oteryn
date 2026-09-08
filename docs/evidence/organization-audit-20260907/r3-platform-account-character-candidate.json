@@ -125,5 +125,28 @@
     "composer_validate": "PASS",
     "tracked_source_clean_after_execution": true,
     "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
+  },
+  "post_adoption_revalidation": {
+    "audit_head": "3b05f71a331da8c06fd0f5d6a0557590004ce5c5",
+    "workflow_run": 34281059173,
+    "job": 102245648440,
+    "result": "PASS",
+    "canonical_group_state": "ACCOUNT_CHARACTER_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS",
+    "verifier_unit_tests": 16,
+    "focused_current_tests": {
+      "test_files": 15,
+      "cases": 86,
+      "assertions": 586,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "php": "8.5.10",
+    "mariadb": "11.8.9",
+    "meta_ci_run": 34281059174,
+    "meta_ci_result": "SUCCESS",
+    "ledger_reproduction_run": 34281059142,
+    "ledger_reproduction_artifact": 10077605747,
+    "ledger_sha256": "b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459"
   }
 }
