@@ -9,6 +9,7 @@ import verify_platform_account_character_group as verifier
 ROOT = Path(__file__).resolve().parents[2]
 CANDIDATE = ROOT / verifier.CANDIDATE
 GROUPS = ROOT / verifier.GROUPS
+ACCOUNT_GROUP_IDS = {spec[0] for spec in verifier.EXPECTED_FAMILIES}
 
 
 class PlatformAccountCharacterCandidateTests(unittest.TestCase):
@@ -18,25 +19,42 @@ class PlatformAccountCharacterCandidateTests(unittest.TestCase):
     def groups_fixture(self):
         return deepcopy(json.loads(GROUPS.read_text(encoding='utf-8')))
 
-    def adopted_fixture(self):
+    def pending_fixture(self):
         data = self.fixture()
+        data['state'] = verifier.PENDING
+        data['coverage_adopted'] = False
+        data.pop('qualification', None)
+        return data
+
+    def pending_groups_fixture(self):
+        groups = self.groups_fixture()
+        groups['groups'] = [row for row in groups['groups'] if row.get('id') not in ACCOUNT_GROUP_IDS]
+        return groups
+
+    def adopted_fixture(self):
+        data = self.pending_fixture()
         data['state'] = verifier.ADOPTED
         data['coverage_adopted'] = True
         data['qualification'] = deepcopy(verifier.PRIMARY_QUALIFICATION)
         return data
 
     def adopted_groups_fixture(self, candidate):
-        groups = self.groups_fixture()
+        groups = self.pending_groups_fixture()
         groups['groups'].extend(verifier.expected_group(candidate, spec) for spec in verifier.EXPECTED_FAMILIES)
         return groups
 
-    def test_committed_pending_candidate_shape_is_exact(self):
+    def test_committed_adopted_candidate_shape_is_exact(self):
         data = self.fixture()
-        self.assertFalse(verifier.validate_candidate_shape(data))
+        self.assertTrue(verifier.validate_candidate_shape(data))
         self.assertEqual(sum(row['expected_count'] for row in data['current_revalidation']['families']), 31)
         self.assertEqual(len(data['current_revalidation']['dependent_blobs']), 23)
         self.assertEqual(len(data['current_revalidation']['focused_test_files']), 15)
-        verifier.validate_group_state(data, self.groups_fixture(), False)
+        verifier.validate_group_state(data, self.groups_fixture(), True)
+
+    def test_explicit_pending_fixture_is_valid_and_has_no_groups(self):
+        data = self.pending_fixture()
+        self.assertFalse(verifier.validate_candidate_shape(data))
+        verifier.validate_group_state(data, self.pending_groups_fixture(), False)
 
     def test_exact_primary_qualification_can_be_adopted(self):
         data = self.adopted_fixture()
@@ -86,11 +104,11 @@ class PlatformAccountCharacterCandidateTests(unittest.TestCase):
             verifier.validate_candidate_shape(data)
 
     def test_pending_candidate_cannot_preclaim_adoption_or_qualification(self):
-        data = self.fixture()
+        data = self.pending_fixture()
         data['coverage_adopted'] = True
         with self.assertRaisesRegex(ValueError, 'adoption/state mismatch'):
             verifier.validate_candidate_shape(data)
-        data = self.fixture()
+        data = self.pending_fixture()
         data['qualification'] = deepcopy(verifier.PRIMARY_QUALIFICATION)
         with self.assertRaisesRegex(ValueError, 'pending candidate must not carry adoption qualification'):
             verifier.validate_candidate_shape(data)
@@ -115,13 +133,15 @@ class PlatformAccountCharacterCandidateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'exact bound run/result'):
                 verifier.validate_candidate_shape(data)
 
-    def test_adopted_group_subset_or_group_evidence_drift_fails_closed(self):
+    def test_adopted_missing_group_fails_closed(self):
         data = self.adopted_fixture()
         groups = self.adopted_groups_fixture(data)
-        groups['groups'].pop()
+        groups['groups'] = [row for row in groups['groups'] if row.get('id') != verifier.EXPECTED_FAMILIES[-1][0]]
         with self.assertRaisesRegex(ValueError, 'missing/duplicated canonical groups'):
             verifier.validate_group_state(data, groups, True)
 
+    def test_adopted_group_evidence_drift_fails_closed(self):
+        data = self.adopted_fixture()
         groups = self.adopted_groups_fixture(data)
         account = next(row for row in groups['groups'] if row.get('id') == verifier.EXPECTED_FAMILIES[0][0])
         account['evaluation']['qualification_run'] += 1
@@ -129,7 +149,7 @@ class PlatformAccountCharacterCandidateTests(unittest.TestCase):
             verifier.validate_group_state(data, groups, True)
 
     def test_pending_candidate_rejects_premature_group_records(self):
-        data = self.fixture()
+        data = self.pending_fixture()
         groups = self.adopted_groups_fixture(self.adopted_fixture())
         with self.assertRaisesRegex(ValueError, 'pending candidate already present'):
             verifier.validate_group_state(data, groups, False)
