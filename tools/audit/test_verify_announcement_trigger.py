@@ -1,7 +1,8 @@
+import json
 from pathlib import Path
 import tempfile
 import unittest
-from verify_announcement_trigger import paths_for_event, matches, verify
+from verify_announcement_trigger import paths_for_event, matches, verify, require_committed_result
 
 TEXT="on:\n  pull_request:\n    paths:\n      - 'app/Announcements/**'\n      - 'test.txt'\n  push:\n    paths:\n      - 'other.txt'\n"
 class Tests(unittest.TestCase):
@@ -25,4 +26,13 @@ class Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/'.github/workflows';p.mkdir(parents=True);(p/'announcements-acceptance.yml').write_text(TEXT)
             with self.assertRaisesRegex(ValueError,'wrong source'):verify(Path(tmp))
+    def test_committed_map_equality_is_required(self):
+        generated={'schema_version':1,'finding':'PLATFORM-F17','cases':[{'selected':False}]}
+        self.assertEqual(require_committed_result(generated,json.dumps(generated).encode()),generated)
+        drift={'schema_version':1,'finding':'PLATFORM-F17','cases':[{'selected':True}]}
+        with self.assertRaisesRegex(ValueError,'differs from committed'):
+            require_committed_result(generated,json.dumps(drift).encode())
+    def test_committed_map_rejects_duplicate_json_keys(self):
+        with self.assertRaisesRegex(ValueError,'duplicate JSON key'):
+            require_committed_result({'schema_version':1},b'{"schema_version":1,"schema_version":1}')
 if __name__=='__main__':unittest.main()
