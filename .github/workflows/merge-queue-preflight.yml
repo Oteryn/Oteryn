@@ -11,11 +11,11 @@ permissions:
 
 jobs:
   preflight:
-    if: ${{ github.event.issue.pull_request && startsWith(github.event.comment.body, '/oteryn-mq-preflight ') }}
+    if: ${{ github.repository == 'Oteryn/Oteryn' && github.event.issue.number == 189 && !github.event.issue.pull_request && startsWith(github.event.comment.body, '/oteryn-mq-preflight ') }}
     uses: ./.github/workflows/merge-queue-preflight-reusable.yml
     with:
       command_body: ${{ github.event.comment.body }}
       author_association: ${{ github.event.comment.author_association }}
-      repository: ${{ github.repository }}
-      pr_number: ${{ github.event.issue.number }}
+      control_repository: ${{ github.repository }}
+      control_issue_number: ${{ github.event.issue.number }}
       trigger_comment_id: ${{ github.event.comment.id }}
