@@ -83,24 +83,39 @@ class MergeGroupObservation(NamedTuple):
     observed_at_epoch_seconds: int
 
 
+def _fullmatch(pattern: re.Pattern[str], value: object) -> bool:
+    return isinstance(value, str) and pattern.fullmatch(value) is not None
+
+
+def _positive_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+
+
+def _boolean_fields(value: object, names: tuple[str, ...]) -> bool:
+    return all(isinstance(getattr(value, name, None), bool) for name in names)
+
+
 def _valid_attempt(attempt: SubmissionAttempt) -> bool:
     return (
         isinstance(attempt, SubmissionAttempt)
-        and ATTEMPT_RE.fullmatch(attempt.attempt_id) is not None
-        and REPOSITORY_RE.fullmatch(attempt.repository) is not None
-        and attempt.pr_number >= 1
-        and REF_RE.fullmatch(attempt.base_ref) is not None
+        and _fullmatch(ATTEMPT_RE, attempt.attempt_id)
+        and _fullmatch(REPOSITORY_RE, attempt.repository)
+        and _positive_int(attempt.pr_number)
+        and _fullmatch(REF_RE, attempt.base_ref)
         and ".." not in attempt.base_ref.split("/")
-        and SHA_RE.fullmatch(attempt.live_pr_head_sha) is not None
+        and _fullmatch(SHA_RE, attempt.live_pr_head_sha)
     )
 
 
-def _fresh(observed_at: int, now: int, max_age: int) -> bool:
+def _fresh(observed_at: object, now: object, max_age: int) -> bool:
     return (
         isinstance(observed_at, int)
         and not isinstance(observed_at, bool)
         and isinstance(now, int)
         and not isinstance(now, bool)
+        and isinstance(max_age, int)
+        and not isinstance(max_age, bool)
+        and max_age >= 0
         and 0 <= observed_at <= now
         and now - observed_at <= max_age
     )
@@ -115,7 +130,7 @@ def _branch_observation_matches(
     return (
         isinstance(observation, BranchQueueObservation)
         and observation.attempt_id == attempt.attempt_id
-        and OBSERVATION_RE.fullmatch(observation.observation_id) is not None
+        and _fullmatch(OBSERVATION_RE, observation.observation_id)
         and observation.source in SUPPORTED_BRANCH_RULE_SOURCES
         and observation.repository == attempt.repository
         and observation.base_ref == attempt.base_ref
@@ -134,7 +149,7 @@ def _freeze_matches(attempt: SubmissionAttempt, freeze: CandidateFreeze) -> bool
         and freeze.repository == attempt.repository
         and freeze.pr_number == attempt.pr_number
         and freeze.head_sha == attempt.live_pr_head_sha
-        and SHA_RE.fullmatch(freeze.head_sha) is not None
+        and _fullmatch(SHA_RE, freeze.head_sha)
     )
 
 
@@ -149,7 +164,15 @@ def choose_submission_route(
     """Choose a protected submission route from fresh, same-attempt GitHub state."""
     if not _valid_attempt(attempt):
         return BLOCKED_STALE_STATE
-    if not isinstance(capabilities, SubmissionCapabilities):
+    if not isinstance(capabilities, SubmissionCapabilities) or not _boolean_fields(
+        capabilities,
+        (
+            "explicit_enqueue_available",
+            "auto_merge_available",
+            "integration_authorized",
+            "pr_eligible",
+        ),
+    ):
         return BLOCKED_STALE_STATE
     if not capabilities.integration_authorized:
         return BLOCKED_NOT_AUTHORIZED
@@ -174,17 +197,19 @@ def choose_submission_route(
 
 def _observation_is_post_submission(
     *,
-    attempt_id: str,
-    observation_id: str,
-    observed_at_epoch_seconds: int,
-    submission_completed_at_epoch_seconds: int,
-    now_epoch_seconds: int,
+    attempt_id: object,
+    observation_id: object,
+    observed_at_epoch_seconds: object,
+    submission_completed_at_epoch_seconds: object,
+    now_epoch_seconds: object,
 ) -> bool:
     return (
-        ATTEMPT_RE.fullmatch(attempt_id) is not None
-        and OBSERVATION_RE.fullmatch(observation_id) is not None
+        _fullmatch(ATTEMPT_RE, attempt_id)
+        and _fullmatch(OBSERVATION_RE, observation_id)
         and isinstance(submission_completed_at_epoch_seconds, int)
         and not isinstance(submission_completed_at_epoch_seconds, bool)
+        and isinstance(observed_at_epoch_seconds, int)
+        and not isinstance(observed_at_epoch_seconds, bool)
         and observed_at_epoch_seconds >= submission_completed_at_epoch_seconds
         and _fresh(
             observed_at_epoch_seconds,
@@ -214,9 +239,8 @@ def _queue_entry_matches(
         and observation.repository == attempt.repository
         and observation.pr_number == attempt.pr_number
         and observation.pr_head_sha == attempt.live_pr_head_sha
-        and SHA_RE.fullmatch(observation.pr_head_sha) is not None
-        and isinstance(observation.queue_entry_id, str)
-        and OBSERVATION_RE.fullmatch(observation.queue_entry_id) is not None
+        and _fullmatch(SHA_RE, observation.pr_head_sha)
+        and _fullmatch(OBSERVATION_RE, observation.queue_entry_id)
         and observation.active is True
     )
 
@@ -240,16 +264,16 @@ def _merge_group_matches(
         now_epoch_seconds=now_epoch_seconds,
     ):
         return False
-    if SHA_RE.fullmatch(observation.integration_head_sha) is None:
+    if not _fullmatch(SHA_RE, observation.integration_head_sha):
         return False
-    if not observation.members:
+    if not isinstance(observation.members, tuple) or not observation.members:
         return False
     for member in observation.members:
         if not isinstance(member, MergeGroupMember):
             return False
-        if REPOSITORY_RE.fullmatch(member.repository) is None or member.pr_number < 1:
+        if not _fullmatch(REPOSITORY_RE, member.repository) or not _positive_int(member.pr_number):
             return False
-        if SHA_RE.fullmatch(member.pr_head_sha) is None:
+        if not _fullmatch(SHA_RE, member.pr_head_sha):
             return False
     expected = MergeGroupMember(
         repository=attempt.repository,
@@ -272,20 +296,25 @@ def verify_queue_admission(
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
     if not _valid_attempt(attempt):
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    if not isinstance(evidence, Iterable):
+        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
 
-    for item in evidence:
-        if _queue_entry_matches(
-            attempt,
-            item,
-            submission_completed_at_epoch_seconds=submission_completed_at_epoch_seconds,
-            now_epoch_seconds=now_epoch_seconds,
-        ):
-            return ENQUEUED
-        if _merge_group_matches(
-            attempt,
-            item,
-            submission_completed_at_epoch_seconds=submission_completed_at_epoch_seconds,
-            now_epoch_seconds=now_epoch_seconds,
-        ):
-            return ENQUEUED
+    try:
+        for item in evidence:
+            if _queue_entry_matches(
+                attempt,
+                item,
+                submission_completed_at_epoch_seconds=submission_completed_at_epoch_seconds,
+                now_epoch_seconds=now_epoch_seconds,
+            ):
+                return ENQUEUED
+            if _merge_group_matches(
+                attempt,
+                item,
+                submission_completed_at_epoch_seconds=submission_completed_at_epoch_seconds,
+                now_epoch_seconds=now_epoch_seconds,
+            ):
+                return ENQUEUED
+    except (TypeError, ValueError):
+        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
     return BLOCKED_QUEUE_ADMISSION_UNPROVEN
