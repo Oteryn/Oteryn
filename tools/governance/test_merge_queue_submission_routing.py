@@ -120,7 +120,7 @@ def merge_group(**overrides):
 
 def verify(items, *, current_attempt=None, submitted_at=NOW - 2, now=NOW, current_route=None):
     return routing.verify_queue_admission(
-        current_route or routing.AUTO_MERGE_MQ_SUBMISSION,
+        routing.AUTO_MERGE_MQ_SUBMISSION if current_route is None else current_route,
         current_attempt or attempt(),
         items,
         submission_completed_at_epoch_seconds=submitted_at,
@@ -149,6 +149,11 @@ def test_mq_rule_observation_must_match_same_attempt_repository_and_base() -> No
     assert route(observation=branch_observation(repository="Oteryn/Oteryn-Platform")) == routing.BLOCKED_STALE_STATE
     assert route(observation=branch_observation(base_ref="release")) == routing.BLOCKED_STALE_STATE
     assert route(observation=branch_observation(source="cached_policy")) == routing.BLOCKED_STALE_STATE
+
+
+def test_malformed_rule_source_is_fail_closed() -> None:
+    for source in ([], {}, set()):
+        assert route(observation=branch_observation(source=source)) == routing.BLOCKED_STALE_STATE
 
 
 def test_freeze_is_bound_to_same_repository_pr_and_live_head() -> None:
@@ -224,6 +229,42 @@ def test_non_mq_or_blocked_routes_cannot_be_promoted_by_queue_evidence() -> None
         routing.BLOCKED_CAPABILITY_UNAVAILABLE,
     ):
         assert verify([queue_entry()], current_route=current_route) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+
+
+def test_malformed_route_selector_is_fail_closed() -> None:
+    for current_route in ([], {}, set()):
+        assert verify([queue_entry()], current_route=current_route) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+
+
+def test_invalid_git_branch_names_fail_closed() -> None:
+    invalid = (
+        "",
+        "@",
+        "/main",
+        "main/",
+        "foo//bar",
+        "foo..bar",
+        "main.",
+        ".main",
+        "foo/.bar",
+        "main.lock",
+        "foo/bar.lock",
+        "foo@{bar",
+        "foo bar",
+        "foo~bar",
+        "foo^bar",
+        "foo:bar",
+        "foo?bar",
+        "foo*bar",
+        "foo[bar",
+        "foo\\bar",
+    )
+    for base_ref in invalid:
+        assert route(current_attempt=attempt(base_ref=base_ref)) == routing.BLOCKED_STALE_STATE, base_ref
+    for base_ref in ("main", "release/1.2", "feature/foo-bar"):
+        current_attempt = attempt(base_ref=base_ref)
+        observation = branch_observation(base_ref=base_ref)
+        assert route(current_attempt=current_attempt, observation=observation) == routing.AUTO_MERGE_MQ_SUBMISSION
 
 
 def test_malformed_attempt_identity_fails_closed() -> None:
