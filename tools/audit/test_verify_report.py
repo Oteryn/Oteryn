@@ -28,11 +28,16 @@ class AuditValidationTest(unittest.TestCase):
         with self.assertRaises(ValueError):audit.validate(self.path)
     def test_current_report_validates_as_accounting_only(self):
         result=audit.validate(self.path)
+        report=audit.read_json(self.path)
+        summary=audit.read_json(self.base/'coverage-summary.json')
+        groups=audit.read_json(self.base/'coverage-groups.json')['groups']
+        grouped=sum(row['expected_count'] for row in groups)
+        direct=report['scoped_review_paths']
         self.assertEqual(result['result'],'ACCOUNTING_VALID_NOT_SEMANTIC_PASS')
         self.assertEqual(result['findings'],78)
-        self.assertEqual(result['grouped_revalidated_paths'],0)
-        self.assertEqual(result['semantically_classified_paths'],202)
-        self.assertEqual(result['unverified_semantics'],4123)
+        self.assertEqual(result['grouped_revalidated_paths'],grouped)
+        self.assertEqual(result['semantically_classified_paths'],direct+grouped)
+        self.assertEqual(result['unverified_semantics'],summary['source_leaf_total']-direct-grouped)
         self.assertFalse(result['tree_and_ledger_verified'])
     def test_boolean_schema_rejected(self):
         self.mutate(self.path,lambda d:d.update(schema_version=True));self.reject()
@@ -58,9 +63,11 @@ class AuditValidationTest(unittest.TestCase):
 
     def test_rejected_candidate_is_preserved_but_not_counted(self):
         data=audit.read_json(self.base/'coverage-groups.json')
-        self.assertEqual(data['groups'],[])
-        self.assertEqual(len(data['rejected_candidates']),1)
-        self.assertEqual(data['rejected_candidates'][0]['evaluation']['outcome'],'REJECTED_NOT_COUNTED_AS_GROUPED')
+        rejected=data['rejected_candidates']
+        self.assertEqual(len(rejected),1)
+        self.assertEqual(rejected[0]['id'],'ATLAS-CREATURE-GAMEPLAY-SHARDS')
+        self.assertEqual(rejected[0]['evaluation']['outcome'],'REJECTED_NOT_COUNTED_AS_GROUPED')
+        self.assertNotIn(rejected[0]['id'],{row['id'] for row in data['groups']})
 
     def test_reproduction_called_pass_rejected(self):
         self.mutate(self.base/'verification-index.json',lambda d:d.update(routing_product_verdict='PASS'));self.reject()
