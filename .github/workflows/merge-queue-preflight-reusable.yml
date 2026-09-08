@@ -9,10 +9,10 @@ on:
       author_association:
         required: true
         type: string
-      repository:
+      control_repository:
         required: true
         type: string
-      pr_number:
+      control_issue_number:
         required: true
         type: number
       trigger_comment_id:
@@ -26,22 +26,22 @@ permissions:
 
 jobs:
   preflight:
-    name: Protected MQ preflight
+    name: Protected organization MQ preflight
     runs-on: ubuntu-latest
     steps:
-      - name: Verify exact PR and live Merge Queue
+      - name: Verify exact target PR and live Merge Queue
         env:
           GH_TOKEN: ${{ github.token }}
           COMMAND_BODY: ${{ inputs.command_body }}
           AUTHOR_ASSOCIATION: ${{ inputs.author_association }}
-          TARGET_REPOSITORY: ${{ inputs.repository }}
-          PR_NUMBER: ${{ inputs.pr_number }}
+          CONTROL_REPOSITORY: ${{ inputs.control_repository }}
+          CONTROL_ISSUE_NUMBER: ${{ inputs.control_issue_number }}
           TRIGGER_COMMENT_ID: ${{ inputs.trigger_comment_id }}
           WORKFLOW_RUN_ID: ${{ github.run_id }}
           WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_REPOSITORY: ${{ github.repository }}
-          EVENT_PR_NUMBER: ${{ github.event.issue.number || 0 }}
+          EVENT_ISSUE_NUMBER: ${{ github.event.issue.number || 0 }}
           EVENT_COMMENT_ID: ${{ github.event.comment.id || 0 }}
           EVENT_COMMENT_BODY: ${{ github.event.comment.body || '' }}
           EVENT_AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association || '' }}
@@ -59,23 +59,35 @@ jobs:
           TOKEN = os.environ["GH_TOKEN"]
           COMMAND_BODY = os.environ["COMMAND_BODY"]
           AUTHOR_ASSOCIATION = os.environ["AUTHOR_ASSOCIATION"]
-          REPOSITORY = os.environ["TARGET_REPOSITORY"]
-          PR_NUMBER = int(os.environ["PR_NUMBER"])
+          CONTROL_REPOSITORY = os.environ["CONTROL_REPOSITORY"]
+          CONTROL_ISSUE_NUMBER = int(os.environ["CONTROL_ISSUE_NUMBER"])
           COMMENT_ID = int(os.environ["TRIGGER_COMMENT_ID"])
           RUN_ID = int(os.environ["WORKFLOW_RUN_ID"])
           RUN_ATTEMPT = int(os.environ["WORKFLOW_RUN_ATTEMPT"])
           EVENT_NAME = os.environ["EVENT_NAME"]
           EVENT_REPOSITORY = os.environ["EVENT_REPOSITORY"]
-          EVENT_PR_NUMBER = int(os.environ["EVENT_PR_NUMBER"])
+          EVENT_ISSUE_NUMBER = int(os.environ["EVENT_ISSUE_NUMBER"])
           EVENT_COMMENT_ID = int(os.environ["EVENT_COMMENT_ID"])
           EVENT_COMMENT_BODY = os.environ["EVENT_COMMENT_BODY"]
           EVENT_AUTHOR_ASSOCIATION = os.environ["EVENT_AUTHOR_ASSOCIATION"]
           EVENT_HAS_PR = os.environ["EVENT_HAS_PR"]
-          COMMAND_RE = re.compile(
-              r"^/oteryn-mq-preflight ([A-Za-z0-9][A-Za-z0-9._:-]{15,127}) ([0-9a-f]{40})$"
-          )
-          REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+          CONTROL_REPOSITORY_EXPECTED = "Oteryn/Oteryn"
+          CONTROL_ISSUE_EXPECTED = 189
+          ALLOWED_TARGETS = {
+              "Oteryn/Oteryn",
+              "Oteryn/Oteryn-Game",
+              "Oteryn/Oteryn-Platform",
+              "Oteryn/Oteryn-Atlas",
+          }
           ALLOWED_ASSOCIATIONS = {"OWNER", "MEMBER", "COLLABORATOR"}
+          COMMAND_RE = re.compile(
+              r"^/oteryn-mq-preflight "
+              r"([A-Za-z0-9][A-Za-z0-9._:-]{15,127}) "
+              r"(Oteryn/(?:Oteryn|Oteryn-Game|Oteryn-Platform|Oteryn-Atlas)) "
+              r"([1-9][0-9]*) "
+              r"([0-9a-f]{40})$"
+          )
           MAX_AGE_SECONDS = 30
 
           def request_json(url, *, method="GET", payload=None):
@@ -99,26 +111,33 @@ jobs:
 
           if (
               EVENT_NAME != "issue_comment"
-              or EVENT_HAS_PR != "true"
-              or EVENT_REPOSITORY != REPOSITORY
-              or EVENT_PR_NUMBER != PR_NUMBER
+              or EVENT_HAS_PR != "false"
+              or EVENT_REPOSITORY != CONTROL_REPOSITORY_EXPECTED
+              or CONTROL_REPOSITORY != CONTROL_REPOSITORY_EXPECTED
+              or EVENT_ISSUE_NUMBER != CONTROL_ISSUE_EXPECTED
+              or CONTROL_ISSUE_NUMBER != CONTROL_ISSUE_EXPECTED
               or EVENT_COMMENT_ID != COMMENT_ID
               or EVENT_COMMENT_BODY != COMMAND_BODY
               or EVENT_AUTHOR_ASSOCIATION != AUTHOR_ASSOCIATION
           ):
-              raise SystemExit("reusable preflight inputs are not bound to the caller issue_comment event")
+              raise SystemExit("preflight inputs are not bound to META control Issue #189")
           if AUTHOR_ASSOCIATION not in ALLOWED_ASSOCIATIONS:
               raise SystemExit(f"comment author association is not authorized: {AUTHOR_ASSOCIATION!r}")
-          if REPOSITORY_RE.fullmatch(REPOSITORY) is None:
-              raise SystemExit("repository identity is malformed")
-          if PR_NUMBER < 1 or COMMENT_ID < 1 or RUN_ID < 1 or RUN_ATTEMPT < 1:
+          if COMMENT_ID < 1 or RUN_ID < 1 or RUN_ATTEMPT < 1:
               raise SystemExit("numeric preflight identity is invalid")
+
           command_match = COMMAND_RE.fullmatch(COMMAND_BODY.strip())
           if command_match is None:
-              raise SystemExit("preflight command must be exactly: /oteryn-mq-preflight <attempt_id> <40-char-head-sha>")
-          attempt_id, expected_head_sha = command_match.groups()
+              raise SystemExit(
+                  "preflight command must be exactly: "
+                  "/oteryn-mq-preflight <attempt_id> <owner/repo> <pr_number> <40-char-head-sha>"
+              )
+          attempt_id, target_repository, pr_number_raw, expected_head_sha = command_match.groups()
+          if target_repository not in ALLOWED_TARGETS:
+              raise SystemExit("target repository is outside the Oteryn Merge Queue preflight allowlist")
+          pr_number = int(pr_number_raw)
 
-          pr = request_json(f"https://api.github.com/repos/{REPOSITORY}/pulls/{PR_NUMBER}")
+          pr = request_json(f"https://api.github.com/repos/{target_repository}/pulls/{pr_number}")
           if pr.get("state") != "open" or pr.get("draft") is not False:
               raise SystemExit("target PR must be open and non-draft")
           base = pr.get("base") or {}
@@ -127,8 +146,11 @@ jobs:
           head_repo = head.get("repo") or {}
           base_ref = base.get("ref")
           live_head_sha = head.get("sha")
-          if base_repo.get("full_name") != REPOSITORY or head_repo.get("full_name") != REPOSITORY:
-              raise SystemExit("preflight supports same-repository PRs only")
+          if (
+              base_repo.get("full_name") != target_repository
+              or head_repo.get("full_name") != target_repository
+          ):
+              raise SystemExit("preflight supports same-repository Oteryn PRs only")
           if base_ref != "main":
               raise SystemExit(f"target PR base must be main, got {base_ref!r}")
           if live_head_sha != expected_head_sha:
@@ -136,7 +158,7 @@ jobs:
                   f"target PR head moved: expected {expected_head_sha}, live {live_head_sha}"
               )
 
-          owner, name = REPOSITORY.split("/", 1)
+          owner, name = target_repository.split("/", 1)
           queue_query = """
           query($owner: String!, $name: String!) {
             repository(owner: $owner, name: $name) {
@@ -162,13 +184,13 @@ jobs:
           queue_id = queue.get("id")
           resource_path = queue.get("resourcePath")
           url = queue.get("url")
-          expected_resource_path = f"/{REPOSITORY}/queue/{base_ref}"
+          expected_resource_path = f"/{target_repository}/queue/{base_ref}"
           expected_url = f"https://github.com{expected_resource_path}"
           if not isinstance(queue_id, str) or not queue_id.startswith("MQ_"):
               raise SystemExit("Merge Queue id is missing or invalid")
           if resource_path != expected_resource_path or url != expected_url:
               raise SystemExit(
-                  "Merge Queue identity does not bind the exact repository/base: "
+                  "Merge Queue identity does not bind the exact target repository/base: "
                   f"resourcePath={resource_path!r}, url={url!r}"
               )
 
@@ -178,9 +200,11 @@ jobs:
               "schema_version": 1,
               "attempt_id": attempt_id,
               "observation_id": observation_id,
-              "source": "protected_issue_comment_preflight",
-              "repository": REPOSITORY,
-              "pr_number": PR_NUMBER,
+              "source": "protected_meta_control_preflight",
+              "control_repository": CONTROL_REPOSITORY,
+              "control_issue_number": CONTROL_ISSUE_NUMBER,
+              "repository": target_repository,
+              "pr_number": pr_number,
               "base_ref": base_ref,
               "pr_head_sha": live_head_sha,
               "merge_queue_required": True,
@@ -197,7 +221,7 @@ jobs:
           print("OTERYN_MQ_PREFLIGHT_V1=" + canonical)
           comment_body = "OTERYN_MQ_PREFLIGHT_V1\n```json\n" + canonical + "\n```"
           result = request_json(
-              f"https://api.github.com/repos/{REPOSITORY}/issues/{PR_NUMBER}/comments",
+              f"https://api.github.com/repos/{CONTROL_REPOSITORY}/issues/{CONTROL_ISSUE_NUMBER}/comments",
               method="POST",
               payload={"body": comment_body},
           )
