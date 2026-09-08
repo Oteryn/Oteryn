@@ -22,12 +22,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  reproduce-ledgers:
+  reproduce-adopted-ledger:
     if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - name: Checkout exact audit candidate
+      - name: Checkout exact adopted audit candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -46,78 +46,50 @@ jobs:
           python3 tools/audit/organization_audit.py \
             --plan docs/evidence/organization-audit-20260907/collection-plan.json \
             --output "$RUNNER_TEMP/audit-inventory"
-      - name: Reproduce current and projected 4,325-row ledgers
+      - name: Reproduce exact adopted 4,325-row ledger
         shell: bash
+        env:
+          EXPECTED_LEDGER_SHA256: b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459
         run: |
           set -euo pipefail
-          python3 - "$RUNNER_TEMP/audit-inventory/inventories" "$RUNNER_TEMP/ledger-proof" <<'PY'
-          from copy import deepcopy
-          import hashlib
-          import json
+          mkdir "$RUNNER_TEMP/ledger-proof"
+          python3 tools/audit/verify_report.py \
+            --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json \
+            --inventory-dir "$RUNNER_TEMP/audit-inventory/inventories" \
+            --ledger-output "$RUNNER_TEMP/ledger-proof/ledger.csv" \
+            | tee "$RUNNER_TEMP/ledger-proof/verify-report.json"
+          python3 - "$RUNNER_TEMP/ledger-proof/ledger.csv" "$RUNNER_TEMP/ledger-proof/digests.json" <<'PY'
+          import csv,hashlib,json,sys
+          from collections import Counter
           from pathlib import Path
-          import sys
-
-          root = Path.cwd()
-          sys.path.insert(0, str(root / 'tools' / 'audit'))
-          import verify_report as report
-          import verify_platform_account_character_group as account
-
-          inventory_dir = Path(sys.argv[1])
-          output = Path(sys.argv[2])
-          output.mkdir()
-          report_path = root / 'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'
-          doc = report.read_json(report_path)
-          evidence = report_path.parent / doc['evidence_directory']
-          review = report.read_tsv(evidence / 'coverage-review.tsv')
-          groups_doc = report.read_json(evidence / 'coverage-groups.json')
-          candidate = account.read_json(root / account.CANDIDATE)
-
-          current_raw, current_counts = report.build_ledger(doc, review, groups_doc['groups'], inventory_dir)
-          current_digest = hashlib.sha256(current_raw).hexdigest()
-          coverage = report.read_json(evidence / 'coverage-summary.json')
-          if current_digest != coverage['ledger_sha256']:
-              raise SystemExit(
-                  'committed current ledger digest mismatch: '
-                  + json.dumps({'reproduced': current_digest, 'committed': coverage['ledger_sha256']}, sort_keys=True)
-              )
-
-          projected_groups = deepcopy(groups_doc['groups'])
-          projected_groups.extend(account.expected_group(candidate, spec) for spec in account.EXPECTED_FAMILIES)
-          projected_raw, projected_counts = report.build_ledger(doc, review, projected_groups, inventory_dir)
-          projected_digest = hashlib.sha256(projected_raw).hexdigest()
-
-          if current_counts != {'meta': 0, 'game': 0, 'platform': 27, 'atlas': 0, 'migration_archive': 0}:
-              raise SystemExit('unexpected current grouped counts: ' + json.dumps(current_counts, sort_keys=True))
-          if projected_counts != {'meta': 0, 'game': 0, 'platform': 58, 'atlas': 0, 'migration_archive': 0}:
-              raise SystemExit('unexpected projected grouped counts: ' + json.dumps(projected_counts, sort_keys=True))
-          if len(current_raw.splitlines()) != 4326 or len(projected_raw.splitlines()) != 4326:
-              raise SystemExit('ledger must contain header plus exactly 4,325 rows')
-
-          (output / 'current-ledger.csv').write_bytes(current_raw)
-          (output / 'projected-ledger.csv').write_bytes(projected_raw)
-          proof = {
-              'schema_version': 1,
-              'audit_head': '${{ github.event.pull_request.head.sha }}',
-              'source_rows': 4325,
-              'direct_paths': 221,
-              'current': {
-                  'grouped_paths': 27,
-                  'unverified_paths': 4077,
-                  'ledger_sha256': current_digest,
-              },
-              'projected_after_account_character_adoption': {
-                  'grouped_paths': 58,
-                  'unverified_paths': 4046,
-                  'ledger_sha256': projected_digest,
-              },
+          ledger=Path(sys.argv[1]); output=Path(sys.argv[2])
+          raw=ledger.read_bytes(); digest=hashlib.sha256(raw).hexdigest()
+          rows=list(csv.DictReader(raw.decode('utf-8').splitlines()))
+          dispositions=Counter(row['disposition'] for row in rows)
+          if len(rows)!=4325:
+              raise SystemExit(f'expected 4325 ledger rows, got {len(rows)}')
+          expected={'DIRECT':221,'GROUPED':58,'UNVERIFIED':4046}
+          if dict(dispositions)!=expected:
+              raise SystemExit('adopted disposition drift: '+json.dumps(dict(dispositions),sort_keys=True))
+          if digest != 'b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459':
+              raise SystemExit('adopted ledger digest drift: '+digest)
+          proof={
+              'schema_version':1,
+              'audit_head':'${{ github.event.pull_request.head.sha }}',
+              'source_rows':4325,
+              'direct_paths':221,
+              'grouped_paths':58,
+              'unverified_paths':4046,
+              'ledger_sha256':digest,
+              'result':'ADOPTED_LEDGER_REPRODUCED_ACCOUNTING_VALID_NOT_SEMANTIC_PASS',
           }
-          (output / 'digests.json').write_text(json.dumps(proof, indent=2, sort_keys=True) + '\n', encoding='utf-8')
-          print(json.dumps(proof, sort_keys=True))
+          output.write_text(json.dumps(proof,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+          print(json.dumps(proof,sort_keys=True))
           PY
-      - name: Upload bounded ledger reproduction proof
+      - name: Upload bounded adopted ledger proof
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: audit185-ledger-reproduction-${{ github.run_id }}
+          name: audit185-adopted-ledger-${{ github.run_id }}
           path: ${{ runner.temp }}/ledger-proof
           if-no-files-found: error
           retention-days: 1
