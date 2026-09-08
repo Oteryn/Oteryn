@@ -21,9 +21,10 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 ATTEMPT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
 OBSERVATION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
+QUEUE_ID_RE = re.compile(r"^MQ_[A-Za-z0-9_-]+$")
 MAX_PREMUTATION_RULE_AGE_SECONDS = 30
 MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS = 60
-SUPPORTED_BRANCH_RULE_SOURCES = frozenset({"branch_rules", "graphql_queue_config"})
+SUPPORTED_BRANCH_RULE_SOURCES = frozenset({"graphql_queue_config"})
 
 
 class SubmissionAttempt(NamedTuple):
@@ -41,6 +42,9 @@ class BranchQueueObservation(NamedTuple):
     repository: str
     base_ref: str
     merge_queue_required: bool
+    queue_id: str | None
+    resource_path: str | None
+    url: str | None
     observed_at_epoch_seconds: int
 
 
@@ -95,8 +99,13 @@ def _boolean_fields(value: object, names: tuple[str, ...]) -> bool:
 
 
 def _valid_branch_name(value: object) -> bool:
-    """Apply git-check-ref-format full-ref constraints to a branch shorthand."""
-    if not isinstance(value, str) or not value or value == "@":
+    """Apply `git check-ref-format --branch` constraints to a branch shorthand."""
+    if (
+        not isinstance(value, str)
+        or not value
+        or value == "@"
+        or value.startswith("-")
+    ):
         return False
     identity = f"refs/heads/{value}"
     return (
@@ -145,20 +154,38 @@ def _branch_observation_matches(
     *,
     now_epoch_seconds: int,
 ) -> bool:
-    return (
-        isinstance(observation, BranchQueueObservation)
-        and observation.attempt_id == attempt.attempt_id
-        and _fullmatch(OBSERVATION_RE, observation.observation_id)
-        and isinstance(observation.source, str)
-        and observation.source in SUPPORTED_BRANCH_RULE_SOURCES
-        and observation.repository == attempt.repository
-        and observation.base_ref == attempt.base_ref
-        and isinstance(observation.merge_queue_required, bool)
-        and _fresh(
-            observation.observed_at_epoch_seconds,
-            now_epoch_seconds,
-            MAX_PREMUTATION_RULE_AGE_SECONDS,
+    if not isinstance(observation, BranchQueueObservation):
+        return False
+    if observation.attempt_id != attempt.attempt_id:
+        return False
+    if not _fullmatch(OBSERVATION_RE, observation.observation_id):
+        return False
+    if not isinstance(observation.source, str) or observation.source not in SUPPORTED_BRANCH_RULE_SOURCES:
+        return False
+    if observation.repository != attempt.repository or observation.base_ref != attempt.base_ref:
+        return False
+    if not isinstance(observation.merge_queue_required, bool):
+        return False
+    if not _fresh(
+        observation.observed_at_epoch_seconds,
+        now_epoch_seconds,
+        MAX_PREMUTATION_RULE_AGE_SECONDS,
+    ):
+        return False
+
+    if observation.merge_queue_required is False:
+        return (
+            observation.queue_id is None
+            and observation.resource_path is None
+            and observation.url is None
         )
+
+    expected_resource_path = f"/{attempt.repository}/queue/{attempt.base_ref}"
+    expected_url = f"https://github.com{expected_resource_path}"
+    return (
+        _fullmatch(QUEUE_ID_RE, observation.queue_id)
+        and observation.resource_path == expected_resource_path
+        and observation.url == expected_url
     )
 
 
@@ -229,7 +256,7 @@ def _observation_is_post_submission(
         and not isinstance(submission_completed_at_epoch_seconds, bool)
         and isinstance(observed_at_epoch_seconds, int)
         and not isinstance(observed_at_epoch_seconds, bool)
-        and observed_at_epoch_seconds >= submission_completed_at_epoch_seconds
+        and observed_at_epoch_seconds > submission_completed_at_epoch_seconds
         and _fresh(
             observed_at_epoch_seconds,
             now_epoch_seconds,
