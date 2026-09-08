@@ -4,7 +4,10 @@ import tempfile
 import unittest
 import zipfile
 from collect_ci_cohort import PLAN, job_metrics
-from verify_r3_evidence import archive_files, digest, json_bytes, junit, go_results, go_coverage, ci_summary
+from verify_r3_evidence import (
+    archive_files, digest, json_bytes, junit, go_results, go_coverage, ci_summary,
+    legacy_failure_signature, migration_execution, require_committed_results,
+)
 
 
 def xml(extra='', declared=1):
@@ -132,6 +135,63 @@ class Tests(unittest.TestCase):
             with zipfile.ZipFile(file,'w') as archive:
                 archive.writestr('scope/value',b'ok');archive.writestr('scope/SHA256SUMS.json',json.dumps({'value':'0'*64}))
             with self.assertRaises(ValueError): archive_files(file,digest(file.read_bytes()))
+
+    def legacy_fixture(self):
+        routes = ['/', '/news', '/news/welcome-to-oteryn', '/wiki', '/download', '/login',
+                  '/register', '/forgot-password', '/recovery-key', '/events', '/support', '/legal/privacy']
+        sizes = [(390,844),(820,1180),(1440,1000),(1920,1080)]
+        cases=[]; failed=[]
+        for width,height in sizes:
+            for route in routes:
+                is_failed = route in {'/support','/legal/privacy'}
+                criteria={k: True for k in ['http_ok','main','heading','language','title','no_overflow','labels','images','unique_ids']}
+                if is_failed:
+                    criteria['http_ok']=False
+                    failed.append({'route':route,'width':width,'criterion':'http_ok'})
+                cases.append({'route':route,'width':width,'height':height,'status':404 if is_failed else 200,
+                              'criteria':criteria,'observed_errors':[]})
+        return {'source_sha':'de917b3477a1de0667531380de3660e8b2ab59aa','playwright':'1.62.1','browser':'test',
+                'cases':cases,'failed_criteria':failed,
+                'no_javascript':{'route':'/login','status':200,'email_visible':True,'password_visible':True}}
+
+    def test_original_browser_failure_signature_is_exact(self):
+        result = legacy_failure_signature(json.dumps(self.legacy_fixture()).encode(), 'de917b3477a1de0667531380de3660e8b2ab59aa')
+        self.assertEqual(result['failed_criteria'], 8)
+
+    def test_original_browser_failure_rejects_hidden_ninth_failure(self):
+        report=self.legacy_fixture()
+        report['cases'][0]['criteria']['main']=False
+        with self.assertRaises(ValueError):
+            legacy_failure_signature(json.dumps(report).encode(), 'de917b3477a1de0667531380de3660e8b2ab59aa')
+
+    def test_migration_log_binds_exact_path_set(self):
+        rows=[]
+        log=[]
+        for i in range(50):
+            name=f'2026_07_19_{i:06d}_migration_{i}'
+            path=f'database/migrations/{name}.php'
+            sha=f'{i:040x}'[-40:]
+            rows.append((path,sha,name))
+            log.append(f'  {name} .... 1.00ms DONE')
+        pair_bytes=''.join(f'{p}\t{s}\n' for p,s,_ in sorted(rows)).encode()
+        ledger='repository\tpath\tblob_sha\tdepth\tscope\tline_ranges\texecution_evidence\n'
+        ledger+=''.join(f'platform\t{p}\t{s}\tSCOPED_SEMANTIC_REVIEW\tR3-DB\t[]\tSOURCE_REVIEW_ONLY\n' for p,s,_ in rows)
+        log_raw=('\n'.join(log)+'\n').encode()
+        review={'schema_version':1,'repository':'Oteryn/Oteryn-Platform','source_sha':'de917b3477a1de0667531380de3660e8b2ab59aa',
+                'execution_artifact_id':7,'execution_log_sha256':digest(log_raw),'count':50,
+                'path_set':{'ledger':'coverage-review.tsv','repository':'platform','exact_prefix':'database/migrations/','exact_suffix':'.php',
+                            'sha256_of_path_and_blob_tsv':digest(pair_bytes)},
+                'up_execution':'All50 migration names occur in the bound successful log; synthetic SQLite only','down_execution':'NOT_EXECUTED'}
+        manifest={'provider_source_sha':'de917b3477a1de0667531380de3660e8b2ab59aa','artifacts':[{'name':'public_ui','artifact_id':7}]}
+        self.assertEqual(migration_execution(log_raw,json.dumps(review).encode(),ledger.encode(),manifest)['migrations'],50)
+        with self.assertRaises(ValueError):
+            migration_execution(log_raw.replace(b'migration_49',b'migration_X'),json.dumps(review).encode(),ledger.encode(),manifest)
+
+    def test_committed_results_drift_fails_closed(self):
+        summary={'a':1,'nested':{'x':2}}
+        self.assertEqual(require_committed_results(summary,json.dumps(summary).encode()),summary)
+        with self.assertRaises(ValueError):
+            require_committed_results(summary,b'{"a":1,"nested":{"x":3}}')
 
 
 if __name__ == '__main__': unittest.main()
