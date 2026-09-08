@@ -16,120 +16,222 @@ ROOT = Path(__file__).resolve().parents[2]
 POLICY = ROOT / "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md"
 REPOSITORY = "Oteryn/Oteryn"
 PR_NUMBER = 188
+BASE_REF = "main"
 PR_HEAD = "a" * 40
+OTHER_HEAD = "c" * 40
 INTEGRATION_HEAD = "b" * 40
+ATTEMPT_ID = "attempt-20260908-0001"
+NOW = 1_800_000_000
 
 
-def capabilities(**overrides: bool):
+def attempt(**overrides):
     values = {
+        "attempt_id": ATTEMPT_ID,
+        "repository": REPOSITORY,
+        "pr_number": PR_NUMBER,
+        "base_ref": BASE_REF,
+        "live_pr_head_sha": PR_HEAD,
+    }
+    values.update(overrides)
+    return routing.SubmissionAttempt(**values)
+
+
+def branch_observation(**overrides):
+    values = {
+        "attempt_id": ATTEMPT_ID,
+        "observation_id": "branch-observation-0001",
+        "source": "branch_rules",
+        "repository": REPOSITORY,
+        "base_ref": BASE_REF,
         "merge_queue_required": True,
+        "observed_at_epoch_seconds": NOW - 2,
+    }
+    values.update(overrides)
+    return routing.BranchQueueObservation(**values)
+
+
+def freeze(**overrides):
+    values = {
+        "repository": REPOSITORY,
+        "pr_number": PR_NUMBER,
+        "head_sha": PR_HEAD,
+    }
+    values.update(overrides)
+    return routing.CandidateFreeze(**values)
+
+
+def capabilities(**overrides):
+    values = {
         "explicit_enqueue_available": False,
         "auto_merge_available": True,
         "integration_authorized": True,
         "pr_eligible": True,
-        "candidate_frozen": True,
     }
     values.update(overrides)
     return routing.SubmissionCapabilities(**values)
 
 
-def evidence(kind: str, **overrides):
+def route(*, current_attempt=None, observation=None, current_freeze=None, current_capabilities=None, now=NOW):
+    return routing.choose_submission_route(
+        current_attempt or attempt(),
+        observation or branch_observation(),
+        current_freeze or freeze(),
+        current_capabilities or capabilities(),
+        now_epoch_seconds=now,
+    )
+
+
+def queue_entry(**overrides):
     values = {
-        "kind": kind,
+        "attempt_id": ATTEMPT_ID,
+        "observation_id": "queue-observation-0001",
         "repository": REPOSITORY,
         "pr_number": PR_NUMBER,
         "pr_head_sha": PR_HEAD,
-        "integration_head_sha": INTEGRATION_HEAD if kind == "merge_group" else None,
+        "queue_entry_id": "queue-entry-00000001",
+        "active": True,
+        "observed_at_epoch_seconds": NOW - 1,
     }
     values.update(overrides)
-    return routing.QueueAdmissionEvidence(**values)
+    return routing.QueueEntryObservation(**values)
 
 
-def verify(route: str, items) -> str:
+def member(**overrides):
+    values = {
+        "repository": REPOSITORY,
+        "pr_number": PR_NUMBER,
+        "pr_head_sha": PR_HEAD,
+    }
+    values.update(overrides)
+    return routing.MergeGroupMember(**values)
+
+
+def merge_group(**overrides):
+    values = {
+        "attempt_id": ATTEMPT_ID,
+        "observation_id": "merge-group-observation-0001",
+        "integration_head_sha": INTEGRATION_HEAD,
+        "members": (member(),),
+        "observed_at_epoch_seconds": NOW - 1,
+    }
+    values.update(overrides)
+    return routing.MergeGroupObservation(**values)
+
+
+def verify(items, *, current_attempt=None, submitted_at=NOW - 2, now=NOW, current_route=None):
     return routing.verify_queue_admission(
-        route,
+        current_route or routing.AUTO_MERGE_MQ_SUBMISSION,
+        current_attempt or attempt(),
         items,
-        expected_repository=REPOSITORY,
-        expected_pr_number=PR_NUMBER,
-        expected_pr_head_sha=PR_HEAD,
+        submission_completed_at_epoch_seconds=submitted_at,
+        now_epoch_seconds=now,
     )
 
 
 def test_explicit_enqueue_is_preferred_when_exposed() -> None:
-    route = routing.choose_submission_route(capabilities(explicit_enqueue_available=True))
-    assert route == routing.EXPLICIT_ENQUEUE
+    result = route(current_capabilities=capabilities(explicit_enqueue_available=True))
+    assert result == routing.EXPLICIT_ENQUEUE
 
 
-def test_auto_merge_is_valid_only_as_required_mq_submission_route() -> None:
-    assert routing.choose_submission_route(capabilities()) == routing.AUTO_MERGE_MQ_SUBMISSION
-    assert routing.choose_submission_route(capabilities(merge_queue_required=False)) == routing.NOT_MQ_TARGET
+def test_auto_merge_is_valid_only_for_fresh_required_mq_state() -> None:
+    assert route() == routing.AUTO_MERGE_MQ_SUBMISSION
+    assert route(observation=branch_observation(merge_queue_required=False)) == routing.NOT_MQ_TARGET
+    stale = branch_observation(
+        observed_at_epoch_seconds=NOW - routing.MAX_PREMUTATION_RULE_AGE_SECONDS - 1
+    )
+    assert route(observation=stale) == routing.BLOCKED_STALE_STATE
+    future = branch_observation(observed_at_epoch_seconds=NOW + 1)
+    assert route(observation=future) == routing.BLOCKED_STALE_STATE
 
 
-def test_missing_authority_eligibility_or_freeze_fails_before_tool_choice() -> None:
-    assert routing.choose_submission_route(capabilities(integration_authorized=False)) == routing.BLOCKED_NOT_AUTHORIZED
-    assert routing.choose_submission_route(capabilities(pr_eligible=False)) == routing.BLOCKED_NOT_ELIGIBLE
-    assert routing.choose_submission_route(capabilities(candidate_frozen=False)) == routing.BLOCKED_NOT_ELIGIBLE
+def test_mq_rule_observation_must_match_same_attempt_repository_and_base() -> None:
+    assert route(observation=branch_observation(attempt_id="different-attempt-0001")) == routing.BLOCKED_STALE_STATE
+    assert route(observation=branch_observation(repository="Oteryn/Oteryn-Platform")) == routing.BLOCKED_STALE_STATE
+    assert route(observation=branch_observation(base_ref="release")) == routing.BLOCKED_STALE_STATE
+    assert route(observation=branch_observation(source="cached_policy")) == routing.BLOCKED_STALE_STATE
+
+
+def test_freeze_is_bound_to_same_repository_pr_and_live_head() -> None:
+    assert route(current_freeze=freeze(repository="Oteryn/Oteryn-Platform")) == routing.BLOCKED_FROZEN_HEAD_MISMATCH
+    assert route(current_freeze=freeze(pr_number=999)) == routing.BLOCKED_FROZEN_HEAD_MISMATCH
+    assert route(current_freeze=freeze(head_sha=OTHER_HEAD)) == routing.BLOCKED_FROZEN_HEAD_MISMATCH
+    moved = attempt(live_pr_head_sha=OTHER_HEAD)
+    assert route(current_attempt=moved) == routing.BLOCKED_FROZEN_HEAD_MISMATCH
+
+
+def test_missing_authority_or_eligibility_fails_before_tool_choice() -> None:
+    assert route(current_capabilities=capabilities(integration_authorized=False)) == routing.BLOCKED_NOT_AUTHORIZED
+    assert route(current_capabilities=capabilities(pr_eligible=False)) == routing.BLOCKED_NOT_ELIGIBLE
 
 
 def test_missing_native_submission_capability_fails_closed() -> None:
-    route = routing.choose_submission_route(
-        capabilities(explicit_enqueue_available=False, auto_merge_available=False)
+    result = route(
+        current_capabilities=capabilities(
+            explicit_enqueue_available=False,
+            auto_merge_available=False,
+        )
     )
-    assert route == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+    assert result == routing.BLOCKED_CAPABILITY_UNAVAILABLE
 
 
-def test_queue_admission_requires_direct_same_pr_same_head_github_evidence() -> None:
-    for route in (routing.EXPLICIT_ENQUEUE, routing.AUTO_MERGE_MQ_SUBMISSION):
-        assert verify(route, []) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
-        for kind in routing.QUEUE_ADMISSION_EVIDENCE:
-            assert verify(route, [evidence(kind)]) == routing.ENQUEUED
-            assert verify(route, [evidence(kind, repository="Oteryn/Oteryn-Platform")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
-            assert verify(route, [evidence(kind, pr_number=999)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
-            assert verify(route, [evidence(kind, pr_head_sha="c" * 40)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+def test_queue_entry_must_be_current_post_submission_and_exact_identity() -> None:
+    assert verify([queue_entry()]) == routing.ENQUEUED
+    assert verify([queue_entry(active=False)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry(attempt_id="different-attempt-0001")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry(repository="Oteryn/Oteryn-Platform")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry(pr_number=999)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry(pr_head_sha=OTHER_HEAD)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry(observed_at_epoch_seconds=NOW - 3)], submitted_at=NOW - 2) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    stale = queue_entry(
+        observed_at_epoch_seconds=NOW - routing.MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS - 1
+    )
+    assert verify([stale], submitted_at=NOW - routing.MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS - 2) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
 
 
-def test_merge_group_requires_valid_exact_integration_head() -> None:
-    route = routing.AUTO_MERGE_MQ_SUBMISSION
-    assert verify(route, [evidence("merge_group", integration_head_sha=None)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    assert verify(route, [evidence("merge_group", integration_head_sha="not-a-sha")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    assert verify(route, [evidence("merge_group")]) == routing.ENQUEUED
+def test_historical_added_to_queue_event_is_not_terminal_admission_evidence() -> None:
+    historical_event = {
+        "event": "added_to_merge_queue",
+        "repository": REPOSITORY,
+        "pr_number": PR_NUMBER,
+        "pr_head_sha": PR_HEAD,
+    }
+    assert verify([historical_event]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
 
 
-def test_malformed_expected_identity_fails_closed() -> None:
-    route = routing.AUTO_MERGE_MQ_SUBMISSION
-    good = [evidence("added_to_merge_queue")]
-    assert routing.verify_queue_admission(
-        route,
-        good,
-        expected_repository="",
-        expected_pr_number=PR_NUMBER,
-        expected_pr_head_sha=PR_HEAD,
-    ) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    assert routing.verify_queue_admission(
-        route,
-        good,
-        expected_repository=REPOSITORY,
-        expected_pr_number=0,
-        expected_pr_head_sha=PR_HEAD,
-    ) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    assert routing.verify_queue_admission(
-        route,
-        good,
-        expected_repository=REPOSITORY,
-        expected_pr_number=PR_NUMBER,
-        expected_pr_head_sha="bad",
-    ) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+def test_merge_group_requires_same_observation_membership_for_exact_pr_head() -> None:
+    assert verify([merge_group()]) == routing.ENQUEUED
+    assert verify([merge_group(members=(member(pr_number=999),))]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([merge_group(members=(member(pr_head_sha=OTHER_HEAD),))]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([merge_group(members=(member(repository="Oteryn/Oteryn-Platform"),))]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([merge_group(integration_head_sha="not-a-sha")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([merge_group(members=())]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    mixed = merge_group(
+        members=(
+            member(repository="Oteryn/Oteryn-Platform", pr_number=44, pr_head_sha=OTHER_HEAD),
+            member(),
+        )
+    )
+    assert verify([mixed]) == routing.ENQUEUED
 
 
 def test_non_mq_or_blocked_routes_cannot_be_promoted_by_queue_evidence() -> None:
-    item = evidence("added_to_merge_queue")
-    for route in (
+    for current_route in (
         routing.NOT_MQ_TARGET,
         routing.BLOCKED_NOT_AUTHORIZED,
         routing.BLOCKED_NOT_ELIGIBLE,
+        routing.BLOCKED_STALE_STATE,
+        routing.BLOCKED_FROZEN_HEAD_MISMATCH,
         routing.BLOCKED_CAPABILITY_UNAVAILABLE,
     ):
-        assert verify(route, [item]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+        assert verify([queue_entry()], current_route=current_route) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+
+
+def test_malformed_attempt_identity_fails_closed() -> None:
+    assert route(current_attempt=attempt(attempt_id="short")) == routing.BLOCKED_STALE_STATE
+    assert route(current_attempt=attempt(repository="bad")) == routing.BLOCKED_STALE_STATE
+    assert route(current_attempt=attempt(pr_number=0)) == routing.BLOCKED_STALE_STATE
+    assert route(current_attempt=attempt(base_ref="../main")) == routing.BLOCKED_STALE_STATE
+    assert route(current_attempt=attempt(live_pr_head_sha="bad")) == routing.BLOCKED_STALE_STATE
 
 
 def test_no_direct_merge_route_exists() -> None:
@@ -142,16 +244,18 @@ def test_no_direct_merge_route_exists() -> None:
     assert "MERGE_PULL_REQUEST" not in route_values
 
 
-def test_canonical_policy_explains_verified_auto_merge_to_mq_boundary() -> None:
+def test_canonical_policy_explains_fresh_safe_auto_merge_to_mq_boundary() -> None:
     text = POLICY.read_text(encoding="utf-8")
     for marker in (
         "Prefer an explicit native enqueue action",
         "`enablePullRequestAutoMerge`",
-        "`added_to_merge_queue`",
-        "`merge_group` candidate",
-        "authorized, eligible and frozen PR",
+        "fresh live GitHub branch-rule or queue-configuration observation",
+        "same repository, base branch and submission attempt",
+        "frozen candidate must bind the same repository, PR number and current head SHA",
+        "fresh current queue-entry readback",
+        "merge-group observation whose own membership includes that exact PR and head",
+        "Historical `added_to_merge_queue` timeline events alone are not terminal admission proof",
         "not a direct-merge fallback or protection bypass",
-        "same repository, PR number and current head SHA",
         "No bypass or direct merge substitutes for an unavailable enqueue tool",
     ):
         assert marker in text
@@ -159,7 +263,11 @@ def test_canonical_policy_explains_verified_auto_merge_to_mq_boundary() -> None:
 
 def main() -> int:
     failures: list[tuple[str, Exception]] = []
-    tests = [(name, test) for name, test in sorted(globals().items()) if name.startswith("test_") and callable(test)]
+    tests = [
+        (name, test)
+        for name, test in sorted(globals().items())
+        if name.startswith("test_") and callable(test)
+    ]
     for name, test in tests:
         try:
             test()
