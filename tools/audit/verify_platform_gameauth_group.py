@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Fail-closed revalidation for the Platform app/GameAuth historical direct-read candidate.
+"""Fail-closed revalidation for the Platform app/GameAuth historical direct-read carry-forward.
 
-Read-only. This tool proves exact historical evidence identity, byte-identical source carry-forward,
-and frozen-current dependent contract identity. It does not by itself adopt GROUPED coverage; focused
-current tests are a separate required qualification step.
+Read-only. The tool verifies exact historical evidence identity, byte-identical source carry-forward,
+frozen-current dependent contracts, and—after adoption—the matching canonical GROUPED record. It does
+not claim Platform or organization product readiness.
 """
 from __future__ import annotations
 
@@ -14,6 +14,10 @@ from pathlib import Path
 import subprocess
 
 CANDIDATE = Path('docs/evidence/organization-audit-20260907/r3-platform-gameauth-candidate.json')
+GROUPS = Path('docs/evidence/organization-audit-20260907/coverage-groups.json')
+PENDING = 'CANDIDATE_PENDING_QUALIFICATION'
+ADOPTED = 'QUALIFIED_ADOPTED_AS_GROUPED'
+OUTCOME = 'ADOPTED_GROUPED_CARRY_FORWARD'
 
 
 def require(ok: bool, message: str) -> None:
@@ -64,8 +68,11 @@ def recursive_entries(root: Path, ref: str, prefix: str):
 def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
     candidate = read_json(audit_root / CANDIDATE)
     require(candidate.get('schema_version') == 1, 'candidate schema')
-    require(candidate.get('state') == 'CANDIDATE_PENDING_QUALIFICATION', 'candidate state')
-    require(candidate.get('coverage_adopted') is False, 'candidate must not already claim adoption')
+    state = candidate.get('state')
+    require(state in {PENDING, ADOPTED}, 'candidate state')
+    adopted = state == ADOPTED
+    require(type(candidate.get('coverage_adopted')) is bool, 'candidate adoption type')
+    require(candidate['coverage_adopted'] is adopted, 'candidate adoption/state mismatch')
     require(candidate.get('repository') == 'Oteryn/Oteryn-Platform', 'candidate repository')
     require(candidate.get('path_prefix') == 'app/GameAuth/', 'candidate prefix')
     require(type(candidate.get('expected_count')) is int and candidate['expected_count'] == 27, 'candidate count')
@@ -120,8 +127,35 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
     for path in tests:
         require(text(platform_root, 'rev-parse', current['source_commit'] + ':' + path), 'focused test missing: ' + path)
 
+    groups_doc = read_json(audit_root / GROUPS)
+    accepted = [row for row in groups_doc.get('groups', []) if row.get('id') == candidate['candidate_id']]
+    if adopted:
+        require(len(accepted) == 1, 'adopted candidate missing/duplicated canonical group')
+        group = accepted[0]
+        require(group.get('repository') == 'platform', 'adopted group repository')
+        require(group.get('disposition') == 'GROUPED', 'adopted group disposition')
+        require(group.get('depth') == 'GROUPED_REVALIDATED', 'adopted group depth')
+        require(group.get('path_prefix') == candidate['path_prefix'], 'adopted group prefix')
+        require(group.get('expected_count') == candidate['expected_count'], 'adopted group count')
+        require(group.get('historical_evidence') == hist, 'adopted group historical evidence drift')
+        require(group.get('current_revalidation') == current, 'adopted group current evidence drift')
+        evaluation = group.get('evaluation') or {}
+        require(evaluation.get('outcome') == OUTCOME, 'adopted group outcome')
+        require(type(evaluation.get('qualification_run')) is int and evaluation['qualification_run'] > 0, 'adopted qualification run')
+        require(type(evaluation.get('qualification_job')) is int and evaluation['qualification_job'] > 0, 'adopted qualification job')
+        focused = evaluation.get('focused_current_tests') or {}
+        require(type(focused.get('cases')) is int and focused['cases'] > 0, 'adopted focused case count')
+        require(type(focused.get('assertions')) is int and focused['assertions'] > 0, 'adopted focused assertion count')
+        require(focused.get('failures') == 0 and focused.get('errors') == 0 and focused.get('skipped') == 0, 'adopted focused tests not all-green')
+        result = 'GAMEAUTH_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS'
+        next_gate = 'retain bounded GROUPED evidence; broader Platform and organization assurance remains open'
+    else:
+        require(accepted == [], 'pending candidate already present in accepted groups')
+        result = 'GAMEAUTH_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED'
+        next_gate = 'focused frozen-current tests must pass before GROUPED adoption'
+
     return {
-        'result': 'GAMEAUTH_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED',
+        'result': result,
         'candidate_id': candidate['candidate_id'],
         'historical_source': hist['audited_main_sha'],
         'current_source': current['source_commit'],
@@ -130,8 +164,8 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
         'historical_direct_read_statement_bound': True,
         'dependent_blobs_verified': len(current['current_blobs']),
         'focused_test_files_bound': len(tests),
-        'coverage_adopted': False,
-        'next_gate': 'focused frozen-current tests must pass before GROUPED adoption',
+        'coverage_adopted': adopted,
+        'next_gate': next_gate,
     }
 
 
