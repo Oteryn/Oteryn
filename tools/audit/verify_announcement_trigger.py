@@ -22,6 +22,22 @@ def require(ok, message):
         raise ValueError(message)
 
 
+def json_bytes(raw):
+    def pairs(items):
+        out={}
+        for key,value in items:
+            require(key not in out,'duplicate JSON key')
+            out[key]=value
+        return out
+    return json.loads(raw,object_pairs_hook=pairs)
+
+
+def require_committed_result(generated, raw):
+    committed=json_bytes(raw)
+    require(generated==committed,'generated F17 trigger evidence differs from committed r3-trigger-evidence.json')
+    return committed
+
+
 def paths_for_event(text, event):
     # The exact source binding below fixes the admitted syntax to this closed shape.
     require(event in {'pull_request', 'push'}, 'event not admitted')
@@ -75,5 +91,10 @@ def verify(source):
 
 
 if __name__ == '__main__':
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--source-root',type=Path,required=True)
-    print(json.dumps(verify(parser.parse_args().source_root),ensure_ascii=False,indent=2))
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--source-root',type=Path,required=True)
+    parser.add_argument('--expected',type=Path,default=Path(__file__).resolve().parents[2]/'docs/evidence/organization-audit-20260907/r3-trigger-evidence.json')
+    args=parser.parse_args()
+    generated=verify(args.source_root)
+    require_committed_result(generated,args.expected.read_bytes())
+    print(json.dumps(generated,ensure_ascii=False,indent=2))
