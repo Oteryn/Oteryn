@@ -21,7 +21,15 @@ PR_HEAD = "a" * 40
 OTHER_HEAD = "c" * 40
 INTEGRATION_HEAD = "b" * 40
 ATTEMPT_ID = "attempt-20260908-0001"
+RUN_ID = 34287648462
+RUN_ATTEMPT = 1
+COMMENT_ID = 5592934697
 NOW = 1_800_000_000
+OBSERVED_AT = NOW - 2
+OBSERVATION_ID = f"mq-preflight-{RUN_ID}-{RUN_ATTEMPT}-{COMMENT_ID}"
+QUEUE_ID = "MQ_queue123456789"
+RESOURCE_PATH = f"/{REPOSITORY}/queue/{BASE_REF}"
+QUEUE_URL = f"https://github.com{RESOURCE_PATH}"
 
 
 def attempt(**overrides):
@@ -39,12 +47,21 @@ def attempt(**overrides):
 def branch_observation(**overrides):
     values = {
         "attempt_id": ATTEMPT_ID,
-        "observation_id": "branch-observation-0001",
-        "source": "branch_rules",
+        "observation_id": OBSERVATION_ID,
+        "source": routing.PREFLIGHT_SOURCE,
         "repository": REPOSITORY,
+        "pr_number": PR_NUMBER,
         "base_ref": BASE_REF,
+        "pr_head_sha": PR_HEAD,
         "merge_queue_required": True,
-        "observed_at_epoch_seconds": NOW - 2,
+        "queue_id": QUEUE_ID,
+        "resource_path": RESOURCE_PATH,
+        "url": QUEUE_URL,
+        "trigger_comment_id": COMMENT_ID,
+        "workflow_run_id": RUN_ID,
+        "workflow_run_attempt": RUN_ATTEMPT,
+        "observed_at_epoch_seconds": OBSERVED_AT,
+        "expires_at_epoch_seconds": OBSERVED_AT + routing.MAX_PREMUTATION_RULE_AGE_SECONDS,
     }
     values.update(overrides)
     return routing.BranchQueueObservation(**values)
@@ -133,26 +150,59 @@ def test_explicit_enqueue_is_preferred_when_exposed() -> None:
     assert result == routing.EXPLICIT_ENQUEUE
 
 
-def test_auto_merge_is_valid_only_for_fresh_required_mq_state() -> None:
+def test_auto_merge_requires_fresh_protected_preflight_for_exact_mq_identity() -> None:
     assert route() == routing.AUTO_MERGE_MQ_SUBMISSION
-    assert route(observation=branch_observation(merge_queue_required=False)) == routing.NOT_MQ_TARGET
+    for changes in (
+        {"attempt_id": "different-attempt-0001"},
+        {"source": "graphql_queue_config"},
+        {"repository": "Oteryn/Oteryn-Platform"},
+        {"pr_number": 999},
+        {"base_ref": "release"},
+        {"pr_head_sha": OTHER_HEAD},
+        {"queue_id": "wrong"},
+        {"resource_path": "/Oteryn/Oteryn/queue/release"},
+        {"url": "https://github.com/Oteryn/Oteryn/queue/release"},
+        {"observation_id": "mq-preflight-wrong"},
+        {"trigger_comment_id": COMMENT_ID + 1},
+        {"workflow_run_id": RUN_ID + 1},
+        {"workflow_run_attempt": RUN_ATTEMPT + 1},
+    ):
+        assert route(observation=branch_observation(**changes)) == routing.BLOCKED_STALE_STATE, changes
+
+
+def test_non_mq_preflight_never_becomes_auto_merge_submission() -> None:
+    observation = branch_observation(
+        merge_queue_required=False,
+        queue_id=None,
+        resource_path=None,
+        url=None,
+    )
+    assert route(observation=observation) == routing.NOT_MQ_TARGET
+
+
+def test_preflight_expiry_and_future_observations_fail_closed() -> None:
+    stale_at = NOW - routing.MAX_PREMUTATION_RULE_AGE_SECONDS - 1
     stale = branch_observation(
-        observed_at_epoch_seconds=NOW - routing.MAX_PREMUTATION_RULE_AGE_SECONDS - 1
+        observed_at_epoch_seconds=stale_at,
+        expires_at_epoch_seconds=stale_at + routing.MAX_PREMUTATION_RULE_AGE_SECONDS,
     )
     assert route(observation=stale) == routing.BLOCKED_STALE_STATE
-    future = branch_observation(observed_at_epoch_seconds=NOW + 1)
+    future_at = NOW + 1
+    future = branch_observation(
+        observed_at_epoch_seconds=future_at,
+        expires_at_epoch_seconds=future_at + routing.MAX_PREMUTATION_RULE_AGE_SECONDS,
+    )
     assert route(observation=future) == routing.BLOCKED_STALE_STATE
+    expired = branch_observation(expires_at_epoch_seconds=NOW - 1)
+    assert route(observation=expired) == routing.BLOCKED_STALE_STATE
+    wrong_expiry = branch_observation(
+        expires_at_epoch_seconds=OBSERVED_AT + routing.MAX_PREMUTATION_RULE_AGE_SECONDS + 1
+    )
+    assert route(observation=wrong_expiry) == routing.BLOCKED_STALE_STATE
 
 
-def test_mq_rule_observation_must_match_same_attempt_repository_and_base() -> None:
-    assert route(observation=branch_observation(attempt_id="different-attempt-0001")) == routing.BLOCKED_STALE_STATE
-    assert route(observation=branch_observation(repository="Oteryn/Oteryn-Platform")) == routing.BLOCKED_STALE_STATE
-    assert route(observation=branch_observation(base_ref="release")) == routing.BLOCKED_STALE_STATE
-    assert route(observation=branch_observation(source="cached_policy")) == routing.BLOCKED_STALE_STATE
-
-
-def test_malformed_rule_source_is_fail_closed() -> None:
-    for source in ([], {}, set()):
+def test_malformed_preflight_source_is_fail_closed() -> None:
+    for source in ([], {}, set(), "cached_policy"):
         assert route(observation=branch_observation(source=source)) == routing.BLOCKED_STALE_STATE
 
 
@@ -179,13 +229,14 @@ def test_missing_native_submission_capability_fails_closed() -> None:
     assert result == routing.BLOCKED_CAPABILITY_UNAVAILABLE
 
 
-def test_queue_entry_must_be_current_post_submission_and_exact_identity() -> None:
+def test_queue_entry_must_be_strictly_post_submission_and_exact_identity() -> None:
     assert verify([queue_entry()]) == routing.ENQUEUED
     assert verify([queue_entry(active=False)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([queue_entry(attempt_id="different-attempt-0001")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([queue_entry(repository="Oteryn/Oteryn-Platform")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([queue_entry(pr_number=999)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([queue_entry(pr_head_sha=OTHER_HEAD)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry(observed_at_epoch_seconds=NOW - 2)], submitted_at=NOW - 2) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([queue_entry(observed_at_epoch_seconds=NOW - 3)], submitted_at=NOW - 2) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     stale = queue_entry(
         observed_at_epoch_seconds=NOW - routing.MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS - 1
@@ -205,6 +256,7 @@ def test_historical_added_to_queue_event_is_not_terminal_admission_evidence() ->
 
 def test_merge_group_requires_same_observation_membership_for_exact_pr_head() -> None:
     assert verify([merge_group()]) == routing.ENQUEUED
+    assert verify([merge_group(observed_at_epoch_seconds=NOW - 2)], submitted_at=NOW - 2) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([merge_group(members=(member(pr_number=999),))]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([merge_group(members=(member(pr_head_sha=OTHER_HEAD),))]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([merge_group(members=(member(repository="Oteryn/Oteryn-Platform"),))]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
@@ -240,6 +292,7 @@ def test_invalid_git_branch_names_fail_closed() -> None:
     invalid = (
         "",
         "@",
+        "-foo",
         "/main",
         "main/",
         "foo//bar",
@@ -263,7 +316,11 @@ def test_invalid_git_branch_names_fail_closed() -> None:
         assert route(current_attempt=attempt(base_ref=base_ref)) == routing.BLOCKED_STALE_STATE, base_ref
     for base_ref in ("main", "release/1.2", "feature/foo-bar"):
         current_attempt = attempt(base_ref=base_ref)
-        observation = branch_observation(base_ref=base_ref)
+        observation = branch_observation(
+            base_ref=base_ref,
+            resource_path=f"/{REPOSITORY}/queue/{base_ref}",
+            url=f"https://github.com/{REPOSITORY}/queue/{base_ref}",
+        )
         assert route(current_attempt=current_attempt, observation=observation) == routing.AUTO_MERGE_MQ_SUBMISSION
 
 
@@ -285,16 +342,15 @@ def test_no_direct_merge_route_exists() -> None:
     assert "MERGE_PULL_REQUEST" not in route_values
 
 
-def test_canonical_policy_explains_fresh_safe_auto_merge_to_mq_boundary() -> None:
+def test_canonical_policy_explains_attempt_bound_auto_merge_to_mq_boundary() -> None:
     text = POLICY.read_text(encoding="utf-8")
     for marker in (
         "Prefer an explicit native enqueue action",
         "`enablePullRequestAutoMerge`",
-        "fresh live GitHub branch-rule or queue-configuration observation",
-        "same repository, base branch and submission attempt",
-        "frozen candidate must bind the same repository, PR number and current head SHA",
-        "fresh current queue-entry readback",
-        "merge-group observation whose own membership includes that exact PR and head",
+        "`/oteryn-mq-preflight <attempt_id> <expected_head_sha>`",
+        "protected default-branch preflight workflow",
+        "same repository, PR number, base branch, current head SHA and Merge Queue identity",
+        "strictly after the connector mutation returns",
         "Historical `added_to_merge_queue` timeline events alone are not terminal admission proof",
         "not a direct-merge fallback or protection bypass",
         "No bypass or direct merge substitutes for an unavailable enqueue tool",
