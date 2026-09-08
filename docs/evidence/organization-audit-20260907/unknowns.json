@@ -107,19 +107,19 @@
     },
     {
       "id": "PLATFORM-H02",
-      "missing": "Private maintainer security disposition and current-generation regression/remediation",
-      "reason": "Controlled source-pinned characterization now exists; previous unexecuted label is superseded. Details retained for owner-private handling under Platform SECURITY.md.",
-      "effect": "Cannot claim private advisory submission, live exploitation or completed security remediation.",
-      "owner_route": "Platform451",
-      "closure_condition": "Private security maintainer must assess severity/reachability on the relevant current source, bind a deterministic regression and disposition/remediation evidence; private submission and full resolution are not claimed by this audit."
+      "missing": "Security maintainer disposition for the already-disclosed characterization and current-generation regression/remediation",
+      "reason": "Controlled source-pinned characterization exists. Independent review established that mechanism details were present in public ancestor commits and public Actions artifacts, so that material must be treated as disclosed. The current report intentionally does not repeat the mechanism. Artifact deletion/expiry, current live reachability, private-advisory submission and remediation are not established.",
+      "effect": "Cannot claim confidentiality restoration, private advisory submission, current exploitability status or completed security remediation.",
+      "owner_route": "Platform451 via the private reporting process in Oteryn/Oteryn-Platform SECURITY.md",
+      "closure_condition": "Platform security maintainer assesses severity/reachability on relevant current source through the private reporting route, binds a deterministic regression and disposition/remediation evidence, and separately verifies any artifact deletion/expiry before claiming historical material is no longer downloadable."
     },
     {
       "id": "INDEPENDENT-REVIEW",
       "missing": "Independent semantic review of this revision",
-      "reason": "Author/source checks are not another reviewer.",
-      "effect": "No self-awarded10/10 or independent acceptance claimed.",
+      "reason": "Review of R3 head 9096edd completed with four P1 and one P2 audit-tool/evidence findings; author remediation is not independent acceptance.",
+      "effect": "No self-awarded10/10 or independent acceptance claimed until a fresh stable post-repair head is re-reviewed.",
       "owner_route": "PR185 reviewer",
-      "closure_condition": "Review stable material head for unsupported assertions, scope substitutions, missing IDs, source/candidate conflation and evidence validity."
+      "closure_condition": "Fresh independent review of the stable post-repair head finds no unresolved material audit/evidence correctness findings; this does not itself close unrelated product/operations obligations."
     }
   ]
 }
