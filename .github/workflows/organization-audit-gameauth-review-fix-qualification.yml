@@ -1,0 +1,126 @@
+name: Organization audit GameAuth review fix qualification (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-gameauth-review-fix-qualification.yml
+      - tools/audit/verify_platform_gameauth_group.py
+      - tools/audit/test_verify_platform_gameauth_group.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-185-gameauth-review-fix
+  cancel-in-progress: false
+
+jobs:
+  exact-head-gameauth-review-fix:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: audit
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Oteryn/Oteryn-Platform
+          ref: de917b3477a1de0667531380de3660e8b2ab59aa
+          path: platform
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Oteryn/Oteryn-Platform
+          ref: 3fe7df5330deb9ed38cc17ae1710f0cb4159019b
+          path: evidence
+          persist-credentials: false
+      - name: Exact identities and clean trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C audit rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git -C platform rev-parse HEAD)" = de917b3477a1de0667531380de3660e8b2ab59aa
+          test "$(git -C evidence rev-parse HEAD)" = 3fe7df5330deb9ed38cc17ae1710f0cb4159019b
+          git -C audit diff --check
+          git -C audit diff --exit-code
+          git -C platform diff --exit-code
+          git -C evidence diff --exit-code
+      - name: Run all audit Python and browser-oracle tests
+        working-directory: audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/audit -p 'test_*.py' -v
+          node --test tools/audit/test-public-surface-contract.mjs tools/audit/test-public-surface-evidence-hardening.mjs
+          python3 tools/audit/verify_report.py --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
+      - name: Revalidate exact adopted GameAuth record
+        working-directory: audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/audit/verify_platform_gameauth_group.py --audit-root . --platform-root ../platform --evidence-root ../evidence > "$RUNNER_TEMP/gameauth.json"
+          python3 - "$RUNNER_TEMP/gameauth.json" <<'PY'
+          import json,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert d['result']=='GAMEAUTH_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS'
+          assert d['paths']==27 and d['dependent_blobs_verified']==23 and d['focused_test_files_bound']==14
+          assert d['coverage_adopted'] is True
+          print('Exact adopted GameAuth verifier PASS.')
+          PY
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5'
+          coverage: none
+          extensions: pdo_mysql, pcntl, gd
+          tools: composer:v2
+      - name: Install frozen Platform dependencies
+        working-directory: platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          composer validate --strict
+          composer install --no-interaction --prefer-dist --no-progress
+          : > .env
+          php artisan config:clear --ansi
+      - name: Repeat exact focused GameAuth qualification
+        working-directory: platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          php artisan test \
+            tests/Feature/GameAuth/EnsureGameWorldCommandTest.php \
+            tests/Feature/GameAuth/GameAuthRevocationTest.php \
+            tests/Feature/GameAuth/GameLoginContextApiTest.php \
+            tests/Feature/GameAuth/GameLoginTicketApiTest.php \
+            tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php \
+            tests/Feature/GameAuth/GameLoginTicketRedeemApiTest.php \
+            tests/Feature/GameAuth/NativeProtocolIdentityMigrationTest.php \
+            tests/Feature/GameAuth/OAuth/NativeOAuthClientManagerTest.php \
+            tests/Feature/GameAuth/OAuth/NativeOAuthGrantPolicyTest.php \
+            tests/Feature/GameAuth/OAuth/NativeOAuthPkceTest.php \
+            tests/Feature/GameAuth/OAuth/NativeOAuthRevocationGenerationTest.php \
+            tests/Feature/GameAuth/OAuth/PublicClientPkcePolicyTest.php \
+            tests/Feature/GameAuth/WorldRegistryTest.php \
+            tests/Unit/Http/Middleware/PreventSensitiveGameAuthResponseCachingTest.php \
+            --log-junit="$RUNNER_TEMP/gameauth-junit.xml"
+          python3 - "$RUNNER_TEMP/gameauth-junit.xml" <<'PY'
+          import sys,xml.etree.ElementTree as ET
+          root=ET.parse(sys.argv[1]).getroot(); cases=root.findall('.//testcase'); failures=root.findall('.//failure'); errors=root.findall('.//error'); skipped=root.findall('.//skipped')
+          assertions=sum(int(x.attrib.get('assertions','0')) for x in cases)
+          assert len(cases)==61 and assertions==565 and not failures and not errors and not skipped
+          print('Focused frozen GameAuth exact 61 cases / 565 assertions PASS.')
+          PY
+      - name: Final cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C audit diff --exit-code
+          git -C platform diff --exit-code
+          git -C evidence diff --exit-code
