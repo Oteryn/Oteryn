@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Positive fixture and adversarial accounting mutations; no network or provider code."""
-import csv
 import json
 from pathlib import Path
 import shutil
@@ -21,7 +20,7 @@ class AuditValidationTest(unittest.TestCase):
         self.path=self.root/REPORT
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-summary.json','workflow-inventory.tsv','verification-index.json']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
     def mutate(self,path,func):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
@@ -31,6 +30,9 @@ class AuditValidationTest(unittest.TestCase):
         result=audit.validate(self.path)
         self.assertEqual(result['result'],'ACCOUNTING_VALID_NOT_SEMANTIC_PASS')
         self.assertEqual(result['findings'],77)
+        self.assertEqual(result['grouped_revalidated_paths'],508)
+        self.assertEqual(result['semantically_classified_paths'],710)
+        self.assertEqual(result['unverified_semantics'],3615)
         self.assertFalse(result['tree_and_ledger_verified'])
     def test_boolean_schema_rejected(self):
         self.mutate(self.path,lambda d:d.update(schema_version=True));self.reject()
@@ -50,6 +52,21 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.path,lambda d:d['known_source_snapshot_p1_ids'].append('GAME-CANDIDATE-361'));self.reject()
     def test_hidden_unverified_paths_rejected(self):
         self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['platform'].update(unverified_semantics=0));self.reject()
+    def test_grouped_count_cannot_be_hidden(self):
+        self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['atlas'].update(grouped=0));self.reject()
+    def test_group_source_cut_must_match(self):
+        self.mutate(self.base/'coverage-groups.json',lambda d:d['groups'][0]['current_revalidation'].update(source_commit='0'*40));self.reject()
+    def test_overlapping_group_prefix_rejected(self):
+        def mutate(d):
+            copy=dict(d['groups'][0]);copy['id']='OVERLAP';copy['path_prefix']='web/creature-gameplay/shards/nested/';copy['historical_evidence']=dict(copy['historical_evidence']);copy['historical_evidence']['pattern']='web/creature-gameplay/shards/nested/**';d['groups'].append(copy)
+        self.mutate(self.base/'coverage-groups.json',mutate);self.reject()
+    def test_direct_group_overlap_rejected(self):
+        p=self.base/'coverage-review.tsv'
+        p.write_text(p.read_text()+"atlas\tweb/creature-gameplay/shards/fake.json\t"+'a'*40+"\tSCOPED_SEMANTIC_REVIEW\toverlap-negative\t[]\tNOT_EXECUTED\n")
+        self.mutate(self.path,lambda d:d.update(scoped_review_paths=d['scoped_review_paths']+1,semantically_classified_paths=d['semantically_classified_paths']+1))
+        def adjust(d):
+            d['scoped_review_paths']+=1;d['semantically_classified_paths']+=1;d['per_repository']['atlas']['direct_scoped']+=1;d['per_repository']['atlas']['unverified_semantics']-=1;d['unverified_semantics_total']-=1
+        self.mutate(self.base/'coverage-summary.json',adjust);self.reject()
     def test_reproduction_called_pass_rejected(self):
         self.mutate(self.base/'verification-index.json',lambda d:d.update(routing_product_verdict='PASS'));self.reject()
     def test_unbound_execution_source_rejected(self):

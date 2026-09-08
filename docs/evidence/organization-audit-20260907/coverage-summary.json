@@ -27,8 +27,8 @@
     "atlas": {
       "leaves": 1155,
       "direct_scoped": 10,
-      "unverified_semantics": 1145,
-      "grouped": 0,
+      "unverified_semantics": 637,
+      "grouped": 508,
       "not_applicable": 0
     },
     "migration_archive": {
@@ -39,13 +39,17 @@
       "not_applicable": 0
     }
   },
-  "ledger_sha256": "72547eec47bb8b5d64688ba0597947708d5ebc524a54acfce267deb47597e7c1",
+  "ledger_sha256": null,
+  "ledger_sha256_status": "PENDING_HOSTED_REBUILD_AFTER_GROUPED_REVALIDATION",
   "identity_coverage": "COMPLETE_FOR_PINNED_FIVE_REPOSITORIES",
   "semantic_coverage": "PARTIAL_EXPLICIT",
   "unclassified_paths": 0,
   "semantic_completion_claimed": false,
-  "durability": "Full CSV accompanies the audit delivery. Committed coverage-review.tsv plus immutable Git trees and verify_report.py reproduce every row. The temporary source artifact is not the sole durable source.",
+  "durability": "Full CSV accompanies the audit delivery. Committed DIRECT review rows plus explicit GROUPED rules, immutable Git trees and verify_report.py reproduce every disposition. GROUPED is never inferred from enumeration alone.",
   "new_scoped_paths_since_r2": 137,
   "scoped_review_paths": 202,
-  "coverage_dimension_note": "DIRECT records an explicit bounded review scope, not universal approval of every line or behavior. An active/suspended/historical classification is not a semantic PASS."
+  "grouped_revalidated_paths": 508,
+  "semantically_classified_paths": 710,
+  "unverified_semantics_total": 3615,
+  "coverage_dimension_note": "DIRECT records an explicit bounded review scope. GROUPED records generated leaves carried forward only through a source-bound historical rule plus current dependent-consumer revalidation. Neither disposition is universal product approval; all remaining leaves stay UNVERIFIED."
 }
