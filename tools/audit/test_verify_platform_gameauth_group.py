@@ -36,7 +36,10 @@ class PlatformGameAuthGroupTests(unittest.TestCase):
         audit = base / 'audit'
         self.make_repo(platform)
 
-        prefix_files = ['app/GameAuth/A.php', 'app/GameAuth/Nested/B.php']
+        prefix_files = ['app/GameAuth/A.php'] + [
+            f'app/GameAuth/Nested/F{index:02d}.php' for index in range(26)
+        ]
+        self.assertEqual(len(prefix_files), 27)
         for path in prefix_files:
             write(platform / path, '<?php\n')
         deps = {
@@ -74,7 +77,7 @@ class PlatformGameAuthGroupTests(unittest.TestCase):
         current_tree = run(platform, 'rev-parse', 'HEAD^{tree}')
 
         self.make_repo(evidence)
-        statement = '**FACT.** All 2 files in the inspected `app/GameAuth/**` batch were read directly.'
+        statement = '**FACT.** All 27 files in the inspected `app/GameAuth/**` batch were read directly.'
         evidence_rel = Path('docs/testing/audit.md')
         write(evidence / evidence_rel, statement + '\n')
         run(evidence, 'add', '.')
@@ -93,7 +96,7 @@ class PlatformGameAuthGroupTests(unittest.TestCase):
             'repository': 'Oteryn/Oteryn-Platform',
             'state': 'CANDIDATE_PENDING_QUALIFICATION',
             'path_prefix': 'app/GameAuth/',
-            'expected_count': 2,
+            'expected_count': 27,
             'historical_evidence': {
                 'publication_commit': publication,
                 'publication_tree': publication_tree,
@@ -103,7 +106,7 @@ class PlatformGameAuthGroupTests(unittest.TestCase):
                 'audited_main_tree': historical_tree,
                 'exact_statement': statement,
                 'pattern': 'app/GameAuth/**',
-                'count': 2,
+                'count': 27,
                 'basis': 'fixture direct read',
             },
             'current_revalidation': {
@@ -129,7 +132,7 @@ class PlatformGameAuthGroupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='gameauth-group-') as td:
             platform, evidence, audit, _, _, _ = self.fixture(Path(td))
             result = gameauth.verify(audit, platform, evidence)
-            self.assertEqual(result['paths'], 2)
+            self.assertEqual(result['paths'], 27)
             self.assertTrue(result['path_blob_identity'])
             self.assertFalse(result['coverage_adopted'])
 
