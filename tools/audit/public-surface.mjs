@@ -5,12 +5,12 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
+import { createNewOutputDirectory } from './safe-output.mjs';
 import { SOURCE_SHA, SOURCE_TREE, SOURCE_BINDINGS, ORIGIN, PLAYWRIGHT, ROUTES, SIZES,
   requestAllowed, caseCriteria, evaluateReport } from './public-surface-contract.mjs';
 const [rootArg, outputArg] = process.argv.slice(2);
 if (process.env.OTERYN_AUDIT185_PUBLIC_UI !== '1' || !rootArg || !outputArg) throw Error('explicit isolated-public-UI consent, source and new output required');
-const root = fs.realpathSync(rootArg), out = path.resolve(outputArg);
-if (fs.existsSync(out) || out === root || out.startsWith(root + path.sep)) throw Error('new output outside provider required');
+const { root, out } = createNewOutputDirectory(rootArg, outputArg);
 for (const [args, expected] of [[['rev-parse', 'HEAD'], SOURCE_SHA], [['rev-parse', 'HEAD^{tree}'], SOURCE_TREE], [['status', '--porcelain', '--untracked-files=no'], '']]) {
   if (execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim() !== expected) throw Error('wrong or dirty source');
 }
@@ -22,7 +22,6 @@ for (const [name, expected] of Object.entries(SOURCE_BINDINGS)) {
 const require = createRequire(path.join(root, 'scripts/acceptance/package.json'));
 const { chromium } = require('@playwright/test');
 if (require('@playwright/test/package.json').version !== PLAYWRIGHT) throw Error('unexpected Playwright dependency');
-fs.mkdirSync(out, { recursive: true });
 const report = { schema_version: 2, source_sha: SOURCE_SHA, source_tree: SOURCE_TREE, source_bindings: SOURCE_BINDINGS,
   playwright: PLAYWRIGHT, scope: 'Anonymous English synthetic fixture; Canary deliberately unavailable; no authenticated/admin/payment/game/production acceptance',
   cases: [], keyboard: [], no_javascript: null };
