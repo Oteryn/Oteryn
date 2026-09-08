@@ -24,7 +24,7 @@ OBSERVATION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
 QUEUE_ID_RE = re.compile(r"^MQ_[A-Za-z0-9_-]+$")
 MAX_PREMUTATION_RULE_AGE_SECONDS = 30
 MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS = 60
-SUPPORTED_BRANCH_RULE_SOURCES = frozenset({"graphql_queue_config"})
+PREFLIGHT_SOURCE = "protected_issue_comment_preflight"
 
 
 class SubmissionAttempt(NamedTuple):
@@ -40,12 +40,18 @@ class BranchQueueObservation(NamedTuple):
     observation_id: str
     source: str
     repository: str
+    pr_number: int
     base_ref: str
+    pr_head_sha: str
     merge_queue_required: bool
     queue_id: str | None
     resource_path: str | None
     url: str | None
+    trigger_comment_id: int
+    workflow_run_id: int
+    workflow_run_attempt: int
     observed_at_epoch_seconds: int
+    expires_at_epoch_seconds: int
 
 
 class CandidateFreeze(NamedTuple):
@@ -158,11 +164,31 @@ def _branch_observation_matches(
         return False
     if observation.attempt_id != attempt.attempt_id:
         return False
-    if not _fullmatch(OBSERVATION_RE, observation.observation_id):
+    if observation.source != PREFLIGHT_SOURCE:
         return False
-    if not isinstance(observation.source, str) or observation.source not in SUPPORTED_BRANCH_RULE_SOURCES:
+    if (
+        observation.repository != attempt.repository
+        or observation.pr_number != attempt.pr_number
+        or observation.base_ref != attempt.base_ref
+        or observation.pr_head_sha != attempt.live_pr_head_sha
+    ):
         return False
-    if observation.repository != attempt.repository or observation.base_ref != attempt.base_ref:
+    if not _fullmatch(SHA_RE, observation.pr_head_sha):
+        return False
+    if not all(
+        _positive_int(value)
+        for value in (
+            observation.trigger_comment_id,
+            observation.workflow_run_id,
+            observation.workflow_run_attempt,
+        )
+    ):
+        return False
+    expected_observation_id = (
+        f"mq-preflight-{observation.workflow_run_id}-"
+        f"{observation.workflow_run_attempt}-{observation.trigger_comment_id}"
+    )
+    if observation.observation_id != expected_observation_id:
         return False
     if not isinstance(observation.merge_queue_required, bool):
         return False
@@ -170,6 +196,15 @@ def _branch_observation_matches(
         observation.observed_at_epoch_seconds,
         now_epoch_seconds,
         MAX_PREMUTATION_RULE_AGE_SECONDS,
+    ):
+        return False
+    if (
+        not isinstance(observation.expires_at_epoch_seconds, int)
+        or isinstance(observation.expires_at_epoch_seconds, bool)
+        or observation.expires_at_epoch_seconds != (
+            observation.observed_at_epoch_seconds + MAX_PREMUTATION_RULE_AGE_SECONDS
+        )
+        or now_epoch_seconds > observation.expires_at_epoch_seconds
     ):
         return False
 
@@ -207,7 +242,7 @@ def choose_submission_route(
     *,
     now_epoch_seconds: int,
 ) -> str:
-    """Choose a protected submission route from fresh, same-attempt GitHub state."""
+    """Choose a protected submission route from one fresh preflight attempt."""
     if not _valid_attempt(attempt):
         return BLOCKED_STALE_STATE
     if not isinstance(capabilities, SubmissionCapabilities) or not _boolean_fields(
@@ -337,7 +372,7 @@ def verify_queue_admission(
     submission_completed_at_epoch_seconds: int,
     now_epoch_seconds: int,
 ) -> str:
-    """Accept only fresh current queue state or same-observation merge-group membership."""
+    """Accept only a strictly post-mutation live queue read or merge-group membership."""
     if not isinstance(route, str) or route not in {
         EXPLICIT_ENQUEUE,
         AUTO_MERGE_MQ_SUBMISSION,
