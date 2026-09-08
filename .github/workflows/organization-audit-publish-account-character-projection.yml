@@ -1,0 +1,127 @@
+name: Organization audit publish account-character projection (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-publish-account-character-projection.yml
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: audit-185-publish-account-character-projection
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PROJECTION_ARTIFACT_ID: '10061679380'
+      PROJECTION_HEAD: e3180806cdf8feff9dea3540c1552acbee187cba
+      UNUSED_TEMP_REF: refs/heads/tmp/audit185-publish-projection
+    steps:
+      - name: Checkout exact publication trigger
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Bind trigger to validated projection parent
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$PROJECTION_HEAD"
+          mapfile -t changed < <(git diff --name-only "$PROJECTION_HEAD" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = '.github/workflows/organization-audit-publish-account-character-projection.yml'
+
+      - name: Download and verify exact projection artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          meta="$RUNNER_TEMP/artifact.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$PROJECTION_ARTIFACT_ID" > "$meta"
+          test "$(jq -r .id "$meta")" = "$PROJECTION_ARTIFACT_ID"
+          test "$(jq -r .name "$meta")" = 'audit185-account-character-projection-34240381730'
+          test "$(jq -r .expired "$meta")" = 'false'
+          test "$(jq -r .workflow_run.head_sha "$meta")" = "$PROJECTION_HEAD"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$PROJECTION_ARTIFACT_ID/zip" > "$RUNNER_TEMP/projection.zip"
+          mkdir "$RUNNER_TEMP/projection"
+          unzip -q "$RUNNER_TEMP/projection.zip" -d "$RUNNER_TEMP/projection"
+          cd "$RUNNER_TEMP/projection"
+          cat > "$RUNNER_TEMP/expected.sha256" <<'EOF'
+          a035e4013e419094584e474f756fe1a5813386edac120826199d2407ffb397e9  docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
+          1a4ef032557d2c92861d794a0b66631a262d88bc56db6a8dbd094e151fa07256  docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.md
+          4fad5f3498552f4f3e641face1428afe83a92d4ca3baa1f41b6a324a46bf7ee9  docs/evidence/organization-audit-20260907/CHECKPOINT-20260908-1552-CEST.md
+          adfc7e134361154a7587115af3bda4347ee1ca4712ead32619ad8f9998960776  docs/evidence/organization-audit-20260907/README.md
+          2cdfee4b5c0a4e4b2b1358c1533d728c9ebf37ef6bf3cc3fa13bd57c7850cf4f  docs/evidence/organization-audit-20260907/coverage-groups.json
+          7cce1abfb32cce1cd6a64411c228cb58c0188f22d81c2502bbfc286baaae78de  docs/evidence/organization-audit-20260907/coverage-summary.json
+          a63da573e3deea207335e9eb9d5589a5b57d9431a2ad145d71fd4fed1516db73  docs/evidence/organization-audit-20260907/r3-platform-account-character-candidate.json
+          082df8fa9cd4083a6bd84086799ba445d3214729a4fcab44569a3806c9df54b5  docs/evidence/organization-audit-20260907/r3-source-review.md
+          2ad2ac247298d23a8ef2fde3817e93e31dea68538250ccf5cbc8ab9fd1a28e08  docs/evidence/organization-audit-20260907/unknowns.json
+          17c5d0e72990d5ce319a563e86f3963c4778ec50cca952d2ddcb9fd93be316b5  docs/evidence/organization-audit-20260907/verification-index.json
+          EOF
+          sha256sum -c "$RUNNER_TEMP/expected.sha256"
+          mapfile -t actual < <(find . -type f -printf '%P\n' | LC_ALL=C sort)
+          mapfile -t expected < <(awk '{print $2}' "$RUNNER_TEMP/expected.sha256" | LC_ALL=C sort)
+          test "${#actual[@]}" -eq 10
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Apply canonical package and validate accounting state
+        shell: bash
+        run: |
+          set -euo pipefail
+          while read -r _ path; do
+            cp "$RUNNER_TEMP/projection/$path" "$path"
+          done < "$RUNNER_TEMP/expected.sha256"
+          python3 tools/audit/verify_report.py --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
+          python3 - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools/audit')
+          import verify_platform_account_character_group as v
+          root=Path('.')
+          candidate=v.read_json(root/v.CANDIDATE)
+          adopted=v.validate_candidate_shape(candidate)
+          assert adopted is True
+          groups=v.read_json(root/v.GROUPS)
+          v.validate_group_state(candidate, groups, adopted)
+          print('ADOPTED_ACCOUNT_CHARACTER_CANONICAL_SHAPE_PASS')
+          PY
+          git diff --check
+          mapfile -t actual < <(git diff --name-only | LC_ALL=C sort)
+          mapfile -t expected < <(awk '{print $2}' "$RUNNER_TEMP/expected.sha256" | LC_ALL=C sort)
+          test "${#actual[@]}" -eq 10
+          diff -u <(printf '%s\n' "${expected[@]}") <(printf '%s\n' "${actual[@]}")
+
+      - name: Publish one fast-forward canonical commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_HEAD_REF"
+          test "$(git rev-parse FETCH_HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          while read -r _ path; do git add -- "$path"; done < "$RUNNER_TEMP/expected.sha256"
+          git commit -m 'docs(audit): adopt qualified Platform account-character groups (#186)'
+          git push origin "HEAD:refs/heads/$GITHUB_HEAD_REF"
+
+      - name: Remove unused accidental temporary ref if still exact
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_sha="$(git ls-remote --heads origin "$UNUSED_TEMP_REF" | awk '{print $1}')"
+          if [ "$remote_sha" = "$PROJECTION_HEAD" ]; then
+            git push origin --delete "$UNUSED_TEMP_REF"
+          elif [ -n "$remote_sha" ]; then
+            echo "Ref moved unexpectedly; refusing deletion: $remote_sha" >&2
+            exit 1
+          fi
