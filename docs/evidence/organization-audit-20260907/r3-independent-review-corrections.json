@@ -3,7 +3,7 @@
   "reviewed_head": "9096edd135d42f31da4824f4c4fb50ee187de2c9",
   "review_summary_comment": 5582123653,
   "review_completed_at_utc": "2026-09-08T09:00:42Z",
-  "status": "CHANGES_REQUIRED_AND_BEING_REMEDIATED",
+  "status": "AUTHOR_REMEDIATION_VERIFIED_AWAITING_FRESH_INDEPENDENT_REREVIEW",
   "findings": [
     {
       "thread_id": "PRRT_kwDOT8KVrs6gKtn7",
@@ -17,7 +17,8 @@
         "organization-audit-20260907/README.md prior restricted/private wording",
         "organization-audit-20260907/r3-source-review.md prior private-characterization wording",
         "organization-audit-20260907/unknowns.json prior owner-private reason text",
-        "organization-audit-20260907/finding-register.tsv PLATFORM-H02 prior restricted-characterization wording"
+        "organization-audit-20260907/finding-register.tsv PLATFORM-H02 prior restricted-characterization wording",
+        "organization-audit-20260907/verification-index.json prior owner-private wording"
       ]
     },
     {
@@ -52,7 +53,17 @@
   "validation": {
     "local_targeted_python_tests": 47,
     "local_targeted_python_result": "PASS",
-    "real_six_archive_recount": "PASS_AGAINST_PREPARED_POST_REVIEW_VERIFIER",
-    "limits": "These are author remediation checks. Exact published-head CI and fresh independent re-review are still required before resolving the review findings."
+    "hosted_qualified_head": "81b5c7c8986123774cd6a4169e934a197d640be2",
+    "hosted_run": 34212229245,
+    "hosted_job": 102015652696,
+    "hosted_python_tests": 92,
+    "hosted_python_result": "PASS",
+    "hosted_node_tests": 34,
+    "hosted_node_result": "PASS",
+    "real_six_archive_recount": "PASS_AND_SEMANTICALLY_EQUALS_COMMITTED_R3_NATIVE_RESULTS",
+    "hosted_meta_ci_run": 34212229295,
+    "hosted_meta_ci_result": "SUCCESS",
+    "temporary_workflow_retired_by": "62e9d88d3ae3ade414aab4814412a3268c2f8785",
+    "limits": "These remain author remediation checks. Subsequent evidence-metadata-only updates require exact-head canonical CI, and a fresh independent review of the final stable head is required before the original review findings may be treated as independently accepted."
   }
 }
