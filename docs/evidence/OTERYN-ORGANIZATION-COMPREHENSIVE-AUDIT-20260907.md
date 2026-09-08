@@ -1,7 +1,7 @@
 # Oteryn organization audit — R3 post-review hardening
 
-**Opinion:** `QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE`  
-**Authority:** existing META Issue #186 / PR #185; provider implementation remains with its owners.  
+**Opinion:** `QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE`
+**Authority:** existing META Issue #186 / PR #185; provider implementation remains with its owners.
 **Production readiness:** NOT CLAIMED. **Independent acceptance/10-of-10:** NOT ESTABLISHED.
 
 R3 preserves the original immutable source cut while adding native Platform evidence, bounded semantic review, later lifecycle observations and a fail-closed correction pass after independent review. It does not relabel a complete inventory as a completed organization audit. The machine-readable companion and registers are canonical for counts; `r3-independent-review-corrections.json` is the explicit correction layer for statements invalidated by the independent review of head `9096edd135d42f31da4824f4c4fb50ee187de2c9`.
