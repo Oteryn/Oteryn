@@ -34,6 +34,58 @@ jobs:
           [[ "$GITHUB_SHA" == "$MERGE_GROUP_HEAD_SHA" ]]
           [[ "$MERGE_GROUP_BASE_REF" == "refs/heads/main" ]]
 
+      - name: Verify live Merge Queue rule
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGET_REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: main
+          CANDIDATE_SHA: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          observed_at="$(date +%s)"
+          rules_file="${RUNNER_TEMP}/active-branch-rules.json"
+          curl --fail-with-body --silent --show-error \
+            --retry 2 \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${TARGET_REPOSITORY}/rules/branches/${TARGET_BRANCH}" \
+            > "${rules_file}"
+          python3 - "${rules_file}" "${TARGET_REPOSITORY}" "${TARGET_BRANCH}" "${CANDIDATE_SHA}" "${observed_at}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" <<'PY'
+          import json
+          import re
+          import sys
+
+          path, repository, branch, candidate_sha, observed_at, run_id, run_attempt = sys.argv[1:]
+          if repository != "Oteryn/Oteryn" or branch != "main":
+              raise SystemExit("live branch-rule observation targeted an unexpected repository or branch")
+          if re.fullmatch(r"[0-9a-f]{40}", candidate_sha) is None:
+              raise SystemExit("candidate SHA is invalid")
+          payload = json.loads(open(path, encoding="utf-8").read())
+          if not isinstance(payload, list):
+              raise SystemExit("active branch-rules response is not a JSON array")
+          rule_types = sorted(
+              rule.get("type")
+              for rule in payload
+              if isinstance(rule, dict) and isinstance(rule.get("type"), str)
+          )
+          if "merge_queue" not in rule_types:
+              raise SystemExit(f"protected main does not currently expose an active merge_queue rule: {rule_types}")
+          observation = {
+              "repository": repository,
+              "base_ref": branch,
+              "candidate_sha": candidate_sha,
+              "merge_queue_required": True,
+              "observed_at_epoch_seconds": int(observed_at),
+              "source": "branch_rules",
+              "workflow_run_id": int(run_id),
+              "workflow_run_attempt": int(run_attempt),
+              "rule_types": rule_types,
+          }
+          print("LIVE_MQ_RULE_OBSERVATION=" + json.dumps(observation, sort_keys=True, separators=(",", ":")))
+          PY
+
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
