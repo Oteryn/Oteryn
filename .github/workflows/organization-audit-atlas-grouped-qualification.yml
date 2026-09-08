@@ -1,0 +1,109 @@
+name: Organization audit Atlas grouped qualification (temporary)
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-atlas-grouped-qualification.yml
+      - tools/audit/**
+      - docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
+      - docs/evidence/organization-audit-20260907/**
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: audit-185-atlas-grouped-qualification
+  cancel-in-progress: false
+jobs:
+  exact-head-atlas-grouped:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: audit
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Oteryn/Oteryn-Atlas
+          ref: f00815858bb5b031c502ad19fb96a05ff66b4d84
+          path: atlas-current
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Oteryn/Oteryn-Atlas
+          ref: 0f62cba3fdbb56af0a01ae7c0b4587b66d1923fc
+          path: atlas-evidence
+          persist-credentials: false
+      - name: Verify exact source identities and static cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C audit rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git -C atlas-current rev-parse HEAD)" = f00815858bb5b031c502ad19fb96a05ff66b4d84
+          test "$(git -C atlas-current rev-parse HEAD^{tree})" = a1009378f8d3950a5ee62fb3ee65041f7d53a1e0
+          test "$(git -C atlas-evidence rev-parse HEAD)" = 0f62cba3fdbb56af0a01ae7c0b4587b66d1923fc
+          git -C audit diff --check
+          git -C audit diff --exit-code
+          git -C atlas-current diff --exit-code
+          git -C atlas-evidence diff --exit-code
+      - name: Run audit accounting and adversarial suites
+        working-directory: audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/audit -p 'test_*.py' -v
+          node --test tools/audit/test-public-surface-contract.mjs tools/audit/test-public-surface-evidence-hardening.mjs
+          python3 tools/audit/verify_report.py --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
+      - name: Revalidate Atlas historical grouped rule and current consumers
+        working-directory: audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/audit/verify_atlas_group.py \
+            --audit-root . \
+            --atlas-root ../atlas-current \
+            --evidence-root ../atlas-evidence
+          node --test \
+            ../atlas-current/tests/fullworld-runtime/creature-gameplay-runtime-safety.test.mjs \
+            ../atlas-current/tests/verification/qualification-gameplay-contract.test.mjs
+      - name: Rebuild complete grouped ledger digest from immutable inventories
+        working-directory: audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/source-artifact"
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/10033995995/zip" > "$RUNNER_TEMP/source-artifact.zip"
+          unzip -q "$RUNNER_TEMP/source-artifact.zip" -d "$RUNNER_TEMP/source-artifact"
+          INV="$(python3 - "$RUNNER_TEMP/source-artifact" <<'PY'
+          from pathlib import Path
+          import sys
+          root=Path(sys.argv[1])
+          required={'meta.json','game.json','platform.json','atlas.json','migration_archive.json'}
+          parents=[]
+          for p in root.rglob('meta.json'):
+              if all((p.parent/name).is_file() for name in required):
+                  parents.append(p.parent)
+          if len(parents)!=1:
+              raise SystemExit(f'expected one inventory directory, found {parents}')
+          print(parents[0])
+          PY
+          )"
+          python3 tools/audit/verify_report.py \
+            --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json \
+            --inventory-dir "$INV" \
+            --rebuild-ledger-digest | tee "$RUNNER_TEMP/ledger-rebuild.json"
+          python3 - "$RUNNER_TEMP/ledger-rebuild.json" <<'PY'
+          import json,sys
+          data=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert data['result']=='LEDGER_REBUILD_NOT_AUDIT_PASS'
+          assert data['rows']==4325
+          assert data['grouped_by_repository']['atlas']==508
+          print('GROUPED_LEDGER_SHA256='+data['sha256'])
+          PY
+          git diff --exit-code
