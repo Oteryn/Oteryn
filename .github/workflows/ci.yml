@@ -95,12 +95,16 @@ jobs:
           queue_id = queue.get("id")
           resource_path = queue.get("resourcePath")
           url = queue.get("url")
+          expected_resource_path = f"/{repository}/queue/{branch}"
+          expected_url = f"https://github.com{expected_resource_path}"
           if not isinstance(queue_id, str) or not queue_id.startswith("MQ_"):
               raise SystemExit("Merge Queue id is missing or invalid")
-          if not isinstance(resource_path, str) or not resource_path:
-              raise SystemExit("Merge Queue resourcePath is missing")
-          if not isinstance(url, str) or not url:
-              raise SystemExit("Merge Queue URL is missing")
+          if resource_path != expected_resource_path:
+              raise SystemExit(
+                  f"Merge Queue resourcePath does not bind target branch: {resource_path!r} != {expected_resource_path!r}"
+              )
+          if url != expected_url:
+              raise SystemExit(f"Merge Queue URL does not bind target branch: {url!r} != {expected_url!r}")
           observation = {
               "repository": repository,
               "base_ref": branch,
