@@ -4,7 +4,7 @@
     {
       "id": "SEMANTIC-COVERAGE",
       "missing": "Unreviewed/currently unbound repository semantics",
-      "reason": "Source bytes available; 221 DIRECT scoped path reviews plus 58 bounded GROUPED Platform paths are now bound (27 GameAuth plus 31 Accounts/CanaryIntegration/CharacterProfiles/Characters), not full behavior approval; 4046 paths retain UNVERIFIED. The historical Atlas 508-path candidate remains rejected and no automatic import from maintenance N/A or unproven summaries is allowed.",
+      "reason": "Source bytes available; 221 DIRECT scoped path reviews plus 107 bounded GROUPED Platform paths are now bound (27 GameAuth, 31 Accounts/CanaryIntegration/CharacterProfiles/Characters, 49 Marketplace/Payments/Wallet), not full behavior approval; 3997 paths retain UNVERIFIED. The historical Atlas 508-path candidate remains rejected and no automatic import from maintenance N/A or unproven summaries is allowed.",
       "effect": "Original exhaustive completeness cannot be claimed.",
       "owner_route": "META186 plus provider audit owners",
       "closure_condition": "Import exact historical disposition ledgers with bounded validity, review changed/uncovered authored families, and retain justified grouping/N/A."
@@ -116,8 +116,8 @@
     {
       "id": "INDEPENDENT-REVIEW",
       "missing": "Independent semantic review of this revision",
-      "reason": "A clean exact-head Codex re-review of 21c02cac completed after the two GameAuth verifier P2 defects were fixed and both new threads were resolved. This later 31-path account/Canary/profile/character GROUPED expansion is new material and has not yet received its own fresh independent exact-head review.",
-      "effect": "No self-awarded 10/10 or final independent acceptance is claimed for the expanded 58-GROUPED revision.",
+      "reason": "A clean exact-head Codex review of f7f200bd completed for the 31-path account/character expansion. The later 49-path Marketplace/Payments/Wallet GROUPED expansion and its exact 45-case/444-assertion qualification/accounting machinery are new material and have not yet received their own fresh independent exact-head review.",
+      "effect": "No self-awarded 10/10 or final independent acceptance is claimed for the expanded 107-GROUPED revision.",
       "owner_route": "PR185 reviewer",
       "closure_condition": "Fresh independent review of the stable post-repair head finds no unresolved material audit/evidence correctness findings; this does not itself close unrelated product/operations obligations."
     }

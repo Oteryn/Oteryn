@@ -20,8 +20,8 @@
     "platform": {
       "leaves": 2165,
       "direct_scoped": 156,
-      "unverified_semantics": 1951,
-      "grouped": 58,
+      "unverified_semantics": 1902,
+      "grouped": 107,
       "not_applicable": 0
     },
     "atlas": {
@@ -39,17 +39,17 @@
       "not_applicable": 0
     }
   },
-  "ledger_sha256": "b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459",
+  "ledger_sha256": "742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406",
   "identity_coverage": "COMPLETE_FOR_PINNED_FIVE_REPOSITORIES",
   "semantic_coverage": "PARTIAL_EXPLICIT",
   "unclassified_paths": 0,
   "semantic_completion_claimed": false,
-  "durability": "Full CSV accompanies the audit delivery. Committed DIRECT review rows, immutable Git trees, explicit accepted/rejected GROUPED records and verify_report.py reproduce every disposition. Platform GameAuth contributes 27 GROUPED paths and the separately qualified Accounts/CanaryIntegration/CharacterProfiles/Characters families contribute 31; the rejected 508-file Atlas candidate remains UNVERIFIED.",
+  "durability": "Full CSV accompanies the audit delivery. Committed DIRECT review rows, immutable Git trees, explicit accepted/rejected GROUPED records and verify_report.py reproduce every disposition. Platform GameAuth contributes 27 GROUPED paths; Accounts/CanaryIntegration/CharacterProfiles/Characters contribute 31; Marketplace/Payments/Wallet contribute 49; the rejected 508-file Atlas candidate remains UNVERIFIED.",
   "new_scoped_paths_since_r2": 156,
   "scoped_review_paths": 221,
-  "grouped_revalidated_paths": 58,
-  "semantically_classified_paths": 279,
-  "unverified_semantics_total": 4046,
-  "coverage_dimension_note": "DIRECT records bounded current/source review, not universal approval. GROUPED records bounded semantic carry-forward only when historical scope, exact identity and current dependent qualification are all bound. Platform GameAuth contributes 27 GROUPED paths; four account/Canary/profile/character families contribute another 31 after exact 86-case/586-assertion frozen-current qualification; the Atlas 508-path candidate remains rejected.",
+  "grouped_revalidated_paths": 107,
+  "semantically_classified_paths": 328,
+  "unverified_semantics_total": 3997,
+  "coverage_dimension_note": "DIRECT records bounded current/source review, not universal approval. GROUPED records bounded semantic carry-forward only when historical scope, exact identity and current dependent qualification are all bound. Platform contributes 107 GROUPED paths: GameAuth 27, account/Canary/profile/character 31, and Marketplace/Payments/Wallet 49. The Atlas 508-path candidate remains rejected.",
   "rejected_group_candidates": 1
 }

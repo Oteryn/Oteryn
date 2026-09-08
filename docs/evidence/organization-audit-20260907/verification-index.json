@@ -289,5 +289,38 @@
     "post_adoption_ledger_artifact": 10077605747,
     "post_adoption_ledger_sha256": "b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459",
     "post_adoption_result": "ACCOUNT_CHARACTER_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS"
+  },
+  "r3_platform_marketplace_payments_wallet_qualification": {
+    "frozen_source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "historical_source_commit": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+    "primary_qualification_head": "13f6933c543db98848450e063e61f8c0dd2fa3d3",
+    "primary_run": 34283717767,
+    "primary_job": 102254287765,
+    "primary_verifier_unit_tests": 10,
+    "exact_family_counts": [
+      21,
+      24,
+      4
+    ],
+    "exact_total_paths": 49,
+    "dependent_blob_bindings": 23,
+    "focused_test_files": 13,
+    "focused_cases": 45,
+    "focused_assertions": 444,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "php": "8.5.10",
+    "mariadb": "11.8.9",
+    "tracked_source_clean_after_execution": true,
+    "hardening_head": "53dc22290da5c952fc76aa4cb7222ad450be6974",
+    "hardening_meta_ci_run": 34284712709,
+    "hardening_qualification_run": 34284712575,
+    "ledger_reproduction_head": "adc884f64982e71609415ef946d97b445488c3e0",
+    "ledger_reproduction_run": 34284837901,
+    "ledger_reproduction_artifact": 10079037530,
+    "pre_adoption_ledger_sha256": "b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459",
+    "projected_adopted_ledger_sha256": "742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406",
+    "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS"
   }
 }
