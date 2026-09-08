@@ -6,6 +6,7 @@
   "path_prefix": "app/GameAuth/",
   "expected_count": 27,
   "historical_evidence": {
+    "repository": "Oteryn/Oteryn-Platform",
     "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
     "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
     "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
