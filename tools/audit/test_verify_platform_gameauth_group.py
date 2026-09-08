@@ -86,15 +86,12 @@ class PlatformGameAuthGroupTests(unittest.TestCase):
         publication_tree = run(evidence, 'rev-parse', 'HEAD^{tree}')
         evidence_blob = run(evidence, 'rev-parse', 'HEAD:' + evidence_rel.as_posix())
 
-        dep_blobs = {}
-        for path in deps:
-            dep_blobs[path] = run(platform, 'rev-parse', current + ':' + path)
-
+        dep_blobs = {path: run(platform, 'rev-parse', current + ':' + path) for path in deps}
         candidate = {
             'schema_version': 1,
             'candidate_id': 'fixture',
             'repository': 'Oteryn/Oteryn-Platform',
-            'state': 'CANDIDATE_PENDING_QUALIFICATION',
+            'state': gameauth.PENDING,
             'path_prefix': 'app/GameAuth/',
             'expected_count': 27,
             'historical_evidence': {
@@ -126,7 +123,33 @@ class PlatformGameAuthGroupTests(unittest.TestCase):
         }
         candidate_path = audit / gameauth.CANDIDATE
         write(candidate_path, json.dumps(candidate))
+        write(audit / gameauth.GROUPS, json.dumps({'schema_version': 1, 'groups': [], 'rejected_candidates': []}))
         return platform, evidence, audit, candidate_path, historical, current
+
+    def adopt(self, audit: Path, candidate_path: Path):
+        candidate = json.loads(candidate_path.read_text())
+        candidate['state'] = gameauth.ADOPTED
+        candidate['coverage_adopted'] = True
+        candidate_path.write_text(json.dumps(candidate))
+        group = {
+            'id': candidate['candidate_id'],
+            'repository': 'platform',
+            'disposition': 'GROUPED',
+            'path_prefix': candidate['path_prefix'],
+            'expected_count': candidate['expected_count'],
+            'depth': 'GROUPED_REVALIDATED',
+            'scope': 'fixture group',
+            'limitations': 'fixture limitation',
+            'historical_evidence': candidate['historical_evidence'],
+            'current_revalidation': candidate['current_revalidation'],
+            'evaluation': {
+                'qualification_run': 1,
+                'qualification_job': 2,
+                'focused_current_tests': {'cases': 3, 'assertions': 4, 'failures': 0, 'errors': 0, 'skipped': 0},
+                'outcome': gameauth.OUTCOME,
+            },
+        }
+        write(audit / gameauth.GROUPS, json.dumps({'schema_version': 1, 'groups': [group], 'rejected_candidates': []}))
 
     def test_exact_identity_candidate_passes_without_adopting_coverage(self):
         with tempfile.TemporaryDirectory(prefix='gameauth-group-') as td:
@@ -135,6 +158,24 @@ class PlatformGameAuthGroupTests(unittest.TestCase):
             self.assertEqual(result['paths'], 27)
             self.assertTrue(result['path_blob_identity'])
             self.assertFalse(result['coverage_adopted'])
+
+    def test_adopted_state_requires_and_revalidates_matching_group(self):
+        with tempfile.TemporaryDirectory(prefix='gameauth-group-') as td:
+            platform, evidence, audit, candidate_path, _, _ = self.fixture(Path(td))
+            self.adopt(audit, candidate_path)
+            result = gameauth.verify(audit, platform, evidence)
+            self.assertEqual(result['result'], 'GAMEAUTH_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS')
+            self.assertTrue(result['coverage_adopted'])
+
+    def test_adopted_state_rejects_group_evidence_drift(self):
+        with tempfile.TemporaryDirectory(prefix='gameauth-group-') as td:
+            platform, evidence, audit, candidate_path, _, _ = self.fixture(Path(td))
+            self.adopt(audit, candidate_path)
+            doc = json.loads((audit / gameauth.GROUPS).read_text())
+            doc['groups'][0]['current_revalidation']['current_app_tree'] = '0' * 40
+            write(audit / gameauth.GROUPS, json.dumps(doc))
+            with self.assertRaisesRegex(ValueError, 'current evidence drift'):
+                gameauth.verify(audit, platform, evidence)
 
     def test_group_source_change_fails_closed(self):
         with tempfile.TemporaryDirectory(prefix='gameauth-group-') as td:
@@ -178,7 +219,7 @@ class PlatformGameAuthGroupTests(unittest.TestCase):
             data = json.loads(candidate_path.read_text())
             data['coverage_adopted'] = True
             candidate_path.write_text(json.dumps(data))
-            with self.assertRaisesRegex(ValueError, 'must not already claim adoption'):
+            with self.assertRaisesRegex(ValueError, 'adoption/state mismatch'):
                 gameauth.verify(audit, platform, evidence)
 
 
