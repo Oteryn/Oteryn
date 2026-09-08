@@ -1,0 +1,44 @@
+name: Organization audit fix reconciler 2 (temporary)
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-fix-reconciler2.yml
+      - .github/workflows/organization-audit-reconcile-atlas-review3.yml
+permissions:
+  contents: write
+jobs:
+  fix-once:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: true
+      - name: Fix the two generated body lines once
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git log -1 --pretty=%s | grep -Fq 'ci(audit): fix reconciler body indentation v2 (#186)'; then exit 0; fi
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/organization-audit-reconcile-atlas-review3.yml')
+          t=p.read_text(encoding='utf-8')
+          replacements={
+              "              self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['atlas'].update(grouped=508,unverified_semantics=637))":"                  self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['atlas'].update(grouped=508,unverified_semantics=637))",
+              "              self.reject()":"                  self.reject()",
+          }
+          for old,new in replacements.items():
+              if t.count(old)!=1:
+                  raise SystemExit(f'expected exactly one target line, found {t.count(old)}: {old!r}')
+              t=t.replace(old,new)
+          p.write_text(t,encoding='utf-8')
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .github/workflows/organization-audit-reconcile-atlas-review3.yml
+          git commit -m 'ci(audit): fix reconciler body indentation v2 (#186)'
+          git push origin HEAD:refs/heads/docs/20260907-org-comprehensive-audit
