@@ -34,93 +34,6 @@ jobs:
           [[ "$GITHUB_SHA" == "$MERGE_GROUP_HEAD_SHA" ]]
           [[ "$MERGE_GROUP_BASE_REF" == "refs/heads/main" ]]
 
-      - name: Verify live Merge Queue configuration
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TARGET_REPOSITORY: ${{ github.repository }}
-          TARGET_BRANCH: main
-          CANDIDATE_SHA: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha || github.sha }}
-        run: |
-          set -euo pipefail
-          observed_at="$(date +%s)"
-          queue_file="${RUNNER_TEMP}/merge-queue.json"
-          owner="${TARGET_REPOSITORY%%/*}"
-          name="${TARGET_REPOSITORY#*/}"
-          python3 - "${owner}" "${name}" > "${RUNNER_TEMP}/merge-queue-query.json" <<'PY'
-          import json
-          import sys
-
-          owner, name = sys.argv[1:]
-          query = """
-          query($owner: String!, $name: String!) {
-            repository(owner: $owner, name: $name) {
-              mergeQueue {
-                id
-                resourcePath
-                url
-              }
-            }
-          }
-          """
-          print(json.dumps({"query": query, "variables": {"owner": owner, "name": name}}))
-          PY
-          curl --fail-with-body --silent --show-error \
-            --retry 2 \
-            --header "Accept: application/vnd.github+json" \
-            --header "Authorization: Bearer ${GH_TOKEN}" \
-            --header "X-GitHub-Api-Version: 2022-11-28" \
-            --header "Content-Type: application/json" \
-            --data-binary "@${RUNNER_TEMP}/merge-queue-query.json" \
-            "https://api.github.com/graphql" \
-            > "${queue_file}"
-          python3 - "${queue_file}" "${TARGET_REPOSITORY}" "${TARGET_BRANCH}" "${CANDIDATE_SHA}" "${observed_at}" "${GITHUB_RUN_ID}" "${GITHUB_RUN_ATTEMPT}" <<'PY'
-          import json
-          import re
-          import sys
-
-          path, repository, branch, candidate_sha, observed_at, run_id, run_attempt = sys.argv[1:]
-          if repository != "Oteryn/Oteryn" or branch != "main":
-              raise SystemExit("live merge-queue observation targeted an unexpected repository or branch")
-          if re.fullmatch(r"[0-9a-f]{40}", candidate_sha) is None:
-              raise SystemExit("candidate SHA is invalid")
-          payload = json.loads(open(path, encoding="utf-8").read())
-          errors = payload.get("errors") if isinstance(payload, dict) else None
-          if errors:
-              raise SystemExit(f"GraphQL merge-queue query failed: {errors}")
-          repository_data = payload.get("data", {}).get("repository") if isinstance(payload, dict) else None
-          queue = repository_data.get("mergeQueue") if isinstance(repository_data, dict) else None
-          if not isinstance(queue, dict):
-              raise SystemExit("repository does not currently expose a Merge Queue")
-          queue_id = queue.get("id")
-          resource_path = queue.get("resourcePath")
-          url = queue.get("url")
-          expected_resource_path = f"/{repository}/queue/{branch}"
-          expected_url = f"https://github.com{expected_resource_path}"
-          if not isinstance(queue_id, str) or not queue_id.startswith("MQ_"):
-              raise SystemExit("Merge Queue id is missing or invalid")
-          if resource_path != expected_resource_path:
-              raise SystemExit(
-                  f"Merge Queue resourcePath does not bind target branch: {resource_path!r} != {expected_resource_path!r}"
-              )
-          if url != expected_url:
-              raise SystemExit(f"Merge Queue URL does not bind target branch: {url!r} != {expected_url!r}")
-          observation = {
-              "repository": repository,
-              "base_ref": branch,
-              "candidate_sha": candidate_sha,
-              "merge_queue_required": True,
-              "observed_at_epoch_seconds": int(observed_at),
-              "source": "graphql_queue_config",
-              "workflow_run_id": int(run_id),
-              "workflow_run_attempt": int(run_attempt),
-              "queue_id": queue_id,
-              "resource_path": resource_path,
-              "url": url,
-          }
-          print("LIVE_MQ_QUEUE_OBSERVATION=" + json.dumps(observation, sort_keys=True, separators=(",", ":")))
-          PY
-
       - name: Checkout exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -161,6 +74,8 @@ jobs:
               Path('SECURITY.md'),
               Path('.github/CODEOWNERS'),
               Path('.github/dependabot.yml'),
+              Path('.github/workflows/merge-queue-preflight.yml'),
+              Path('.github/workflows/merge-queue-preflight-reusable.yml'),
               Path('docs/architecture/adr/0001-ecosystem-topology-authority.md'),
               Path('docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md'),
               Path('docs/ci/CI_CONTRACT.md'),
@@ -194,6 +109,7 @@ jobs:
               Path('tools/governance/test_remote_desktop_action_gate.py'),
               Path('tools/governance/test_merge_queue_workflow_contract.py'),
               Path('tools/governance/test_merge_queue_submission_routing.py'),
+              Path('tools/governance/test_merge_queue_preflight_workflow.py'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
           if missing:
@@ -300,6 +216,7 @@ jobs:
           python3 tools/governance/test_remote_desktop_action_gate.py
           python3 tools/governance/test_merge_queue_workflow_contract.py
           python3 tools/governance/test_merge_queue_submission_routing.py
+          python3 tools/governance/test_merge_queue_preflight_workflow.py
           python3 tools/governance/test_bounded_execution_guard.py
           python3 tools/governance/test_agent_continuation_policy.py
           python3 tools/governance/test_agent_continuation_review_repairs.py
