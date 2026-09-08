@@ -24,7 +24,17 @@ OBSERVATION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
 QUEUE_ID_RE = re.compile(r"^MQ_[A-Za-z0-9_-]+$")
 MAX_PREMUTATION_RULE_AGE_SECONDS = 30
 MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS = 60
-PREFLIGHT_SOURCE = "protected_issue_comment_preflight"
+PREFLIGHT_SOURCE = "protected_meta_control_preflight"
+CONTROL_REPOSITORY = "Oteryn/Oteryn"
+CONTROL_ISSUE_NUMBER = 189
+ALLOWED_TARGET_REPOSITORIES = frozenset(
+    {
+        "Oteryn/Oteryn",
+        "Oteryn/Oteryn-Game",
+        "Oteryn/Oteryn-Platform",
+        "Oteryn/Oteryn-Atlas",
+    }
+)
 
 
 class SubmissionAttempt(NamedTuple):
@@ -39,6 +49,8 @@ class BranchQueueObservation(NamedTuple):
     attempt_id: str
     observation_id: str
     source: str
+    control_repository: str
+    control_issue_number: int
     repository: str
     pr_number: int
     base_ref: str
@@ -106,12 +118,7 @@ def _boolean_fields(value: object, names: tuple[str, ...]) -> bool:
 
 def _valid_branch_name(value: object) -> bool:
     """Apply `git check-ref-format --branch` constraints to a branch shorthand."""
-    if (
-        not isinstance(value, str)
-        or not value
-        or value == "@"
-        or value.startswith("-")
-    ):
+    if not isinstance(value, str) or not value or value == "@" or value.startswith("-"):
         return False
     identity = f"refs/heads/{value}"
     return (
@@ -133,6 +140,7 @@ def _valid_attempt(attempt: SubmissionAttempt) -> bool:
     return (
         isinstance(attempt, SubmissionAttempt)
         and _fullmatch(ATTEMPT_RE, attempt.attempt_id)
+        and attempt.repository in ALLOWED_TARGET_REPOSITORIES
         and _fullmatch(REPOSITORY_RE, attempt.repository)
         and _positive_int(attempt.pr_number)
         and _valid_branch_name(attempt.base_ref)
@@ -162,12 +170,12 @@ def _branch_observation_matches(
 ) -> bool:
     if not isinstance(observation, BranchQueueObservation):
         return False
-    if observation.attempt_id != attempt.attempt_id:
-        return False
-    if observation.source != PREFLIGHT_SOURCE:
+    if observation.attempt_id != attempt.attempt_id or observation.source != PREFLIGHT_SOURCE:
         return False
     if (
-        observation.repository != attempt.repository
+        observation.control_repository != CONTROL_REPOSITORY
+        or observation.control_issue_number != CONTROL_ISSUE_NUMBER
+        or observation.repository != attempt.repository
         or observation.pr_number != attempt.pr_number
         or observation.base_ref != attempt.base_ref
         or observation.pr_head_sha != attempt.live_pr_head_sha
@@ -201,19 +209,14 @@ def _branch_observation_matches(
     if (
         not isinstance(observation.expires_at_epoch_seconds, int)
         or isinstance(observation.expires_at_epoch_seconds, bool)
-        or observation.expires_at_epoch_seconds != (
-            observation.observed_at_epoch_seconds + MAX_PREMUTATION_RULE_AGE_SECONDS
-        )
+        or observation.expires_at_epoch_seconds
+        != observation.observed_at_epoch_seconds + MAX_PREMUTATION_RULE_AGE_SECONDS
         or now_epoch_seconds > observation.expires_at_epoch_seconds
     ):
         return False
 
     if observation.merge_queue_required is False:
-        return (
-            observation.queue_id is None
-            and observation.resource_path is None
-            and observation.url is None
-        )
+        return observation.queue_id is None and observation.resource_path is None and observation.url is None
 
     expected_resource_path = f"/{attempt.repository}/queue/{attempt.base_ref}"
     expected_url = f"https://github.com{expected_resource_path}"
@@ -242,17 +245,12 @@ def choose_submission_route(
     *,
     now_epoch_seconds: int,
 ) -> str:
-    """Choose a protected submission route from one fresh preflight attempt."""
+    """Choose a protected submission route from one fresh central preflight attempt."""
     if not _valid_attempt(attempt):
         return BLOCKED_STALE_STATE
     if not isinstance(capabilities, SubmissionCapabilities) or not _boolean_fields(
         capabilities,
-        (
-            "explicit_enqueue_available",
-            "auto_merge_available",
-            "integration_authorized",
-            "pr_eligible",
-        ),
+        ("explicit_enqueue_available", "auto_merge_available", "integration_authorized", "pr_eligible"),
     ):
         return BLOCKED_STALE_STATE
     if not capabilities.integration_authorized:
@@ -261,11 +259,7 @@ def choose_submission_route(
         return BLOCKED_NOT_ELIGIBLE
     if not _freeze_matches(attempt, freeze):
         return BLOCKED_FROZEN_HEAD_MISMATCH
-    if not _branch_observation_matches(
-        attempt,
-        branch_observation,
-        now_epoch_seconds=now_epoch_seconds,
-    ):
+    if not _branch_observation_matches(attempt, branch_observation, now_epoch_seconds=now_epoch_seconds):
         return BLOCKED_STALE_STATE
     if not branch_observation.merge_queue_required:
         return NOT_MQ_TARGET
@@ -292,11 +286,7 @@ def _observation_is_post_submission(
         and isinstance(observed_at_epoch_seconds, int)
         and not isinstance(observed_at_epoch_seconds, bool)
         and observed_at_epoch_seconds > submission_completed_at_epoch_seconds
-        and _fresh(
-            observed_at_epoch_seconds,
-            now_epoch_seconds,
-            MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS,
-        )
+        and _fresh(observed_at_epoch_seconds, now_epoch_seconds, MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS)
     )
 
 
@@ -352,6 +342,8 @@ def _merge_group_matches(
     for member in observation.members:
         if not isinstance(member, MergeGroupMember):
             return False
+        if member.repository not in ALLOWED_TARGET_REPOSITORIES:
+            return False
         if not _fullmatch(REPOSITORY_RE, member.repository) or not _positive_int(member.pr_number):
             return False
         if not _fullmatch(SHA_RE, member.pr_head_sha):
@@ -373,16 +365,10 @@ def verify_queue_admission(
     now_epoch_seconds: int,
 ) -> str:
     """Accept only a strictly post-mutation live queue read or merge-group membership."""
-    if not isinstance(route, str) or route not in {
-        EXPLICIT_ENQUEUE,
-        AUTO_MERGE_MQ_SUBMISSION,
-    }:
+    if not isinstance(route, str) or route not in {EXPLICIT_ENQUEUE, AUTO_MERGE_MQ_SUBMISSION}:
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    if not _valid_attempt(attempt):
+    if not _valid_attempt(attempt) or not isinstance(evidence, Iterable):
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    if not isinstance(evidence, Iterable):
-        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-
     try:
         for item in evidence:
             if _queue_entry_matches(
