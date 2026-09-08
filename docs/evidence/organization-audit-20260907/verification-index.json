@@ -227,5 +227,24 @@
     "Complete all-ecosystem CVE/SBOM/provenance/secret-history assessment",
     "Actual billed usage and agent token/cost comparison",
     "Independent semantic acceptance"
-  ]
+  ],
+  "r3_platform_gameauth_qualification": {
+    "frozen_source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "historical_source_commit": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+    "qualification_head": "261c3838cd4806ef29bd9e0e1808049be4bdf809",
+    "run": 34225490543,
+    "job": 102058467962,
+    "verifier_unit_tests": 5,
+    "exact_gameauth_paths": 27,
+    "dependent_blob_bindings": 23,
+    "focused_test_files": 14,
+    "focused_cases": 61,
+    "focused_assertions": 565,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "tracked_source_clean_after_execution": true,
+    "separate_concurrency_artifact": 10035749457,
+    "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS"
+  }
 }

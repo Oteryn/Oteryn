@@ -2,7 +2,7 @@
   "schema_version": 1,
   "candidate_id": "PLATFORM-GAMEAUTH-HISTORICAL-DIRECT-CARRYFORWARD",
   "repository": "Oteryn/Oteryn-Platform",
-  "state": "CANDIDATE_PENDING_QUALIFICATION",
+  "state": "QUALIFIED_ADOPTED_AS_GROUPED",
   "path_prefix": "app/GameAuth/",
   "expected_count": 27,
   "historical_evidence": {
@@ -81,6 +81,26 @@
       "qualification": "separate exact-source MariaDB concurrency evidence; not replaced by the focused SQLite/default-environment test set"
     }
   },
-  "coverage_adopted": false,
-  "limitations": "Candidate only. Exact byte identity can carry historical source-reading evidence, but does not establish production security, current-main status, provider remediation, full Identity/session correctness, real-world Gateway connectivity, or organization-wide audit completion."
+  "coverage_adopted": true,
+  "limitations": "Candidate only. Exact byte identity can carry historical source-reading evidence, but does not establish production security, current-main status, provider remediation, full Identity/session correctness, real-world Gateway connectivity, or organization-wide audit completion.",
+  "qualification": {
+    "qualification_head": "261c3838cd4806ef29bd9e0e1808049be4bdf809",
+    "workflow_run": 34225490543,
+    "job": 102058467962,
+    "verifier_unit_tests": 5,
+    "verifier_unit_result": "PASS",
+    "focused_current_tests": {
+      "test_files": 14,
+      "cases": 61,
+      "assertions": 565,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "php": "8.5.10",
+    "composer_validate": "PASS",
+    "tracked_source_clean_after_execution": true,
+    "existing_exact_source_concurrency_artifact": 10035749457,
+    "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
+  }
 }

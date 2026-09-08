@@ -4,7 +4,7 @@
     {
       "id": "SEMANTIC-COVERAGE",
       "missing": "Unreviewed/currently unbound repository semantics",
-      "reason": "Source bytes available; 202 explicitly scoped path reviews are bound, not full behavior approval; 4123 paths retain UNVERIFIED. No automatic import from maintenance N/A or unproven historical summaries.",
+      "reason": "Source bytes available; 221 DIRECT scoped path reviews plus 27 bounded GROUPED GameAuth paths are now bound, not full behavior approval; 4077 paths retain UNVERIFIED. The historical Atlas 508-path candidate remains rejected and no automatic import from maintenance N/A or unproven summaries is allowed.",
       "effect": "Original exhaustive completeness cannot be claimed.",
       "owner_route": "META186 plus provider audit owners",
       "closure_condition": "Import exact historical disposition ledgers with bounded validity, review changed/uncovered authored families, and retain justified grouping/N/A."
@@ -116,8 +116,8 @@
     {
       "id": "INDEPENDENT-REVIEW",
       "missing": "Independent semantic review of this revision",
-      "reason": "Review of R3 head 9096edd completed with four P1 and one P2 audit-tool/evidence findings; author remediation is not independent acceptance.",
-      "effect": "No self-awarded10/10 or independent acceptance claimed until a fresh stable post-repair head is re-reviewed.",
+      "reason": "A clean exact-head review of d72356ad found no new P0/P1/P2 after prior hardening and all 15 historical audit-package review threads were resolved. This later Platform routes/GameAuth coverage reconciliation is new material and has not yet received its own fresh independent exact-head review.",
+      "effect": "No self-awarded 10/10 or final independent acceptance is claimed for the expanded revision.",
       "owner_route": "PR185 reviewer",
       "closure_condition": "Fresh independent review of the stable post-repair head finds no unresolved material audit/evidence correctness findings; this does not itself close unrelated product/operations obligations."
     }

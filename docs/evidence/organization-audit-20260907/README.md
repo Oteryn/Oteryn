@@ -1,6 +1,6 @@
 # Organization audit R3 evidence
 
-Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 15 residual obligations and 202 explicit scoped path reviews out of 4325 immutable leaves. `4123` leaves retain UNVERIFIED semantics. Full-file, control-field and translation-range reviews are intentionally distinguished.
+Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 15 residual obligations, 221 DIRECT scoped path reviews and 27 bounded GROUPED GameAuth paths out of 4325 immutable leaves. `4077` leaves retain UNVERIFIED semantics. Full-file, control-field, translation-range and GROUPED carry-forward evidence are intentionally distinguished.
 
 ## Local checks
 
@@ -19,6 +19,7 @@ python3 tools/audit/organization_audit.py --plan docs/evidence/organization-audi
 python3 tools/audit/verify_report.py --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json --inventory-dir /tmp/audit-new-inventory/inventories --ledger-output /tmp/audit-new-ledger.csv
 python3 tools/audit/reproduce_platform_routing.py --source-root /path/to/exact-platform-de917b3 --output /tmp/audit-new-routing.json
 python3 tools/audit/verify_announcement_trigger.py --source-root /path/to/exact-platform-de917b3
+python3 tools/audit/verify_platform_gameauth_group.py --audit-root . --platform-root /path/to/exact-platform-de917b3 --evidence-root /path/to/platform-audit-publication-3fe7df5
 python3 tools/audit/verify_r3_evidence.py --manifest docs/evidence/organization-audit-20260907/r3-native-manifest.json --archive-dir /path/to/public-native-archives
 ```
 
@@ -28,7 +29,7 @@ After independent review of `9096edd135d42f31da4824f4c4fb50ee187de2c9`, the veri
 
 ## Evidence map and durability
 
-`r3-atlas-grouped-revalidation.json` records a rejected 508-shard GROUPED carry-forward: immutable shard identity passed, but current consumer impact-routing qualification failed, so all 508 remain UNVERIFIED. `r3-native-manifest.json` binds six public native archives; `r3-native-results.json` stores the independently recalculated summary. `r3-trigger-evidence.json` binds the locale-trigger finding. `r3-migration-review.json` binds the closed 50-path ledger subset and synthetic-up observation. `r3-visual-review.json` records eight actually inspected screenshot digests and limits. `r3-lifecycle.json` records later native state without rebasing the source cut. `r3-source-review.md` explains precise scope and negative evidence. `r3-independent-review-corrections.json` is the post-review correction layer for statements invalidated by independent review and takes precedence for those explicitly named statements until the canonical compact registers are rewritten consistently.
+`r3-atlas-grouped-revalidation.json` records a rejected 508-shard GROUPED carry-forward: immutable shard identity passed, but current consumer impact-routing qualification failed, so all 508 remain UNVERIFIED. `r3-platform-gameauth-candidate.json` binds an accepted 27-path Platform GameAuth carry-forward after exact historical/source identity, 23 dependent blob bindings and 61/61 focused frozen-current tests; this remains bounded GROUPED evidence, not product PASS. `r3-native-manifest.json` binds six public native archives; `r3-native-results.json` stores the independently recalculated summary. `r3-trigger-evidence.json` binds the locale-trigger finding. `r3-migration-review.json` binds the closed 50-path ledger subset and synthetic-up observation. `r3-visual-review.json` records eight actually inspected screenshot digests and limits. `r3-lifecycle.json` records later native state without rebasing the source cut. `r3-source-review.md` explains precise scope and negative evidence. `r3-independent-review-corrections.json` is the post-review correction layer for statements invalidated by independent review and takes precedence for those explicitly named statements until the canonical compact registers are rewritten consistently.
 
 Full 4325-row CSV, native archives, original and corrected captures, red/green tool-regression logs and expanded checks accompany the downloadable audit delivery. Actions archives expire (dates in manifest); preserve the delivery. Committed immutable Git coordinates plus the collector reproduce source inventories, not historical runtime outputs after those outputs expire. Do not treat a digest alone as the raw evidence.
 

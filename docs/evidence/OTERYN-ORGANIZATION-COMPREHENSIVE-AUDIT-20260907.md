@@ -10,16 +10,16 @@ R3 preserves the original immutable source cut while adding native Platform evid
 
 The source set remains META@`1a01c5b3e08666a82245b1cac78da3736c65e785`, Game@`4d6139083179b8fd8c5d0497b2abf8c2545de599`, Platform@`de917b3477a1de0667531380de3660e8b2ab59aa`, Atlas@`f00815858bb5b031c502ad19fb96a05ff66b4d84`, plus migration archive@`6da4f83ef6a35afbab3332f90d7c7f171d23d235`. Companion JSON supplies all root-tree identities. Eight acquired current/supporting trees and 4641 unique blobs were hash-verified; source code is not copied here as product authority.
 
-| Source | Tracked leaves | Explicit scoped reviews | Semantics not adopted/established |
-|---|---:|---:|---:|
-| meta | 174 | 20 | 154 |
-| game | 830 | 34 | 796 |
-| platform | 2165 | 137 | 2028 |
-| atlas | 1155 | 10 | 1145 |
-| migration_archive | 1 | 1 | 0 |
-| **Total** | **4325** | **202** | **4123** |
+| Source | Tracked leaves | DIRECT scoped | GROUPED revalidated | UNVERIFIED semantics |
+|---|---:|---:|---:|---:|
+| meta | 174 | 20 | 0 | 154 |
+| game | 830 | 34 | 0 | 796 |
+| platform | 2165 | 156 | 27 | 1982 |
+| atlas | 1155 | 10 | 0 | 1145 |
+| migration_archive | 1 | 1 | 0 | 0 |
+| **Total** | **4325** | **221** | **27** | **4077** |
 
-`DIRECT` is a bounded review with the stated scope, not full approval of the entire file or every dependency. R2 had 65 scoped entries; R3 adds 137 distinct paths and extends some existing scopes. In particular, R3 reads all 50 Platform migration files and the control fields of all 77 workflow files. It does not claim that every workflow step body was reviewed. All unadopted semantics stay UNVERIFIED; grouping/N/A are not used to inflate coverage. Full CSV is reproducible from immutable inventories, `coverage-review.tsv` and the committed ledger digest.
+`DIRECT` is a bounded review with the stated scope, not full approval of the entire file or every dependency. R2 had 65 scoped entries; the current revision adds 156 DIRECT paths and extends some existing scopes. It reads all 50 Platform migration files, control fields of all 77 workflow files and all 19 files in the frozen Platform routes tree. The prior Platform audit statement that there were 21 route files was rejected fail-closed; the frozen tree contains 19 and all 19 were read directly here. Exactly 27 `app/GameAuth/**` leaves are additionally GROUPED: the earlier audit directly read all 27, the complete path/blob set and whole `app` tree are byte-identical at frozen `de917b3…`, 23 dependent blobs are source-bound, and 61 focused frozen-current cases / 565 assertions passed with zero failures/errors/skips. Separate exact-source concurrency evidence remains distinct. GROUPED is bounded semantic carry-forward, not product/security readiness. The rejected Atlas 508-path candidate remains UNVERIFIED. Full CSV is reproducible from immutable inventories, `coverage-review.tsv`, `coverage-groups.json` and the committed ledger digest.
 
 The original unresolvable Game coordinate `3327db49c0c3e2d90afe6a74954c579a36aba2a5` remains explicitly recorded as a corrected input. Its cause is unknown; no motive or fabricated history is inferred. R2's historical source discussion remains available in this PR at `f9de42c75e25627a424d429434c4922f399965e6`.
 
@@ -88,7 +88,7 @@ Platform 1270 is closed **without merge**, with recorded successor 1304; 1304 is
 
 Independent review of stable R3 head `9096edd135d42f31da4824f4c4fb50ee187de2c9` completed with four P1 and one P2 audit/evidence findings. They are preserved in `r3-independent-review-corrections.json`; author remediation is not itself independent acceptance.
 
-A later independent re-review of `e242a68a9df73304cbb6ba8bd3cfebbb36a2197b` found one remaining canonical disclosure-label P1 and two strict-JSON-type P2 evidence defects. This revision corrects those items, but the resulting new head still requires fresh independent re-review; author remediation is not independent acceptance.
+Successive independent review waves exposed and drove correction of the remaining canonical disclosure, strict-JSON-type, output-symlink and rejected-GROUPED evidence defects. A final exact-head re-review of `d72356adccf5600dc2fc2a075f215a6b071a21df` completed with no new P0/P1/P2, after which all 15 historical audit-package review threads were resolved. That resolves those audit-package defects, not provider findings. The Platform routes/GameAuth coverage expansion in this later revision is new material and therefore still requires fresh independent exact-head review.
 
 The correction pass does five things:
 
