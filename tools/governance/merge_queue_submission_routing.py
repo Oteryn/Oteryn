@@ -3,8 +3,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable
+from typing import Iterable, NamedTuple
 
 EXPLICIT_ENQUEUE = "EXPLICIT_ENQUEUE"
 AUTO_MERGE_MQ_SUBMISSION = "AUTO_MERGE_MQ_SUBMISSION"
@@ -24,8 +23,7 @@ QUEUE_ADMISSION_EVIDENCE = frozenset(
 )
 
 
-@dataclass(frozen=True)
-class SubmissionCapabilities:
+class SubmissionCapabilities(NamedTuple):
     merge_queue_required: bool
     explicit_enqueue_available: bool
     auto_merge_available: bool
