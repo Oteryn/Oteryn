@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from collect_ci_cohort import elapsed, select_runs, job_metrics, ReadOnlyAPI, PLAN, collect, write_new
+from collect_ci_cohort import elapsed, select_runs, job_metrics, ReadOnlyAPI, PLAN, collect, write_new, prepare_output_parent
 
 
 def run(n=1, **kw):
@@ -112,6 +112,48 @@ class Tests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 write_new(link, b'new')
             self.assertEqual(target.read_bytes(), b'preserve')
+
+    def test_write_new_refuses_symlinked_ancestor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / 'provider'
+            target.mkdir()
+            alias = root / 'provider-link'
+            try:
+                alias.symlink_to(target, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest('symlink unavailable')
+            output = alias / 'new-evidence' / 'result.json'
+            with self.assertRaisesRegex(ValueError, 'ancestor symlink'):
+                write_new(output, b'new')
+            self.assertFalse((target / 'new-evidence').exists())
+
+    def test_prepare_output_parent_refuses_deeper_path_under_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / 'provider'
+            (target / 'existing').mkdir(parents=True)
+            alias = root / 'provider-link'
+            try:
+                alias.symlink_to(target, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest('symlink unavailable')
+            with self.assertRaisesRegex(ValueError, 'ancestor symlink'):
+                prepare_output_parent(alias / 'existing' / 'new' / 'result.json')
+            self.assertFalse((target / 'existing' / 'new').exists())
+
+    def test_prepare_output_parent_refuses_dangling_ancestor_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            alias = root / 'dangling-link'
+            target = root / 'missing-provider'
+            try:
+                alias.symlink_to(target, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest('symlink unavailable')
+            with self.assertRaisesRegex(ValueError, 'ancestor symlink'):
+                prepare_output_parent(alias / 'new' / 'result.json')
+            self.assertFalse(target.exists())
 
 
 if __name__ == '__main__': unittest.main()

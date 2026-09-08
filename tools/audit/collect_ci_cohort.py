@@ -90,9 +90,37 @@ def job_metrics(job, run):
             'start_delay_from_run_creation_seconds': delay, 'timestamp_anomalies': anomalies}
 
 
+def prepare_output_parent(path: Path) -> Path:
+    """Create only lexical, non-symlink output ancestry and return an absolute path.
+
+    The nearest existing ancestor and every created directory must resolve to the
+    same lexical path. This rejects both direct ancestor symlinks and deeper
+    paths that are already underneath a symlinked ancestor before any evidence
+    file is created.
+    """
+    absolute = Path(os.path.abspath(path))
+    parent = absolute.parent
+    cursor = parent
+    missing = []
+    while not os.path.lexists(cursor):
+        missing.append(cursor)
+        require(cursor.parent != cursor, 'output parent resolution failed')
+        cursor = cursor.parent
+    require(not cursor.is_symlink(), 'output ancestor symlink refused')
+    require(cursor.resolve(strict=True) == cursor, 'output ancestor symlink refused')
+    for directory in reversed(missing):
+        directory.mkdir()
+        require(not directory.is_symlink(), 'output ancestor symlink refused')
+        require(directory.resolve(strict=True) == directory, 'output ancestor symlink refused')
+    require(parent.resolve(strict=True) == parent, 'output ancestor symlink refused')
+    return absolute
+
+
 def write_new(path: Path, raw: bytes) -> None:
-    """Create one evidence file exclusively; never overwrite or follow a final-path symlink."""
-    path.parent.mkdir(parents=True, exist_ok=True)
+    """Create one evidence file exclusively; never overwrite or follow symlinks."""
+    path = prepare_output_parent(path)
+    if path.is_symlink():
+        raise FileExistsError(str(path))
     with path.open('xb') as handle:
         handle.write(raw)
 
@@ -181,20 +209,20 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     require(os.environ.get('OTERYN_AUDIT185_CI_COHORT') == '1', 'explicit bounded metadata collection consent required')
-    require(not args.output.exists(), 'refusing output overwrite')
-    args.output.parent.mkdir(parents=True, exist_ok=True)
+    output = prepare_output_parent(args.output)
+    require(not os.path.lexists(output), 'refusing output overwrite')
     try:
         result = collect(ReadOnlyAPI(os.environ.get('GH_TOKEN')))
     except Exception as exc:
         diagnostic = {'collection_failed': True, 'error_type': type(exc).__name__, 'message': str(exc)[:300], 'qualification': 'NO_COMPLETE_COHORT'}
-        diagnostic_path = args.output.parent / 'collection-error.json'
+        diagnostic_path = output.parent / 'collection-error.json'
         try:
             write_new(diagnostic_path, (json.dumps(diagnostic, indent=2) + '\n').encode())
         except FileExistsError:
             raise RuntimeError('collection failed; existing collection-error.json preserved without overwrite') from exc
         raise
     raw = (json.dumps(result, indent=2) + '\n').encode()
-    write_new(args.output, raw)
+    write_new(output, raw)
     print(json.dumps({'runs': len(result['runs']), 'unique_event_candidates': result['unique_event_candidates'], 'api_calls': result['api_calls'], 'sha256': hashlib.sha256(raw).hexdigest()}))
 
 

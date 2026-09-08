@@ -37,11 +37,12 @@
           "current grouped prefix contains exactly 508 regular-file leaves",
           "current manifest, consumer, loader and focused test blobs match this record",
           "focused current consumer/runtime tests pass on the exact current source"
-        ]
+        ],
+        "qualification_status": "FAILED_CURRENT_CONSUMER_IMPACT_ROUTING_4_PASS_1_FAIL"
       },
       "depth": "GROUPED_REVALIDATION_CANDIDATE_REJECTED",
-      "scope": "Generated creature-gameplay shard products only. Historical grouped semantics are carried forward because the exact shard prefix and manifest are unchanged, while the changed current consumer/loader contract is separately source-bound and requalified.",
-      "limitations": "This does not make the 508 generated shards DIRECT reviews, restore Atlas verification, approve every gameplay value, qualify a real browser/fullworld run, or establish current product readiness.",
+      "scope": "Identity-only evidence for the rejected candidate: the exact 508 shard leaves and manifest are unchanged from the historical source, and the five named current dependent blobs are source-bound. Historical semantic GROUPED assurance is NOT carried forward because the required current consumer/impact-routing qualification failed 4/5. All 508 leaves remain UNVERIFIED.",
+      "limitations": "This rejected record is not semantic coverage. It does not make the 508 generated shards DIRECT or GROUPED reviews, restore Atlas verification, approve gameplay values, qualify a browser/fullworld run, or establish current product readiness.",
       "evaluation": {
         "qualification_run": 34218265762,
         "qualification_job": 102035087439,

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Revalidate one historical Atlas GROUPED rule against an exact current source checkout.
+"""Reproduce identity evidence for the rejected historical Atlas GROUPED candidate.
 
-Read-only. This proves carry-forward eligibility for the generated shard group,
-not Atlas product readiness or restored verification.
+Read-only. The committed candidate is explicitly rejected because its required
+current consumer/impact-routing qualification failed. Successful execution here
+proves only immutable shard/manifest identity and source bindings; it never
+promotes the 508 leaves to semantic coverage.
 """
 from __future__ import annotations
 import argparse
@@ -53,10 +55,23 @@ def tree_entries(root,ref,prefix):
 
 def verify(audit_root:Path,atlas_root:Path,evidence_root:Path):
     group_doc=read_json(audit_root/'docs/evidence/organization-audit-20260907/coverage-groups.json')
-    groups=group_doc.get('groups',[])+group_doc.get('rejected_candidates',[])
-    selected=[g for g in groups if g['id']==GROUP_ID]
-    require(len(selected)==1,'Atlas grouped rule missing/duplicated')
-    group=selected[0];hist=group['historical_evidence'];current=group['current_revalidation']
+    require(not any(g.get('id')==GROUP_ID for g in group_doc.get('groups',[])),'rejected Atlas candidate must not be present in adopted groups')
+    selected=[g for g in group_doc.get('rejected_candidates',[]) if g.get('id')==GROUP_ID]
+    require(len(selected)==1,'rejected Atlas grouped candidate missing/duplicated')
+    group=selected[0]
+    require(group.get('disposition')=='REVALIDATION_FAILED_NOT_ADOPTED','Atlas candidate is not explicitly rejected')
+    require(group.get('depth')=='GROUPED_REVALIDATION_CANDIDATE_REJECTED','Atlas rejected depth mismatch')
+    evaluation=group.get('evaluation') or {}
+    require(evaluation.get('outcome')=='REJECTED_NOT_COUNTED_AS_GROUPED','Atlas rejection outcome mismatch')
+    focused=evaluation.get('focused_current_consumer_tests') or {}
+    require(type(focused.get('passed')) is int and focused.get('passed')>=0,'Atlas pass count invalid')
+    require(type(focused.get('failed')) is int and focused.get('failed')>0,'Atlas rejection must retain a failed current consumer qualification')
+    require(type(evaluation.get('qualification_run')) is int and type(evaluation.get('qualification_job')) is int,'Atlas rejection execution identity missing')
+    require('NOT carried forward' in group.get('scope',''),'Atlas rejected scope must explicitly refuse semantic carry-forward')
+    require('remain UNVERIFIED' in group.get('scope',''),'Atlas rejected scope must retain UNVERIFIED semantics')
+
+    hist=group['historical_evidence'];current=group['current_revalidation']
+    require(current.get('qualification_status','').startswith('FAILED_CURRENT_CONSUMER_'),'Atlas current revalidation must remain failed')
     require(text(atlas_root,'rev-parse','HEAD')==current['source_commit'],'wrong current Atlas commit')
     require(text(atlas_root,'rev-parse','HEAD^{tree}')==current['source_tree'],'wrong current Atlas tree')
     require(text(evidence_root,'rev-parse','HEAD')==hist['publication_commit'],'wrong Atlas audit publication commit')
@@ -72,24 +87,27 @@ def verify(audit_root:Path,atlas_root:Path,evidence_root:Path):
     require(matches[0].get('basis')==hist['basis'],'historical grouped basis mismatch')
     prefix=group['path_prefix'];manifest='web/creature-gameplay/manifest.json'
     changed=git(atlas_root,'diff','--name-only',hist['audited_main_sha'],current['source_commit'],'--',prefix,manifest).decode().splitlines()
-    require(changed==[],'grouped shard/manifest source changed: '+repr(changed[:10]))
+    require(changed==[],'grouped shard/manifest identity changed: '+repr(changed[:10]))
     old=tree_entries(atlas_root,hist['audited_main_sha'],prefix)
     now=tree_entries(atlas_root,current['source_commit'],prefix)
-    require(len(now)==group['expected_count'] and len(old)==group['expected_count'],'grouped tree count mismatch')
-    require(old==now,'grouped tree identity changed')
-    require(all(mode=='100644' and kind=='blob' for _,mode,kind,_ in now),'grouped set contains non-regular leaf')
+    require(len(now)==group['expected_count'] and len(old)==group['expected_count'],'rejected grouped tree count mismatch')
+    require(old==now,'rejected grouped tree identity changed')
+    require(all(mode=='100644' and kind=='blob' for _,mode,kind,_ in now),'rejected grouped set contains non-regular leaf')
     for path,expected in current['current_blobs'].items():
         actual=text(atlas_root,'rev-parse',current['source_commit']+':'+path)
         require(actual==expected,'current Atlas dependent blob mismatch: '+path)
     return {
-        'result':'GROUPED_REVALIDATION_ELIGIBLE_NOT_PRODUCT_PASS',
+        'result':'REJECTED_GROUP_IDENTITY_REPRODUCED_NOT_SEMANTIC_COVERAGE',
         'group_id':group['id'],
         'repository':'Oteryn/Oteryn-Atlas',
         'historical_source':hist['audited_main_sha'],
         'current_source':current['source_commit'],
-        'grouped_paths':len(now),
+        'candidate_paths':len(now),
         'changed_group_or_manifest_paths':0,
         'dependent_blobs_verified':len(current['current_blobs']),
+        'consumer_tests':focused,
+        'semantic_carry_forward':False,
+        'adopted_grouped_coverage':False,
         'limitation':group['limitations'],
     }
 
