@@ -31,6 +31,7 @@ class SubmissionCapabilities(NamedTuple):
     auto_merge_available: bool
     integration_authorized: bool
     pr_eligible: bool
+    candidate_frozen: bool
 
 
 class QueueAdmissionEvidence(NamedTuple):
@@ -45,7 +46,7 @@ def choose_submission_route(capabilities: SubmissionCapabilities) -> str:
     """Choose the least-ambiguous protected submission route without bypassing MQ."""
     if not capabilities.integration_authorized:
         return BLOCKED_NOT_AUTHORIZED
-    if not capabilities.pr_eligible:
+    if not capabilities.pr_eligible or not capabilities.candidate_frozen:
         return BLOCKED_NOT_ELIGIBLE
     if not capabilities.merge_queue_required:
         return NOT_MQ_TARGET
