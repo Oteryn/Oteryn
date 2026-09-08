@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Fail-closed verifier for the frozen Platform 31-file account/Canary/profile/character carry-forward candidate.
 
-Read-only. Pending state proves immutable historical direct-read evidence, exact historical/current source
-identity for four families, and the complete dependent test/config binding. It does not adopt coverage or
-claim product readiness; frozen-current behavioral tests are a separate required qualification step.
+Read-only. The tool verifies immutable historical direct-read evidence, exact historical/current source
+identity for four families, the complete dependent test/config binding, and—if adoption is claimed—the
+exact qualification record plus four canonical GROUPED records. It does not claim product readiness.
 """
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from pathlib import Path
 import subprocess
 
 CANDIDATE = Path('docs/evidence/organization-audit-20260907/r3-platform-account-character-candidate.json')
+GROUPS = Path('docs/evidence/organization-audit-20260907/coverage-groups.json')
 SOURCE_COMMIT = 'de917b3477a1de0667531380de3660e8b2ab59aa'
 SOURCE_TREE = 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e'
 HISTORICAL_COMMIT = '3b2ea1c7392187d5d22488673073dc8f8305a374'
@@ -23,6 +24,9 @@ EVIDENCE_COMMIT = '3fe7df5330deb9ed38cc17ae1710f0cb4159019b'
 EVIDENCE_TREE = 'c6ac8cb7cbff069d7ac7303b3472d992da254774'
 EVIDENCE_PATH = 'docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md'
 EVIDENCE_BLOB = '34361414339a5ca57ec5cd13e332ad196aa9e35f'
+PENDING = 'CANDIDATE_PENDING_QUALIFICATION'
+ADOPTED = 'QUALIFIED_ADOPTED_AS_GROUPED'
+OUTCOME = 'ADOPTED_GROUPED_CARRY_FORWARD'
 EXPECTED_FAMILIES = (
     ('PLATFORM-ACCOUNTS-HISTORICAL-DIRECT-CARRYFORWARD', 'app/Accounts/', 7, '7505ff7d6836c667e0354622616ba2673e1ff9f2'),
     ('PLATFORM-CANARY-INTEGRATION-HISTORICAL-DIRECT-CARRYFORWARD', 'app/CanaryIntegration/', 8, 'f37ac5641d49dbc7f419c69ffc0ae852af655baa'),
@@ -64,11 +68,54 @@ NON_TEST_DEPENDENCIES = (
     'phpunit.xml',
 )
 EXPECTED_DEPENDENT_PATHS = frozenset(NON_TEST_DEPENDENCIES + FOCUSED_TEST_FILES)
+FOCUSED_RESULT = {
+    'cases': 86,
+    'assertions': 586,
+    'failures': 0,
+    'errors': 0,
+    'skipped': 0,
+}
+PRIMARY_QUALIFICATION = {
+    'qualification_head': 'a55ed0c005b581dd91042a3da40678f8ff04acb6',
+    'workflow_run': 34230659158,
+    'job': 102075660945,
+    'verifier_unit_tests': 8,
+    'verifier_unit_result': 'PASS',
+    'focused_current_tests': {
+        'test_files': 15,
+        **FOCUSED_RESULT,
+    },
+    'php': '8.5.10',
+    'mariadb': '11.8.9',
+    'composer_validate': 'PASS',
+    'tracked_source_clean_after_execution': True,
+    'outcome': OUTCOME,
+}
+GROUP_SCOPE = (
+    'Historical direct-read evidence for the documented 31-file account/Canary/profile/character batch '
+    'is carried forward only for this exact byte-identical family. Adoption is bounded by exact family '
+    'path/blob identity, the exact 23-path dependent binding set, and the exact 15-file frozen-current '
+    'qualification result of 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips.'
+)
+GROUP_LIMITATIONS = (
+    'Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, '
+    'later-current-main status, provider remediation, full Platform security/correctness, or organization-wide audit completion.'
+)
 
 
 def require(ok: bool, message: str) -> None:
     if not ok:
         raise ValueError(message)
+
+
+def json_exact(left, right) -> bool:
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(json_exact(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(json_exact(a, b) for a, b in zip(left, right))
+    return left == right
 
 
 def read_json(path: Path):
@@ -108,12 +155,75 @@ def recursive_entries(root: Path, ref: str, prefix: str):
     return rows
 
 
-def validate_candidate_shape(candidate) -> None:
+def expected_historical_group(prefix: str, count: int) -> dict:
+    return {
+        'repository': 'Oteryn/Oteryn-Platform',
+        'publication_commit': EVIDENCE_COMMIT,
+        'publication_tree': EVIDENCE_TREE,
+        'coverage_rules_path': EVIDENCE_PATH,
+        'coverage_rules_blob': EVIDENCE_BLOB,
+        'audited_main_sha': HISTORICAL_COMMIT,
+        'audited_main_tree': HISTORICAL_TREE,
+        'pattern': prefix + '**',
+        'count': count,
+        'basis': 'historical direct read of the documented 31-file account/Canary/profile/character batch, bounded to this exact family by immutable source enumeration',
+    }
+
+
+def expected_current_group(current: dict, prefix: str, count: int, tree_sha: str) -> dict:
+    return {
+        'source_commit': SOURCE_COMMIT,
+        'source_tree': SOURCE_TREE,
+        'historical_app_tree': APP_TREE,
+        'current_app_tree': APP_TREE,
+        'family_tree': tree_sha,
+        'changed_paths_under_group_prefix': 0,
+        'historical_to_current_compare_status': 'ahead',
+        'current_blobs': current['dependent_blobs'],
+        'required_checks': [
+            'historical 31-file direct-read evidence is bound exactly and this family is its exact enumerated subset',
+            'historical and frozen current app trees are byte-identical',
+            f'historical and frozen current {prefix} trees contain exactly the same {count} regular-file leaves and blob identities',
+            'the dependent binding map is exactly the required 23 paths and contains all 15 focused test files',
+            'the exact frozen-current 15-file qualification passes with 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips',
+        ],
+        'focused_test_files': list(FOCUSED_TEST_FILES),
+    }
+
+
+def expected_group(candidate: dict, spec: tuple[str, str, int, str]) -> dict:
+    family_id, prefix, count, tree_sha = spec
+    return {
+        'id': family_id,
+        'repository': 'platform',
+        'disposition': 'GROUPED',
+        'path_prefix': prefix,
+        'expected_count': count,
+        'depth': 'GROUPED_REVALIDATED',
+        'scope': GROUP_SCOPE,
+        'limitations': GROUP_LIMITATIONS,
+        'historical_evidence': expected_historical_group(prefix, count),
+        'current_revalidation': expected_current_group(candidate['current_revalidation'], prefix, count, tree_sha),
+        'evaluation': {
+            'qualification_head': PRIMARY_QUALIFICATION['qualification_head'],
+            'qualification_run': PRIMARY_QUALIFICATION['workflow_run'],
+            'qualification_job': PRIMARY_QUALIFICATION['job'],
+            'verifier_unit_tests': PRIMARY_QUALIFICATION['verifier_unit_tests'],
+            'focused_current_tests': FOCUSED_RESULT,
+            'outcome': OUTCOME,
+        },
+    }
+
+
+def validate_candidate_shape(candidate) -> bool:
     require(type(candidate.get('schema_version')) is int and candidate['schema_version'] == 1, 'candidate schema')
     require(candidate.get('candidate_id') == 'PLATFORM-ACCOUNT-CHARACTER-HISTORICAL-DIRECT-CARRYFORWARD', 'candidate id')
     require(candidate.get('repository') == 'Oteryn/Oteryn-Platform', 'candidate repository')
-    require(candidate.get('state') == 'CANDIDATE_PENDING_QUALIFICATION', 'candidate state')
-    require(candidate.get('coverage_adopted') is False, 'pending candidate cannot adopt coverage')
+    state = candidate.get('state')
+    require(state in {PENDING, ADOPTED}, 'candidate state')
+    adopted = state == ADOPTED
+    require(type(candidate.get('coverage_adopted')) is bool, 'candidate adoption type')
+    require(candidate['coverage_adopted'] is adopted, 'candidate adoption/state mismatch')
     require(type(candidate.get('expected_total')) is int and candidate['expected_total'] == 31, 'candidate total')
 
     hist = candidate.get('historical_evidence') or {}
@@ -141,10 +251,37 @@ def validate_candidate_shape(candidate) -> None:
     require(tuple(current.get('focused_test_files') or ()) == FOCUSED_TEST_FILES, 'focused test set/order must be exact 15 files')
     require(set(FOCUSED_TEST_FILES).issubset(deps), 'every focused test must be blob-bound')
 
+    if adopted:
+        qualification = candidate.get('qualification')
+        require(isinstance(qualification, dict), 'adopted candidate qualification missing')
+        require(json_exact(qualification, PRIMARY_QUALIFICATION), 'candidate qualification must equal exact bound run/result')
+    else:
+        require('qualification' not in candidate, 'pending candidate must not carry adoption qualification')
+    return adopted
+
+
+def validate_group_state(candidate: dict, groups_doc: dict, adopted: bool) -> None:
+    require(type(groups_doc.get('schema_version')) is int and groups_doc['schema_version'] == 1, 'coverage group schema')
+    groups = groups_doc.get('groups')
+    require(isinstance(groups, list), 'coverage groups missing')
+    ids = {spec[0] for spec in EXPECTED_FAMILIES}
+    accepted = [row for row in groups if row.get('id') in ids]
+    if adopted:
+        require(len(accepted) == 4, 'adopted account/character families missing/duplicated canonical groups')
+        by_id = {row.get('id'): row for row in accepted}
+        require(len(by_id) == 4, 'duplicate adopted account/character group id')
+        for spec in EXPECTED_FAMILIES:
+            expected = expected_group(candidate, spec)
+            require(json_exact(by_id.get(spec[0]), expected), 'adopted group drift: ' + spec[0])
+    else:
+        require(accepted == [], 'pending candidate already present in accepted groups')
+
 
 def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
     candidate = read_json(audit_root / CANDIDATE)
-    validate_candidate_shape(candidate)
+    adopted = validate_candidate_shape(candidate)
+    groups_doc = read_json(audit_root / GROUPS)
+    validate_group_state(candidate, groups_doc, adopted)
     hist = candidate['historical_evidence']; current = candidate['current_revalidation']
 
     require(text(platform_root, 'rev-parse', 'HEAD') == SOURCE_COMMIT, 'wrong frozen Platform source')
@@ -187,8 +324,15 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
         actual = text(platform_root, 'rev-parse', SOURCE_COMMIT + ':' + path)
         require(actual == expected, 'frozen-current dependent blob mismatch: ' + path)
 
+    if adopted:
+        result = 'ACCOUNT_CHARACTER_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS'
+        next_gate = 'run exact-head adopted-state hosted requalification and bind that post-adoption run before cleanup'
+    else:
+        result = 'ACCOUNT_CHARACTER_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED'
+        next_gate = 'exact frozen-current 15-file behavioral qualification must be bound before GROUPED adoption'
+
     return {
-        'result': 'ACCOUNT_CHARACTER_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED',
+        'result': result,
         'candidate_id': candidate['candidate_id'],
         'historical_source': HISTORICAL_COMMIT,
         'current_source': SOURCE_COMMIT,
@@ -196,8 +340,8 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
         'families': family_results,
         'dependent_blobs_verified': len(deps),
         'focused_test_files_bound': len(FOCUSED_TEST_FILES),
-        'coverage_adopted': False,
-        'next_gate': 'frozen-current 15-file behavioral qualification including MariaDB concurrency/integration must pass before any GROUPED adoption',
+        'coverage_adopted': adopted,
+        'next_gate': next_gate,
     }
 
 

@@ -23,7 +23,7 @@ jobs:
     timeout-minutes: 30
     services:
       mariadb:
-        image: mariadb:11.8
+        image: mariadb:11.8.9
         env:
           MARIADB_ROOT_PASSWORD: oteryn-audit31-root
           MARIADB_DATABASE: oteryn_audit31
@@ -106,16 +106,19 @@ jobs:
           python3 - "$RUNNER_TEMP/account-character-identity.json" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
-          assert d['result']=='ACCOUNT_CHARACTER_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED'
+          assert d['result'] in {
+              'ACCOUNT_CHARACTER_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED',
+              'ACCOUNT_CHARACTER_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS',
+          }
           assert d['paths']==31 and [x['paths'] for x in d['families']]==[7,8,4,12]
           assert d['dependent_blobs_verified']==23 and d['focused_test_files_bound']==15
-          assert d['coverage_adopted'] is False
-          print('31-path identity/history gate PASS; coverage remains pending tests.')
+          assert type(d['coverage_adopted']) is bool
+          print('31-path identity/history gate PASS; canonical adoption state:', d['coverage_adopted'])
           PY
-      - name: Setup PHP 8.5
+      - name: Setup PHP 8.5.10
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
         with:
-          php-version: '8.5'
+          php-version: '8.5.10'
           coverage: none
           extensions: pdo_mysql, pdo_sqlite, pcntl, gd
           tools: composer:v2
@@ -164,23 +167,39 @@ jobs:
           from pathlib import Path
           import json,sys,xml.etree.ElementTree as ET
           root=Path(sys.argv[1]); files=sorted(root.glob('*.xml'))
-          if len(files)!=6: raise SystemExit(f'expected six JUnit files, got {len(files)}')
+          expected_per_file={
+              'ordinary.xml': {'cases':74,'assertions':424,'failures':0,'errors':0,'skipped':0},
+              'profile-concurrency.xml': {'cases':1,'assertions':17,'failures':0,'errors':0,'skipped':0},
+              'provisioning.xml': {'cases':2,'assertions':11,'failures':0,'errors':0,'skipped':0},
+              'character-create.xml': {'cases':6,'assertions':65,'failures':0,'errors':0,'skipped':0},
+              'transfer.xml': {'cases':2,'assertions':15,'failures':0,'errors':0,'skipped':0},
+              'transfer-concurrency.xml': {'cases':1,'assertions':54,'failures':0,'errors':0,'skipped':0},
+          }
+          if {p.name for p in files} != set(expected_per_file):
+              raise SystemExit(f'JUnit file set drift: {[p.name for p in files]}')
           total={'test_files':15,'junit_files':len(files),'cases':0,'assertions':0,'failures':0,'errors':0,'skipped':0}
-          identities=set()
-          per_file=[]
+          identities=set(); per_file=[]
           for path in files:
               tree=ET.parse(path).getroot(); cases=tree.findall('.//testcase')
               row={'file':path.name,'cases':len(cases),'assertions':0,'failures':0,'errors':0,'skipped':0}
               for case in cases:
                   identity=(case.attrib.get('classname'),case.attrib.get('name'))
-                  if not all(identity) or identity in identities: raise SystemExit(f'duplicate/missing JUnit identity: {identity}')
+                  if not all(identity) or identity in identities:
+                      raise SystemExit(f'duplicate/missing JUnit identity: {identity}')
                   identities.add(identity)
                   row['assertions']+=int(case.attrib.get('assertions','0'))
-                  row['failures']+=len(case.findall('failure')); row['errors']+=len(case.findall('error')); row['skipped']+=len(case.findall('skipped'))
-              for key in ('cases','assertions','failures','errors','skipped'): total[key]+=row[key]
+                  row['failures']+=len(case.findall('failure'))
+                  row['errors']+=len(case.findall('error'))
+                  row['skipped']+=len(case.findall('skipped'))
+              actual={key:row[key] for key in ('cases','assertions','failures','errors','skipped')}
+              if actual != expected_per_file[path.name]:
+                  raise SystemExit(f'qualification per-file drift for {path.name}: {json.dumps(actual,sort_keys=True)}')
+              for key in ('cases','assertions','failures','errors','skipped'):
+                  total[key]+=row[key]
               per_file.append(row)
-          if total['cases']<=0 or total['assertions']<=0 or total['failures'] or total['errors'] or total['skipped']:
-              raise SystemExit('qualification is not all-green/no-skip: '+json.dumps(total))
+          expected_total={'test_files':15,'junit_files':6,'cases':86,'assertions':586,'failures':0,'errors':0,'skipped':0}
+          if total != expected_total:
+              raise SystemExit('qualification exact aggregate drift: '+json.dumps(total,sort_keys=True))
           print(json.dumps({'total':total,'junit':per_file},sort_keys=True))
           PY
       - name: Final tracked-source cleanliness
