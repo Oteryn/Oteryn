@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Reproduce routing observations on exact source; never runs a provider workflow."""
-import argparse, contextlib, hashlib, importlib.util, json, os, pathlib, subprocess, sys, tempfile
+import argparse, hashlib, importlib.util, json, os, pathlib, subprocess, sys, tempfile
 
 def run(cmd, cwd):
     return subprocess.run(cmd,cwd=cwd,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=20).stdout.strip()
@@ -9,6 +9,24 @@ def load(path, name):
     mod=importlib.util.module_from_spec(spec);sys.modules[name]=mod;spec.loader.exec_module(mod);return mod
 def blob(path):
     b=path.read_bytes();return hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+def write_new(path, text):
+    path=pathlib.Path(path).absolute()
+    parent=path.parent
+    if not parent.is_dir() or parent.is_symlink() or pathlib.Path(os.path.realpath(parent))!=parent:
+        raise ValueError('existing nonsymlink output parent required')
+    flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,'O_NOFOLLOW',0)
+    try:
+        fd=os.open(path,flags,0o600)
+    except FileExistsError as exc:
+        raise ValueError('refusing output overwrite or symlink') from exc
+    try:
+        with os.fdopen(fd,'w',encoding='utf-8',newline='') as handle:
+            handle.write(text)
+    except Exception:
+        try:path.unlink()
+        except OSError:pass
+        raise
+
 def probe(root):
     gate=root/'scripts/ci/required_test_gate.py'
     sources={p:blob(root/p) for p in ('scripts/ci/classify_changes.py','scripts/ci/required_test_gate.py','tests/ci/fixtures/change-routing-cases.json')}
@@ -45,5 +63,4 @@ def probe(root):
     return {'schema_version':1,'repository':'Oteryn/Oteryn-Platform','source_commit':'de917b3477a1de0667531380de3660e8b2ab59aa','source_blobs':sources,'python':sys.version.split()[0],'git':run(['git','--version'],root),'policy_fixture_count':fixture_count,'cases':cases,'false_negative_count':len(false_neg),'reproduction_result':'REPRODUCED','product_result':'FAIL_FOR_TWO_ROUTING_CASES','production_or_merge_bypass_tested':False,'isolation':'temporary local Git fixtures, no remote configured, deleted after probes'}
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--source-root',type=pathlib.Path,required=True);p.add_argument('--output',type=pathlib.Path,required=True);a=p.parse_args()
-    if a.output.exists():raise ValueError('refusing output overwrite')
-    data=probe(a.source_root.resolve());a.output.write_text(json.dumps(data,indent=2)+'\n');print(json.dumps({k:v for k,v in data.items() if k!='cases'},indent=2))
+    data=probe(a.source_root.resolve());write_new(a.output,json.dumps(data,indent=2)+'\n');print(json.dumps({k:v for k,v in data.items() if k!='cases'},indent=2))
