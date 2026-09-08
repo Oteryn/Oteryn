@@ -3,6 +3,7 @@
 from __future__ import annotations
 import argparse
 from collections import Counter
+import csv
 import hashlib
 import io
 import json
@@ -13,6 +14,20 @@ import re
 import xml.etree.ElementTree as ET
 import zipfile
 from collect_ci_cohort import PLAN, measured_interval
+
+
+SOURCE_SHA = 'de917b3477a1de0667531380de3660e8b2ab59aa'
+SOURCE_TREE = 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e'
+LEGACY_ROUTES = [
+    '/', '/news', '/news/welcome-to-oteryn', '/wiki', '/download', '/login',
+    '/register', '/forgot-password', '/recovery-key', '/events', '/support', '/legal/privacy',
+]
+LEGACY_SIZES = [(390, 844), (820, 1180), (1440, 1000), (1920, 1080)]
+LEGACY_FAILED_ROUTES = {'/support', '/legal/privacy'}
+LEGACY_CRITERIA = {'http_ok', 'main', 'heading', 'language', 'title', 'no_overflow', 'labels', 'images', 'unique_ids'}
+MIGRATION_LINE = re.compile(
+    r'^\s{2}([0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{6}_[A-Za-z0-9_]+)\s+.*?([0-9]+(?:\.[0-9]+)?)ms\s+DONE\s*$'
+)
 
 
 def require(ok, message):
@@ -159,10 +174,81 @@ def ci_summary(data):
     return summary
 
 
+def legacy_failure_signature(raw, source_sha):
+    """Validate the original captured failure exactly, without trusting its recorded green/failed summary."""
+    report = json_bytes(raw)
+    require(report.get('source_sha') == source_sha, 'wrong original UI source')
+    require(report.get('playwright') == '1.62.1' and isinstance(report.get('browser'), str) and report['browser'], 'wrong original UI toolchain')
+    cases = report.get('cases')
+    require(isinstance(cases, list) and len(cases) == 48, 'original UI matrix incomplete')
+    expected_matrix = {(route, width, height) for width, height in LEGACY_SIZES for route in LEGACY_ROUTES}
+    actual_matrix = {(r.get('route'), r.get('width'), r.get('height')) for r in cases}
+    require(len(actual_matrix) == 48 and actual_matrix == expected_matrix, 'original UI matrix identity mismatch')
+    expected_failed = {(route, width, 'http_ok') for width, _ in LEGACY_SIZES for route in LEGACY_FAILED_ROUTES}
+    stored_failed = report.get('failed_criteria')
+    require(isinstance(stored_failed, list), 'original UI failed_criteria missing')
+    actual_failed = {(r.get('route'), r.get('width'), r.get('criterion')) for r in stored_failed}
+    require(len(stored_failed) == 8 and len(actual_failed) == 8 and actual_failed == expected_failed, 'original UI failure signature mismatch')
+    for row in cases:
+        criteria = row.get('criteria')
+        require(isinstance(criteria, dict) and set(criteria) == LEGACY_CRITERIA, 'original UI criterion shape changed')
+        false_keys = {k for k, value in criteria.items() if value is not True}
+        if row['route'] in LEGACY_FAILED_ROUTES:
+            require(row.get('status') == 404 and false_keys == {'http_ok'}, 'original editorial failure mismatch')
+        else:
+            require(row.get('status') == 200 and not false_keys, 'unexpected original UI failure')
+        require(not row.get('error') and row.get('observed_errors') == [], 'original UI browser error present')
+    no_js = report.get('no_javascript')
+    require(no_js == {'route': '/login', 'status': 200, 'email_visible': True, 'password_visible': True}, 'original no-JS control mismatch')
+    return {'failed_criteria': 8, 'mode': 'PARSED_ORIGINAL_CAPTURE_NOT_NEW_BROWSER_EXECUTION'}
+
+
+def migration_execution(log_raw, migration_review_raw, coverage_review_raw, manifest):
+    """Bind the successful synthetic up log to the exact 50 source paths/blobs."""
+    review = json_bytes(migration_review_raw)
+    require(review.get('schema_version') == 1 and review.get('repository') == 'Oteryn/Oteryn-Platform', 'migration review identity')
+    require(review.get('source_sha') == manifest['provider_source_sha'], 'migration source mismatch')
+    require(review.get('execution_log_sha256') == digest(log_raw), 'migration log digest mismatch')
+    public_ui = next((item for item in manifest['artifacts'] if item.get('name') == 'public_ui'), None)
+    require(public_ui is not None and review.get('execution_artifact_id') == public_ui.get('artifact_id'), 'migration artifact binding mismatch')
+    path_set = review.get('path_set')
+    require(isinstance(path_set, dict) and path_set.get('ledger') == 'coverage-review.tsv', 'migration ledger binding')
+    text = coverage_review_raw.decode('utf-8')
+    rows = list(csv.DictReader(io.StringIO(text), delimiter='\t'))
+    require(rows and set(rows[0]) == {'repository', 'path', 'blob_sha', 'depth', 'scope', 'line_ranges', 'execution_evidence'}, 'coverage ledger columns changed')
+    selected = [
+        row for row in rows
+        if row['repository'] == path_set.get('repository')
+        and row['path'].startswith(path_set.get('exact_prefix', ''))
+        and row['path'].endswith(path_set.get('exact_suffix', ''))
+    ]
+    require(len(selected) == review.get('count') == 50, 'migration path count mismatch')
+    pairs = sorted((row['path'], row['blob_sha']) for row in selected)
+    pair_bytes = ''.join(f'{path}\t{sha}\n' for path, sha in pairs).encode()
+    require(digest(pair_bytes) == path_set.get('sha256_of_path_and_blob_tsv'), 'migration path/blob digest mismatch')
+    expected_names = {Path(path).stem for path, _ in pairs}
+    observed = []
+    for line in log_raw.decode('utf-8').splitlines():
+        match = MIGRATION_LINE.match(line)
+        if match:
+            observed.append(match.group(1))
+    require(len(observed) == 50 and len(set(observed)) == 50, 'migration execution count/duplicate mismatch')
+    require(set(observed) == expected_names, 'migration execution names do not equal the source ledger')
+    require(review.get('up_execution') == 'All50 migration names occur in the bound successful log; synthetic SQLite only', 'migration review execution claim changed')
+    require(review.get('down_execution') == 'NOT_EXECUTED', 'migration down execution must remain unclaimed')
+    return {'migrations': 50, 'mode': 'SYNTHETIC_SQLITE_UP_ONLY'}
+
+
+def require_committed_results(summary, raw):
+    committed = json_bytes(raw)
+    require(summary == committed, 'recount differs from committed r3-native-results.json')
+    return committed
+
+
 def verify(manifest_path, archive_dir):
     manifest = json_bytes(manifest_path.read_bytes()); require(manifest['schema_version'] == 1, 'manifest version')
-    require(manifest['provider_source_sha'] == 'de917b3477a1de0667531380de3660e8b2ab59aa', 'wrong provider source')
-    require(manifest['provider_tree_sha'] == 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e', 'wrong provider tree')
+    require(manifest['provider_source_sha'] == SOURCE_SHA, 'wrong provider source')
+    require(manifest['provider_tree_sha'] == SOURCE_TREE, 'wrong provider tree')
     all_files = {}
     for item in manifest['artifacts']:
         require(Path(item['filename']).name == item['filename'] and '\\' not in item['filename'], 'unsafe artifact filename')
@@ -172,7 +258,28 @@ def verify(manifest_path, archive_dir):
         for name, checksum in item['evidence_files'].items():
             require(name in files and digest(files[name]) == checksum, 'bound evidence file mismatch: ' + name)
         all_files[item['name']] = files
-    php, gateway, concurrency, ui = (all_files[n] for n in ['php', 'gateway', 'concurrency', 'public_ui'])
+    required_artifacts = {'php', 'gateway', 'concurrency', 'public_ui_original', 'public_ui', 'ci_metadata'}
+    require(set(all_files) == required_artifacts, 'artifact set changed')
+    php, gateway, concurrency, ui_original, ui = (all_files[n] for n in ['php', 'gateway', 'concurrency', 'public_ui_original', 'public_ui'])
+
+    legacy_failure_signature(ui_original['browser/result.json'], manifest['provider_source_sha'])
+    legacy_reassessment = subprocess.run(
+        ['node', str(Path(__file__).with_name('verify-public-surface-evidence.mjs')), '--legacy'],
+        input=ui_original['browser/result.json'], capture_output=True, timeout=15, check=False)
+    require(legacy_reassessment.returncode == 0, 'original browser capture does not pass the explicit legacy replay oracle')
+    legacy_check = json_bytes(legacy_reassessment.stdout)
+    require(legacy_check.get('verdict') == 'PASS_SCOPED_PUBLIC_FIXTURE'
+            and legacy_check.get('mode') == 'REPLAY_OF_CAPTURED_OBSERVATIONS_NOT_NEW_BROWSER_EXECUTION'
+            and not legacy_check.get('errors'), 'legacy browser replay mode/signature mismatch')
+
+    evidence_dir = manifest_path.parent
+    migration_execution(
+        ui['migrations.log'],
+        (evidence_dir / 'r3-migration-review.json').read_bytes(),
+        (evidence_dir / 'coverage-review.tsv').read_bytes(),
+        manifest,
+    )
+
     experiment = json_bytes(php['experiment.json'])
     require(experiment['source_sha'] == manifest['provider_source_sha'] and experiment['baseline_exit'] == 0 and experiment['empty_env_control_exit'] == 0, 'wrong PHP source or nonzero execution')
     baseline, names, skipped = junit(php['no-env.junit.xml'])
@@ -206,6 +313,8 @@ def verify(manifest_path, archive_dir):
          'ui_reassessment': browser_check, 'ui_cases': len(report['cases']), 'ui_expected_404_cases': sum(r['status'] == 404 for r in report['cases']),
          'ci': ci_summary(json_bytes(all_files['ci_metadata']['cohort.json'])),
          'limitations': 'Across-profile identity closure is not one all-green full integration run. Browser anonymous English fixture only. No production, full accessibility, native Game/Rust, deployment, DR or independent semantic qualification.'}
+
+    require_committed_results(summary, (evidence_dir / 'r3-native-results.json').read_bytes())
     return summary
 
 
