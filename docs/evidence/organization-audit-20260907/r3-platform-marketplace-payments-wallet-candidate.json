@@ -2,7 +2,7 @@
   "schema_version": 1,
   "candidate_id": "PLATFORM-MARKETPLACE-PAYMENTS-WALLET-HISTORICAL-DIRECT-CARRYFORWARD",
   "repository": "Oteryn/Oteryn-Platform",
-  "state": "CANDIDATE_PENDING_QUALIFICATION",
+  "state": "QUALIFIED_PENDING_ADOPTION",
   "expected_total": 49,
   "historical_evidence": {
     "repository": "Oteryn/Oteryn-Platform",
@@ -81,14 +81,43 @@
       "tests/Unit/Payments/PaymentOrderStateMachineTest.php"
     ],
     "required_checks": [
-      "historical audit publication commit/tree and report blob match exactly",
-      "historical evidence contains the exact 49-file direct-read statement exactly once",
+      "historical audit publication commit/tree and evidence blob match exactly",
+      "historical evidence contains the exact 49-file Marketplace/Payments/Wallet direct-read statement exactly once",
       "historical and frozen current app trees are byte-identical",
-      "each of Marketplace/Payments/Wallet matches exact historical/current tree, regular-file count and path/blob identities",
+      "each family tree matches its exact SHA and exact regular-file count on historical and frozen sources",
+      "each family has identical historical/current path/blob entries and no changed path under its prefix",
       "the dependent binding map is exactly the required 23 paths and contains all 13 focused test files",
-      "fresh frozen-current PHP 8.5.10 qualification passes with real Marketplace transfer and Payment event/refund MariaDB concurrency/integration enabled"
+      "fresh frozen-current qualification executes all 13 focused files with zero failures/errors/skips, including four real-MariaDB integration/concurrency files"
     ]
   },
   "coverage_adopted": false,
-  "limitations": "Candidate only. Historical direct-read evidence plus byte identity does not establish current product readiness. All 49 leaves remain UNVERIFIED until the exact verifier and fresh frozen-current behavioral/MariaDB qualification pass; provider runtime remains read-only."
+  "limitations": "Qualified candidate only; coverage is not adopted. Historical direct-read evidence, exact byte identity, the exact 23-path dependent binding set and the exact 13-file frozen-current qualification (45 cases / 444 assertions / 0 failures / 0 errors / 0 skips) are bound. The 49 leaves remain UNVERIFIED until three exact GROUPED records are atomically adopted and post-adoption proof/review completes.",
+  "qualification": {
+    "qualification_head": "13f6933c543db98848450e063e61f8c0dd2fa3d3",
+    "workflow_run": 34283717767,
+    "job": 102254287765,
+    "verifier_unit_tests": 10,
+    "verifier_unit_result": "PASS",
+    "focused_current_tests": {
+      "test_files": 13,
+      "junit_files": 5,
+      "cases": 45,
+      "assertions": 444,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit": [
+        {"file":"marketplace-transfer-concurrency.xml","cases":1,"assertions":54,"failures":0,"errors":0,"skipped":0},
+        {"file":"marketplace-transfer.xml","cases":2,"assertions":15,"failures":0,"errors":0,"skipped":0},
+        {"file":"ordinary.xml","cases":40,"assertions":327,"failures":0,"errors":0,"skipped":0},
+        {"file":"payment-event-concurrency.xml","cases":1,"assertions":23,"failures":0,"errors":0,"skipped":0},
+        {"file":"payment-refund-concurrency.xml","cases":1,"assertions":25,"failures":0,"errors":0,"skipped":0}
+      ]
+    },
+    "php": "8.5.10",
+    "mariadb": "11.8.9",
+    "composer_validate": "PASS",
+    "tracked_source_clean_after_execution": true,
+    "outcome": "QUALIFIED_PRIMARY_NOT_YET_ADOPTED"
+  }
 }

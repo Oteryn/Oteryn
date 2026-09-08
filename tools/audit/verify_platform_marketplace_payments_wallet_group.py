@@ -83,12 +83,64 @@ EXPECTED_DEPENDENT_BLOBS = {
     'tests/Feature/Payments/PaymentPartialRefundIntegrityTest.php': '1dcff12df2d27d5e6d1a875f5e217fa047816bff',
     'tests/Unit/Payments/PaymentOrderStateMachineTest.php': '8481f198ab1961062dda957e28660d76b27ee405',
 }
-EXPECTED_GROUP_IDS = frozenset(spec[0] for spec in EXPECTED_FAMILIES)
+
+QUALIFIED_PENDING = 'QUALIFIED_PENDING_ADOPTION'
+ADOPTED = 'QUALIFIED_ADOPTED_AS_GROUPED'
+OUTCOME = 'ADOPTED_GROUPED_CARRY_FORWARD'
+PRIMARY_QUALIFICATION = {
+    'qualification_head': '13f6933c543db98848450e063e61f8c0dd2fa3d3',
+    'workflow_run': 34283717767,
+    'job': 102254287765,
+    'verifier_unit_tests': 10,
+    'verifier_unit_result': 'PASS',
+    'focused_current_tests': {
+        'test_files': 13,
+        'junit_files': 5,
+        'cases': 45,
+        'assertions': 444,
+        'failures': 0,
+        'errors': 0,
+        'skipped': 0,
+        'junit': [
+            {'file': 'marketplace-transfer-concurrency.xml', 'cases': 1, 'assertions': 54, 'failures': 0, 'errors': 0, 'skipped': 0},
+            {'file': 'marketplace-transfer.xml', 'cases': 2, 'assertions': 15, 'failures': 0, 'errors': 0, 'skipped': 0},
+            {'file': 'ordinary.xml', 'cases': 40, 'assertions': 327, 'failures': 0, 'errors': 0, 'skipped': 0},
+            {'file': 'payment-event-concurrency.xml', 'cases': 1, 'assertions': 23, 'failures': 0, 'errors': 0, 'skipped': 0},
+            {'file': 'payment-refund-concurrency.xml', 'cases': 1, 'assertions': 25, 'failures': 0, 'errors': 0, 'skipped': 0},
+        ],
+    },
+    'php': '8.5.10',
+    'mariadb': '11.8.9',
+    'composer_validate': 'PASS',
+    'tracked_source_clean_after_execution': True,
+    'outcome': 'QUALIFIED_PRIMARY_NOT_YET_ADOPTED',
+}
+GROUP_SCOPE = (
+    'Historical direct-read evidence for the documented 49-file Marketplace/Payments/Wallet production batch '
+    'is carried forward only for this exact byte-identical family. Adoption is bounded by exact family '
+    'path/blob identity, the exact 23-path dependent binding set, and the exact 13-file frozen-current '
+    'qualification result of 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips.'
+)
+GROUP_LIMITATIONS = (
+    'Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, '
+    'later-current-main status, provider remediation, complete Platform payment/marketplace correctness/security, '
+    'or organization-wide audit completion.'
+)
 
 
 def require(ok: bool, message: str) -> None:
     if not ok:
         raise ValueError(message)
+
+
+def json_exact(left, right) -> bool:
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(json_exact(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(json_exact(a, b) for a, b in zip(left, right))
+    return left == right
 
 
 def read_json(path: Path):
@@ -128,13 +180,75 @@ def recursive_entries(root: Path, ref: str, prefix: str):
     return rows
 
 
-def validate_candidate_shape(candidate) -> None:
+def expected_historical_group(prefix: str, count: int) -> dict:
+    return {
+        'repository': 'Oteryn/Oteryn-Platform',
+        'publication_commit': EVIDENCE_COMMIT,
+        'publication_tree': EVIDENCE_TREE,
+        'coverage_rules_path': EVIDENCE_PATH,
+        'coverage_rules_blob': EVIDENCE_BLOB,
+        'audited_main_sha': HISTORICAL_COMMIT,
+        'audited_main_tree': HISTORICAL_TREE,
+        'pattern': prefix + '**',
+        'count': count,
+        'basis': 'historical direct read of the documented 49-file Marketplace/Payments/Wallet production batch, bounded to this exact family by immutable source enumeration',
+    }
+
+
+def expected_current_group(current: dict, prefix: str, count: int, tree_sha: str) -> dict:
+    return {
+        'source_commit': SOURCE_COMMIT,
+        'source_tree': SOURCE_TREE,
+        'historical_app_tree': APP_TREE,
+        'current_app_tree': APP_TREE,
+        'family_tree': tree_sha,
+        'changed_paths_under_group_prefix': 0,
+        'historical_to_current_compare_status': 'ahead',
+        'current_blobs': current['dependent_blobs'],
+        'required_checks': [
+            'historical 49-file direct-read evidence is bound exactly and this family is its exact enumerated subset',
+            'historical and frozen current app trees are byte-identical',
+            f'historical and frozen current {prefix} trees contain exactly the same {count} regular-file leaves and blob identities',
+            'the dependent binding map is exactly the required 23 paths and contains all 13 focused test files',
+            'the exact frozen-current 13-file qualification passes with 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips',
+        ],
+        'focused_test_files': list(FOCUSED_TEST_FILES),
+    }
+
+
+def expected_group(candidate: dict, spec: tuple[str, str, int, str]) -> dict:
+    family_id, prefix, count, tree_sha = spec
+    return {
+        'id': family_id,
+        'repository': 'platform',
+        'disposition': 'GROUPED',
+        'path_prefix': prefix,
+        'expected_count': count,
+        'depth': 'GROUPED_REVALIDATED',
+        'scope': GROUP_SCOPE,
+        'limitations': GROUP_LIMITATIONS,
+        'historical_evidence': expected_historical_group(prefix, count),
+        'current_revalidation': expected_current_group(candidate['current_revalidation'], prefix, count, tree_sha),
+        'evaluation': {
+            'qualification_head': PRIMARY_QUALIFICATION['qualification_head'],
+            'qualification_run': PRIMARY_QUALIFICATION['workflow_run'],
+            'qualification_job': PRIMARY_QUALIFICATION['job'],
+            'verifier_unit_tests': PRIMARY_QUALIFICATION['verifier_unit_tests'],
+            'focused_current_tests': PRIMARY_QUALIFICATION['focused_current_tests'],
+            'outcome': OUTCOME,
+        },
+    }
+
+
+def validate_candidate_shape(candidate) -> bool:
     require(type(candidate.get('schema_version')) is int and candidate['schema_version'] == 1, 'candidate schema')
     require(candidate.get('candidate_id') == 'PLATFORM-MARKETPLACE-PAYMENTS-WALLET-HISTORICAL-DIRECT-CARRYFORWARD', 'candidate id')
     require(candidate.get('repository') == 'Oteryn/Oteryn-Platform', 'candidate repository')
-    require(candidate.get('state') == 'CANDIDATE_PENDING_QUALIFICATION', 'candidate state')
-    require(candidate.get('coverage_adopted') is False, 'pending candidate cannot adopt coverage')
-    require('qualification' not in candidate, 'pending candidate must not carry qualification')
+    state = candidate.get('state')
+    require(state in {QUALIFIED_PENDING, ADOPTED}, 'candidate state')
+    adopted = state == ADOPTED
+    require(type(candidate.get('coverage_adopted')) is bool, 'candidate adoption type')
+    require(candidate['coverage_adopted'] is adopted, 'candidate adoption/state mismatch')
     require(type(candidate.get('expected_total')) is int and candidate['expected_total'] == 49, 'candidate total')
 
     hist = candidate.get('historical_evidence') or {}
@@ -158,24 +272,42 @@ def validate_candidate_shape(candidate) -> None:
     deps = current.get('dependent_blobs')
     require(isinstance(deps, dict), 'dependent blob map')
     require(set(deps) == EXPECTED_DEPENDENT_PATHS and len(deps) == 23, 'dependent path set must be exact 23 bindings')
-    require(deps == EXPECTED_DEPENDENT_BLOBS, 'dependent blob values must be exact')
+    require(deps == EXPECTED_DEPENDENT_BLOBS, 'dependent blob bindings must be exact')
     require(tuple(current.get('focused_test_files') or ()) == FOCUSED_TEST_FILES, 'focused test set/order must be exact 13 files')
     require(set(FOCUSED_TEST_FILES).issubset(deps), 'every focused test must be blob-bound')
 
+    qualification = candidate.get('qualification')
+    require(isinstance(qualification, dict), 'qualified candidate missing primary qualification')
+    require(json_exact(qualification, PRIMARY_QUALIFICATION), 'candidate qualification must equal exact bound run/result')
+    if adopted:
+        require('post_adoption_revalidation' not in candidate, 'post-adoption evidence must be bound only after adopted-state requalification')
+    else:
+        require('post_adoption_revalidation' not in candidate, 'pending adoption candidate cannot carry post-adoption revalidation')
+    return adopted
 
-def validate_group_absence(groups_doc: dict) -> None:
+
+def validate_group_state(candidate: dict, groups_doc: dict, adopted: bool) -> None:
     require(type(groups_doc.get('schema_version')) is int and groups_doc['schema_version'] == 1, 'coverage group schema')
     groups = groups_doc.get('groups')
     require(isinstance(groups, list), 'coverage groups missing')
-    present = [row.get('id') for row in groups if row.get('id') in EXPECTED_GROUP_IDS]
-    require(present == [], 'pending Marketplace/Payments/Wallet candidate already has accepted group records')
+    ids = {spec[0] for spec in EXPECTED_FAMILIES}
+    accepted = [row for row in groups if row.get('id') in ids]
+    if adopted:
+        require(len(accepted) == 3, 'adopted Marketplace/Payments/Wallet families missing/duplicated canonical groups')
+        by_id = {row.get('id'): row for row in accepted}
+        require(len(by_id) == 3, 'duplicate adopted Marketplace/Payments/Wallet group id')
+        for spec in EXPECTED_FAMILIES:
+            require(json_exact(by_id.get(spec[0]), expected_group(candidate, spec)), 'adopted group drift: ' + spec[0])
+    else:
+        require(accepted == [], 'qualified pending Marketplace/Payments/Wallet candidate already has accepted group records')
 
 
 def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
     candidate = read_json(audit_root / CANDIDATE)
-    validate_candidate_shape(candidate)
-    validate_group_absence(read_json(audit_root / GROUPS))
-    hist = candidate['historical_evidence']; current = candidate['current_revalidation']
+    adopted = validate_candidate_shape(candidate)
+    validate_group_state(candidate, read_json(audit_root / GROUPS), adopted)
+    hist = candidate['historical_evidence']
+    current = candidate['current_revalidation']
 
     require(text(platform_root, 'rev-parse', 'HEAD') == SOURCE_COMMIT, 'wrong frozen Platform source')
     require(text(platform_root, 'rev-parse', 'HEAD^{tree}') == SOURCE_TREE, 'wrong frozen Platform tree')
@@ -192,7 +324,8 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
     require(text(platform_root, 'rev-parse', HISTORICAL_COMMIT + ':app') == APP_TREE, 'historical app tree mismatch')
     require(text(platform_root, 'rev-parse', SOURCE_COMMIT + ':app') == APP_TREE, 'current app tree mismatch')
 
-    total = 0; family_results = []
+    total = 0
+    family_results = []
     for family_id, prefix, count, tree_sha in EXPECTED_FAMILIES:
         path = prefix.rstrip('/')
         require(text(platform_root, 'rev-parse', HISTORICAL_COMMIT + ':' + path) == tree_sha, 'historical family tree mismatch: ' + prefix)
@@ -213,8 +346,15 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
         actual = text(platform_root, 'rev-parse', SOURCE_COMMIT + ':' + path)
         require(actual == deps[path], 'frozen-current dependent blob mismatch: ' + path)
 
+    if adopted:
+        result = 'MARKETPLACE_PAYMENTS_WALLET_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS'
+        next_gate = 'run exact-head adopted-state hosted requalification and bind post-adoption evidence before cleanup'
+    else:
+        result = 'MARKETPLACE_PAYMENTS_WALLET_PRIMARY_QUALIFIED_NOT_ADOPTED'
+        next_gate = 'reproduce projected ledger digest and atomically adopt three exact GROUPED records or leave all 49 UNVERIFIED'
+
     return {
-        'result': 'MARKETPLACE_PAYMENTS_WALLET_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED',
+        'result': result,
         'candidate_id': candidate['candidate_id'],
         'historical_source': HISTORICAL_COMMIT,
         'current_source': SOURCE_COMMIT,
@@ -222,8 +362,9 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
         'families': family_results,
         'dependent_blobs_verified': len(deps),
         'focused_test_files_bound': len(FOCUSED_TEST_FILES),
-        'coverage_adopted': False,
-        'next_gate': 'fresh frozen-current 13-file PHP 8.5.10 qualification including four real-MariaDB integration/concurrency files must pass before any GROUPED adoption',
+        'primary_qualification': PRIMARY_QUALIFICATION,
+        'coverage_adopted': adopted,
+        'next_gate': next_gate,
     }
 
 

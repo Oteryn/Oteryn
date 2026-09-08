@@ -90,26 +90,31 @@ jobs:
           git -C audit diff --exit-code
           git -C platform diff --exit-code
           git -C evidence diff --exit-code
-      - name: Run exact candidate verifier unit tests
+      - name: Run exact hardened verifier unit tests
         working-directory: audit/tools/audit
         shell: bash
         run: |
           set -euo pipefail
           python3 -m unittest -v test_verify_platform_marketplace_payments_wallet_group.py
-      - name: Revalidate historical direct-read and exact 49 path/blob identities
+      - name: Revalidate exact primary qualification binding and 49 path/blob identities
         working-directory: audit
         shell: bash
         run: |
           set -euo pipefail
-          python3 tools/audit/verify_platform_marketplace_payments_wallet_group.py --audit-root . --platform-root ../platform --evidence-root ../evidence | tee "$RUNNER_TEMP/mpw-identity.json"
-          python3 - "$RUNNER_TEMP/mpw-identity.json" <<'PY'
+          python3 tools/audit/verify_platform_marketplace_payments_wallet_group.py --audit-root . --platform-root ../platform --evidence-root ../evidence | tee "$RUNNER_TEMP/mpw-primary.json"
+          python3 - "$RUNNER_TEMP/mpw-primary.json" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
-          assert d['result']=='MARKETPLACE_PAYMENTS_WALLET_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED'
+          assert d['result']=='MARKETPLACE_PAYMENTS_WALLET_PRIMARY_QUALIFIED_NOT_ADOPTED'
           assert d['paths']==49 and [x['paths'] for x in d['families']]==[21,24,4]
           assert d['dependent_blobs_verified']==23 and d['focused_test_files_bound']==13
           assert d['coverage_adopted'] is False
-          print('49-path identity/history gate PASS; coverage remains pending tests.')
+          q=d['primary_qualification']
+          assert q['qualification_head']=='13f6933c543db98848450e063e61f8c0dd2fa3d3'
+          assert q['workflow_run']==34283717767 and q['job']==102254287765
+          assert q['focused_current_tests']['cases']==45 and q['focused_current_tests']['assertions']==444
+          assert q['focused_current_tests']['failures']==q['focused_current_tests']['errors']==q['focused_current_tests']['skipped']==0
+          print('49-path exact primary qualification binding PASS; coverage remains unadopted.')
           PY
       - name: Setup PHP 8.5.10
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
@@ -176,11 +181,14 @@ jobs:
           from pathlib import Path
           import json,sys,xml.etree.ElementTree as ET
           root=Path(sys.argv[1]); files=sorted(root.glob('*.xml'))
-          expected_names={
-              'ordinary.xml', 'marketplace-transfer.xml', 'marketplace-transfer-concurrency.xml',
-              'payment-event-concurrency.xml', 'payment-refund-concurrency.xml',
+          expected_per_file={
+              'marketplace-transfer-concurrency.xml': {'cases':1,'assertions':54,'failures':0,'errors':0,'skipped':0},
+              'marketplace-transfer.xml': {'cases':2,'assertions':15,'failures':0,'errors':0,'skipped':0},
+              'ordinary.xml': {'cases':40,'assertions':327,'failures':0,'errors':0,'skipped':0},
+              'payment-event-concurrency.xml': {'cases':1,'assertions':23,'failures':0,'errors':0,'skipped':0},
+              'payment-refund-concurrency.xml': {'cases':1,'assertions':25,'failures':0,'errors':0,'skipped':0},
           }
-          if {p.name for p in files} != expected_names:
+          if {p.name for p in files} != set(expected_per_file):
               raise SystemExit(f'JUnit file set drift: {[p.name for p in files]}')
           total={'test_files':13,'junit_files':len(files),'cases':0,'assertions':0,'failures':0,'errors':0,'skipped':0}
           identities=set(); per_file=[]
@@ -196,11 +204,15 @@ jobs:
                   row['failures']+=len(case.findall('failure'))
                   row['errors']+=len(case.findall('error'))
                   row['skipped']+=len(case.findall('skipped'))
+              actual={key:row[key] for key in ('cases','assertions','failures','errors','skipped')}
+              if actual != expected_per_file[path.name]:
+                  raise SystemExit(f'qualification per-file drift for {path.name}: {json.dumps(actual,sort_keys=True)}')
               for key in ('cases','assertions','failures','errors','skipped'):
                   total[key]+=row[key]
               per_file.append(row)
-          if total['cases']<=0 or total['assertions']<=0 or total['failures'] or total['errors'] or total['skipped']:
-              raise SystemExit('qualification is not all-green/no-skip: '+json.dumps(total,sort_keys=True))
+          expected_total={'test_files':13,'junit_files':5,'cases':45,'assertions':444,'failures':0,'errors':0,'skipped':0}
+          if total != expected_total:
+              raise SystemExit('qualification exact aggregate drift: '+json.dumps(total,sort_keys=True))
           print(json.dumps({'total':total,'junit':per_file},sort_keys=True))
           PY
       - name: Final tracked-source cleanliness
