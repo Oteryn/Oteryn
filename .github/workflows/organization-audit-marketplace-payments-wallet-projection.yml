@@ -1,0 +1,263 @@
+name: Organization audit Marketplace-Payments-Wallet canonical projection (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-marketplace-payments-wallet-projection.yml
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: audit-185-marketplace-payments-wallet-projection
+  cancel-in-progress: false
+
+jobs:
+  project-canonical-package:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      QUALIFIED_PARENT: adc884f64982e71609415ef946d97b445488c3e0
+      LEDGER_PROOF_RUN: '34284837901'
+      LEDGER_PROOF_ARTIFACT: '10079037530'
+      PROJECTED_LEDGER_SHA256: 742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406
+    steps:
+      - name: Checkout exact projection trigger
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Bind trigger to exact qualified parent and ledger artifact
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$QUALIFIED_PARENT"
+          mapfile -t changed < <(git diff --name-only "$QUALIFIED_PARENT" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = '.github/workflows/organization-audit-marketplace-payments-wallet-projection.yml'
+          meta="$RUNNER_TEMP/artifact.json"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$LEDGER_PROOF_ARTIFACT" > "$meta"
+          test "$(jq -r .id "$meta")" = "$LEDGER_PROOF_ARTIFACT"
+          test "$(jq -r .expired "$meta")" = 'false'
+          test "$(jq -r .workflow_run.id "$meta")" = "$LEDGER_PROOF_RUN"
+          test "$(jq -r .workflow_run.head_sha "$meta")" = "$QUALIFIED_PARENT"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$LEDGER_PROOF_ARTIFACT/zip" > "$RUNNER_TEMP/ledger.zip"
+          mkdir "$RUNNER_TEMP/ledger-proof"
+          unzip -q "$RUNNER_TEMP/ledger.zip" -d "$RUNNER_TEMP/ledger-proof"
+          python3 - "$RUNNER_TEMP/ledger-proof/digests.json" <<'PY'
+          import json,os,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert d['audit_head']==os.environ['QUALIFIED_PARENT']
+          assert d['source_rows']==4325 and d['direct_paths']==221
+          assert d['current']['grouped_paths']==58 and d['current']['unverified_paths']==4046
+          assert d['current']['ledger_sha256']=='b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459'
+          p=d['projected_after_mpw_adoption']
+          assert p['grouped_paths']==107 and p['unverified_paths']==3997
+          assert p['ledger_sha256']==os.environ['PROJECTED_LEDGER_SHA256']
+          print('EXACT_PROJECTED_LEDGER_PROOF_BOUND')
+          PY
+      - name: Generate and validate projected canonical package
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/projected-root" "$RUNNER_TEMP/package" <<'PY'
+          from copy import deepcopy
+          import json
+          from pathlib import Path
+          import shutil
+          import sys
+
+          root=Path.cwd(); stage=Path(sys.argv[1]); package=Path(sys.argv[2])
+          shutil.copytree(root,stage,symlinks=True)
+          package.mkdir()
+          sys.path.insert(0,str(stage/'tools'/'audit'))
+          import verify_report as report
+          import verify_platform_marketplace_payments_wallet_group as mpw
+
+          report_rel=Path('docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json')
+          report_md_rel=Path('docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.md')
+          evidence_rel=Path('docs/evidence/organization-audit-20260907')
+          candidate_rel=evidence_rel/'r3-platform-marketplace-payments-wallet-candidate.json'
+          groups_rel=evidence_rel/'coverage-groups.json'
+          summary_rel=evidence_rel/'coverage-summary.json'
+          unknowns_rel=evidence_rel/'unknowns.json'
+          verification_rel=evidence_rel/'verification-index.json'
+          readme_rel=evidence_rel/'README.md'
+          source_review_rel=evidence_rel/'r3-source-review.md'
+          changed=[candidate_rel,groups_rel,summary_rel,report_rel,report_md_rel,unknowns_rel,verification_rel,readme_rel,source_review_rel]
+
+          def load(rel): return json.loads((stage/rel).read_text(encoding='utf-8'))
+          def dump(rel,obj): (stage/rel).write_text(json.dumps(obj,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+          def replace_once(text,old,new,label):
+              if text.count(old)!=1: raise SystemExit(f'{label}: expected one anchor, got {text.count(old)}')
+              return text.replace(old,new,1)
+
+          candidate=load(candidate_rel)
+          if mpw.validate_candidate_shape(candidate) is not False:
+              raise SystemExit('candidate must be qualified pending adoption')
+          candidate['state']=mpw.ADOPTED
+          candidate['coverage_adopted']=True
+          candidate['limitations']=(
+              'Adopted only as bounded GROUPED carry-forward after exact historical/source identity, the exact 23-path dependent binding set, '
+              'the exact ordered 13-file frozen-current qualification and bound 45-case/444-assertion all-green result. This does not establish '
+              'production readiness, later-current-main status, provider remediation, complete payment/marketplace correctness/security, or organization-wide audit completion.'
+          )
+          dump(candidate_rel,candidate)
+
+          groups=load(groups_rel)
+          mpw.validate_group_state(candidate,groups,False)
+          ids={r.get('id') for r in groups['groups']}
+          if ids & {s[0] for s in mpw.EXPECTED_FAMILIES}: raise SystemExit('MPW group preexists')
+          groups['groups'].extend(mpw.expected_group(candidate,s) for s in mpw.EXPECTED_FAMILIES)
+          mpw.validate_group_state(candidate,groups,True)
+          dump(groups_rel,groups)
+
+          summary=load(summary_rel)
+          summary['per_repository']['platform']['grouped']=107
+          summary['per_repository']['platform']['unverified_semantics']=1902
+          summary['ledger_sha256']='742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406'
+          summary['grouped_revalidated_paths']=107
+          summary['semantically_classified_paths']=328
+          summary['unverified_semantics_total']=3997
+          summary['durability']=(
+              'Full CSV accompanies the audit delivery. Committed DIRECT review rows, immutable Git trees, explicit accepted/rejected GROUPED records and '
+              'verify_report.py reproduce every disposition. Platform GameAuth contributes 27 GROUPED paths; Accounts/CanaryIntegration/CharacterProfiles/Characters '
+              'contribute 31; Marketplace/Payments/Wallet contribute 49; the rejected 508-file Atlas candidate remains UNVERIFIED.'
+          )
+          summary['coverage_dimension_note']=(
+              'DIRECT records bounded current/source review, not universal approval. GROUPED records bounded semantic carry-forward only when historical scope, exact identity '
+              'and current dependent qualification are all bound. Platform contributes 107 GROUPED paths: GameAuth 27, account/Canary/profile/character 31, and Marketplace/Payments/Wallet 49. '
+              'The Atlas 508-path candidate remains rejected.'
+          )
+          dump(summary_rel,summary)
+
+          doc=load(report_rel)
+          doc['revision']='R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-107'
+          doc['grouped_revalidated_paths']=107
+          doc['semantically_classified_paths']=328
+          doc['r3_platform_marketplace_payments_wallet_candidate']='organization-audit-20260907/r3-platform-marketplace-payments-wallet-candidate.json'
+          doc['r3_review']['latest_completed_rereview']={
+              'reviewed_head':'f7f200bd4ef4822cdfab450c628bdf76864cedba',
+              'completed_at_utc':'2026-09-08T21:45:26.228644Z',
+              'result':'PASS_NO_NEW_P0_P1_P2',
+              'p1':0,'p2':0,'new_material_findings':[],
+              'historical_review_threads_resolved_after_readback':15,
+              'gameauth_review_threads_resolved_after_readback':2,
+              'account_character_batch_review':'PASS_NO_NEW_P0_P1_P2'
+          }
+          doc['r3_review']['fresh_rereview_reason']=(
+              'The 49-path Platform Marketplace/Payments/Wallet GROUPED expansion and its exact qualification/accounting machinery are material evidence added after the clean f7f200bd account/character review.'
+          )
+          dump(report_rel,doc)
+
+          unknowns=load(unknowns_rel)
+          sem=next(x for x in unknowns['items'] if x['id']=='SEMANTIC-COVERAGE')
+          sem['reason']=(
+              'Source bytes available; 221 DIRECT scoped path reviews plus 107 bounded GROUPED Platform paths are now bound '
+              '(27 GameAuth, 31 Accounts/CanaryIntegration/CharacterProfiles/Characters, 49 Marketplace/Payments/Wallet), not full behavior approval; '
+              '3997 paths retain UNVERIFIED. The historical Atlas 508-path candidate remains rejected and no automatic import from maintenance N/A or unproven summaries is allowed.'
+          )
+          ind=next(x for x in unknowns['items'] if x['id']=='INDEPENDENT-REVIEW')
+          ind['reason']=(
+              'A clean exact-head Codex review of f7f200bd completed for the 31-path account/character expansion. The later 49-path Marketplace/Payments/Wallet GROUPED expansion '
+              'and its exact 45-case/444-assertion qualification/accounting machinery are new material and have not yet received their own fresh independent exact-head review.'
+          )
+          ind['effect']='No self-awarded 10/10 or final independent acceptance is claimed for the expanded 107-GROUPED revision.'
+          dump(unknowns_rel,unknowns)
+
+          idx=load(verification_rel)
+          idx['r3_platform_marketplace_payments_wallet_qualification']={
+              'frozen_source_commit':mpw.SOURCE_COMMIT,
+              'historical_source_commit':mpw.HISTORICAL_COMMIT,
+              'primary_qualification_head':'13f6933c543db98848450e063e61f8c0dd2fa3d3',
+              'primary_run':34283717767,'primary_job':102254287765,
+              'primary_verifier_unit_tests':10,
+              'exact_family_counts':[21,24,4],'exact_total_paths':49,
+              'dependent_blob_bindings':23,'focused_test_files':13,
+              'focused_cases':45,'focused_assertions':444,'failures':0,'errors':0,'skips':0,
+              'php':'8.5.10','mariadb':'11.8.9','tracked_source_clean_after_execution':True,
+              'hardening_head':'53dc22290da5c952fc76aa4cb7222ad450be6974',
+              'hardening_meta_ci_run':34284712709,'hardening_qualification_run':34284712575,
+              'ledger_reproduction_head':'adc884f64982e71609415ef946d97b445488c3e0',
+              'ledger_reproduction_run':34284837901,'ledger_reproduction_artifact':10079037530,
+              'pre_adoption_ledger_sha256':'b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459',
+              'projected_adopted_ledger_sha256':'742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406',
+              'qualification':'BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS'
+          }
+          dump(verification_rel,idx)
+
+          readme=(stage/readme_rel).read_text(encoding='utf-8')
+          readme=replace_once(readme,
+              'R3 contains 78 finding records, 23 A–W domains, 15 residual obligations, 221 DIRECT scoped path reviews and 58 bounded GROUPED Platform paths out of 4325 immutable leaves. `4046` leaves retain UNVERIFIED semantics.',
+              'R3 contains 78 finding records, 23 A–W domains, 15 residual obligations, 221 DIRECT scoped path reviews and 107 bounded GROUPED Platform paths out of 4325 immutable leaves. `3997` leaves retain UNVERIFIED semantics.',
+              'README accounting')
+          old='`r3-platform-gameauth-candidate.json` binds an accepted 27-path Platform GameAuth carry-forward after exact historical/source identity, 23 dependent blob bindings and 61 focused frozen-current cases / 565 assertions. `r3-platform-account-character-candidate.json` separately binds four accepted Accounts/CanaryIntegration/CharacterProfiles/Characters families totaling 31 paths after exact 23 dependent bindings and 15 focused frozen-current files produced 86 cases / 586 assertions with zero failures/errors/skips. Both are bounded GROUPED evidence, not product PASS.'
+          new='`r3-platform-gameauth-candidate.json` binds an accepted 27-path Platform GameAuth carry-forward after exact historical/source identity, 23 dependent blob bindings and 61 focused frozen-current cases / 565 assertions. `r3-platform-account-character-candidate.json` separately binds four accepted Accounts/CanaryIntegration/CharacterProfiles/Characters families totaling 31 paths after exact 23 dependent bindings and 15 focused frozen-current files produced 86 cases / 586 assertions with zero failures/errors/skips. `r3-platform-marketplace-payments-wallet-candidate.json` binds three accepted Marketplace/Payments/Wallet families totaling 49 paths after exact 23 dependent bindings and 13 focused files produced 45 cases / 444 assertions with zero failures/errors/skips, including four real-MariaDB integration/concurrency files. All three records are bounded GROUPED evidence, not product PASS.'
+          readme=replace_once(readme,old,new,'README evidence map')
+          old='The R3 native hosted collector is absent from the effective tree. Temporary account/character qualification, ledger-reproduction and projection workflows remain only while this new GROUPED batch is being rebound and independently reviewed; they must be removed before the final stable audit tree. No provider writes, deployment, new required gate, automatic background worker, full semantic completion or self-awarded score is implied.'
+          new='The R3 native hosted collector and the completed 31-path batch workflows are absent from the effective tree. Temporary Marketplace/Payments/Wallet qualification, ledger-reproduction and projection workflows remain only while the 49-path adoption is rebound and independently reviewed; they must be removed before the next stable audit checkpoint. No provider writes, deployment, new required gate, automatic background worker, full semantic completion or self-awarded score is implied.'
+          readme=replace_once(readme,old,new,'README temp workflows')
+          (stage/readme_rel).write_text(readme,encoding='utf-8')
+
+          md=(stage/report_md_rel).read_text(encoding='utf-8')
+          md=replace_once(md,'| platform | 2165 | 156 | 58 | 1951 |','| platform | 2165 | 156 | 107 | 1902 |','report platform row')
+          md=replace_once(md,'| **Total** | **4325** | **221** | **58** | **4046** |','| **Total** | **4325** | **221** | **107** | **3997** |','report total row')
+          old='Exactly 58 Platform leaves are additionally GROUPED. The first 27 are `app/GameAuth/**`: the earlier audit directly read all 27, the complete path/blob set and whole `app` tree are byte-identical at frozen `de917b3…`, 23 dependent blobs are source-bound, and 61 focused frozen-current cases / 565 assertions passed with zero failures/errors/skips; separate exact-source concurrency evidence remains distinct. The additional 31 are four non-overlapping families — `app/Accounts/**` (7), `app/CanaryIntegration/**` (8), `app/CharacterProfiles/**` (4), and `app/Characters/**` (12). Their historical direct-read statement is bound to the immutable Platform audit publication, every family path/blob set is byte-identical at the same frozen source, the dependent map is exactly 23 paths including the ordered 15 focused tests, and qualification run `34230659158` / job `102075660945` produced exactly 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips under PHP 8.5.10 with MariaDB 11.8.9. GROUPED is bounded semantic carry-forward, not product/security readiness. The rejected Atlas 508-path candidate remains UNVERIFIED. Full CSV is reproducible from immutable inventories, `coverage-review.tsv`, `coverage-groups.json` and ledger SHA-256 `b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459`.'
+          new='Exactly 107 Platform leaves are additionally GROUPED. GameAuth contributes 27 paths after exact historical/source identity, 23 dependent bindings and 61 focused cases / 565 assertions. Four account/Canary/profile/character families contribute 31 paths after exact 23 dependent bindings and an ordered 15-file qualification producing 86 cases / 586 assertions. Three Marketplace/Payments/Wallet families contribute 49 paths — `app/Marketplace/**` (21), `app/Payments/**` (24), `app/Wallet/**` (4) — after exact historical direct-read evidence, byte-identical family trees, exact 23 dependent bindings and an ordered 13-file PHP 8.5.10/MariaDB 11.8.9 qualification producing 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips, including four real-MariaDB integration/concurrency files. GROUPED is bounded semantic carry-forward, not product/security readiness. The rejected Atlas 508-path candidate remains UNVERIFIED. Full CSV is reproducible from immutable inventories, `coverage-review.tsv`, `coverage-groups.json` and ledger SHA-256 `742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406`.'
+          md=replace_once(md,old,new,'report grouped paragraph')
+          old='The Platform routes/GameAuth expansion and its two verifier P2 repairs received a clean exact-head re-review at `21c02cac9cbb4e114741bab83985b48a817dfd35`. The later 31-path Accounts/CanaryIntegration/CharacterProfiles/Characters GROUPED expansion is new material and therefore still requires fresh independent exact-head review.'
+          new='The Platform routes/GameAuth expansion and its two verifier P2 repairs received a clean exact-head re-review at `21c02cac9cbb4e114741bab83985b48a817dfd35`. The later 31-path Accounts/CanaryIntegration/CharacterProfiles/Characters GROUPED expansion received a clean exact-head review at `f7f200bd4ef4822cdfab450c628bdf76864cedba`. The still-later 49-path Marketplace/Payments/Wallet expansion is new material and therefore requires its own fresh independent exact-head review.'
+          md=replace_once(md,old,new,'report review state')
+          old='The final task changes audit docs/evidence/tools only. Temporary qualification/reproduction workflows used for the 31-path GROUPED batch are not required checks and must be removed after adopted-state proof plus independent review; no provider/runtime/production change is introduced, and protected `meta-gate` / Merge Queue remain unchanged.'
+          new='The final task changes audit docs/evidence/tools only. Temporary workflows for the completed 31-path batch were removed; the Marketplace/Payments/Wallet qualification/reproduction/projection workflows are temporary evidence machinery and must be removed after adopted-state proof plus independent review. No provider/runtime/production change is introduced, and protected `meta-gate` / Merge Queue remain unchanged.'
+          md=replace_once(md,old,new,'report temp workflows')
+          (stage/report_md_rel).write_text(md,encoding='utf-8')
+
+          source=(stage/source_review_rel).read_text(encoding='utf-8')
+          anchor='Read the Announcements ticker, browser profile, acceptance spec and only the relevant EN/PL translation ranges.'
+          addition=(
+              'Separately, the historical 49-file Marketplace/Payments/Wallet production batch was reused only after exact family reconstruction: '
+              '`app/Marketplace/**` (21), `app/Payments/**` (24), and `app/Wallet/**` (4) are byte-identical between the historical audited generation and frozen `de917b3…`. '
+              'The candidate binds exactly 23 dependent config/route/toolchain/test blobs and an ordered 13-file qualification; PHP 8.5.10/MariaDB 11.8.9 produced '
+              '45 cases / 444 assertions / zero failures/errors/skips, including real Marketplace transfer integration/concurrency and Payment event/refund concurrency. '
+              'These 49 leaves are bounded GROUPED carry-forward, not DIRECT current review, later-main acceptance, payment security approval, or product readiness.\n\n'
+          )
+          if source.count(anchor)!=1: raise SystemExit('source review anchor drift')
+          source=source.replace(anchor,addition+anchor,1)
+          (stage/source_review_rel).write_text(source,encoding='utf-8')
+
+          # Validate projected accounting and exact GROUPED shape before packaging.
+          result=report.validate(stage/report_rel)
+          assert result['result']=='ACCOUNTING_VALID_NOT_SEMANTIC_PASS'
+          assert result['grouped_revalidated_paths']==107
+          assert result['semantically_classified_paths']==328
+          assert result['unverified_semantics']==3997
+          c=mpw.read_json(stage/mpw.CANDIDATE)
+          assert mpw.validate_candidate_shape(c) is True
+          mpw.validate_group_state(c,mpw.read_json(stage/mpw.GROUPS),True)
+
+          for rel in changed:
+              dst=package/rel; dst.parent.mkdir(parents=True,exist_ok=True); shutil.copy2(stage/rel,dst)
+          (package/'SHA256SUMS').write_text(''.join(
+              __import__('hashlib').sha256((package/r).read_bytes()).hexdigest()+'  '+str(r)+'\n' for r in changed
+          ),encoding='utf-8')
+          print('PROJECTED_CANONICAL_PACKAGE_VALID_221_107_3997')
+          PY
+      - name: Upload projected canonical package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: audit185-mpw-adoption-projection-${{ github.run_id }}
+          path: ${{ runner.temp }}/package
+          if-no-files-found: error
+          retention-days: 1
+      - name: Final tracked-source cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
