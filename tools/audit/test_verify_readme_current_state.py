@@ -38,6 +38,39 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         mutated = self.current.replace('14 residual obligations', '15 residual obligations', 1)
         self.reject(mutated)
 
+    def test_spelled_out_stale_obligation_claim_rejected(self):
+        mutated = self.current.replace(
+            'Full 4325-row CSV',
+            'Fifteen residual obligations remain.\n\nFull 4325-row CSV',
+            1,
+        )
+        self.reject(mutated)
+
+    def test_numeric_extra_obligation_claim_rejected(self):
+        mutated = self.current.replace(
+            'Full 4325-row CSV',
+            'There are 15 obligations left.\n\nFull 4325-row CSV',
+            1,
+        )
+        self.reject(mutated)
+
+    def test_duplicate_canonical_obligation_claim_rejected(self):
+        mutated = self.current.replace(
+            'Full 4325-row CSV',
+            '14 residual obligations.\n\nFull 4325-row CSV',
+            1,
+        )
+        self.reject(mutated)
+
+    def test_relocated_canonical_obligation_claim_rejected(self):
+        mutated = self.current.replace('14 residual obligations, ', '', 1)
+        mutated = mutated.replace(
+            'Full 4325-row CSV',
+            'There are 14 residual obligations.\n\nFull 4325-row CSV',
+            1,
+        )
+        self.reject(mutated)
+
     def test_historical_review_pending_wording_rejected(self):
         mutated = self.current.replace(
             'Those five corrections are applied and carried forward in the current audit lineage; they are not a pending review gate in this README.',

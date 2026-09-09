@@ -36,12 +36,30 @@ EXPECTED_UNRESOLVED_IDS = {
     'COST-CI', 'COST-AGENTS', 'SUPPLY-CHAIN', 'NATIVE-G1', 'UI-343', 'PORTABILITY',
     'LIVE-TELEMETRY', 'PRIVACY-RIGHTS', 'PLATFORM-H02',
 }
+SECTION_7_HEADING = '## 7. Remaining obligations and closure conditions'
+SECTION_8_HEADING = '## 8. Reproduction, retention and integration boundary'
 EXPECTED_RESIDUAL_OBLIGATIONS_PARAGRAPH = (
     'All 23 A–W domains have a criterion, method, evidence, opinion and limitation in `domain-matrix.tsv`. '
     'FOURTEEN material residual obligations retain explicit owner routes and measurable closure conditions in '
     '`unknowns.json`: `SEMANTIC-COVERAGE`, `HISTORY-REVALIDATION`, `ADMIN-STATE`, `INFRA-STATE`, `RECOVERY`, '
     '`COST-CI`, `COST-AGENTS`, `SUPPLY-CHAIN`, `NATIVE-G1`, `UI-343`, `PORTABILITY`, `LIVE-TELEMETRY`, '
     '`PRIVACY-RIGHTS`, and `PLATFORM-H02`.'
+)
+EXPECTED_SECTION_7_PARAGRAPHS = (
+    SECTION_7_HEADING,
+    EXPECTED_RESIDUAL_OBLIGATIONS_PARAGRAPH,
+    (
+        'These are not all access failures. Source bytes and native hosted execution are available. '
+        'Missing semantic review must be completed or validly imported, not labelled inaccessible. '
+        'Maintenance does not turn suspended authored code into tested code. No host/deploy action is '
+        'authorized merely because a tool exists.'
+    ),
+    (
+        'Professional completion requires every material scoped obligation to receive a defensible disposition '
+        'and independent review of the stable candidate. It does not require fixing every discovered product '
+        'defect inside this META audit. Conversely, an unreviewed source area cannot be called audited merely '
+        'because its remediation has an owner.'
+    ),
 )
 _LIBC = ctypes.CDLL(None, use_errno=True)
 _AT_EMPTY_PATH = 0x1000
@@ -132,9 +150,19 @@ def json_exact(left, right):
 def validate_residual_obligations_paragraph(report_path: Path) -> None:
     companion = report_path.with_suffix('.md')
     require(companion.is_file(), 'companion report missing')
-    paragraphs = [re.sub(r'\s+', ' ', part.strip()) for part in re.split(r'\n\s*\n', companion.read_text(encoding='utf-8')) if part.strip()]
-    expected = re.sub(r'\s+', ' ', EXPECTED_RESIDUAL_OBLIGATIONS_PARAGRAPH)
-    require(paragraphs.count(expected) == 1, 'residual-obligations paragraph drift')
+    text = companion.read_text(encoding='utf-8')
+    require(text.count(SECTION_7_HEADING) == 1, 'section 7 heading missing/duplicated')
+    require(text.count(SECTION_8_HEADING) == 1, 'section 8 heading missing/duplicated')
+    start = text.index(SECTION_7_HEADING)
+    end = text.index(SECTION_8_HEADING, start)
+    section = text[start:end]
+    paragraphs = tuple(
+        re.sub(r'\s+', ' ', part.strip())
+        for part in re.split(r'\n\s*\n', section)
+        if part.strip()
+    )
+    expected = tuple(re.sub(r'\s+', ' ', part) for part in EXPECTED_SECTION_7_PARAGRAPHS)
+    require(paragraphs == expected, 'section 7 paragraph sequence drift')
 
 
 def read_json(path):

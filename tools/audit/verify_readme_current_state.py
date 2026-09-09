@@ -41,7 +41,6 @@ EXPECTED_DURABILITY_CLOSEOUT = (
     'completion, product readiness, or self-awarded score is implied.'
 )
 STALE_MARKERS = (
-    '15 residual obligations',
     '221 DIRECT scoped path reviews',
     '223 DIRECT scoped path reviews',
     '107 bounded GROUPED Platform paths',
@@ -54,6 +53,7 @@ STALE_MARKERS = (
     'canonical adoption is verified by the temporary Platform Announcements adopted-proof workflow',
     'The current tree retains two bounded audit-proof workflows',
 )
+OBLIGATION_TOKEN = re.compile(r'\bobligations?\b', re.IGNORECASE)
 
 
 def require(condition: bool, message: str) -> None:
@@ -74,6 +74,11 @@ def validate_text(text: str) -> dict[str, object]:
     require(len(items) >= 4, 'README paragraph structure incomplete')
     require(items[0] == EXPECTED_TITLE, 'README title drift')
     require(items[1] == normalize(EXPECTED_INTRO), 'README current accounting paragraph drift')
+    require(OBLIGATION_TOKEN.findall(items[1]) == ['obligations'], 'README canonical obligation claim drift')
+    require(
+        all(OBLIGATION_TOKEN.search(item) is None for index, item in enumerate(items) if index != 1),
+        'README obligation claim must occur only in canonical intro',
+    )
     require(items[2] == EXPECTED_LOCAL_HEADING, 'README current accounting slot drift')
     evidence_indexes = [index for index, item in enumerate(items) if item == EXPECTED_EVIDENCE_HEADING]
     require(len(evidence_indexes) == 1, 'README evidence heading missing/duplicated')

@@ -100,6 +100,39 @@ class AuditValidationTest(unittest.TestCase):
         companion=self.path.with_suffix('.md')
         companion.write_text(companion.read_text(encoding='utf-8').replace(', `HISTORY-REVALIDATION`','',1),encoding='utf-8')
         self.reject()
+    def test_false_professional_completion_replacement_rejected(self):
+        companion=self.path.with_suffix('.md')
+        text=companion.read_text(encoding='utf-8')
+        text=text.replace(
+            audit.EXPECTED_SECTION_7_PARAGRAPHS[-1],
+            'This audit establishes organization-wide completion, product readiness, and an independent 10/10.',
+            1,
+        )
+        companion.write_text(text,encoding='utf-8');self.reject()
+    def test_adjacent_false_completion_paragraph_rejected(self):
+        companion=self.path.with_suffix('.md')
+        text=companion.read_text(encoding='utf-8').replace(
+            audit.EXPECTED_SECTION_7_PARAGRAPHS[-1],
+            audit.EXPECTED_SECTION_7_PARAGRAPHS[-1] +
+            '\n\nThis audit establishes organization-wide completion, product readiness, and an independent 10/10.',
+            1,
+        )
+        companion.write_text(text,encoding='utf-8');self.reject()
+    def test_section_7_missing_access_limit_rejected(self):
+        companion=self.path.with_suffix('.md')
+        text=companion.read_text(encoding='utf-8').replace(
+            audit.EXPECTED_SECTION_7_PARAGRAPHS[2] + '\n\n', '', 1)
+        companion.write_text(text,encoding='utf-8');self.reject()
+    def test_section_7_reordered_paragraphs_rejected(self):
+        companion=self.path.with_suffix('.md')
+        first,second=audit.EXPECTED_SECTION_7_PARAGRAPHS[2:]
+        text=companion.read_text(encoding='utf-8').replace(first+'\n\n'+second,second+'\n\n'+first,1)
+        companion.write_text(text,encoding='utf-8');self.reject()
+    def test_section_7_truncated_paragraph_rejected(self):
+        companion=self.path.with_suffix('.md')
+        text=companion.read_text(encoding='utf-8').replace(
+            ' No host/deploy action is authorized merely because a tool exists.', '', 1)
+        companion.write_text(text,encoding='utf-8');self.reject()
     def mutate_semantic_coverage(self, func):
         def mutate(data):
             func(next(row for row in data['items'] if row['id']=='SEMANTIC-COVERAGE'))
