@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/organization-audit-platform-marketplace-payments-wallet-qualification.yml
       - docs/evidence/organization-audit-20260907/r3-platform-marketplace-payments-wallet-candidate.json
+      - docs/evidence/organization-audit-20260907/verification-index.json
       - tools/audit/verify_platform_marketplace_payments_wallet_group.py
       - tools/audit/test_verify_platform_marketplace_payments_wallet_group.py
 
@@ -114,7 +115,7 @@ jobs:
           assert q['workflow_run']==34283717767 and q['job']==102254287765
           assert q['focused_current_tests']['cases']==45 and q['focused_current_tests']['assertions']==444
           assert q['focused_current_tests']['failures']==q['focused_current_tests']['errors']==q['focused_current_tests']['skipped']==0
-          print('49-path adopted primary qualification binding PASS; post-adoption proof still required.')
+          print('49-path adopted primary/post-adoption evidence validation PASS; next gate: '+d['next_gate'])
           PY
       - name: Setup PHP 8.5.10
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240

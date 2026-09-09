@@ -10,6 +10,7 @@ on:
       - docs/evidence/organization-audit-20260907/coverage-review.tsv
       - docs/evidence/organization-audit-20260907/coverage-summary.json
       - docs/evidence/organization-audit-20260907/r3-platform-marketplace-payments-wallet-candidate.json
+      - docs/evidence/organization-audit-20260907/verification-index.json
       - tools/audit/organization_audit.py
       - tools/audit/verify_report.py
       - tools/audit/verify_platform_marketplace_payments_wallet_group.py
@@ -46,11 +47,12 @@ jobs:
           c=v.read_json(v.CANDIDATE)
           assert v.validate_candidate_shape(c) is True
           v.validate_group_state(c,v.read_json(v.GROUPS),True)
+          v.validate_verification_index(v.read_json(v.INDEX))
           q=c['qualification']
           assert q['qualification_head']=='13f6933c543db98848450e063e61f8c0dd2fa3d3'
           assert q['workflow_run']==34283717767 and q['job']==102254287765
           assert q['focused_current_tests']['cases']==45 and q['focused_current_tests']['assertions']==444
-          print('ADOPTED_EXACT_PRIMARY_PROOF_PASS')
+          print('ADOPTED_EXACT_PRIMARY_AND_INDEX_PROOF_PASS')
           PY
       - name: Rebuild immutable source inventories
         shell: bash
