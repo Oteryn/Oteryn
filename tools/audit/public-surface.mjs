@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 import { createNewOutputDirectory, createOwnedArtifact, saveOwnedArtifact, readOwnedArtifact,
-  verifyOwnedArtifactEntry } from './safe-output.mjs';
+  publishOwnedArtifact } from './safe-output.mjs';
 import { SOURCE_SHA, SOURCE_TREE, SOURCE_BINDINGS, ORIGIN, PLAYWRIGHT, ROUTES, SIZES,
   requestAllowed, caseCriteria, evaluateReport } from './public-surface-contract.mjs';
 const [rootArg, outputArg] = process.argv.slice(2);
@@ -113,12 +113,12 @@ try {
     for (const [name, screenshotFd] of [...screenshots].sort(([a], [b]) => a.localeCompare(b))) {
       hashes[name] = crypto.createHash('sha256').update(readOwnedArtifact(screenshotFd)).digest('hex');
     }
-    verifyOwnedArtifactEntry(artifactRoot, 'result.json', resultFd);
-    for (const [name, screenshotFd] of screenshots) verifyOwnedArtifactEntry(artifactRoot, name, screenshotFd);
+    publishOwnedArtifact(artifactRoot, 'result.json', resultFd);
+    for (const [name, screenshotFd] of screenshots) publishOwnedArtifact(artifactRoot, name, screenshotFd);
     const checksumFd = createOwnedArtifact(artifactRoot, 'SHA256SUMS.json');
     try {
       saveOwnedArtifact(checksumFd, JSON.stringify(hashes, null, 2) + '\n');
-      verifyOwnedArtifactEntry(artifactRoot, 'SHA256SUMS.json', checksumFd);
+      publishOwnedArtifact(artifactRoot, 'SHA256SUMS.json', checksumFd);
     } finally { fs.closeSync(checksumFd); }
   } finally {
     for (const screenshotFd of screenshots.values()) fs.closeSync(screenshotFd);

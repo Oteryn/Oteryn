@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {SOURCE_SHA,SOURCE_TREE,SOURCE_BINDINGS,PLAYWRIGHT,ORIGIN,ROUTES,SIZES,expectedStatus,evaluateReport,requestAllowed} from './public-surface-contract.mjs';
 import { createNewOutputDirectory, createOwnedArtifact, saveOwnedArtifact, readOwnedArtifact,
-  readArtifactLeaf, publishArtifactLeaf, verifyOwnedArtifactEntry } from './safe-output.mjs';
+  readArtifactLeaf, publishArtifactLeaf, publishOwnedArtifact } from './safe-output.mjs';
 function valid() {
   return {schema_version:2,source_sha:SOURCE_SHA,source_tree:SOURCE_TREE,source_bindings:{...SOURCE_BINDINGS},playwright:PLAYWRIGHT,browser:'unit-test-double',
     cases:SIZES.flatMap(([width,height])=>ROUTES.map(route=>({route,width,height,status:expectedStatus(route),final_url:ORIGIN+route,observed_errors:[],
@@ -112,6 +112,7 @@ test('result saves retain the owned inode after final-leaf symlink replacement',
   const resultFd = createOwnedArtifact(result.descriptorPath, 'result.json');
   try {
     saveOwnedArtifact(resultFd, 'initial');
+    publishOwnedArtifact(result.descriptorPath, 'result.json', resultFd);
     fs.renameSync(path.join(result.out, 'result.json'), owned);
     fs.symlinkSync(sentinel, path.join(result.out, 'result.json'));
     saveOwnedArtifact(resultFd, 'later-save');
@@ -133,15 +134,15 @@ for (const name of ['390-home.png', 'SHA256SUMS.json']) {
     const result = createNewOutputDirectory(provider, path.join(outParent, 'new-evidence'));
     try {
       fs.symlinkSync(sentinel, path.join(result.out, name));
-      assert.throws(() => publishArtifactLeaf(result.descriptorPath, name, 'artifact'), /EEXIST|ELOOP/);
+      assert.throws(() => publishArtifactLeaf(result.descriptorPath, name, 'artifact'), /File exists|EEXIST|ELOOP/);
       assert.equal(fs.readFileSync(sentinel, 'utf8'), 'provider-bytes');
       assert.throws(() => readArtifactLeaf(result.descriptorPath, name), /ELOOP/);
     } finally { fs.closeSync(result.fd); }
   });
 }
 
-for (const name of ['result.json', '390-home.png']) {
-  test(`${name} final entry must still identify its owned regular-file inode`, t => {
+for (const name of ['result.json', '390-home.png', 'SHA256SUMS.json']) {
+  test(`${name} terminal publication cannot bless a substituted regular file`, t => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit185-safe-finalize-'));
     t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
     const provider = path.join(tmp, 'provider');
@@ -151,15 +152,11 @@ for (const name of ['result.json', '390-home.png']) {
     const fd = createOwnedArtifact(output.descriptorPath, name);
     try {
       saveOwnedArtifact(fd, 'owned');
-      fs.renameSync(path.join(output.out, name), path.join(output.out, `owned-${name}`));
-      fs.writeFileSync(path.join(output.out, name), 'replacement');
-      assert.throws(() => verifyOwnedArtifactEntry(output.descriptorPath, name, fd), /no longer identifies/);
-      fs.rmSync(path.join(output.out, name));
-      const sentinel = path.join(provider, 'sentinel');
-      fs.writeFileSync(sentinel, 'provider');
-      fs.symlinkSync(sentinel, path.join(output.out, name));
-      assert.throws(() => verifyOwnedArtifactEntry(output.descriptorPath, name, fd), /ELOOP/);
-      assert.equal(fs.readFileSync(sentinel, 'utf8'), 'provider');
+      assert.throws(() => publishOwnedArtifact(output.descriptorPath, name, fd, {
+        beforePublish() { fs.writeFileSync(path.join(output.out, name), 'replacement'); },
+      }), /atomic exclusive artifact publication failed/);
+      assert.equal(fs.readFileSync(path.join(output.out, name), 'utf8'), 'replacement');
+      assert.equal(readOwnedArtifact(fd).toString(), 'owned');
     } finally { fs.closeSync(fd); fs.closeSync(output.fd); }
   });
 }

@@ -1,7 +1,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const NOFOLLOW = fs.constants.O_NOFOLLOW ?? 0;
+const O_TMPFILE = 0x410000;
+const LINKAT_PROGRAM = String.raw`
+import ctypes, os, sys
+libc = ctypes.CDLL(None, use_errno=True)
+linkat = getattr(libc, "linkat", None)
+if linkat is None:
+    raise OSError(38, "linkat unavailable")
+source = os.fsencode(sys.argv[1])
+name = os.fsencode(sys.argv[2])
+if linkat(-100, source, 3, name, 0x400) != 0:
+    error = ctypes.get_errno()
+    raise OSError(error, os.strerror(error), sys.argv[2])
+`;
 
 function leafPath(descriptorPath, name) {
   if (!name || name === '.' || name === '..' || path.basename(name) !== name) {
@@ -15,8 +29,11 @@ function requireRegularFile(fd) {
 }
 
 export function createOwnedArtifact(descriptorPath, name) {
-  const fd = fs.openSync(leafPath(descriptorPath, name),
-    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | NOFOLLOW, 0o600);
+  leafPath(descriptorPath, name);
+  if (process.platform !== 'linux' || !NOFOLLOW) {
+    throw Error('atomic owned-artifact publication unavailable');
+  }
+  const fd = fs.openSync(descriptorPath, fs.constants.O_RDWR | O_TMPFILE, 0o600);
   try { requireRegularFile(fd); }
   catch (error) { fs.closeSync(fd); throw error; }
   return fd;
@@ -61,20 +78,27 @@ export function readArtifactLeaf(descriptorPath, name) {
 
 export function publishArtifactLeaf(descriptorPath, name, bytes) {
   const fd = createOwnedArtifact(descriptorPath, name);
-  try { saveOwnedArtifact(fd, bytes); }
+  try { saveOwnedArtifact(fd, bytes); publishOwnedArtifact(descriptorPath, name, fd); }
   finally { fs.closeSync(fd); }
 }
 
-export function verifyOwnedArtifactEntry(descriptorPath, name, ownedFd) {
-  const owned = fs.fstatSync(ownedFd);
-  if (!owned.isFile()) throw Error('owned artifact is not a regular file');
-  const entryFd = fs.openSync(leafPath(descriptorPath, name), fs.constants.O_RDONLY | NOFOLLOW);
-  try {
-    const entry = fs.fstatSync(entryFd);
-    if (!entry.isFile() || entry.dev !== owned.dev || entry.ino !== owned.ino) {
-      throw Error(`artifact entry no longer identifies owned inode: ${name}`);
-    }
-  } finally { fs.closeSync(entryFd); }
+export function publishOwnedArtifact(descriptorPath, name, ownedFd, hooks = {}) {
+  const leaf = path.basename(leafPath(descriptorPath, name));
+  requireRegularFile(ownedFd);
+  const directoryFd = Number(path.basename(descriptorPath));
+  if (!Number.isSafeInteger(directoryFd) || descriptorPath !== `/proc/self/fd/${directoryFd}`) {
+    throw Error('descriptor-backed artifact directory required');
+  }
+  hooks.beforePublish?.();
+  const source = `/proc/${process.pid}/fd/${ownedFd}`;
+  const result = spawnSync('/usr/bin/python3', ['-c', LINKAT_PROGRAM, source, leaf], {
+    encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe', directoryFd],
+  });
+  if (result.error) throw Error(`atomic artifact publication unavailable: ${result.error.message}`);
+  if (result.status !== 0) {
+    const detail = (result.stderr || '').trim();
+    throw Error(`atomic exclusive artifact publication failed: ${name}${detail ? `: ${detail}` : ''}`);
+  }
 }
 
 function inside(candidate, root) {
