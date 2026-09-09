@@ -81,6 +81,39 @@ class AuditValidationTest(unittest.TestCase):
         def mutate(data):
             func(next(row for row in data['items'] if row['id']=='INDEPENDENT-REVIEW'))
         self.mutate(self.base/'unknowns.json',mutate)
+    def mutate_semantic_coverage(self, func):
+        def mutate(data):
+            func(next(row for row in data['items'] if row['id']=='SEMANTIC-COVERAGE'))
+        self.mutate(self.base/'unknowns.json',mutate)
+    def test_stale_semantic_coverage_transition_rejected(self):
+        self.mutate_semantic_coverage(lambda row:row.update(
+            reason=row['reason'].replace('223 DIRECT', '221 DIRECT')
+                                .replace('113 bounded GROUPED', '107 bounded GROUPED')
+                                .replace('3989 paths', '3997 paths')))
+        self.reject()
+    def test_changed_semantic_coverage_total_rejected(self):
+        self.mutate_semantic_coverage(lambda row:row.update(
+            missing='3989 source leaves retain UNVERIFIED semantics; 336 of 4324 leaves are semantically classified'))
+        self.reject()
+    def test_changed_semantic_classified_count_rejected(self):
+        self.mutate_semantic_coverage(lambda row:row.update(
+            effect='Original exhaustive completeness cannot be claimed from 335 semantically classified leaves out of 4325.'))
+        self.reject()
+    def test_missing_marketplace_test_provenance_rejected(self):
+        self.mutate_semantic_coverage(lambda row:row.update(
+            reason=row['reason'].replace(' + 6 Marketplace tests', '')))
+        self.reject()
+    def test_missing_recorder_provenance_rejected(self):
+        self.mutate_semantic_coverage(lambda row:row.update(
+            reason=row['reason'].replace(' (the prior 221 plus app/Audit/AdminAuditRecorder.php and app/Audit/SecurityEventRecorder.php)', '')))
+        self.reject()
+    def test_semantic_coverage_extra_key_rejected(self):
+        self.mutate_semantic_coverage(lambda row:row.update(semantic_pass=False))
+        self.reject()
+    def test_semantic_coverage_nested_type_drift_rejected(self):
+        self.mutate_semantic_coverage(lambda row:row.update(
+            missing={'unverified': 3989, 'classified': 336, 'total': 4325}))
+        self.reject()
     def test_stale_independent_review_phase_rejected(self):
         self.mutate_independent_review(lambda row:row.update(
             reason='The 49-path Marketplace/Payments/Wallet expansion is unreviewed.',

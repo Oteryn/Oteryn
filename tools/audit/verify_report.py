@@ -26,6 +26,14 @@ STATES = {'SOURCE_REPAIRED_TESTED','PARTIALLY_REPAIRED','RETIRED_SOURCE','SOURCE
 DEFAULT_REASON = 'Identity enumerated; this continuation does not assert a complete semantic review of this leaf. Historical/source oracles may provide narrower evidence in the finding register.'
 DIRECT_ADDITIONS = 'coverage-review-additions.tsv'
 DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
+SEMANTIC_COVERAGE_UNKNOWN = {
+    'id': 'SEMANTIC-COVERAGE',
+    'missing': '3989 source leaves retain UNVERIFIED semantics; 336 of 4325 leaves are semantically classified',
+    'reason': 'Source bytes are available; 223 DIRECT scoped path reviews are bound (the prior 221 plus app/Audit/AdminAuditRecorder.php and app/Audit/SecurityEventRecorder.php), and 113 bounded GROUPED Platform paths are bound (27 GameAuth + 31 Accounts/CanaryIntegration/CharacterProfiles/Characters + 49 Marketplace/Payments/Wallet + 6 Marketplace tests). This is bounded semantic accounting, not full behavior, product, or audit approval; 3989 paths retain UNVERIFIED. The rejected Atlas 508-path candidate remains UNVERIFIED, and no automatic import from maintenance N/A or unproven summaries is allowed.',
+    'effect': 'Original exhaustive completeness cannot be claimed from 336 semantically classified leaves out of 4325.',
+    'owner_route': 'META186 plus provider audit owners',
+    'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review changed/uncovered authored families, and retain justified grouping/N/A.',
+}
 INDEPENDENT_REVIEW_UNKNOWN = {
     'id': 'INDEPENDENT-REVIEW',
     'missing': 'Independent review lifecycle/outcome for the two adopted Platform audit-recorder DIRECT paths',
@@ -39,6 +47,17 @@ INDEPENDENT_REVIEW_UNKNOWN = {
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def json_exact(left, right):
+    """Compare JSON values recursively without Python's bool/int equivalence."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(json_exact(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(json_exact(a, b) for a, b in zip(left, right))
+    return left == right
 
 
 def read_json(path):
@@ -235,9 +254,12 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(all(all(r[k].strip() for k in ['acceptance_criterion','method_and_evidence','opinion','remaining_limit','references']) for r in domains),'empty domain evidence')
     unknowns=read_json(base/'unknowns.json')['items'];unique(unknowns,lambda r:r['id'],'unknown id')
     require(len(unknowns)==doc['unresolved_unknowns'],'unknown count')
+    semantic_coverage=[row for row in unknowns if row.get('id')=='SEMANTIC-COVERAGE']
+    require(len(semantic_coverage)==1,'semantic-coverage unknown missing')
+    require(json_exact(semantic_coverage[0],SEMANTIC_COVERAGE_UNKNOWN),'semantic-coverage unknown drift')
     independent=[row for row in unknowns if row.get('id')=='INDEPENDENT-REVIEW']
     require(len(independent)==1,'independent-review unknown missing')
-    require(independent[0]==INDEPENDENT_REVIEW_UNKNOWN,'independent-review unknown drift')
+    require(json_exact(independent[0],INDEPENDENT_REVIEW_UNKNOWN),'independent-review unknown drift')
     review=load_review(base,doc)
     for row in review:
         require(row['repository'] in repo and SHA.fullmatch(row['blob_sha']),'invalid review source')
