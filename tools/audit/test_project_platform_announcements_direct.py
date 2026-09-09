@@ -76,7 +76,8 @@ class AnnouncementsProjectionTest(unittest.TestCase):
         projector.project_rows(self.rows(),candidate)
         self.assertEqual(candidate,before)
         self.assertFalse(candidate['coverage_adopted'])
-        self.assertEqual(candidate['projection']['status'],'NOT_RUN_NO_CANONICAL_CHANGE')
+        self.assertEqual(candidate['projection']['status'],'PROJECTION_SUCCESS_NOT_ADOPTED')
+        self.assertEqual(candidate['projection']['adopted_paths'],0)
 
 
 if __name__=='__main__': unittest.main()
