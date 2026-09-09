@@ -3,9 +3,10 @@
 
 The executor accepts one authenticated control comment, binds authorization to the
 exact requested repository/PR/base/head, qualifies the exact candidate, and performs
-only GraphQL enqueuePullRequest(expectedHeadOid=...). If the enqueue result shows a
-base/queue race or otherwise cannot be verified, it reconciles by dequeuing the PR
-before returning failure. It has no direct-merge or generic auto-merge path.
+only GraphQL enqueuePullRequest(expectedHeadOid=...). If an enqueue result cannot be
+verified, cleanup is limited to the exact queue entry attributable to this attempt;
+concurrent/new-head entries are never dequeued. It has no direct-merge or generic
+auto-merge path.
 """
 
 from __future__ import annotations
@@ -496,18 +497,36 @@ def get_existing_queue_entry(
     return _normalize_entry(request, entry, require_pull_request=False)
 
 
+def _entry_id(entry: object) -> str | None:
+    if not isinstance(entry, dict):
+        return None
+    value = entry.get("id")
+    return value if isinstance(value, str) and value else None
+
+
 def _reconcile_after_indeterminate_enqueue(
     client: Client,
     *,
+    request: SubmissionRequest,
     pull_node_id: str,
     attempt_id: str,
+    attributable_entry_id: str | None,
     original_error: Exception,
 ) -> None:
-    """Remove any queue entry created during an indeterminate or mismatched enqueue."""
+    """Remove only an exact queue entry attributable to this failed attempt."""
 
     try:
         node = _query_queue_node(client, pull_node_id)
-        if node.get("mergeQueueEntry") is not None:
+        current_entry = node.get("mergeQueueEntry")
+        current_entry_id = _entry_id(current_entry)
+        current_head = str(node.get("headRefOid") or "").lower()
+
+        should_dequeue = (
+            attributable_entry_id is not None
+            and current_entry_id == attributable_entry_id
+            and current_head == request.expected_head_sha
+        )
+        if should_dequeue:
             response = client.graphql(
                 DEQUEUE_MUTATION,
                 {
@@ -521,18 +540,27 @@ def _reconcile_after_indeterminate_enqueue(
             if payload.get("clientMutationId") != f"{attempt_id}:reconcile":
                 raise SubmissionError("dequeuePullRequest response clientMutationId mismatch")
 
-        after = _query_queue_node(client, pull_node_id)
-        if after.get("mergeQueueEntry") is not None:
-            raise SubmissionError("queue entry still exists after reconciliation")
+            after = _query_queue_node(client, pull_node_id)
+            if _entry_id(after.get("mergeQueueEntry")) == attributable_entry_id:
+                raise SubmissionError("attributable queue entry still exists after reconciliation")
+
     except Exception as reconciliation_error:
         raise SubmissionError(
-            "enqueue result was not safely verifiable and queue reconciliation failed: "
+            "enqueue result was not safely verifiable and attributable-entry reconciliation failed: "
             f"{reconciliation_error}; original error: {original_error}"
         ) from reconciliation_error
 
+    if attributable_entry_id is None:
+        cleanup = "no queue entry was attributable to this attempt; concurrent entries were left untouched"
+    elif current_head != request.expected_head_sha:
+        cleanup = "target head moved; current queue entry was left untouched"
+    elif current_entry_id != attributable_entry_id:
+        cleanup = "current queue entry is not the entry returned for this attempt and was left untouched"
+    else:
+        cleanup = "the exact attributable queue entry was reconciled/dequeued"
+
     raise SubmissionError(
-        "enqueue result was not safely verifiable; any current queue entry was reconciled/dequeued: "
-        f"{original_error}"
+        f"enqueue result was not safely verifiable; {cleanup}: {original_error}"
     ) from original_error
 
 
@@ -545,6 +573,7 @@ def enqueue_pull_request(
     if existing is not None:
         return "ALREADY_ENQUEUED_EXACT_HEAD", existing
 
+    attributable_entry_id: str | None = None
     try:
         data = client.graphql(
             ENQUEUE_MUTATION,
@@ -560,6 +589,10 @@ def enqueue_pull_request(
         if payload.get("clientMutationId") != request.attempt_id:
             raise SubmissionError("enqueuePullRequest response clientMutationId mismatch")
 
+        attributable_entry_id = _entry_id(payload.get("mergeQueueEntry"))
+        if attributable_entry_id is None:
+            raise SubmissionError("enqueuePullRequest response queue entry ID is missing")
+
         response_entry = _normalize_entry(
             request, payload.get("mergeQueueEntry"), require_pull_request=True
         )
@@ -572,8 +605,10 @@ def enqueue_pull_request(
     except SubmissionError as exc:
         _reconcile_after_indeterminate_enqueue(
             client,
+            request=request,
             pull_node_id=pull.node_id,
             attempt_id=request.attempt_id,
+            attributable_entry_id=attributable_entry_id,
             original_error=exc,
         )
         raise AssertionError("unreachable")
