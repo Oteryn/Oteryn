@@ -8,7 +8,12 @@ from pathlib import Path
 
 CANDIDATE = Path('docs/evidence/organization-audit-20260907/r3-platform-marketplace-tests-candidate.json')
 GROUPS = Path('docs/evidence/organization-audit-20260907/coverage-groups.json')
+SUMMARY = Path('docs/evidence/organization-audit-20260907/coverage-summary.json')
+REPORT = Path('docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json')
+INDEX = Path('docs/evidence/organization-audit-20260907/verification-index.json')
 EVIDENCE_PATH = 'docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md'
+
+GROUP_ID = 'PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD'
 SOURCE_COMMIT = 'de917b3477a1de0667531380de3660e8b2ab59aa'
 SOURCE_TREE = 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e'
 HISTORICAL_COMMIT = '3b2ea1c7392187d5d22488673073dc8f8305a374'
@@ -19,7 +24,8 @@ EVIDENCE_BLOB = '34361414339a5ca57ec5cd13e332ad196aa9e35f'
 MARKETPLACE_TEST_TREE = '03f7d3735dee4140bf75960f0e106c3ba3d3b37b'
 PREFIX = 'tests/Feature/Marketplace/'
 EXACT_STATEMENT = '**FACT.** The following Marketplace tests were read directly during continuation:'
-QUALIFIED = 'QUALIFIED_PENDING_ADOPTION'
+ADOPTED_PENDING = 'QUALIFIED_ADOPTED_AS_GROUPED_PENDING_POST_ADOPTION_REVALIDATION'
+LEDGER_SHA = '25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617'
 
 EXPECTED_PATH_BLOBS = {
     'tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php': 'f9b9a17d34003132acf877a9755b998d6cfa5403',
@@ -45,55 +51,68 @@ REQUIRED_CHECKS = (
     'the exact frozen-current six-file qualification is bound to its exact head/run/job and JUnit totals',
     'fresh frozen-current execution repeats all six files with zero failures/errors/skips including both real-MariaDB tests',
 )
-LIMITATIONS = (
-    'Qualified frozen-current carry-forward candidate only. Historical direct-read evidence, byte identity and the bound '
-    '17-case/179-assertion all-green qualification do not establish production correctness, complete Marketplace/payment '
-    'correctness, later-current-main status, or organization-wide audit completion. No GROUPED coverage is adopted until '
-    'projected-ledger reproduction and atomic canonical adoption pass, followed by post-adoption revalidation and '
-    'independent exact-head review.'
-)
-PRIMARY_QUALIFICATION = {
+PRIMARY = {
     'qualification_head': 'f54e5b0640945d7a5f0a7c471ac81105436214ae',
     'workflow_run': 34323945126,
     'job': 102376779500,
     'verifier_unit_tests': 10,
     'verifier_unit_result': 'PASS',
     'focused_current_tests': {
-        'test_files': 6,
-        'junit_files': 3,
-        'cases': 17,
-        'assertions': 179,
-        'failures': 0,
-        'errors': 0,
-        'skipped': 0,
+        'test_files': 6, 'junit_files': 3, 'cases': 17, 'assertions': 179,
+        'failures': 0, 'errors': 0, 'skipped': 0,
         'junit': [
             {'file': 'ordinary.xml', 'cases': 14, 'assertions': 110, 'failures': 0, 'errors': 0, 'skipped': 0},
             {'file': 'transfer-concurrency.xml', 'cases': 1, 'assertions': 54, 'failures': 0, 'errors': 0, 'skipped': 0},
             {'file': 'transfer.xml', 'cases': 2, 'assertions': 15, 'failures': 0, 'errors': 0, 'skipped': 0},
         ],
     },
-    'php': '8.5.10',
-    'mariadb': '11.8.9',
-    'composer_validate': 'PASS',
+    'php': '8.5.10', 'mariadb': '11.8.9', 'composer_validate': 'PASS',
     'tracked_source_clean_after_execution': True,
     'outcome': 'QUALIFIED_PRIMARY_NOT_YET_ADOPTED',
 }
-
-
-def json_exact(left, right) -> bool:
-    if type(left) is not type(right):
-        return False
-    if isinstance(left, dict):
-        return left.keys() == right.keys() and all(json_exact(left[key], right[key]) for key in left)
-    if isinstance(left, list):
-        return len(left) == len(right) and all(json_exact(a, b) for a, b in zip(left, right))
-    return left == right
-
+PRE_ADOPTION = {
+    'audit_head': '1999409a1205b7bdb5663a809992b9c44efd8dbb',
+    'workflow_run': 34329669372, 'job': 102395040735, 'result': 'PASS',
+    'verifier_unit_tests': 13,
+    'focused_current_tests': PRIMARY['focused_current_tests'],
+    'php': '8.5.10', 'mariadb': '11.8.9',
+    'meta_ci_run': 34329669391, 'meta_ci_result': 'SUCCESS',
+}
+PROJECTED_LEDGER = {
+    'projection_head': '1999409a1205b7bdb5663a809992b9c44efd8dbb',
+    'workflow_run': 34329669431, 'job': 102395041138, 'artifact': 10095210015,
+    'source_rows': 4325, 'direct_paths': 221, 'grouped_paths': 113, 'unverified_paths': 3991,
+    'new_grouped_paths': sorted(EXPECTED_PATH_BLOBS),
+    'ledger_sha256': LEDGER_SHA, 'outcome': 'PROJECTED_LEDGER_PASS',
+}
+CANDIDATE_LIMITATIONS = (
+    'Adopted only as bounded GROUPED carry-forward after immutable historical direct-read evidence explicitly names all six files, '
+    'exact historical/frozen tree/path/blob identity, the exact bound 17-case/179-assertion all-green qualification including both real-MariaDB tests, '
+    'and projected-ledger reproduction proving only these six rows transition UNVERIFIED to GROUPED. This does not establish production readiness, '
+    'complete Marketplace/payment correctness, later-current-main status, provider remediation, or organization-wide audit completion. '
+    'Post-adoption exact-head qualifier/ledger/META proof and fresh independent review are still required.'
+)
+GROUP_SCOPE = (
+    'Historical direct-read evidence explicitly names every file in the exact six-file Marketplace test directory; frozen-current carry-forward '
+    'is bounded by exact tree/path/blob identity and the bound 17-case/179-assertion all-green qualification including both real-MariaDB tests.'
+)
+GROUP_LIMITATIONS = (
+    'Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, complete Marketplace/payment correctness, '
+    'later-current-main status, provider remediation, or organization-wide audit completion. Post-adoption exact-head proof and fresh independent review remain required.'
+)
 
 def require(ok: bool, message: str) -> None:
     if not ok:
         raise ValueError(message)
 
+def json_exact(left, right) -> bool:
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(json_exact(left[k], right[k]) for k in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(json_exact(a, b) for a, b in zip(left, right))
+    return left == right
 
 def read_json(path: Path) -> dict:
     def pairs(items):
@@ -102,114 +121,168 @@ def read_json(path: Path) -> dict:
             require(key not in out, f'duplicate JSON key in {path}: {key}')
             out[key] = value
         return out
-
     data = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=pairs)
     require(isinstance(data, dict), f'{path} must contain a JSON object')
     return data
 
-
 def expected_candidate() -> dict:
     return {
         'schema_version': 1,
-        'candidate_id': 'PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD',
+        'candidate_id': GROUP_ID,
         'repository': 'Oteryn/Oteryn-Platform',
-        'state': QUALIFIED,
+        'state': ADOPTED_PENDING,
         'expected_total': 6,
         'historical_evidence': {
-            'publication_commit': EVIDENCE_COMMIT,
-            'publication_tree': EVIDENCE_TREE,
-            'evidence_path': EVIDENCE_PATH,
-            'evidence_blob': EVIDENCE_BLOB,
-            'audited_main_sha': HISTORICAL_COMMIT,
-            'audited_main_tree': HISTORICAL_TREE,
+            'publication_commit': EVIDENCE_COMMIT, 'publication_tree': EVIDENCE_TREE,
+            'evidence_path': EVIDENCE_PATH, 'evidence_blob': EVIDENCE_BLOB,
+            'audited_main_sha': HISTORICAL_COMMIT, 'audited_main_tree': HISTORICAL_TREE,
             'exact_statement': EXACT_STATEMENT,
             'basis': 'immutable historical evidence explicitly names every file in the six-file Marketplace test directory',
         },
         'current_revalidation': {
-            'source_commit': SOURCE_COMMIT,
-            'source_tree': SOURCE_TREE,
-            'path_prefix': PREFIX,
-            'historical_tree': MARKETPLACE_TEST_TREE,
-            'current_tree': MARKETPLACE_TEST_TREE,
-            'path_blobs': EXPECTED_PATH_BLOBS,
-            'focused_test_files': list(FOCUSED_TEST_FILES),
+            'source_commit': SOURCE_COMMIT, 'source_tree': SOURCE_TREE, 'path_prefix': PREFIX,
+            'historical_tree': MARKETPLACE_TEST_TREE, 'current_tree': MARKETPLACE_TEST_TREE,
+            'path_blobs': EXPECTED_PATH_BLOBS, 'focused_test_files': list(FOCUSED_TEST_FILES),
             'required_checks': list(REQUIRED_CHECKS),
         },
-        'coverage_adopted': False,
-        'limitations': LIMITATIONS,
-        'qualification': PRIMARY_QUALIFICATION,
+        'coverage_adopted': True,
+        'limitations': CANDIDATE_LIMITATIONS,
+        'qualification': PRIMARY,
+        'pre_adoption_revalidation': PRE_ADOPTION,
+        'projected_ledger': PROJECTED_LEDGER,
     }
 
+def expected_group() -> dict:
+    return {
+        'id': GROUP_ID, 'repository': 'platform', 'disposition': 'GROUPED',
+        'path_prefix': PREFIX, 'expected_count': 6, 'depth': 'GROUPED_REVALIDATED',
+        'scope': GROUP_SCOPE, 'limitations': GROUP_LIMITATIONS,
+        'historical_evidence': {
+            'repository': 'Oteryn/Oteryn-Platform',
+            'publication_commit': EVIDENCE_COMMIT, 'publication_tree': EVIDENCE_TREE,
+            'coverage_rules_path': EVIDENCE_PATH, 'coverage_rules_blob': EVIDENCE_BLOB,
+            'audited_main_sha': HISTORICAL_COMMIT, 'audited_main_tree': HISTORICAL_TREE,
+            'exact_statement': EXACT_STATEMENT, 'pattern': PREFIX + '**', 'count': 6,
+            'basis': 'immutable historical evidence explicitly names every file in the six-file Marketplace test directory',
+        },
+        'current_revalidation': {
+            'source_commit': SOURCE_COMMIT, 'source_tree': SOURCE_TREE,
+            'family_tree': MARKETPLACE_TEST_TREE, 'changed_paths_under_group_prefix': 0,
+            'historical_to_current_compare_status': 'ahead',
+            'current_blobs': EXPECTED_PATH_BLOBS, 'required_checks': list(REQUIRED_CHECKS),
+            'focused_test_files': list(FOCUSED_TEST_FILES),
+        },
+        'evaluation': {
+            'qualification_head': PRIMARY['qualification_head'],
+            'qualification_run': PRIMARY['workflow_run'],
+            'qualification_job': PRIMARY['job'],
+            'verifier_unit_tests': PRIMARY['verifier_unit_tests'],
+            'focused_current_tests': PRIMARY['focused_current_tests'],
+            'pre_adoption_revalidation': PRE_ADOPTION,
+            'projected_ledger': PROJECTED_LEDGER,
+            'outcome': 'ADOPTED_GROUPED_CARRY_FORWARD_PENDING_POST_ADOPTION_REVALIDATION',
+        },
+    }
+
+def expected_index_row() -> dict:
+    return {
+        'frozen_source_commit': SOURCE_COMMIT,
+        'historical_source_commit': HISTORICAL_COMMIT,
+        'family_tree': MARKETPLACE_TEST_TREE,
+        'exact_total_paths': 6,
+        'path_blob_bindings': 6,
+        'focused_test_files': 6,
+        'primary_qualification_head': PRIMARY['qualification_head'],
+        'primary_run': PRIMARY['workflow_run'],
+        'primary_job': PRIMARY['job'],
+        'primary_verifier_unit_tests': PRIMARY['verifier_unit_tests'],
+        'focused_cases': 17, 'focused_assertions': 179,
+        'failures': 0, 'errors': 0, 'skips': 0,
+        'php': '8.5.10', 'mariadb': '11.8.9',
+        'qualification_binding_head': 'b8f7aba0ed08813203f64ae56cac5ef7f857af93',
+        'qualification_binding_run': 34329383462,
+        'qualification_binding_job': 102394131869,
+        'qualification_binding_verifier_unit_tests': 13,
+        'pre_adoption_head': PRE_ADOPTION['audit_head'],
+        'pre_adoption_run': PRE_ADOPTION['workflow_run'],
+        'pre_adoption_job': PRE_ADOPTION['job'],
+        'pre_adoption_meta_ci_run': PRE_ADOPTION['meta_ci_run'],
+        'projected_ledger_run': PROJECTED_LEDGER['workflow_run'],
+        'projected_ledger_job': PROJECTED_LEDGER['job'],
+        'projected_ledger_artifact': PROJECTED_LEDGER['artifact'],
+        'projected_ledger_sha256': LEDGER_SHA,
+        'projected_grouped_paths': 113,
+        'projected_unverified_paths': 3991,
+        'qualification': 'BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS',
+        'post_adoption_status': 'PENDING',
+    }
 
 def validate_candidate_shape(candidate: dict) -> None:
-    require(json_exact(candidate, expected_candidate()), 'Marketplace-test candidate canonical evidence fields/key sets drift')
+    require(json_exact(candidate, expected_candidate()), 'Marketplace-test adopted candidate canonical evidence fields/key sets drift')
 
-
-def validate_group_absence(groups_doc: dict) -> None:
+def validate_group_state(groups_doc: dict) -> None:
     require(type(groups_doc.get('schema_version')) is int and groups_doc['schema_version'] == 1, 'coverage-groups schema')
     groups = groups_doc.get('groups')
     require(isinstance(groups, list), 'coverage-groups groups must be a list')
+    rows = [g for g in groups if isinstance(g, dict) and g.get('id') == GROUP_ID]
+    require(len(rows) == 1, 'Marketplace-test canonical group missing/duplicated')
+    require(json_exact(rows[0], expected_group()), 'Marketplace-test canonical group drift')
+    target_paths = set(EXPECTED_PATH_BLOBS)
     for group in groups:
-        require(isinstance(group, dict), 'coverage group must be an object')
-        require(group.get('id') != 'PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD', 'qualified Marketplace-test group already exists')
+        if group is rows[0] or not isinstance(group, dict):
+            continue
         prefix = group.get('path_prefix')
         if isinstance(prefix, str):
-            require(not any(path.startswith(prefix) for path in EXPECTED_PATH_BLOBS), f'qualified Marketplace tests overlap existing group {group.get("id")}')
+            require(not any(path.startswith(prefix) for path in target_paths), f'Marketplace-test overlap with group {group.get("id")}')
         paths = group.get('paths')
         if isinstance(paths, list):
-            require(not set(paths).intersection(EXPECTED_PATH_BLOBS), f'qualified Marketplace tests overlap explicit existing group {group.get("id")}')
+            require(not target_paths.intersection(paths), f'Marketplace-test explicit overlap with group {group.get("id")}')
 
+def validate_accounting(audit_root: Path) -> None:
+    summary = read_json(audit_root / SUMMARY)
+    platform = summary['per_repository']['platform']
+    require((platform['leaves'], platform['direct_scoped'], platform['grouped'], platform['unverified_semantics']) == (2165, 156, 113, 1896), 'Marketplace-test summary platform accounting drift')
+    require(summary.get('ledger_sha256') == LEDGER_SHA, 'Marketplace-test summary ledger digest drift')
+    require((summary.get('grouped_revalidated_paths'), summary.get('semantically_classified_paths'), summary.get('unverified_semantics_total')) == (113, 334, 3991), 'Marketplace-test summary totals drift')
+    report = read_json(audit_root / REPORT)
+    require(report.get('revision') == 'R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113', 'Marketplace-test report revision drift')
+    require((report.get('scoped_review_paths'), report.get('grouped_revalidated_paths'), report.get('semantically_classified_paths')) == (221, 113, 334), 'Marketplace-test report accounting drift')
+    require(report.get('r3_platform_marketplace_tests_candidate') == 'organization-audit-20260907/r3-platform-marketplace-tests-candidate.json', 'Marketplace-test report candidate binding drift')
+    index = read_json(audit_root / INDEX)
+    require(json_exact(index.get('r3_platform_marketplace_tests_qualification'), expected_index_row()), 'Marketplace-test verification-index row drift')
 
 def git(root: Path, *args: str) -> str:
-    result = subprocess.run(
-        ['git', '-C', str(root), *args],
-        check=True,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=30,
-    )
-    return result.stdout.strip()
-
+    return subprocess.run(['git', '-C', str(root), *args], check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30).stdout.strip()
 
 def tree_entries(root: Path, commit: str) -> dict[str, tuple[str, str]]:
-    raw = subprocess.run(
-        ['git', '-C', str(root), 'ls-tree', '-r', '-z', '--full-tree', commit, '--', PREFIX],
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=30,
-    ).stdout
-    entries: dict[str, tuple[str, str]] = {}
+    raw = subprocess.run(['git', '-C', str(root), 'ls-tree', '-r', '-z', '--full-tree', commit, '--', PREFIX], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30).stdout
+    entries = {}
     for item in raw.split(b'\0'):
         if not item:
             continue
         meta, path_bytes = item.split(b'\t', 1)
         mode, kind, sha = meta.decode().split()
         path = path_bytes.decode()
-        require(kind == 'blob' and mode == '100644', f'unexpected Marketplace test entry mode/type for {path}: {mode} {kind}')
+        require(kind == 'blob' and mode == '100644', f'unexpected Marketplace test entry {path}: {mode} {kind}')
         entries[path] = (mode, sha)
     return entries
-
 
 def verify(audit_root: Path, platform_root: Path, evidence_root: Path) -> dict:
     candidate = read_json(audit_root / CANDIDATE)
     validate_candidate_shape(candidate)
-    validate_group_absence(read_json(audit_root / GROUPS))
-
+    validate_group_state(read_json(audit_root / GROUPS))
+    validate_accounting(audit_root)
     require(git(platform_root, 'rev-parse', 'HEAD') == SOURCE_COMMIT, 'frozen Platform HEAD drift')
     require(git(platform_root, 'rev-parse', 'HEAD^{tree}') == SOURCE_TREE, 'frozen Platform tree drift')
     require(git(platform_root, 'rev-parse', f'{HISTORICAL_COMMIT}^{{tree}}') == HISTORICAL_TREE, 'historical Platform tree drift')
     require(git(platform_root, 'rev-parse', f'{HISTORICAL_COMMIT}:tests/Feature/Marketplace') == MARKETPLACE_TEST_TREE, 'historical Marketplace-test tree drift')
     require(git(platform_root, 'rev-parse', f'{SOURCE_COMMIT}:tests/Feature/Marketplace') == MARKETPLACE_TEST_TREE, 'frozen Marketplace-test tree drift')
-
     historical_entries = tree_entries(platform_root, HISTORICAL_COMMIT)
     current_entries = tree_entries(platform_root, SOURCE_COMMIT)
     expected_entries = {path: ('100644', sha) for path, sha in EXPECTED_PATH_BLOBS.items()}
     require(json_exact(historical_entries, expected_entries), 'historical Marketplace-test path/blob set drift')
     require(json_exact(current_entries, expected_entries), 'frozen Marketplace-test path/blob set drift')
     require(json_exact(historical_entries, current_entries), 'Marketplace-test historical/current identity drift')
-
     require(git(evidence_root, 'rev-parse', 'HEAD') == EVIDENCE_COMMIT, 'historical evidence HEAD drift')
     require(git(evidence_root, 'rev-parse', 'HEAD^{tree}') == EVIDENCE_TREE, 'historical evidence tree drift')
     require(git(evidence_root, 'rev-parse', f'HEAD:{EVIDENCE_PATH}') == EVIDENCE_BLOB, 'historical evidence blob drift')
@@ -217,10 +290,9 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path) -> dict:
     require(evidence_text.count(EXACT_STATEMENT) == 1, 'historical Marketplace-test direct-read statement missing/duplicated')
     for path in EXPECTED_PATH_BLOBS:
         require(evidence_text.count(f'`{path}`') == 1, f'historical evidence missing/duplicates exact Marketplace test path: {path}')
-
     return {
-        'result': 'MARKETPLACE_TESTS_PRIMARY_QUALIFIED_NOT_ADOPTED',
-        'candidate_id': candidate['candidate_id'],
+        'result': 'MARKETPLACE_TESTS_GROUPED_ADOPTION_PENDING_POST_ADOPTION_PROOF_NOT_PRODUCT_PASS',
+        'candidate_id': GROUP_ID,
         'historical_source': HISTORICAL_COMMIT,
         'current_source': SOURCE_COMMIT,
         'path_prefix': PREFIX,
@@ -228,11 +300,13 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path) -> dict:
         'paths': 6,
         'path_blobs_verified': 6,
         'focused_test_files_bound': 6,
-        'primary_qualification': PRIMARY_QUALIFICATION,
-        'coverage_adopted': False,
-        'next_gate': 'reproduce projected 4,325-row ledger with exactly six additional GROUPED paths, then atomically adopt or reject the batch',
+        'primary_qualification': PRIMARY,
+        'pre_adoption_revalidation': PRE_ADOPTION,
+        'projected_ledger': PROJECTED_LEDGER,
+        'coverage_adopted': True,
+        'ledger_sha256': LEDGER_SHA,
+        'next_gate': 'fresh exact-head qualifier + immutable 4,325-row ledger reproduction + META CI; bind those proof coordinates before independent review',
     }
-
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -241,7 +315,6 @@ def main() -> None:
     parser.add_argument('--evidence-root', type=Path, required=True)
     args = parser.parse_args()
     print(json.dumps(verify(args.audit_root.resolve(), args.platform_root.resolve(), args.evidence_root.resolve()), indent=2))
-
 
 if __name__ == '__main__':
     main()

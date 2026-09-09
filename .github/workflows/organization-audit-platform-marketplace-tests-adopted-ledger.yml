@@ -1,0 +1,108 @@
+name: Organization audit Platform Marketplace tests adopted ledger reproduction (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-platform-marketplace-tests-adopted-ledger.yml
+      - docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
+      - docs/evidence/organization-audit-20260907/collection-plan.json
+      - docs/evidence/organization-audit-20260907/coverage-groups.json
+      - docs/evidence/organization-audit-20260907/coverage-review.tsv
+      - docs/evidence/organization-audit-20260907/coverage-summary.json
+      - docs/evidence/organization-audit-20260907/r3-platform-marketplace-tests-candidate.json
+      - docs/evidence/organization-audit-20260907/verification-index.json
+      - tools/audit/organization_audit.py
+      - tools/audit/verify_report.py
+      - tools/audit/verify_platform_marketplace_tests_group.py
+      - tools/audit/test_verify_platform_marketplace_tests_group.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-185-platform-marketplace-tests-adopted-ledger
+  cancel-in-progress: false
+
+jobs:
+  reproduce-adopted-ledger:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact adopted audit candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Verify exact adopted canonical records
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git diff --check
+          git diff --exit-code
+          (cd tools/audit && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_verify_platform_marketplace_tests_group.py)
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+          sys.path.insert(0,'tools/audit')
+          import verify_platform_marketplace_tests_group as v
+          c=v.read_json(v.CANDIDATE)
+          v.validate_candidate_shape(c)
+          v.validate_group_state(v.read_json(v.GROUPS))
+          v.validate_accounting(Path('.').resolve())
+          assert c['coverage_adopted'] is True
+          assert c['qualification']['workflow_run']==34323945126
+          assert c['projected_ledger']['ledger_sha256']=='25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617'
+          print('ADOPTED_CANONICAL_RECORDS_PASS')
+          PY
+      - name: Rebuild immutable source inventories
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/audit/organization_audit.py \
+            --plan docs/evidence/organization-audit-20260907/collection-plan.json \
+            --output "$RUNNER_TEMP/audit-inventory"
+      - name: Reproduce exact adopted 4,325-row ledger
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/audit/verify_report.py \
+            --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json \
+            --inventory-dir "$RUNNER_TEMP/audit-inventory/inventories" \
+            --ledger-output "$RUNNER_TEMP/adopted-ledger.csv"
+          python3 - "$RUNNER_TEMP/adopted-ledger.csv" "$RUNNER_TEMP/adopted-proof.json" <<'PY'
+          import csv,hashlib,json,sys
+          from collections import Counter
+          raw=open(sys.argv[1],'rb').read(); rows=list(csv.DictReader(raw.decode().splitlines()))
+          counts=Counter(r['disposition'] for r in rows); digest=hashlib.sha256(raw).hexdigest()
+          expected={'DIRECT':221,'GROUPED':113,'UNVERIFIED':3991}
+          if len(rows)!=4325 or dict(counts)!=expected:
+              raise SystemExit(f'adopted ledger count drift: rows={len(rows)} counts={dict(counts)}')
+          if digest!='25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617':
+              raise SystemExit('adopted ledger digest drift: '+digest)
+          proof={
+              'schema_version':1,
+              'audit_head':'${{ github.event.pull_request.head.sha }}',
+              'source_rows':4325,'direct_paths':221,'grouped_paths':113,'unverified_paths':3991,
+              'ledger_sha256':digest,
+              'candidate_primary':{'head':'f54e5b0640945d7a5f0a7c471ac81105436214ae','run':34323945126,'job':102376779500,'cases':17,'assertions':179},
+          }
+          open(sys.argv[2],'w',encoding='utf-8').write(json.dumps(proof,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(proof,sort_keys=True))
+          PY
+      - name: Upload bounded adopted ledger proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: audit185-marketplace-tests-adopted-ledger-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/adopted-proof.json
+            ${{ runner.temp }}/adopted-ledger.csv
+          if-no-files-found: error
+          retention-days: 1
+      - name: Final tracked-source cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code
