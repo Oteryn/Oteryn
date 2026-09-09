@@ -33,7 +33,7 @@
       "semantic_assertions": [
         "final class SecurityEventRecorder",
         "public const IDENTITY_REGISTERED = 'identity.registered';",
-        "public const GAME_LOGIN_TICKET_REDEEMED = 'game_auth.ticket.redeemed';",
+        "public const GAME_LOGIN_TICKET_REDEEMED = 'game_auth.ticket_redeemed';",
         "public const CANARY_ACCOUNT_PROVISIONING_CONFLICT = 'identity.canary_account_provisioning_conflict';",
         "DB::table('identity_security_events')->insert([",
         "'occurred_at' => now()"
