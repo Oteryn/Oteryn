@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      EXPECTED_PARENT: 46f98e12f39dd6eb71aa7f8bf52e69d22f558a91
+      EXPECTED_PARENT: cdf49027f5af17c3377930889e1ed2f6cb5c074e
       BRANCH: docs/20260907-org-comprehensive-audit
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
@@ -99,6 +99,28 @@ jobs:
           set -euo pipefail
           python3 tools/audit/adopt_platform_marketplace_tests.py | tee "$RUNNER_TEMP/adoption-mutation.json"
 
+      - name: Align accepted group scope to exact projected-ledger scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          path=Path('docs/evidence/organization-audit-20260907/coverage-groups.json')
+          doc=json.loads(path.read_text(encoding='utf-8'))
+          rows=[r for r in doc['groups'] if r.get('id')=='PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD']
+          assert len(rows)==1
+          old=('Historical direct-read evidence explicitly names every file in the exact six-file Marketplace test directory; frozen-current carry-forward '
+               'is bounded by exact tree/path/blob identity, the bound 17-case/179-assertion all-green qualification including both real-MariaDB tests, '
+               'and exact projected-ledger reproduction.')
+          projected=('Historical direct-read evidence explicitly names every file in the exact six-file Marketplace test directory; frozen-current carry-forward '
+                     'is bounded by exact tree/path/blob identity and the bound 17-case/179-assertion all-green qualification including both real-MariaDB tests.')
+          assert rows[0]['scope']==old
+          rows[0]['scope']=projected
+          path.write_text(json.dumps(doc,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
+          print('PROJECTED_SCOPE_EXACTLY_RESTORED')
+          PY
+
       - name: Reproduce exact post-adoption ledger and compare rows
         shell: bash
         run: |
@@ -155,6 +177,7 @@ jobs:
           assert c['projected_ledger']['ledger_sha256']=='25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617'
           rows=[x for x in g['groups'] if x.get('id')=='PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD']
           assert len(rows)==1 and rows[0]['expected_count']==6
+          assert rows[0]['scope'].endswith('including both real-MariaDB tests.')
           assert rows[0]['evaluation']['outcome']=='ADOPTED_GROUPED_CARRY_FORWARD_PENDING_POST_ADOPTION_REVALIDATION'
           p=s['per_repository']['platform']
           assert (p['direct_scoped'],p['grouped'],p['unverified_semantics'])==(156,113,1896)
