@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      EXPECTED_PARENT: c67c1e9d7622612affdd431b2af9fae05d0d11ef
+      EXPECTED_PARENT: f1d53b90e3ad23cf88c41f0da1f465ea3f26c53a
       BRANCH: docs/20260907-org-comprehensive-audit
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
@@ -155,6 +155,10 @@ jobs:
           verifier_path.write_text(nonlocal_verifier[0], encoding='utf-8')
 
           tests = tests_path.read_text(encoding='utf-8')
+          outcome_anchor = "row['evaluation']['outcome']='ADOPTED_GROUPED_CARRY_FORWARD'"
+          if tests.count(outcome_anchor) != 1:
+              raise SystemExit('group outcome negative-control anchor drift')
+          tests = tests.replace(outcome_anchor, "row['evaluation']['outcome']='BROKEN'", 1)
           old_test = """    def test_post_adoption_preclaim_fails_closed(self):\n        d=self.candidate(); d['post_adoption_revalidation']={'result':'PASS'}\n        with self.assertRaisesRegex(ValueError,'candidate canonical'):\n            verifier.validate_candidate_shape(d)\n"""
           new_test = """    def test_post_adoption_evidence_drift_fails_closed(self):\n        for key, value in (('audit_head','0'*40),('workflow_run',1),('job',1),('verifier_unit_tests',13),('meta_ci_result','FAILURE'),('ledger_reproduction_artifact',1),('ledger_sha256','0'*64)):\n            d=self.candidate(); d['post_adoption_revalidation'][key]=value\n            with self.assertRaisesRegex(ValueError,'candidate canonical'):\n                verifier.validate_candidate_shape(d)\n        d=self.candidate(); d['post_adoption_revalidation']['ledger_counts']['grouped_paths']=112\n        with self.assertRaisesRegex(ValueError,'candidate canonical'):\n            verifier.validate_candidate_shape(d)\n"""
           if tests.count(old_test) != 1:
