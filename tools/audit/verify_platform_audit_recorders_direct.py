@@ -49,13 +49,9 @@ def read_json(path: Path) -> dict:
     return value
 
 
-def canonical_candidate_blob(candidate: dict) -> str:
-    raw=(json.dumps(candidate,indent=2,ensure_ascii=False)+'\n').encode('utf-8')
-    return blob_sha(raw)
-
-
 def validate_candidate_shape(candidate: dict) -> None:
-    require(canonical_candidate_blob(candidate)==CANDIDATE_BLOB,'complete audit-recorder candidate content drift')
+    reference=read_json(Path(__file__).resolve().parents[2]/CANDIDATE_REL)
+    require(vr.json_exact(candidate,reference),'complete audit-recorder candidate content drift')
     require(candidate.get('coverage_adopted') is True,'complete audit-recorder candidate adoption drift')
     require(candidate.get('source')=={'repository':'Oteryn/Oteryn-Platform','commit_sha':SOURCE_COMMIT,'tree_sha':SOURCE_TREE},'complete audit-recorder candidate source drift')
     require(candidate.get('adoption',{}).get('direct_overlay_path')==str(OVERLAY_REL),'complete audit-recorder candidate overlay path drift')
@@ -139,6 +135,7 @@ def main() -> int:
     parser.add_argument('--platform-root',type=Path,required=True)
     args=parser.parse_args()
     candidate=read_json(args.audit_root/CANDIDATE_REL)
+    require(git(args.audit_root,'rev-parse','HEAD:'+str(CANDIDATE_REL))==CANDIDATE_BLOB,'tracked audit-recorder candidate blob drift')
     validate_candidate_shape(candidate)
     validate_adopted_docs(candidate,args.audit_root)
     validate_source(candidate,args.platform_root)
