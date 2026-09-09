@@ -1,0 +1,179 @@
+name: Organization audit Platform audit recorders qualification (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-platform-audit-recorders-qualification.yml
+      - docs/evidence/organization-audit-20260907/r3-platform-audit-recorders-direct-candidate.json
+      - docs/evidence/organization-audit-20260907/collection-plan.json
+      - docs/evidence/organization-audit-20260907/coverage-review.tsv
+      - docs/evidence/organization-audit-20260907/coverage-groups.json
+      - docs/evidence/organization-audit-20260907/coverage-summary.json
+      - docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
+      - tools/audit/organization_audit.py
+      - tools/audit/verify_report.py
+      - tools/audit/verify_platform_audit_recorders_direct.py
+      - tools/audit/test_verify_platform_audit_recorders_direct.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-185-platform-audit-recorders-qualification
+  cancel-in-progress: false
+
+jobs:
+  qualify-audit-recorders:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    services:
+      mariadb:
+        image: mariadb:11.8.9
+        env:
+          MARIADB_ROOT_PASSWORD: oteryn-audit-recorders-root
+          MARIADB_DATABASE: oteryn_audit_recorders
+          MARIADB_ROOT_HOST: "%"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      APP_ENV: testing
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: oteryn_audit_recorders
+      DB_USERNAME: root
+      DB_PASSWORD: oteryn-audit-recorders-root
+      CACHE_STORE: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      MAIL_MAILER: array
+    steps:
+      - name: Checkout exact audit candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: audit
+          persist-credentials: false
+      - name: Checkout frozen Platform source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Oteryn/Oteryn-Platform
+          ref: de917b3477a1de0667531380de3660e8b2ab59aa
+          path: platform
+          persist-credentials: false
+      - name: Verify exact coordinates and candidate machinery
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C audit rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          test "$(git -C platform rev-parse HEAD)" = de917b3477a1de0667531380de3660e8b2ab59aa
+          test "$(git -C platform rev-parse HEAD^{tree})" = ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e
+          git -C audit diff --check
+          git -C audit diff --exit-code
+          git -C platform diff --exit-code
+          (cd audit/tools/audit && python3 -m unittest -v test_verify_platform_audit_recorders_direct.py)
+          python3 audit/tools/audit/verify_platform_audit_recorders_direct.py \
+            --audit-root audit --platform-root platform | tee "$RUNNER_TEMP/direct-candidate.json"
+      - name: Rebuild immutable audit inventories
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 audit/tools/audit/organization_audit.py \
+            --plan audit/docs/evidence/organization-audit-20260907/collection-plan.json \
+            --output "$RUNNER_TEMP/audit-inventory"
+      - name: Mechanically project the two DIRECT rows without adoption
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 audit/tools/audit/verify_platform_audit_recorders_direct.py \
+            --audit-root audit --platform-root platform \
+            --inventory-dir "$RUNNER_TEMP/audit-inventory/inventories" | tee "$RUNNER_TEMP/projection.json"
+          python3 - "$RUNNER_TEMP/projection.json" <<'PY'
+          import json,re,sys
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert d['result']=='PLATFORM_AUDIT_RECORDERS_DIRECT_CANDIDATE_REVALIDATED_NOT_ADOPTED_NOT_PRODUCT_PASS'
+          assert d['paths']==2 and d['path_blobs_verified']==2
+          assert d['persistence_bindings_verified']==2 and d['focused_test_files_bound']==3
+          assert d['security_event_constants_verified']==31 and d['coverage_adopted'] is False
+          p=d['projected_ledger']
+          assert p['result']=='PLATFORM_AUDIT_RECORDERS_PROJECTED_LEDGER_NOT_ADOPTED_NOT_PRODUCT_PASS'
+          assert p['source_rows']==4325 and p['direct_paths']==223 and p['grouped_paths']==113 and p['unverified_paths']==3989
+          assert p['semantically_classified_paths']==336
+          assert p['platform_direct_paths']==158 and p['platform_grouped_paths']==113 and p['platform_unverified_paths']==1894
+          assert re.fullmatch(r'[0-9a-f]{64}',p['ledger_sha256'])
+          print('PROJECTED_LEDGER='+p['ledger_sha256'])
+          PY
+      - name: Setup PHP 8.5.10
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
+        with:
+          php-version: '8.5.10'
+          coverage: none
+          extensions: pdo_mysql, pdo_sqlite, pcntl, gd
+          tools: composer:v2
+      - name: Install frozen Platform dependencies
+        working-directory: platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          composer validate --strict
+          composer install --no-interaction --prefer-dist --no-progress
+          : > .env
+          php artisan config:clear --ansi
+      - name: Execute representative recorder consumers on MariaDB
+        working-directory: platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          php artisan test \
+            tests/Feature/Admin/AdminRoleManagementTest.php \
+            tests/Feature/Identity/RegistrationTest.php \
+            tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php \
+            --log-junit="$RUNNER_TEMP/audit-recorders-junit.xml"
+      - name: Recount primary qualification results
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/audit-recorders-junit.xml" "$RUNNER_TEMP/test-summary.json" <<'PY'
+          import json,sys,xml.etree.ElementTree as ET
+          path=sys.argv[1]
+          cases=ET.parse(path).getroot().findall('.//testcase')
+          identities=set(); result={'test_files':3,'cases':len(cases),'assertions':0,'failures':0,'errors':0,'skipped':0}
+          for case in cases:
+              ident=(case.attrib.get('classname'),case.attrib.get('name'))
+              if not all(ident) or ident in identities:
+                  raise SystemExit(f'duplicate/missing JUnit identity: {ident}')
+              identities.add(ident)
+              result['assertions'] += int(case.attrib.get('assertions','0'))
+              result['failures'] += len(case.findall('failure'))
+              result['errors'] += len(case.findall('error'))
+              result['skipped'] += len(case.findall('skipped'))
+          if result['cases'] <= 0 or result['assertions'] <= 0 or any(result[k] for k in ('failures','errors','skipped')):
+              raise SystemExit('primary qualification failed/drifted: '+json.dumps(result,sort_keys=True))
+          open(sys.argv[2],'w',encoding='utf-8').write(json.dumps(result,indent=2,sort_keys=True)+'\n')
+          print('PRIMARY_QUALIFICATION='+json.dumps(result,sort_keys=True))
+          PY
+      - name: Upload bounded pre-adoption proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: audit185-platform-audit-recorders-pre-adoption-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/direct-candidate.json
+            ${{ runner.temp }}/projection.json
+            ${{ runner.temp }}/test-summary.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Final tracked-source cleanliness
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C audit diff --exit-code
+          git -C platform diff --exit-code

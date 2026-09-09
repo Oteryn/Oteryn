@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "id": "platform-audit-recorders-direct-20260909",
+  "repository": "platform",
+  "disposition": "DIRECT_CANDIDATE_NOT_ADOPTED",
+  "coverage_adopted": false,
+  "source": {
+    "repository": "Oteryn/Oteryn-Platform",
+    "commit_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "tree_sha": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e"
+  },
+  "paths": [
+    {
+      "path": "app/Audit/AdminAuditRecorder.php",
+      "blob_sha": "78a757d143036aa4c9c13e40c96a9f1fb66cb6a4",
+      "depth": "SCOPED_SEMANTIC_REVIEW",
+      "scope": "Full-file direct bounded review of the recorder implementation: admin audit insertion shape, nullable actor/target handling, JSON metadata encoding, and occurred_at assignment. This does not classify or approve every caller of the recorder.",
+      "line_ranges": [],
+      "semantic_assertions": [
+        "final class AdminAuditRecorder",
+        "DB::table('admin_audit_events')->insert([",
+        "json_encode($metadata, JSON_THROW_ON_ERROR)",
+        "'occurred_at' => now()"
+      ]
+    },
+    {
+      "path": "app/Audit/SecurityEventRecorder.php",
+      "blob_sha": "cdf63637dc6902f575abceeaa106525173f08e5f",
+      "depth": "SCOPED_SEMANTIC_REVIEW",
+      "scope": "Full-file direct bounded review of the recorder implementation: the 31 declared security-event constants, public event helpers, and identity_security_events persistence shape. This does not establish exhaustive correctness of every caller or every security workflow.",
+      "line_ranges": [],
+      "expected_public_event_constants": 31,
+      "semantic_assertions": [
+        "final class SecurityEventRecorder",
+        "public const IDENTITY_REGISTERED = 'identity.registered';",
+        "public const GAME_LOGIN_TICKET_REDEEMED = 'game_auth.ticket.redeemed';",
+        "public const CANARY_ACCOUNT_PROVISIONING_CONFLICT = 'identity.canary_account_provisioning_conflict';",
+        "DB::table('identity_security_events')->insert([",
+        "'occurred_at' => now()"
+      ]
+    }
+  ],
+  "persistence_contract": [
+    {
+      "path": "database/migrations/2026_07_20_093300_create_admin_audit_events_table.php",
+      "blob_sha": "7ec89faee81a5e6ecd80a741f39e967389838044",
+      "table": "admin_audit_events",
+      "role": "QUALIFICATION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"
+    },
+    {
+      "path": "database/migrations/2026_07_19_073601_create_identity_security_events_table.php",
+      "blob_sha": "783b83a4c735117f4efbbe94f217c603b2a90815",
+      "table": "identity_security_events",
+      "role": "QUALIFICATION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"
+    }
+  ],
+  "focused_current_tests": [
+    {
+      "path": "tests/Feature/Admin/AdminRoleManagementTest.php",
+      "blob_sha": "05bcee51c5a7abd3ddc90cb675db74a768429aa1",
+      "required_text": "admin_audit_events",
+      "role": "REPRESENTATIVE_EXECUTION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"
+    },
+    {
+      "path": "tests/Feature/Identity/RegistrationTest.php",
+      "blob_sha": "cfb79eeed2ad544166e35724c0ad5cd220c61862",
+      "required_text": "identity_security_events",
+      "role": "REPRESENTATIVE_EXECUTION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"
+    },
+    {
+      "path": "tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php",
+      "blob_sha": "1fdf519959d61086f2c32e2415761a4a53369ab4",
+      "required_text": "identity_security_events",
+      "role": "REPRESENTATIVE_EXECUTION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"
+    }
+  ],
+  "baseline_accounting": {
+    "source_rows": 4325,
+    "direct_paths": 221,
+    "grouped_paths": 113,
+    "unverified_paths": 3991,
+    "semantically_classified_paths": 334,
+    "platform_direct_paths": 156,
+    "platform_grouped_paths": 113,
+    "platform_unverified_paths": 1896,
+    "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617"
+  },
+  "projected_accounting": {
+    "source_rows": 4325,
+    "direct_paths": 223,
+    "grouped_paths": 113,
+    "unverified_paths": 3989,
+    "semantically_classified_paths": 336,
+    "platform_direct_paths": 158,
+    "platform_grouped_paths": 113,
+    "platform_unverified_paths": 1894,
+    "ledger_sha256": "PENDING_MECHANICAL_REBUILD"
+  },
+  "qualification": {
+    "status": "PENDING_PRIMARY_QUALIFICATION",
+    "workflow_run": null,
+    "job": null,
+    "test_files": 3,
+    "cases": null,
+    "assertions": null,
+    "failures": null,
+    "errors": null,
+    "skipped": null
+  },
+  "limitations": [
+    "DIRECT here is a bounded semantic source-review disposition, not a product or production-readiness PASS.",
+    "The two migration files and three focused test files are qualification dependencies only and are not promoted by this candidate.",
+    "The focused test set is representative, not an exhaustive execution of all AdminAuditRecorder callers or all 31 SecurityEventRecorder event types.",
+    "No later Platform main, live deployment state, branch protection, Merge Queue state, or runtime incident status is inferred from this frozen source qualification.",
+    "Canonical coverage-review.tsv, report counts, and ledger digest remain unchanged until primary qualification and a mechanically reproduced projected ledger are bound."
+  ]
+}
