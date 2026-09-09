@@ -1,0 +1,257 @@
+name: Organization audit repair Marketplace evidence-integrity review findings (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-repair-marketplace-evidence-integrity.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: audit-185-repair-marketplace-evidence-integrity
+  cancel-in-progress: false
+
+jobs:
+  repair:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EXPECTED_PARENT: bf8dc2c6076ba13ef43bf47596bc5b46ffe313cc
+    steps:
+      - name: Checkout exact review-repair trigger
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Require exact one-file trigger
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_PARENT"
+          mapfile -t changed < <(git diff --name-only "$EXPECTED_PARENT" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = '.github/workflows/organization-audit-repair-marketplace-evidence-integrity.yml'
+
+      - name: Harden candidate and verification-index validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          verifier_path = Path('tools/audit/verify_platform_marketplace_payments_wallet_group.py')
+          tests_path = Path('tools/audit/test_verify_platform_marketplace_payments_wallet_group.py')
+
+          verifier = verifier_path.read_text(encoding='utf-8')
+          old = "GROUPS = Path('docs/evidence/organization-audit-20260907/coverage-groups.json')\n"
+          new = old + "INDEX = Path('docs/evidence/organization-audit-20260907/verification-index.json')\n"
+          if verifier.count(old) != 1 or 'INDEX = Path(' in verifier:
+              raise SystemExit('INDEX constant anchor drift')
+          verifier = verifier.replace(old, new, 1)
+
+          anchor = "\n\ndef require(ok: bool, message: str) -> None:\n"
+          if verifier.count(anchor) != 1:
+              raise SystemExit('constant insertion anchor drift')
+          constants = r'''
+CANDIDATE_LIMITATIONS = (
+    'Adopted only as bounded GROUPED carry-forward after exact historical/source identity, the exact 23-path '
+    'dependent binding set, the exact ordered 13-file frozen-current qualification and bound 45-case/444-assertion '
+    'all-green result. This does not establish production readiness, later-current-main status, provider remediation, '
+    'complete payment/marketplace correctness/security, or organization-wide audit completion.'
+)
+CANDIDATE_REQUIRED_CHECKS = (
+    'historical audit publication commit/tree and evidence blob match exactly',
+    'historical evidence contains the exact 49-file Marketplace/Payments/Wallet direct-read statement exactly once',
+    'historical and frozen current app trees are byte-identical',
+    'each family tree matches its exact SHA and exact regular-file count on historical and frozen sources',
+    'each family has identical historical/current path/blob entries and no changed path under its prefix',
+    'the dependent binding map is exactly the required 23 paths and contains all 13 focused test files',
+    'fresh frozen-current qualification executes all 13 focused files with zero failures/errors/skips, including four real-MariaDB integration/concurrency files',
+)
+EXPECTED_INDEX_ROW = {
+    'frozen_source_commit': SOURCE_COMMIT,
+    'historical_source_commit': HISTORICAL_COMMIT,
+    'primary_qualification_head': PRIMARY_QUALIFICATION['qualification_head'],
+    'primary_run': PRIMARY_QUALIFICATION['workflow_run'],
+    'primary_job': PRIMARY_QUALIFICATION['job'],
+    'primary_verifier_unit_tests': PRIMARY_QUALIFICATION['verifier_unit_tests'],
+    'exact_family_counts': [21, 24, 4],
+    'exact_total_paths': 49,
+    'dependent_blob_bindings': 23,
+    'focused_test_files': 13,
+    'focused_cases': 45,
+    'focused_assertions': 444,
+    'failures': 0,
+    'errors': 0,
+    'skips': 0,
+    'php': '8.5.10',
+    'mariadb': '11.8.9',
+    'tracked_source_clean_after_execution': True,
+    'hardening_head': '53dc22290da5c952fc76aa4cb7222ad450be6974',
+    'hardening_meta_ci_run': 34284712709,
+    'hardening_qualification_run': 34284712575,
+    'ledger_reproduction_head': 'adc884f64982e71609415ef946d97b445488c3e0',
+    'ledger_reproduction_run': 34284837901,
+    'ledger_reproduction_artifact': 10079037530,
+    'pre_adoption_ledger_sha256': 'b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459',
+    'projected_adopted_ledger_sha256': POST_ADOPTION['ledger_sha256'],
+    'qualification': 'BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS',
+    'post_adoption_head': POST_ADOPTION['audit_head'],
+    'post_adoption_run': POST_ADOPTION['workflow_run'],
+    'post_adoption_job': POST_ADOPTION['job'],
+    'post_adoption_verifier_unit_tests': POST_ADOPTION['verifier_unit_tests'],
+    'post_adoption_meta_ci_run': POST_ADOPTION['meta_ci_run'],
+    'post_adoption_ledger_run': POST_ADOPTION['ledger_reproduction_run'],
+    'post_adoption_ledger_job': POST_ADOPTION['ledger_reproduction_job'],
+    'post_adoption_ledger_artifact': POST_ADOPTION['ledger_reproduction_artifact'],
+    'post_adoption_ledger_sha256': POST_ADOPTION['ledger_sha256'],
+    'post_adoption_grouped_paths': POST_ADOPTION['ledger_counts']['grouped_paths'],
+    'post_adoption_unverified_paths': POST_ADOPTION['ledger_counts']['unverified_paths'],
+    'post_adoption_result': POST_ADOPTION['canonical_group_state'],
+}
+'''
+          verifier = verifier.replace(anchor, '\n' + constants + anchor, 1)
+
+          anchor = "\n\ndef validate_candidate_shape(candidate) -> bool:\n"
+          if verifier.count(anchor) != 1:
+              raise SystemExit('candidate helper insertion anchor drift')
+          helpers = r'''
+def expected_candidate(adopted: bool) -> dict:
+    expected = {
+        'schema_version': 1,
+        'candidate_id': 'PLATFORM-MARKETPLACE-PAYMENTS-WALLET-HISTORICAL-DIRECT-CARRYFORWARD',
+        'repository': 'Oteryn/Oteryn-Platform',
+        'state': ADOPTED if adopted else QUALIFIED_PENDING,
+        'expected_total': 49,
+        'historical_evidence': {
+            'repository': 'Oteryn/Oteryn-Platform',
+            'publication_commit': EVIDENCE_COMMIT,
+            'publication_tree': EVIDENCE_TREE,
+            'evidence_path': EVIDENCE_PATH,
+            'evidence_blob': EVIDENCE_BLOB,
+            'audited_main_sha': HISTORICAL_COMMIT,
+            'audited_main_tree': HISTORICAL_TREE,
+            'exact_statement': EXACT_STATEMENT,
+            'basis': 'historical direct read of the documented 49-file Marketplace/Payments/Wallet production batch',
+        },
+        'current_revalidation': {
+            'source_commit': SOURCE_COMMIT,
+            'source_tree': SOURCE_TREE,
+            'historical_app_tree': APP_TREE,
+            'current_app_tree': APP_TREE,
+            'families': [
+                {'id': family_id, 'path_prefix': prefix, 'expected_count': count, 'tree_sha': tree_sha}
+                for family_id, prefix, count, tree_sha in EXPECTED_FAMILIES
+            ],
+            'dependent_blobs': EXPECTED_DEPENDENT_BLOBS,
+            'focused_test_files': list(FOCUSED_TEST_FILES),
+            'required_checks': list(CANDIDATE_REQUIRED_CHECKS),
+        },
+        'coverage_adopted': adopted,
+        'limitations': CANDIDATE_LIMITATIONS,
+        'qualification': PRIMARY_QUALIFICATION,
+    }
+    if adopted:
+        expected['post_adoption_revalidation'] = POST_ADOPTION
+    return expected
+
+
+def validate_verification_index(index_doc: dict) -> None:
+    require(type(index_doc.get('schema_version')) is int and index_doc['schema_version'] == 1, 'verification-index schema')
+    require(
+        json_exact(index_doc.get('r3_platform_marketplace_payments_wallet_qualification'), EXPECTED_INDEX_ROW),
+        'Marketplace verification-index record must exactly match bound candidate evidence',
+    )
+'''
+          verifier = verifier.replace(anchor, '\n' + helpers + anchor, 1)
+
+          old = "    else:\n        require('post_adoption_revalidation' not in candidate, 'pending adoption candidate cannot carry post-adoption revalidation')\n    return adopted\n"
+          new = "    else:\n        require('post_adoption_revalidation' not in candidate, 'pending adoption candidate cannot carry post-adoption revalidation')\n    require(json_exact(candidate, expected_candidate(adopted)), 'candidate canonical evidence fields/key sets drift')\n    return adopted\n"
+          if verifier.count(old) != 1:
+              raise SystemExit('candidate exact-comparison anchor drift')
+          verifier = verifier.replace(old, new, 1)
+
+          old = "    validate_group_state(candidate, read_json(audit_root / GROUPS), adopted)\n    hist = candidate['historical_evidence']\n"
+          new = "    validate_group_state(candidate, read_json(audit_root / GROUPS), adopted)\n    validate_verification_index(read_json(audit_root / INDEX))\n    hist = candidate['historical_evidence']\n"
+          if verifier.count(old) != 1:
+              raise SystemExit('verification-index call anchor drift')
+          verifier = verifier.replace(old, new, 1)
+          verifier_path.write_text(verifier, encoding='utf-8')
+
+          tests = tests_path.read_text(encoding='utf-8')
+          old = "GROUPS = ROOT / verifier.GROUPS\n"
+          new = old + "INDEX = ROOT / verifier.INDEX\n"
+          if tests.count(old) != 1 or 'INDEX = ROOT / verifier.INDEX' in tests:
+              raise SystemExit('test INDEX anchor drift')
+          tests = tests.replace(old, new, 1)
+
+          old = "    def groups_fixture(self):\n        return deepcopy(json.loads(GROUPS.read_text(encoding='utf-8')))\n\n"
+          new = old + "    def index_fixture(self):\n        return deepcopy(json.loads(INDEX.read_text(encoding='utf-8')))\n\n"
+          if tests.count(old) != 1:
+              raise SystemExit('test index fixture anchor drift')
+          tests = tests.replace(old, new, 1)
+
+          old = "        verifier.validate_group_state(data, self.groups_fixture(), True)\n"
+          new = old + "        verifier.validate_verification_index(self.index_fixture())\n"
+          if tests.count(old) != 1:
+              raise SystemExit('committed candidate test anchor drift')
+          tests = tests.replace(old, new, 1)
+
+          anchor = "    def test_bool_total_is_not_integer_49(self):\n"
+          if tests.count(anchor) != 1:
+              raise SystemExit('new adversarial tests anchor drift')
+          additions = r'''    def test_candidate_claim_fields_and_key_sets_fail_closed(self):
+        mutations = []
+        data = self.fixture(); data['limitations'] = 'production ready'; mutations.append(data)
+        data = self.fixture(); data['historical_evidence']['basis'] += ' changed'; mutations.append(data)
+        data = self.fixture(); data['current_revalidation']['required_checks'].pop(); mutations.append(data)
+        data = self.fixture(); data['unexpected_claim'] = 'complete'; mutations.append(data)
+        for data in mutations:
+            with self.assertRaisesRegex(ValueError, 'canonical evidence fields/key sets drift'):
+                verifier.validate_candidate_shape(data)
+
+    def test_verification_index_primary_post_and_key_drift_fail_closed(self):
+        data = self.index_fixture(); data['r3_platform_marketplace_payments_wallet_qualification']['primary_run'] += 1
+        with self.assertRaisesRegex(ValueError, 'verification-index record must exactly match'):
+            verifier.validate_verification_index(data)
+        data = self.index_fixture(); data['r3_platform_marketplace_payments_wallet_qualification']['post_adoption_ledger_sha256'] = '0' * 64
+        with self.assertRaisesRegex(ValueError, 'verification-index record must exactly match'):
+            verifier.validate_verification_index(data)
+        data = self.index_fixture(); data['r3_platform_marketplace_payments_wallet_qualification']['unexpected'] = True
+        with self.assertRaisesRegex(ValueError, 'verification-index record must exactly match'):
+            verifier.validate_verification_index(data)
+
+'''
+          tests = tests.replace(anchor, additions + anchor, 1)
+          tests_path.write_text(tests, encoding='utf-8')
+          PY
+
+          (cd tools/audit && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_verify_platform_marketplace_payments_wallet_group.py)
+          PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile tools/audit/verify_platform_marketplace_payments_wallet_group.py tools/audit/test_verify_platform_marketplace_payments_wallet_group.py
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/verify_report.py --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
+          git diff --check
+          mapfile -t actual < <(git diff --name-only | LC_ALL=C sort)
+          expected=(
+            'tools/audit/test_verify_platform_marketplace_payments_wallet_group.py'
+            'tools/audit/verify_platform_marketplace_payments_wallet_group.py'
+          )
+          diff -u <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort) <(printf '%s\n' "${actual[@]}")
+
+      - name: Publish one fast-forward review-repair commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_HEAD_REF"
+          test "$(git rev-parse FETCH_HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            tools/audit/test_verify_platform_marketplace_payments_wallet_group.py \
+            tools/audit/verify_platform_marketplace_payments_wallet_group.py
+          git commit -m 'fix(audit): harden Marketplace evidence integrity (#186)'
+          git push origin "HEAD:refs/heads/$GITHUB_HEAD_REF"
