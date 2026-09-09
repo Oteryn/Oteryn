@@ -184,6 +184,30 @@ class AnnouncementsProjectionTest(unittest.TestCase):
             self.assertEqual(renamed.read_bytes(),b'ledger')
             self.assertFalse(second.exists())
 
+    def test_ownership_check_interception_cannot_replace_captured_pathname(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); first=root/'first'; second=root/'second'
+            real_stat=projector.os.stat
+            attacked=False
+            def replace_active_name_after_check(path,*args,**kwargs):
+                nonlocal attacked
+                observed=real_stat(path,*args,**kwargs)
+                if isinstance(path,str) and path.startswith('.first.rollback-') and not attacked:
+                    attacked=True
+                    # The tool-owned inode has already been atomically captured
+                    # under ``path``.  Reusing the published name now must not
+                    # expose these unrelated bytes to the subsequent unlink.
+                    first.write_bytes(b'unrelated replacement')
+                return observed
+            with mock.patch.object(projector.os,'fsync',side_effect=[None,OSError('simulated second fsync failure')]), \
+                 mock.patch.object(projector.os,'stat',side_effect=replace_active_name_after_check):
+                with self.assertRaisesRegex(OSError,'simulated second fsync failure'):
+                    projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
+            self.assertTrue(attacked)
+            self.assertEqual(first.read_bytes(),b'unrelated replacement')
+            self.assertFalse(second.exists())
+            self.assertEqual(list(root.glob('.first.rollback-*')),[])
+
     def test_quarantine_name_collision_is_retried(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); first=root/'first'; second=root/'second'
