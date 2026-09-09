@@ -184,7 +184,7 @@ def verify_enqueue_receipt(
     now_epoch_seconds: int,
 ) -> str:
     """Accept only the immediate exact-target receipt from the enqueue mutation."""
-    if route not in {EXPLICIT_ENQUEUE, PROTECTED_EXECUTOR_ENQUEUE}:
+    if not isinstance(route, str) or route not in {EXPLICIT_ENQUEUE, PROTECTED_EXECUTOR_ENQUEUE}:
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
     if not _valid_attempt(attempt) or not isinstance(receipt, EnqueueReceipt):
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
