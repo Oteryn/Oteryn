@@ -109,17 +109,26 @@ class AsyncMergeReceipt(NamedTuple):
     http_status: int
     request_uuid: str
     observed_at_epoch_seconds: int
+    executor_sequence: int
 
 
 class PostSubmissionTargetObservation(NamedTuple):
-    """Immediate live PR readback after an accepted queue request."""
+    """Immediate live PR readback after an accepted queue request.
+
+    ``accepted_request_uuid`` binds the readback to the exact GitHub async
+    receipt. ``executor_sequence`` is an executor-owned monotonic causal marker;
+    it must be strictly greater than the receipt marker. Whole-second wall-clock
+    timestamps are used only for bounded freshness, never causal ordering.
+    """
 
     source: str
     repository: str
     pr_number: int
     base_ref: str
     pr_head_sha: str
+    accepted_request_uuid: str
     observed_at_epoch_seconds: int
+    executor_sequence: int
 
 
 # ``merge-async`` is the selected Oteryn native route. Its exact-head fence and
@@ -329,6 +338,7 @@ def verify_async_merge_receipt(
         or isinstance(receipt.http_status, bool)
         or not isinstance(receipt.observed_at_epoch_seconds, int)
         or isinstance(receipt.observed_at_epoch_seconds, bool)
+        or not _positive_int(receipt.executor_sequence)
         or not isinstance(now_epoch_seconds, int)
         or isinstance(now_epoch_seconds, bool)
         or not 0 <= receipt.observed_at_epoch_seconds <= now_epoch_seconds
@@ -349,7 +359,7 @@ def verify_post_submission_target(
     *,
     now_epoch_seconds: int,
 ) -> str:
-    """Require immediate live target readback after accepted submission."""
+    """Require receipt-bound, causally post-response live target readback."""
 
     if (
         verify_async_merge_receipt(
@@ -369,8 +379,12 @@ def verify_post_submission_target(
         or observation.base_ref != attempt.base_ref
         or observation.pr_head_sha != attempt.live_pr_head_sha
         or not _fullmatch(SHA_RE, observation.pr_head_sha)
+        or observation.accepted_request_uuid != receipt.request_uuid
+        or not _fullmatch(UUID_RE, observation.accepted_request_uuid)
         or not isinstance(observation.observed_at_epoch_seconds, int)
         or isinstance(observation.observed_at_epoch_seconds, bool)
+        or not _positive_int(observation.executor_sequence)
+        or observation.executor_sequence <= receipt.executor_sequence
         or not isinstance(now_epoch_seconds, int)
         or isinstance(now_epoch_seconds, bool)
         or not 0 <= observation.observed_at_epoch_seconds <= now_epoch_seconds
