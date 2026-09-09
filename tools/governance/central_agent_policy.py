@@ -13,7 +13,7 @@ import urllib.request
 
 POLICY_PATH = Path("ecosystem/organization-agent-policy.json")
 POLICY_ID = "OTERYN_ORGANIZATION_AGENT_POLICY"
-POLICY_VERSION = "3.0.0"
+POLICY_VERSION = "3.1.0"
 AUTHORITY_REPOSITORY = "Oteryn/Oteryn"
 BINDING_PATH = "docs/agents/META_AGENT_POLICY_BINDING.json"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
