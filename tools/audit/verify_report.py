@@ -24,23 +24,25 @@ STATES = {'SOURCE_REPAIRED_TESTED','PARTIALLY_REPAIRED','RETIRED_SOURCE','SOURCE
           'REPORTED_CLOSED','LIVE_RECORD_RECONCILED','REPORTED_IMPLEMENTED_NOT_REQUALIFIED',
           'REPORTED_OPEN','OWNER_DECISION_PENDING','HISTORICAL_TERMINAL','REPORTED_OPEN_CANDIDATE'}
 DEFAULT_REASON = 'Identity enumerated; this continuation does not assert a complete semantic review of this leaf. Historical/source oracles may provide narrower evidence in the finding register.'
-DIRECT_ADDITIONS = 'coverage-review-additions.tsv'
-DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
+DIRECT_ADDITIONS = 'coverage-review-canonical-additions.tsv'
+DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-canonical-additions.tsv'
+RECORDER_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
+ANNOUNCEMENTS_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-announcements-additions.tsv'
 SEMANTIC_COVERAGE_UNKNOWN = {
     'id': 'SEMANTIC-COVERAGE',
-    'missing': '3989 source leaves retain UNVERIFIED semantics; 336 of 4325 leaves are semantically classified',
-    'reason': 'Source bytes are available; 223 DIRECT scoped path reviews are bound (the prior 221 plus app/Audit/AdminAuditRecorder.php and app/Audit/SecurityEventRecorder.php), and 113 bounded GROUPED Platform paths are bound (27 GameAuth + 31 Accounts/CanaryIntegration/CharacterProfiles/Characters + 49 Marketplace/Payments/Wallet + 6 Marketplace tests). This is bounded semantic accounting, not full behavior, product, or audit approval; 3989 paths retain UNVERIFIED. The rejected Atlas 508-path candidate remains UNVERIFIED, and no automatic import from maintenance N/A or unproven summaries is allowed.',
-    'effect': 'Original exhaustive completeness cannot be claimed from 336 semantically classified leaves out of 4325.',
+    'missing': '3979 source leaves retain UNVERIFIED semantics; 346 of 4325 leaves are semantically classified',
+    'reason': 'Source bytes are available; 233 DIRECT scoped path reviews are bound (the prior 221 plus two app/Audit recorder paths plus ten app/Announcements/** paths), and 113 bounded GROUPED Platform paths are bound (27 GameAuth + 31 Accounts/CanaryIntegration/CharacterProfiles/Characters + 49 Marketplace/Payments/Wallet + 6 Marketplace tests). The ten Announcements DIRECT paths are frozen-source bounded reviews qualified by real MariaDB 11.8.9 with 4 cases / 20 assertions and a mechanical projection proving exactly those ten rows transition UNVERIFIED to DIRECT; the Polish editorial_translations join branch and a dedicated simultaneous-writer race remain explicit execution limits. This is bounded semantic accounting, not full behavior, product, or audit approval; 3979 paths retain UNVERIFIED. The rejected Atlas 508-path candidate remains UNVERIFIED, and no automatic import from maintenance N/A or unproven summaries is allowed.',
+    'effect': 'Original exhaustive completeness cannot be claimed from 346 semantically classified leaves out of 4325.',
     'owner_route': 'META186 plus provider audit owners',
     'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review changed/uncovered authored families, and retain justified grouping/N/A.',
 }
 INDEPENDENT_REVIEW_UNKNOWN = {
     'id': 'INDEPENDENT-REVIEW',
-    'missing': 'Independent review lifecycle/outcome for the two adopted Platform audit-recorder DIRECT paths',
-    'reason': 'Independent review and cleanup are complete for the 49-path Marketplace/Payments/Wallet GROUPED expansion and the six-file Marketplace-test GROUPED batch. The remaining bounded review slice is app/Audit/AdminAuditRecorder.php and app/Audit/SecurityEventRecorder.php on the current stable audit lineage; its independent-review lifecycle and outcome are external mutable PR #185 metadata and are not self-certified by this evidence object.',
-    'effect': 'No whole-audit or product-readiness conclusion and no self-awarded independent 10/10 are claimed from the two-path recorder adoption.',
+    'missing': 'Independent review lifecycle/outcome for the adopted Platform audit-recorder and Announcements DIRECT slices',
+    'reason': 'Independent review and cleanup are complete for the 49-path Marketplace/Payments/Wallet GROUPED expansion and the six-file Marketplace-test GROUPED batch. The current stable audit lineage additionally adopts two app/Audit recorder paths and ten app/Announcements/** paths as bounded DIRECT reviews. Their independent-review lifecycle and outcome are external mutable PR #185 metadata and are not self-certified by this evidence object.',
+    'effect': 'No whole-audit or product-readiness conclusion and no self-awarded independent 10/10 are claimed from these twelve post-Marketplace DIRECT paths.',
     'owner_route': 'PR185 reviewer',
-    'closure_condition': 'PR #185 review metadata records the independent exact-head disposition for the two recorder paths; this evidence object remains a durable pre-review snapshot and does not itself close unrelated product/operations obligations.',
+    'closure_condition': 'PR #185 review metadata records the independent exact-head disposition for the recorder and Announcements DIRECT slices; this evidence object remains a durable pre-review snapshot and does not itself close unrelated product/operations obligations.',
 }
 
 
@@ -238,6 +240,9 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
         require(SHA.fullmatch(v['commit_sha']) and SHA.fullmatch(v['tree_sha']),'invalid source identity')
         require(type(v['leaf_count']) is int and v['leaf_count']>0,'invalid leaf count')
     require(doc['evidence_directory']=='organization-audit-20260907','invalid evidence directory')
+    require(doc.get('coverage_review_additions')==DIRECT_ADDITIONS_BINDING,'canonical direct additions binding drift')
+    require(doc.get('coverage_review_recorder_additions')==RECORDER_ADDITIONS_BINDING,'recorder additions evidence binding drift')
+    require(doc.get('coverage_review_announcements_additions')==ANNOUNCEMENTS_ADDITIONS_BINDING,'Announcements additions evidence binding drift')
     base=report_path.parent/doc['evidence_directory']
     findings=read_tsv(base/'finding-register.tsv');unique(findings,lambda r:r['id'],'finding id')
     require(len(findings)==doc['reconciled_register_rows'],'finding count mismatch')

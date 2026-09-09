@@ -21,17 +21,20 @@ class ReadmeCurrentStateTest(unittest.TestCase):
     def test_current_readme_passes(self):
         result = readme_contract.validate_text(self.current)
         self.assertEqual(result['result'], 'README_CURRENT_STATE_VALIDATED_NOT_PRODUCT_PASS')
-        self.assertEqual(result['direct_paths'], 223)
+        self.assertEqual(result['direct_paths'], 233)
         self.assertEqual(result['grouped_paths'], 113)
-        self.assertEqual(result['unverified_paths'], 3989)
-        self.assertEqual(result['semantically_classified_paths'], 336)
+        self.assertEqual(result['unverified_paths'], 3979)
+        self.assertEqual(result['semantically_classified_paths'], 346)
+        self.assertEqual(result['remaining_bounded_proof_workflows'], [
+            'organization-audit-platform-audit-recorders-qualification.yml',
+            'organization-audit-platform-announcements-adopted-proof.yml',
+        ])
         self.assertFalse(result['product_readiness_claimed'])
         self.assertFalse(result['audit_completion_claimed'])
 
     def test_old_accounting_transition_rejected(self):
-        mutated = self.current.replace('223 DIRECT scoped path reviews', '221 DIRECT scoped path reviews', 1)
-        mutated = mutated.replace('113 bounded GROUPED Platform paths', '107 bounded GROUPED Platform paths', 1)
-        mutated = mutated.replace('3989 retain UNVERIFIED semantics', '3997 retain UNVERIFIED semantics', 1)
+        mutated = self.current.replace('233 DIRECT scoped path reviews', '223 DIRECT scoped path reviews', 1)
+        mutated = mutated.replace('3979 retain UNVERIFIED semantics', '3989 retain UNVERIFIED semantics', 1)
         self.reject(mutated)
 
     def test_historical_review_pending_wording_rejected(self):
@@ -46,6 +49,14 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         mutated = self.current.replace(
             'Marketplace/Payments/Wallet qualification, ledger-reproduction and projection workflows and the six-file Marketplace-test temporary proof workflows were removed after their completed review/cleanup.',
             'Temporary Marketplace/Payments/Wallet qualification, ledger-reproduction and projection workflows remain only while the 49-path adoption is rebound and independently reviewed.',
+            1,
+        )
+        self.reject(mutated)
+
+    def test_announcements_pre_adoption_workflow_wording_rejected(self):
+        mutated = self.current.replace(
+            'The Announcements pre-adoption qualification and projection workflows are removed after their bound successful runs; canonical adoption is verified by the temporary Platform Announcements adopted-proof workflow.',
+            'The Announcements pre-adoption qualification and projection workflows remain active.',
             1,
         )
         self.reject(mutated)
@@ -72,7 +83,7 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         self.reject(mutated)
 
     def test_truncated_current_accounting_paragraph_rejected(self):
-        mutated = self.current.replace(' and 3989 retain UNVERIFIED semantics.', '.', 1)
+        mutated = self.current.replace(' and 3979 retain UNVERIFIED semantics.', '.', 1)
         self.reject(mutated)
 
 

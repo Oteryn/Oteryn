@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Fail-closed verifier for the adopted two-file frozen Platform audit-recorder DIRECT slice.
+"""Fail-closed verifier for the preserved two-path Platform audit-recorder DIRECT slice.
 
-The verifier binds frozen source/persistence/test identities, the exact two-row
-DIRECT overlay, canonical accounting and both pre/post-adoption execution proof.
-A successful result is bounded audit evidence only, never product readiness.
+The recorder candidate and its original two-row overlay are immutable historical
+adoption evidence. Current global accounting may advance through a separate
+canonical composition overlay; that must not rewrite the recorder evidence.
 """
 from __future__ import annotations
 
@@ -14,169 +14,18 @@ import json
 from pathlib import Path
 import re
 import subprocess
-import sys
+
+import verify_report as vr
 
 CANDIDATE_REL = Path('docs/evidence/organization-audit-20260907/r3-platform-audit-recorders-direct-candidate.json')
-REPORT_REL = Path('docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json')
-SUMMARY_REL = Path('docs/evidence/organization-audit-20260907/coverage-summary.json')
+CANDIDATE_BLOB = 'ca73bad56417157136b4284e8b31fe7f29829d07'
 OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/coverage-review-additions.tsv')
+OVERLAY_BLOB = '9b5c1afc0d1ac39641077510fb4d6c20222e04d5'
+CANONICAL_OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/coverage-review-canonical-additions.tsv')
 SOURCE_COMMIT = 'de917b3477a1de0667531380de3660e8b2ab59aa'
 SOURCE_TREE = 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e'
-LEDGER_SHA = '2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f'
-OVERLAY_BLOB = '9b5c1afc0d1ac39641077510fb4d6c20222e04d5'
-EXPECTED_PATHS = {
-    'app/Audit/AdminAuditRecorder.php': '78a757d143036aa4c9c13e40c96a9f1fb66cb6a4',
-    'app/Audit/SecurityEventRecorder.php': 'cdf63637dc6902f575abceeaa106525173f08e5f',
-}
-EXPECTED_PERSISTENCE = {
-    'database/migrations/2026_07_20_093300_create_admin_audit_events_table.php': '7ec89faee81a5e6ecd80a741f39e967389838044',
-    'database/migrations/2026_07_19_073601_create_identity_security_events_table.php': '783b83a4c735117f4efbbe94f217c603b2a90815',
-}
-EXPECTED_TESTS = {
-    'tests/Feature/Admin/AdminRoleManagementTest.php': '05bcee51c5a7abd3ddc90cb675db74a768429aa1',
-    'tests/Feature/Identity/RegistrationTest.php': 'cfb79eeed2ad544166e35724c0ad5cd220c61862',
-    'tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php': '1fdf519959d61086f2c32e2415761a4a53369ab4',
-}
+CURRENT_LEDGER_SHA = '73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9'
 SHA = re.compile(r'[0-9a-f]{40}\Z')
-
-EXPECTED_CANDIDATE = json.loads(r'''
-{
-  "schema_version": 1,
-  "id": "platform-audit-recorders-direct-20260909",
-  "repository": "platform",
-  "disposition": "DIRECT_ADOPTED_POST_PROOF_COMPLETE_PENDING_INDEPENDENT_REVIEW",
-  "coverage_adopted": true,
-  "source": {
-    "repository": "Oteryn/Oteryn-Platform",
-    "commit_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
-    "tree_sha": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e"
-  },
-  "paths": [
-    {
-      "path": "app/Audit/AdminAuditRecorder.php",
-      "blob_sha": "78a757d143036aa4c9c13e40c96a9f1fb66cb6a4",
-      "depth": "SCOPED_SEMANTIC_REVIEW",
-      "scope": "Full-file direct bounded review of the recorder implementation: admin audit insertion shape, nullable actor/target handling, JSON metadata encoding, and occurred_at assignment. This does not classify or approve every caller of the recorder.",
-      "line_ranges": [],
-      "semantic_assertions": ["final class AdminAuditRecorder", "DB::table('admin_audit_events')->insert([", "json_encode($metadata, JSON_THROW_ON_ERROR)", "'occurred_at' => now()"]
-    },
-    {
-      "path": "app/Audit/SecurityEventRecorder.php",
-      "blob_sha": "cdf63637dc6902f575abceeaa106525173f08e5f",
-      "depth": "SCOPED_SEMANTIC_REVIEW",
-      "scope": "Full-file direct bounded review of the recorder implementation: the 31 declared security-event constants, public event helpers, and identity_security_events persistence shape. This does not establish exhaustive correctness of every caller or every security workflow.",
-      "line_ranges": [],
-      "expected_public_event_constants": 31,
-      "semantic_assertions": ["final class SecurityEventRecorder", "public const IDENTITY_REGISTERED = 'identity.registered';", "public const GAME_LOGIN_TICKET_REDEEMED = 'game_auth.ticket_redeemed';", "public const CANARY_ACCOUNT_PROVISIONING_CONFLICT = 'identity.canary_account_provisioning_conflict';", "DB::table('identity_security_events')->insert([", "'occurred_at' => now()"]
-    }
-  ],
-  "persistence_contract": [
-    {"path": "database/migrations/2026_07_20_093300_create_admin_audit_events_table.php", "blob_sha": "7ec89faee81a5e6ecd80a741f39e967389838044", "table": "admin_audit_events", "role": "QUALIFICATION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"},
-    {"path": "database/migrations/2026_07_19_073601_create_identity_security_events_table.php", "blob_sha": "783b83a4c735117f4efbbe94f217c603b2a90815", "table": "identity_security_events", "role": "QUALIFICATION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"}
-  ],
-  "focused_current_tests": [
-    {"path": "tests/Feature/Admin/AdminRoleManagementTest.php", "blob_sha": "05bcee51c5a7abd3ddc90cb675db74a768429aa1", "required_text": "admin_audit_events", "role": "REPRESENTATIVE_EXECUTION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"},
-    {"path": "tests/Feature/Identity/RegistrationTest.php", "blob_sha": "cfb79eeed2ad544166e35724c0ad5cd220c61862", "required_text": "identity_security_events", "role": "REPRESENTATIVE_EXECUTION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"},
-    {"path": "tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php", "blob_sha": "1fdf519959d61086f2c32e2415761a4a53369ab4", "required_text": "identity_security_events", "role": "REPRESENTATIVE_EXECUTION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"}
-  ],
-  "baseline_accounting": {
-    "source_rows": 4325,
-    "direct_paths": 221,
-    "grouped_paths": 113,
-    "unverified_paths": 3991,
-    "semantically_classified_paths": 334,
-    "platform_direct_paths": 156,
-    "platform_grouped_paths": 113,
-    "platform_unverified_paths": 1896,
-    "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617"
-  },
-  "initial_projection": {
-    "head_sha": "e68726c9590f0ea611871abfbf1bd3238b635c6c",
-    "workflow_run": 34347577287,
-    "job": 102452733285,
-    "artifact": 10102358530,
-    "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f",
-    "note": "First mechanical projection retained as provenance; no canonical coverage was changed on this head."
-  },
-  "qualification": {
-    "status": "PRIMARY_QUALIFICATION_SUCCESS",
-    "head_sha": "e68726c9590f0ea611871abfbf1bd3238b635c6c",
-    "workflow_run": 34347577287,
-    "job": 102452733285,
-    "artifact": 10102358530,
-    "artifact_sha256": "eda15a09fdffedbec2bcecc2591d2ba6674be21993c9f2555a8cdd5b2df6b24d",
-    "mariadb_image": "mariadb:11.8.9",
-    "db_connection": "mysql",
-    "db_port": 3306,
-    "test_files": 3,
-    "cases": 25,
-    "assertions": 89,
-    "failures": 0,
-    "errors": 0,
-    "skipped": 0
-  },
-  "pre_adoption_exact_head": {
-    "status": "SUCCESS",
-    "head_sha": "14b18e00936cbf09884e51bfc4c8eaf121edd715",
-    "workflow_run": 34348443102,
-    "job": 102455526087,
-    "artifact": 10102677683,
-    "artifact_sha256": "0103eca993e0a52d2d9bab834594cb5d63072842bb40f819b34de7d47be7d7a1",
-    "meta_ci_run": 34348443175,
-    "verifier_unit_tests": 12,
-    "test_files": 3,
-    "cases": 25,
-    "assertions": 89,
-    "failures": 0,
-    "errors": 0,
-    "skipped": 0,
-    "projected_ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f"
-  },
-  "projected_accounting": {
-    "source_rows": 4325,
-    "direct_paths": 223,
-    "grouped_paths": 113,
-    "unverified_paths": 3989,
-    "semantically_classified_paths": 336,
-    "platform_direct_paths": 158,
-    "platform_grouped_paths": 113,
-    "platform_unverified_paths": 1894,
-    "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f"
-  },
-  "adoption": {
-    "status": "ADOPTED_POST_PROOF_COMPLETE_PENDING_INDEPENDENT_REVIEW",
-    "direct_overlay_path": "docs/evidence/organization-audit-20260907/coverage-review-additions.tsv",
-    "direct_overlay_blob_sha": "9b5c1afc0d1ac39641077510fb4d6c20222e04d5",
-    "adopted_paths": 2,
-    "source_rows": 4325,
-    "direct_paths": 223,
-    "grouped_paths": 113,
-    "unverified_paths": 3989,
-    "semantically_classified_paths": 336,
-    "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f"
-  },
-  "post_adoption_revalidation": {
-    "status": "SUCCESS",
-    "head_sha": "8d2c412955a283de54c40bec2995a961d2322d9d",
-    "workflow_run": 34355682587,
-    "job": 102479632543,
-    "artifact": 10105627207,
-    "artifact_sha256": "b0e9f04185f16904dbd6f290e0d559aeb2515512e6bd378a83c5d90524ba7c2e",
-    "meta_ci_run": 34355682545,
-    "verifier_unit_tests": 14,
-    "cases": 25,
-    "assertions": 89,
-    "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f"
-  },
-  "limitations": [
-    "DIRECT here is a bounded semantic source-review disposition, not a product or production-readiness PASS.",
-    "The two migration files and three focused test files are qualification dependencies only and are not promoted by this candidate.",
-    "The focused test set is representative, not an exhaustive execution of all AdminAuditRecorder callers or all 31 SecurityEventRecorder event types.",
-    "No later Platform main, live deployment state, branch protection, Merge Queue state, or runtime incident status is inferred from this frozen source qualification.",
-    "Exact-head post-adoption proof is complete and bound at 8d2c412955a283de54c40bec2995a961d2322d9d; fresh independent review of the stable recorder-adoption audit head remains required before this slice is considered closed."
-  ]
-}
-''')
 
 
 def require(condition: bool, message: str) -> None:
@@ -184,128 +33,129 @@ def require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
-def json_exact(left, right) -> bool:
-    if type(left) is not type(right):
-        return False
-    if isinstance(left, dict):
-        return left.keys() == right.keys() and all(json_exact(left[key], right[key]) for key in left)
-    if isinstance(left, list):
-        return len(left) == len(right) and all(json_exact(a, b) for a, b in zip(left, right))
-    return left == right
+def blob_sha(raw: bytes) -> str:
+    return hashlib.sha1(b'blob ' + str(len(raw)).encode('ascii') + b'\0' + raw).hexdigest()
 
 
 def read_json(path: Path) -> dict:
     def pairs(items):
-        out = {}
-        for key, value in items:
-            require(key not in out, 'duplicate JSON key: ' + key)
-            out[key] = value
+        out={}
+        for key,value in items:
+            require(key not in out,'duplicate JSON key')
+            out[key]=value
         return out
-    value = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=pairs)
-    require(isinstance(value, dict), 'JSON root must be object')
+    value=json.loads(path.read_text(encoding='utf-8'),object_pairs_hook=pairs)
+    require(isinstance(value,dict),'candidate root')
     return value
 
 
-def git(cwd: Path, *args: str) -> str:
-    return subprocess.run(
-        ['git', '-c', 'core.hooksPath=/dev/null', *args], cwd=cwd, check=True,
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60,
-    ).stdout.strip()
+def canonical_candidate_blob(candidate: dict) -> str:
+    raw=(json.dumps(candidate,indent=2,ensure_ascii=False)+'\n').encode('utf-8')
+    return blob_sha(raw)
 
 
-def tree_blob(cwd: Path, path: str) -> str:
-    raw = git(cwd, 'ls-tree', 'HEAD', '--', path)
-    require(raw, 'source path absent: ' + path)
-    head, actual_path = raw.split('\t', 1)
-    mode, kind, oid = head.split(' ')
-    require(actual_path == path and mode == '100644' and kind == 'blob' and SHA.fullmatch(oid), 'invalid tree entry: ' + path)
-    return oid
-
-
-def blob_sha(raw: bytes) -> str:
-    return hashlib.sha1(b'blob ' + str(len(raw)).encode() + b'\0' + raw).hexdigest()
-
-
-def validate_candidate_shape(c: dict) -> None:
-    require(json_exact(c, EXPECTED_CANDIDATE),
-            'complete audit-recorder candidate evidence fields/key sets drift')
+def validate_candidate_shape(candidate: dict) -> None:
+    require(canonical_candidate_blob(candidate)==CANDIDATE_BLOB,'complete audit-recorder candidate content drift')
+    require(candidate.get('coverage_adopted') is True,'complete audit-recorder candidate adoption drift')
+    require(candidate.get('source')=={'repository':'Oteryn/Oteryn-Platform','commit_sha':SOURCE_COMMIT,'tree_sha':SOURCE_TREE},'complete audit-recorder candidate source drift')
+    require(candidate.get('adoption',{}).get('direct_overlay_path')==str(OVERLAY_REL),'complete audit-recorder candidate overlay path drift')
+    require(candidate.get('adoption',{}).get('direct_overlay_blob_sha')==OVERLAY_BLOB,'complete audit-recorder candidate overlay blob drift')
 
 
 def validate_source_text(path: str, text: str, row: dict) -> None:
     for token in row['semantic_assertions']:
-        require(token in text, f'semantic oracle missing from {path}: {token}')
+        require(token in text,'semantic oracle drift: '+path)
     if path.endswith('SecurityEventRecorder.php'):
-        count = len(re.findall(r'^\s*public const [A-Z0-9_]+\s*=', text, flags=re.MULTILINE))
-        require(count == 31, f'security event constant count drift: {count}')
+        constants=re.findall(r'^\s*public const [A-Z0-9_]+\s*=',text,re.MULTILINE)
+        require(len(constants)==row['expected_public_event_constants'],'security event constant count drift')
 
 
-def validate_platform(c: dict, platform_root: Path) -> None:
-    require(git(platform_root, 'rev-parse', 'HEAD') == SOURCE_COMMIT, 'Platform HEAD drift')
-    require(git(platform_root, 'rev-parse', 'HEAD^{tree}') == SOURCE_TREE, 'Platform tree drift')
-    rows = {row['path']: row for row in c['paths']}
-    for path, oid in {**EXPECTED_PATHS, **EXPECTED_PERSISTENCE, **EXPECTED_TESTS}.items():
-        require(tree_blob(platform_root, path) == oid, 'frozen blob identity drift: ' + path)
-    for path, row in rows.items():
-        validate_source_text(path, (platform_root / path).read_text(encoding='utf-8'), row)
-    admin = (platform_root / 'database/migrations/2026_07_20_093300_create_admin_audit_events_table.php').read_text(encoding='utf-8')
-    for token in ["Schema::create('admin_audit_events'", "'actor_identity_id'", "'action', 96", "'target_type', 80", "'target_id', 191", "'metadata'", "'occurred_at'"]:
-        require(token in admin, 'admin audit persistence oracle missing: ' + token)
-    security = (platform_root / 'database/migrations/2026_07_19_073601_create_identity_security_events_table.php').read_text(encoding='utf-8')
-    for token in ["Schema::create('identity_security_events'", "'identity_id'", "'event_type', 100", "'occurred_at'", "['identity_id', 'event_type']"]:
-        require(token in security, 'security persistence oracle missing: ' + token)
-    for row in c['focused_current_tests']:
-        require(row['required_text'] in (platform_root / row['path']).read_text(encoding='utf-8'), 'focused test lost persistence assertion surface: ' + row['path'])
+def git(cwd: Path,*args: str) -> str:
+    return subprocess.run(['git','-c','core.hooksPath=/dev/null',*args],cwd=cwd,check=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=60).stdout.strip()
 
 
-def validate_adopted_docs(c: dict, audit_root: Path) -> None:
-    sys.path.insert(0, str((audit_root / 'tools/audit').resolve()))
-    import verify_report as vr
-    report = vr.read_json(audit_root / REPORT_REL)
-    base = (audit_root / REPORT_REL).parent / report['evidence_directory']
-    review = vr.load_review(base, report)
-    require(len(review) == 223, 'combined DIRECT review count drift')
-    by_key = {(row['repository'], row['path']): row for row in review}
-    for row in c['paths']:
-        actual = by_key.get(('platform', row['path']))
-        require(actual is not None, 'adopted DIRECT row missing: ' + row['path'])
-        require(actual['blob_sha'] == row['blob_sha'] and actual['depth'] == row['depth'] and actual['scope'] == row['scope'] and actual['line_ranges'] == '[]', 'adopted DIRECT row drift: ' + row['path'])
-    overlay = (audit_root / OVERLAY_REL).read_bytes()
-    require(blob_sha(overlay) == OVERLAY_BLOB, 'DIRECT overlay blob drift')
-    overlay_rows = list(csv.DictReader(overlay.decode('utf-8').splitlines(), delimiter='\t'))
-    require(len(overlay_rows) == 2 and {(r['repository'], r['path']) for r in overlay_rows} == {('platform', p) for p in EXPECTED_PATHS}, 'DIRECT overlay membership drift')
-    summary = vr.read_json(audit_root / SUMMARY_REL)
-    platform = summary['per_repository']['platform']
-    require((summary['scoped_review_paths'], summary['grouped_revalidated_paths'], summary['semantically_classified_paths'], summary['unverified_semantics_total']) == (223, 113, 336, 3989), 'summary total drift')
-    require((platform['leaves'], platform['direct_scoped'], platform['grouped'], platform['unverified_semantics']) == (2165, 158, 113, 1894), 'Platform summary drift')
-    require(summary['ledger_sha256'] == LEDGER_SHA, 'canonical ledger digest drift')
-    require(report.get('revision') == 'R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-223', 'report revision drift')
-    require((report['scoped_review_paths'], report['grouped_revalidated_paths'], report['semantically_classified_paths']) == (223, 113, 336), 'report accounting drift')
-    require(report.get('coverage_review_additions') == 'organization-audit-20260907/coverage-review-additions.tsv', 'report overlay binding drift')
-    require(report.get('r3_platform_audit_recorders_direct_candidate') == 'organization-audit-20260907/r3-platform-audit-recorders-direct-candidate.json', 'report candidate binding drift')
+def tree_blob(cwd: Path,path: str) -> str:
+    raw=git(cwd,'ls-tree','HEAD','--',path)
+    require(raw,'source path absent: '+path)
+    head,actual=raw.split('\t',1);mode,kind,oid=head.split(' ')
+    require(actual==path and kind=='blob' and mode.startswith('100'),'not regular source blob: '+path)
+    require(bool(SHA.fullmatch(oid)),'invalid source blob: '+path)
+    return oid
 
 
-def run(audit_root: Path, platform_root: Path) -> dict:
-    c = read_json(audit_root / CANDIDATE_REL)
-    validate_candidate_shape(c)
-    validate_adopted_docs(c, audit_root)
-    validate_platform(c, platform_root)
-    return {
-        'result': 'PLATFORM_AUDIT_RECORDERS_DIRECT_POST_PROOF_BOUND_PENDING_INDEPENDENT_REVIEW_NOT_PRODUCT_PASS',
-        'source_commit': SOURCE_COMMIT, 'source_tree': SOURCE_TREE, 'paths': 2, 'path_blobs_verified': 2,
-        'persistence_bindings_verified': 2, 'focused_test_files_bound': 3, 'security_event_constants_verified': 31,
-        'coverage_adopted': True, 'direct_paths': 223, 'grouped_paths': 113, 'unverified_paths': 3989,
-        'semantically_classified_paths': 336, 'ledger_sha256': LEDGER_SHA,
-        'post_adoption_run': 34355682587, 'post_adoption_job': 102479632543, 'next_gate': 'fresh independent exact-head review',
-    }
+def read_tsv(path: Path) -> list[dict[str,str]]:
+    with path.open(encoding='utf-8',newline='') as handle:
+        return list(csv.DictReader(handle,delimiter='\t'))
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--audit-root', type=Path, required=True)
-    parser.add_argument('--platform-root', type=Path, required=True)
-    args = parser.parse_args()
-    print(json.dumps(run(args.audit_root.resolve(), args.platform_root.resolve()), indent=2, sort_keys=True))
+def validate_adopted_docs(candidate: dict, audit_root: Path) -> None:
+    validate_candidate_shape(candidate)
+    old_overlay=audit_root/OVERLAY_REL
+    require(old_overlay.is_file(),'recorder overlay missing')
+    require(blob_sha(old_overlay.read_bytes())==OVERLAY_BLOB,'recorder overlay blob drift')
+    old_rows=read_tsv(old_overlay)
+    require(len(old_rows)==2,'recorder overlay row count drift')
+    expected_paths={row['path'] for row in candidate['paths']}
+    require({row['path'] for row in old_rows}==expected_paths,'recorder overlay membership drift')
+
+    report_path=audit_root/'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'
+    report=vr.read_json(report_path)
+    require(report.get('revision')=='R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-233','current report revision drift')
+    require(report.get('coverage_review_additions')==vr.DIRECT_ADDITIONS_BINDING,'current canonical overlay binding drift')
+    require(report.get('coverage_review_recorder_additions')==str(OVERLAY_REL).removeprefix('docs/evidence/'),'recorder evidence binding drift')
+    require(report.get('scoped_review_paths')==233 and report.get('grouped_revalidated_paths')==113 and report.get('semantically_classified_paths')==346,'current report accounting drift')
+    summary=vr.read_json(audit_root/'docs/evidence/organization-audit-20260907/coverage-summary.json')
+    require(summary.get('ledger_sha256')==CURRENT_LEDGER_SHA,'current ledger digest drift')
+    require(summary.get('scoped_review_paths')==233 and summary.get('grouped_revalidated_paths')==113 and summary.get('unverified_semantics_total')==3979 and summary.get('semantically_classified_paths')==346,'current summary accounting drift')
+    platform=summary['per_repository']['platform']
+    require(platform=={'leaves':2165,'direct_scoped':168,'unverified_semantics':1884,'grouped':113,'not_applicable':0},'current Platform accounting drift')
+
+    base=report_path.parent/report['evidence_directory']
+    review=vr.load_review(base,report)
+    require(len(review)==233,'current composed DIRECT count drift')
+    by_path={(row['repository'],row['path']):row for row in review}
+    for row in candidate['paths']:
+        current=by_path.get(('platform',row['path']))
+        require(current is not None,'recorder missing from current canonical composition: '+row['path'])
+        require(current['blob_sha']==row['blob_sha'] and current['depth']==row['depth'] and current['scope']==row['scope'],'recorder current canonical row drift: '+row['path'])
 
 
-if __name__ == '__main__':
-    main()
+def validate_source(candidate: dict, platform_root: Path) -> None:
+    require(git(platform_root,'rev-parse','HEAD')==SOURCE_COMMIT,'frozen Platform commit drift')
+    require(git(platform_root,'rev-parse','HEAD^{tree}')==SOURCE_TREE,'frozen Platform tree drift')
+    for row in candidate['paths']:
+        require(tree_blob(platform_root,row['path'])==row['blob_sha'],'recorder source blob drift: '+row['path'])
+        validate_source_text(row['path'],git(platform_root,'show','HEAD:'+row['path']),row)
+    for dep in candidate['persistence_contract']:
+        require(tree_blob(platform_root,dep['path'])==dep['blob_sha'],'recorder persistence blob drift: '+dep['path'])
+    for test in candidate['focused_current_tests']:
+        require(tree_blob(platform_root,test['path'])==test['blob_sha'],'recorder focused-test blob drift: '+test['path'])
+        require(test['required_text'] in git(platform_root,'show','HEAD:'+test['path']),'recorder focused-test oracle drift: '+test['path'])
+
+
+def main() -> int:
+    parser=argparse.ArgumentParser()
+    parser.add_argument('--audit-root',type=Path,default=Path('.'))
+    parser.add_argument('--platform-root',type=Path,required=True)
+    args=parser.parse_args()
+    candidate=read_json(args.audit_root/CANDIDATE_REL)
+    validate_candidate_shape(candidate)
+    validate_adopted_docs(candidate,args.audit_root)
+    validate_source(candidate,args.platform_root)
+    print(json.dumps({
+        'result':'AUDIT_RECORDERS_DIRECT_EVIDENCE_PRESERVED_IN_CURRENT_CANONICAL_COMPOSITION',
+        'recorder_paths':2,
+        'current_direct_paths':233,
+        'current_grouped_paths':113,
+        'current_unverified_paths':3979,
+        'current_semantically_classified_paths':346,
+        'current_ledger_sha256':CURRENT_LEDGER_SHA,
+        'independent_review_required':True,
+        'product_readiness_claimed':False,
+        'audit_completion_claimed':False,
+    },sort_keys=True))
+    return 0
+
+
+if __name__=='__main__':
+    raise SystemExit(main())

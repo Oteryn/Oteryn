@@ -13,8 +13,8 @@ EXPECTED_EVIDENCE_HEADING = '## Evidence map and durability'
 EXPECTED_INTRO = (
     'Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; '
     'this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 15 residual '
-    'obligations, 223 DIRECT scoped path reviews and 113 bounded GROUPED Platform paths out of 4325 immutable '
-    'leaves. In total, 336 leaves are semantically classified and 3989 retain UNVERIFIED semantics. Full-file, '
+    'obligations, 233 DIRECT scoped path reviews and 113 bounded GROUPED Platform paths out of 4325 immutable '
+    'leaves. In total, 346 leaves are semantically classified and 3979 retain UNVERIFIED semantics. Full-file, '
     'control-field, translation-range and GROUPED carry-forward evidence are intentionally distinguished.'
 )
 EXPECTED_REVIEW_CLOSEOUT = (
@@ -31,19 +31,24 @@ EXPECTED_REVIEW_CLOSEOUT = (
 EXPECTED_DURABILITY_CLOSEOUT = (
     'The R3 native hosted collector and the completed 31-path batch workflows are absent from the effective tree. '
     'Marketplace/Payments/Wallet qualification, ledger-reproduction and projection workflows and the six-file '
-    'Marketplace-test temporary proof workflows were removed after their completed review/cleanup. Of the bounded '
-    'audit-proof workflows, only the temporary Platform audit-recorder adopted-proof workflow remains in the '
-    'current tree; its lifecycle/review outcome is external PR #185 metadata, and PR #185 remains Draft. No '
-    'provider writes, deployment, new required gate, automatic background worker, full semantic completion, '
-    'product readiness, or self-awarded score is implied.'
+    'Marketplace-test temporary proof workflows were removed after their completed review/cleanup. The '
+    'Announcements pre-adoption qualification and projection workflows are removed after their bound successful '
+    'runs; canonical adoption is verified by the temporary Platform Announcements adopted-proof workflow. The '
+    'current tree retains two bounded audit-proof workflows: the Platform audit-recorder adopted-proof workflow '
+    'and the Platform Announcements adopted-proof workflow. Their independent-review lifecycle/outcome is external '
+    'PR #185 metadata, and PR #185 remains Draft. No provider writes, deployment, new required gate, automatic '
+    'background worker, full semantic completion, product readiness, or self-awarded score is implied.'
 )
 STALE_MARKERS = (
     '221 DIRECT scoped path reviews',
+    '223 DIRECT scoped path reviews',
     '107 bounded GROUPED Platform paths',
+    '3989 retain UNVERIFIED semantics',
     '`3997` leaves retain UNVERIFIED semantics',
     'These remain author remediation until the resulting exact head receives canonical CI and fresh independent re-review.',
     'Temporary Marketplace/Payments/Wallet qualification, ledger-reproduction and projection workflows remain',
     '49-path adoption is rebound and independently reviewed',
+    'only the temporary Platform audit-recorder adopted-proof workflow remains',
 )
 
 
@@ -66,32 +71,31 @@ def validate_text(text: str) -> dict[str, object]:
     require(items[0] == EXPECTED_TITLE, 'README title drift')
     require(items[1] == normalize(EXPECTED_INTRO), 'README current accounting paragraph drift')
     require(items[2] == EXPECTED_LOCAL_HEADING, 'README current accounting slot drift')
-
     evidence_indexes = [index for index, item in enumerate(items) if item == EXPECTED_EVIDENCE_HEADING]
     require(len(evidence_indexes) == 1, 'README evidence heading missing/duplicated')
     evidence_index = evidence_indexes[0]
     require(evidence_index > 0, 'README evidence heading position invalid')
     require(items[evidence_index - 1] == normalize(EXPECTED_REVIEW_CLOSEOUT), 'README historical review closeout drift')
     require(items[-1] == normalize(EXPECTED_DURABILITY_CLOSEOUT), 'README workflow durability closeout drift')
-
     for expected, label in (
         (EXPECTED_INTRO, 'current accounting'),
         (EXPECTED_REVIEW_CLOSEOUT, 'historical review closeout'),
         (EXPECTED_DURABILITY_CLOSEOUT, 'workflow durability closeout'),
     ):
         require(items.count(normalize(expected)) == 1, f'README {label} paragraph missing/duplicated')
-
     compact = normalize(text)
     for marker in STALE_MARKERS:
         require(normalize(marker) not in compact, f'README stale marker present: {marker}')
-
     return {
         'result': 'README_CURRENT_STATE_VALIDATED_NOT_PRODUCT_PASS',
-        'direct_paths': 223,
+        'direct_paths': 233,
         'grouped_paths': 113,
-        'unverified_paths': 3989,
-        'semantically_classified_paths': 336,
-        'remaining_bounded_proof_workflow': 'organization-audit-platform-audit-recorders-qualification.yml',
+        'unverified_paths': 3979,
+        'semantically_classified_paths': 346,
+        'remaining_bounded_proof_workflows': [
+            'organization-audit-platform-audit-recorders-qualification.yml',
+            'organization-audit-platform-announcements-adopted-proof.yml',
+        ],
         'product_readiness_claimed': False,
         'audit_completion_claimed': False,
     }

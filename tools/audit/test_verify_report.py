@@ -20,7 +20,7 @@ class AuditValidationTest(unittest.TestCase):
         self.path=self.root/REPORT
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
     def mutate(self,path,func):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
@@ -87,17 +87,16 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.base/'unknowns.json',mutate)
     def test_stale_semantic_coverage_transition_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('223 DIRECT', '221 DIRECT')
-                                .replace('113 bounded GROUPED', '107 bounded GROUPED')
-                                .replace('3989 paths', '3997 paths')))
+            reason=row['reason'].replace('233 DIRECT', '223 DIRECT')
+                                .replace('3979 paths', '3989 paths')))
         self.reject()
     def test_changed_semantic_coverage_total_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            missing='3989 source leaves retain UNVERIFIED semantics; 336 of 4324 leaves are semantically classified'))
+            missing='3979 source leaves retain UNVERIFIED semantics; 346 of 4324 leaves are semantically classified'))
         self.reject()
     def test_changed_semantic_classified_count_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            effect='Original exhaustive completeness cannot be claimed from 335 semantically classified leaves out of 4325.'))
+            effect='Original exhaustive completeness cannot be claimed from 345 semantically classified leaves out of 4325.'))
         self.reject()
     def test_missing_marketplace_test_provenance_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
@@ -105,21 +104,25 @@ class AuditValidationTest(unittest.TestCase):
         self.reject()
     def test_missing_recorder_provenance_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace(' (the prior 221 plus app/Audit/AdminAuditRecorder.php and app/Audit/SecurityEventRecorder.php)', '')))
+            reason=row['reason'].replace(' plus two app/Audit recorder paths', '')))
+        self.reject()
+    def test_missing_announcements_provenance_rejected(self):
+        self.mutate_semantic_coverage(lambda row:row.update(
+            reason=row['reason'].replace(' plus ten app/Announcements/** paths', '')))
         self.reject()
     def test_semantic_coverage_extra_key_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(semantic_pass=False))
         self.reject()
     def test_semantic_coverage_nested_type_drift_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            missing={'unverified': 3989, 'classified': 336, 'total': 4325}))
+            missing={'unverified': 3979, 'classified': 346, 'total': 4325}))
         self.reject()
     def test_stale_independent_review_phase_rejected(self):
         self.mutate_independent_review(lambda row:row.update(
             reason='The 49-path Marketplace/Payments/Wallet expansion is unreviewed.',
-            effect='No final acceptance is claimed for the 107-GROUPED revision.'))
+            effect='No final acceptance is claimed for an older grouped revision.'))
         self.reject()
-    def test_changed_recorder_only_gate_rejected(self):
+    def test_changed_current_review_gate_rejected(self):
         self.mutate_independent_review(lambda row:row.update(
             missing='Independent review lifecycle/outcome for the complete audit'))
         self.reject()
@@ -133,13 +136,17 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.path,lambda d:d['workflow_census'].update(total_workflows=78));self.reject()
     def test_direct_additions_binding_drift_rejected(self):
         self.mutate(self.path,lambda d:d.update(coverage_review_additions='organization-audit-20260907/other.tsv'));self.reject()
+    def test_recorder_evidence_binding_drift_rejected(self):
+        self.mutate(self.path,lambda d:d.update(coverage_review_recorder_additions='organization-audit-20260907/other.tsv'));self.reject()
+    def test_announcements_evidence_binding_drift_rejected(self):
+        self.mutate(self.path,lambda d:d.update(coverage_review_announcements_additions='organization-audit-20260907/other.tsv'));self.reject()
     def test_direct_additions_duplicate_base_path_rejected(self):
         base=(self.base/'coverage-review.tsv').read_text(encoding='utf-8').splitlines()
-        p=self.base/'coverage-review-additions.tsv';header=p.read_text(encoding='utf-8').splitlines()[0]
+        p=self.base/'coverage-review-canonical-additions.tsv';header=p.read_text(encoding='utf-8').splitlines()[0]
         p.write_text(header+'\n'+base[1]+'\n',encoding='utf-8')
         self.reject()
     def test_direct_additions_missing_rejected(self):
-        (self.base/'coverage-review-additions.tsv').unlink();self.reject()
+        (self.base/'coverage-review-canonical-additions.tsv').unlink();self.reject()
     def test_tree_digest_matches_native_git(self):
         oid='d670460b4b4aece5915caf5c68d12f560a9fe3e4';raw=b'100644 a.txt\0'+bytes.fromhex(oid)
         expected=subprocess.run(['git','hash-object','-t','tree','--stdin'],input=raw,stdout=subprocess.PIPE,check=True,timeout=5).stdout.decode().strip()
