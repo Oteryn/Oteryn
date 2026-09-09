@@ -5,7 +5,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
-import { createNewOutputDirectory } from './safe-output.mjs';
+import { createNewOutputDirectory, createOwnedArtifact, saveOwnedArtifact, readOwnedArtifact,
+  readArtifactLeaf, publishArtifactLeaf } from './safe-output.mjs';
 import { SOURCE_SHA, SOURCE_TREE, SOURCE_BINDINGS, ORIGIN, PLAYWRIGHT, ROUTES, SIZES,
   requestAllowed, caseCriteria, evaluateReport } from './public-surface-contract.mjs';
 const [rootArg, outputArg] = process.argv.slice(2);
@@ -27,9 +28,14 @@ if (require('@playwright/test/package.json').version !== PLAYWRIGHT) throw Error
 const report = { schema_version: 2, source_sha: SOURCE_SHA, source_tree: SOURCE_TREE, source_bindings: SOURCE_BINDINGS,
   playwright: PLAYWRIGHT, scope: 'Anonymous English synthetic fixture; Canary deliberately unavailable; no authenticated/admin/payment/game/production acceptance',
   cases: [], keyboard: [], no_javascript: null };
+const resultFd = createOwnedArtifact(artifactRoot, 'result.json');
+const screenshots = new Set();
+process.removeListener('exit', closeOutput);
+const closeArtifacts = () => { fs.closeSync(resultFd); closeOutput(); };
+process.once('exit', closeArtifacts);
 const browser = await chromium.launch({ headless: true });
 report.browser = browser.version();
-const save = () => fs.writeFileSync(path.join(artifactRoot, 'result.json'), JSON.stringify(report, null, 2) + '\n');
+const save = () => saveOwnedArtifact(resultFd, JSON.stringify(report, null, 2) + '\n');
 function safeURL(raw) { try { const u = new URL(raw); return u.origin + u.pathname; } catch { return 'invalid-url'; } }
 async function restrict(context, problems) {
   await context.route('**/*', route => {
@@ -67,7 +73,8 @@ try {
         });
         if ([390, 1440].includes(width) && ['/', '/news', '/wiki', '/login'].includes(route)) {
           const name = `${width}-${route === '/' ? 'home' : route.slice(1)}.png`;
-          await page.screenshot({ path: path.join(artifactRoot, name), fullPage: true, animations: 'disabled' }); row.screenshot = name;
+          const bytes = await page.screenshot({ fullPage: true, animations: 'disabled' });
+          publishArtifactLeaf(artifactRoot, name, bytes); screenshots.add(name); row.screenshot = name;
         }
       } catch (e) { row.error = String(e).slice(0, 350); }
       row.observed_errors = problems.slice(start); row.criteria = caseCriteria(row);
@@ -96,10 +103,12 @@ try {
 } finally {
   try {
     await browser.close(); report.assessment = evaluateReport(report); save();
-    const hashes = Object.fromEntries(fs.readdirSync(artifactRoot).sort().map(name => [name, crypto.createHash('sha256').update(fs.readFileSync(path.join(artifactRoot, name))).digest('hex')]));
-    fs.writeFileSync(path.join(artifactRoot, 'SHA256SUMS.json'), JSON.stringify(hashes, null, 2) + '\n');
+    const hashes = { 'result.json': crypto.createHash('sha256').update(readOwnedArtifact(resultFd)).digest('hex') };
+    for (const name of [...screenshots].sort()) hashes[name] = crypto.createHash('sha256').update(readArtifactLeaf(artifactRoot, name)).digest('hex');
+    publishArtifactLeaf(artifactRoot, 'SHA256SUMS.json', JSON.stringify(hashes, null, 2) + '\n');
   } finally {
-    process.removeListener('exit', closeOutput);
+    fs.closeSync(resultFd);
+    process.removeListener('exit', closeArtifacts);
     closeOutput();
   }
 }

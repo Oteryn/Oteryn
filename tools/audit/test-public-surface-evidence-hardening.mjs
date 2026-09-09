@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {SOURCE_SHA,SOURCE_TREE,SOURCE_BINDINGS,PLAYWRIGHT,ORIGIN,ROUTES,SIZES,expectedStatus,evaluateReport,requestAllowed} from './public-surface-contract.mjs';
-import { createNewOutputDirectory } from './safe-output.mjs';
+import { createNewOutputDirectory, createOwnedArtifact, saveOwnedArtifact, readOwnedArtifact,
+  readArtifactLeaf, publishArtifactLeaf } from './safe-output.mjs';
 function valid() {
   return {schema_version:2,source_sha:SOURCE_SHA,source_tree:SOURCE_TREE,source_bindings:{...SOURCE_BINDINGS},playwright:PLAYWRIGHT,browser:'unit-test-double',
     cases:SIZES.flatMap(([width,height])=>ROUTES.map(route=>({route,width,height,status:expectedStatus(route),final_url:ORIGIN+route,observed_errors:[],
@@ -81,3 +82,44 @@ test('browser artifacts stay bound to created output inode after pathname replac
     fs.closeSync(result.fd);
   }
 });
+
+test('result saves retain the owned inode after final-leaf symlink replacement', t => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit185-safe-leaf-'));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const provider = path.join(tmp, 'provider');
+  const outParent = path.join(tmp, 'evidence');
+  fs.mkdirSync(provider); fs.mkdirSync(outParent);
+  const result = createNewOutputDirectory(provider, path.join(outParent, 'new-evidence'));
+  const owned = path.join(outParent, 'owned-result.json');
+  const sentinel = path.join(provider, 'sentinel');
+  fs.writeFileSync(sentinel, 'provider-bytes');
+  const resultFd = createOwnedArtifact(result.descriptorPath, 'result.json');
+  try {
+    saveOwnedArtifact(resultFd, 'initial');
+    fs.renameSync(path.join(result.out, 'result.json'), owned);
+    fs.symlinkSync(sentinel, path.join(result.out, 'result.json'));
+    saveOwnedArtifact(resultFd, 'later-save');
+    assert.equal(fs.readFileSync(sentinel, 'utf8'), 'provider-bytes');
+    assert.equal(fs.readFileSync(owned, 'utf8'), 'later-save');
+    assert.equal(readOwnedArtifact(resultFd).toString(), 'later-save');
+  } finally { fs.closeSync(resultFd); fs.closeSync(result.fd); }
+});
+
+for (const name of ['390-home.png', 'SHA256SUMS.json']) {
+  test(`${name} exclusive publication refuses a provider-target symlink`, t => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit185-safe-leaf-'));
+    t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+    const provider = path.join(tmp, 'provider');
+    const outParent = path.join(tmp, 'evidence');
+    fs.mkdirSync(provider); fs.mkdirSync(outParent);
+    const sentinel = path.join(provider, 'sentinel');
+    fs.writeFileSync(sentinel, 'provider-bytes');
+    const result = createNewOutputDirectory(provider, path.join(outParent, 'new-evidence'));
+    try {
+      fs.symlinkSync(sentinel, path.join(result.out, name));
+      assert.throws(() => publishArtifactLeaf(result.descriptorPath, name, 'artifact'), /EEXIST|ELOOP/);
+      assert.equal(fs.readFileSync(sentinel, 'utf8'), 'provider-bytes');
+      assert.throws(() => readArtifactLeaf(result.descriptorPath, name), /ELOOP/);
+    } finally { fs.closeSync(result.fd); }
+  });
+}
