@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 MODULE_PATH = Path(__file__).with_name("merge_queue_submission_routing.py")
@@ -69,6 +70,21 @@ def branch_observation(**overrides):
     return routing.BranchQueueObservation(**values)
 
 
+def proof_comment(observation=None, **overrides):
+    observation = observation or branch_observation()
+    canonical = json.dumps(routing._proof_payload(observation), sort_keys=True, separators=(",", ":"))
+    values = {
+        "repository": routing.CONTROL_REPOSITORY,
+        "issue_number": routing.CONTROL_ISSUE_NUMBER,
+        "comment_id": observation.proof_comment_id,
+        "author_login": routing.PREFLIGHT_PROOF_AUTHOR,
+        "body": "OTERYN_MQ_PREFLIGHT_V1\n```json\n" + canonical + "\n```",
+        "observed_at_epoch_seconds": NOW - 1,
+    }
+    values.update(overrides)
+    return routing.ProofCommentObservation(**values)
+
+
 def workflow_run(**overrides):
     values = {
         "repository": routing.CONTROL_REPOSITORY,
@@ -111,11 +127,12 @@ def capabilities(**overrides):
     return routing.SubmissionCapabilities(**values)
 
 
-def route(*, current_attempt=None, observation=None, workflow=None, head_read=None, current_freeze=None, current_capabilities=None, now=NOW):
+def route(*, current_attempt=None, observation=None, proof=None, workflow=None, head_read=None, current_freeze=None, current_capabilities=None, now=NOW):
+    current_observation = observation or branch_observation()
     return routing.choose_submission_route(
-        current_attempt or attempt(), observation or branch_observation(), workflow or workflow_run(),
-        head_read or live_head(), current_freeze or freeze(), current_capabilities or capabilities(),
-        now_epoch_seconds=now,
+        current_attempt or attempt(), current_observation, proof or proof_comment(current_observation),
+        workflow or workflow_run(), head_read or live_head(), current_freeze or freeze(),
+        current_capabilities or capabilities(), now_epoch_seconds=now,
     )
 
 
@@ -144,7 +161,7 @@ def verify(items, *, submitted_at=NOW - 2, current_route=None):
     )
 
 
-def test_auto_merge_requires_authenticated_central_preflight_and_successful_run() -> None:
+def test_auto_merge_requires_authenticated_central_preflight_successful_run_and_live_comment() -> None:
     assert route() == routing.AUTO_MERGE_MQ_SUBMISSION
     for changes in (
         {"source": "cached_policy"},
@@ -158,7 +175,8 @@ def test_auto_merge_requires_authenticated_central_preflight_and_successful_run(
         {"proof_comment_author_login": "blakinio"},
         {"workflow_sha": OTHER_HEAD},
     ):
-        assert route(observation=branch_observation(**changes)) == routing.BLOCKED_STALE_STATE, changes
+        changed = branch_observation(**changes)
+        assert route(observation=changed, proof=proof_comment(changed)) == routing.BLOCKED_STALE_STATE, changes
     for changes in (
         {"repository": "Oteryn/Oteryn-Platform"},
         {"workflow_run_id": RUN_ID + 1},
@@ -171,6 +189,21 @@ def test_auto_merge_requires_authenticated_central_preflight_and_successful_run(
         {"head_sha": OTHER_HEAD},
     ):
         assert route(workflow=workflow_run(**changes)) == routing.BLOCKED_STALE_STATE, changes
+
+
+def test_proof_comment_must_be_fresh_github_authored_exact_body_and_identity() -> None:
+    observation = branch_observation()
+    assert route(observation=observation, proof=proof_comment(observation)) == routing.AUTO_MERGE_MQ_SUBMISSION
+    for changes in (
+        {"repository": "Oteryn/Oteryn-Platform"},
+        {"issue_number": 190},
+        {"comment_id": PROOF_COMMENT_ID + 1},
+        {"author_login": "blakinio"},
+        {"body": "OTERYN_MQ_PREFLIGHT_V1\n```json\n{}\n```"},
+        {"observed_at_epoch_seconds": OBSERVED_AT - 1},
+        {"observed_at_epoch_seconds": NOW - routing.MAX_PREMUTATION_RULE_AGE_SECONDS - 1},
+    ):
+        assert route(observation=observation, proof=proof_comment(observation, **changes)) == routing.BLOCKED_STALE_STATE, changes
 
 
 def test_live_head_must_be_fresh_exact_and_after_preflight() -> None:
@@ -197,7 +230,7 @@ def test_only_four_oteryn_targets_and_unhashable_repository_fail_closed() -> Non
 def test_preflight_freshness_freeze_authority_and_capability_fail_closed() -> None:
     stale_at = NOW - routing.MAX_PREMUTATION_RULE_AGE_SECONDS - 1
     stale = branch_observation(observed_at_epoch_seconds=stale_at, expires_at_epoch_seconds=stale_at + routing.MAX_PREMUTATION_RULE_AGE_SECONDS)
-    assert route(observation=stale) == routing.BLOCKED_STALE_STATE
+    assert route(observation=stale, proof=proof_comment(stale)) == routing.BLOCKED_STALE_STATE
     assert route(current_freeze=freeze(head_sha=OTHER_HEAD)) == routing.BLOCKED_FROZEN_HEAD_MISMATCH
     assert route(current_attempt=attempt(live_pr_head_sha=OTHER_HEAD)) == routing.BLOCKED_FROZEN_HEAD_MISMATCH
     assert route(current_capabilities=capabilities(integration_authorized=False)) == routing.BLOCKED_NOT_AUTHORIZED
