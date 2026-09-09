@@ -57,4 +57,27 @@ test('browser output creates a new canonical directory outside provider', t => {
   const result = createNewOutputDirectory(provider, path.join(outParent, 'new-evidence'));
   assert.equal(result.root, fs.realpathSync(provider));
   assert.equal(result.out, fs.realpathSync(path.join(outParent, 'new-evidence')));
+  fs.closeSync(result.fd);
+});
+
+test('browser artifacts stay bound to created output inode after pathname replacement', t => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'audit185-safe-output-'));
+  t.after(() => fs.rmSync(tmp, { recursive: true, force: true }));
+  const provider = path.join(tmp, 'provider');
+  const outParent = path.join(tmp, 'evidence');
+  const requested = path.join(outParent, 'new-evidence');
+  const moved = path.join(outParent, 'original-inode');
+  fs.mkdirSync(provider); fs.mkdirSync(outParent);
+  const result = createNewOutputDirectory(provider, requested);
+  try {
+    fs.renameSync(requested, moved);
+    fs.symlinkSync(provider, requested, 'dir');
+    for (const [name, bytes] of [['result.json', '{}\n'], ['390-home.png', 'screenshot'], ['SHA256SUMS.json', '{}\n']]) {
+      fs.writeFileSync(path.join(result.descriptorPath, name), bytes);
+    }
+    assert.deepEqual(fs.readdirSync(provider), []);
+    assert.deepEqual(fs.readdirSync(moved).sort(), ['390-home.png', 'SHA256SUMS.json', 'result.json']);
+  } finally {
+    fs.closeSync(result.fd);
+  }
 });

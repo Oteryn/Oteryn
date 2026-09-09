@@ -20,5 +20,15 @@ export function createNewOutputDirectory(rootArg, outputArg) {
   fs.mkdirSync(out, { recursive: false, mode: 0o700 });
   const canonical = fs.realpathSync(out);
   if (canonical !== out || inside(canonical, root)) throw Error('unsafe output resolution');
-  return { root, out };
+  const flags = fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | (fs.constants.O_NOFOLLOW ?? 0);
+  const fd = fs.openSync(out, flags);
+  const descriptorPath = `/proc/self/fd/${fd}`;
+  let descriptorCanonical;
+  try { descriptorCanonical = fs.realpathSync(descriptorPath); }
+  catch (error) { fs.closeSync(fd); throw Error(`descriptor-backed output unavailable: ${error.message}`); }
+  if (descriptorCanonical !== canonical) {
+    fs.closeSync(fd);
+    throw Error('created output descriptor mismatch');
+  }
+  return { root, out, fd, descriptorPath };
 }

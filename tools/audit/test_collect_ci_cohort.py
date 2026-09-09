@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 from collect_ci_cohort import elapsed, select_runs, job_metrics, ReadOnlyAPI, PLAN, collect, write_new, prepare_output_parent
 
 
@@ -154,6 +155,39 @@ class Tests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'ancestor symlink'):
                 prepare_output_parent(alias / 'new' / 'result.json')
             self.assertFalse(target.exists())
+
+    def test_main_keeps_original_parent_inode_for_result_after_path_replacement(self):
+        import collect_ci_cohort as cohort
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); parent = root / 'evidence'; parent.mkdir()
+            moved = root / 'original'; target = root / 'provider'; target.mkdir()
+            def swap(_api):
+                parent.rename(moved)
+                parent.symlink_to(target, target_is_directory=True)
+                return {'runs': [], 'unique_event_candidates': 0, 'api_calls': 0}
+            with patch.dict(os.environ, {'OTERYN_AUDIT185_CI_COHORT': '1', 'GH_TOKEN': 'x'}), \
+                    patch('sys.argv', ['collect_ci_cohort.py', '--output', str(parent / 'result.json')]), \
+                    patch.object(cohort, 'collect', side_effect=swap):
+                cohort.main()
+            self.assertTrue((moved / 'result.json').is_file())
+            self.assertEqual(list(target.iterdir()), [])
+
+    def test_main_keeps_original_parent_inode_for_diagnostic_after_path_replacement(self):
+        import collect_ci_cohort as cohort
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); parent = root / 'evidence'; parent.mkdir()
+            moved = root / 'original'; target = root / 'provider'; target.mkdir()
+            def swap(_api):
+                parent.rename(moved)
+                parent.symlink_to(target, target_is_directory=True)
+                raise ValueError('expected collection failure')
+            with patch.dict(os.environ, {'OTERYN_AUDIT185_CI_COHORT': '1', 'GH_TOKEN': 'x'}), \
+                    patch('sys.argv', ['collect_ci_cohort.py', '--output', str(parent / 'result.json')]), \
+                    patch.object(cohort, 'collect', side_effect=swap):
+                with self.assertRaisesRegex(ValueError, 'expected collection failure'):
+                    cohort.main()
+            self.assertTrue((moved / 'collection-error.json').is_file())
+            self.assertEqual(list(target.iterdir()), [])
 
 
 if __name__ == '__main__': unittest.main()

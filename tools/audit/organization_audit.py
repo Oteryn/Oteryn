@@ -93,11 +93,23 @@ def blob_hash(content: bytes) -> str:
     return hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
 
 
-def write_json(path: Path, value: object) -> None:
-    path.write_text(json.dumps(value, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+def write_bytes_at(directory_fd: int, name: str, raw: bytes) -> None:
+    if "/" in name or name in {"", ".", ".."}:
+        raise ValueError("unsafe output filename")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(name, flags, 0o600, dir_fd=directory_fd)
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(raw)
 
 
-def create_directory_no_symlinks(path: Path) -> Path:
+def write_json_at(directory_fd: int, name: str, value: object) -> None:
+    write_bytes_at(directory_fd, name,
+                   (json.dumps(value, ensure_ascii=True, indent=2, sort_keys=True) + "\n").encode())
+
+
+def create_directory_no_symlinks(path: Path) -> tuple[Path, int]:
     """Create a new directory without following any lexical ancestor symlink."""
     absolute = Path(os.path.abspath(path))
     current = Path(absolute.anchor)
@@ -131,19 +143,21 @@ def create_directory_no_symlinks(path: Path) -> Path:
                 raise ValueError("output ancestry must contain only directories, not symlinks") from exc
             os.close(descriptor)
             descriptor = child
-    finally:
+    except Exception:
         os.close(descriptor)
-    return absolute
+        raise
+    return absolute, descriptor
 
 
-def collect(plan: dict, output: Path, include_objects: bool = False) -> dict:
-    rows = validate_plan(plan)
-    output = create_directory_no_symlinks(output)
-    inventories = output / "inventories"
-    inventories.mkdir()
+def _collect_bound(rows: list[dict], output_fd: int, inventories_fd: int, include_objects: bool) -> dict:
     results, exported, exported_bytes = [], set(), 0
     # Zip entries are object IDs, never provider-controlled filesystem paths.
-    archive = zipfile.ZipFile(output / "source-objects.zip", "w", zipfile.ZIP_DEFLATED) if include_objects else None
+    archive_handle = None
+    if include_objects:
+        archive_descriptor = os.open("source-objects.zip", os.O_WRONLY | os.O_CREAT | os.O_EXCL |
+                                     getattr(os, "O_NOFOLLOW", 0), 0o600, dir_fd=output_fd)
+        archive_handle = os.fdopen(archive_descriptor, "wb")
+    archive = zipfile.ZipFile(archive_handle, "w", zipfile.ZIP_DEFLATED) if archive_handle else None
     try:
         with tempfile.TemporaryDirectory(prefix="oteryn-audit-") as tmp:
             repositories = {}
@@ -184,22 +198,46 @@ def collect(plan: dict, output: Path, include_objects: bool = False) -> dict:
                              "leaf_count": len(entries), "family_counts": family_counts,
                              "identity_coverage": "COMPLETE", "semantic_coverage": "NOT_INFERRED",
                              "entries": entries}
-                write_json(inventories / (key + ".json"), inventory)
+                write_json_at(inventories_fd, key + ".json", inventory)
                 results.append({k: v for k, v in inventory.items() if k != "entries"})
                 print(json.dumps({"snapshot": key, "commit_sha": sha, "tree_sha": tree,
                                   "leaf_count": len(entries), "semantic_coverage": "NOT_INFERRED"}))
     finally:
         if archive is not None:
             archive.close()
+        if archive_handle is not None and not archive_handle.closed:
+            archive_handle.close()
     summary = {"schema_version": 1, "collected_at": datetime.now(timezone.utc).isoformat(),
                "collector_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                "result": "IDENTITY_INVENTORY_COLLECTED_NOT_AUDIT_PASS", "snapshots": results,
                "exported_objects": len(exported), "exported_object_bytes": exported_bytes}
-    write_json(output / "summary.json", summary)
-    sums = {str(p.relative_to(output)): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in sorted(output.rglob("*")) if p.is_file()}
-    write_json(output / "SHA256SUMS.json", sums)
+    write_json_at(output_fd, "summary.json", summary)
+    names = ["inventories/" + row["snapshot_id"] + ".json" for row in results]
+    if include_objects:
+        names.append("source-objects.zip")
+    names.append("summary.json")
+    sums = {}
+    for name in sorted(names):
+        parent_fd, leaf = (inventories_fd, name.removeprefix("inventories/")) if name.startswith("inventories/") else (output_fd, name)
+        descriptor = os.open(leaf, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=parent_fd)
+        with os.fdopen(descriptor, "rb") as handle:
+            sums[name] = hashlib.sha256(handle.read()).hexdigest()
+    write_json_at(output_fd, "SHA256SUMS.json", sums)
     return summary
+
+def collect(plan: dict, output: Path, include_objects: bool = False) -> dict:
+    rows = validate_plan(plan)
+    _output, output_fd = create_directory_no_symlinks(output)
+    inventories_fd = None
+    try:
+        os.mkdir("inventories", dir_fd=output_fd)
+        directory_flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+        inventories_fd = os.open("inventories", directory_flags, dir_fd=output_fd)
+        return _collect_bound(rows, output_fd, inventories_fd, include_objects)
+    finally:
+        if inventories_fd is not None:
+            os.close(inventories_fd)
+        os.close(output_fd)
 
 
 def main() -> None:

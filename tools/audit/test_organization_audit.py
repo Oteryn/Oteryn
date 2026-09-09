@@ -110,6 +110,24 @@ class CollectorTest(unittest.TestCase):
             inventory = json.loads((Path(tmp)/"out/inventories/meta.json").read_text())
             self.assertEqual(inventory["entries"][0]["disposition"], "UNVERIFIED")
 
+    def test_collection_stays_bound_to_created_output_after_path_replacement(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(audit, "git", side_effect=[b"", b"", b"a"*40+b"\n", b"d"*40+b"\n", self.row()]):
+            root = Path(tmp); output = root / "out"; moved = root / "original"; provider = root / "provider"
+            provider.mkdir()
+            real_mkdir = audit.os.mkdir
+            def swap_before_inventories(name, *args, **kwargs):
+                if name == "inventories":
+                    output.rename(moved)
+                    output.symlink_to(provider, target_is_directory=True)
+                return real_mkdir(name, *args, **kwargs)
+            with patch.object(audit.os, "mkdir", side_effect=swap_before_inventories):
+                audit.collect(self.plan, output)
+            self.assertTrue((moved / "inventories/meta.json").is_file())
+            self.assertTrue((moved / "summary.json").is_file())
+            self.assertTrue((moved / "SHA256SUMS.json").is_file())
+            self.assertEqual(list(provider.iterdir()), [])
+
 
 if __name__ == "__main__":
     unittest.main()

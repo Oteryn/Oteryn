@@ -10,7 +10,9 @@ import { SOURCE_SHA, SOURCE_TREE, SOURCE_BINDINGS, ORIGIN, PLAYWRIGHT, ROUTES, S
   requestAllowed, caseCriteria, evaluateReport } from './public-surface-contract.mjs';
 const [rootArg, outputArg] = process.argv.slice(2);
 if (process.env.OTERYN_AUDIT185_PUBLIC_UI !== '1' || !rootArg || !outputArg) throw Error('explicit isolated-public-UI consent, source and new output required');
-const { root, out } = createNewOutputDirectory(rootArg, outputArg);
+const { root, out, fd: outputFd, descriptorPath: artifactRoot } = createNewOutputDirectory(rootArg, outputArg);
+const closeOutput = () => fs.closeSync(outputFd);
+process.once('exit', closeOutput);
 for (const [args, expected] of [[['rev-parse', 'HEAD'], SOURCE_SHA], [['rev-parse', 'HEAD^{tree}'], SOURCE_TREE], [['status', '--porcelain', '--untracked-files=no'], '']]) {
   if (execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim() !== expected) throw Error('wrong or dirty source');
 }
@@ -27,7 +29,7 @@ const report = { schema_version: 2, source_sha: SOURCE_SHA, source_tree: SOURCE_
   cases: [], keyboard: [], no_javascript: null };
 const browser = await chromium.launch({ headless: true });
 report.browser = browser.version();
-const save = () => fs.writeFileSync(path.join(out, 'result.json'), JSON.stringify(report, null, 2) + '\n');
+const save = () => fs.writeFileSync(path.join(artifactRoot, 'result.json'), JSON.stringify(report, null, 2) + '\n');
 function safeURL(raw) { try { const u = new URL(raw); return u.origin + u.pathname; } catch { return 'invalid-url'; } }
 async function restrict(context, problems) {
   await context.route('**/*', route => {
@@ -65,7 +67,7 @@ try {
         });
         if ([390, 1440].includes(width) && ['/', '/news', '/wiki', '/login'].includes(route)) {
           const name = `${width}-${route === '/' ? 'home' : route.slice(1)}.png`;
-          await page.screenshot({ path: path.join(out, name), fullPage: true, animations: 'disabled' }); row.screenshot = name;
+          await page.screenshot({ path: path.join(artifactRoot, name), fullPage: true, animations: 'disabled' }); row.screenshot = name;
         }
       } catch (e) { row.error = String(e).slice(0, 350); }
       row.observed_errors = problems.slice(start); row.criteria = caseCriteria(row);
@@ -92,9 +94,14 @@ try {
   if (problems.length) throw Error('no-JavaScript context attempted an out-of-scope request');
   await context.close();
 } finally {
-  await browser.close(); report.assessment = evaluateReport(report); save();
-  const hashes = Object.fromEntries(fs.readdirSync(out).sort().map(name => [name, crypto.createHash('sha256').update(fs.readFileSync(path.join(out, name))).digest('hex')]));
-  fs.writeFileSync(path.join(out, 'SHA256SUMS.json'), JSON.stringify(hashes, null, 2) + '\n');
+  try {
+    await browser.close(); report.assessment = evaluateReport(report); save();
+    const hashes = Object.fromEntries(fs.readdirSync(artifactRoot).sort().map(name => [name, crypto.createHash('sha256').update(fs.readFileSync(path.join(artifactRoot, name))).digest('hex')]));
+    fs.writeFileSync(path.join(artifactRoot, 'SHA256SUMS.json'), JSON.stringify(hashes, null, 2) + '\n');
+  } finally {
+    process.removeListener('exit', closeOutput);
+    closeOutput();
+  }
 }
 console.log(JSON.stringify(report.assessment));
 if (report.assessment.errors.length) process.exitCode = 1;
