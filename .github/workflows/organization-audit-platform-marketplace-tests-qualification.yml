@@ -106,7 +106,7 @@ jobs:
           python3 - "$RUNNER_TEMP/marketplace-tests-adopted.json" <<'PY'
           import json,sys
           d=json.load(open(sys.argv[1],encoding='utf-8'))
-          assert d['result']=='MARKETPLACE_TESTS_GROUPED_ADOPTION_PENDING_POST_ADOPTION_PROOF_NOT_PRODUCT_PASS'
+          assert d['result']=='MARKETPLACE_TESTS_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS'
           assert d['paths']==6 and d['path_blobs_verified']==6 and d['focused_test_files_bound']==6
           assert d['coverage_adopted'] is True
           assert d['ledger_sha256']=='25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617'
@@ -116,6 +116,16 @@ jobs:
           assert q['focused_current_tests']['cases']==17 and q['focused_current_tests']['assertions']==179
           assert d['pre_adoption_revalidation']['workflow_run']==34329669372
           assert d['projected_ledger']['workflow_run']==34329669431
+          p=d['post_adoption_revalidation']
+          assert p['audit_head']=='c67c1e9d7622612affdd431b2af9fae05d0d11ef'
+          assert p['workflow_run']==34333058684 and p['job']==102405922454
+          assert p['verifier_unit_tests']==14 and p['focused_current_tests']['cases']==17 and p['focused_current_tests']['assertions']==179
+          assert p['meta_ci_run']==34333058582 and p['meta_ci_result']=='SUCCESS'
+          assert p['ledger_reproduction_run']==34333058620 and p['ledger_reproduction_job']==102405921741
+          assert p['ledger_reproduction_artifact']==10096546256
+          assert p['ledger_sha256']=='25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617'
+          assert p['ledger_counts']=={'source_rows':4325,'direct_paths':221,'grouped_paths':113,'unverified_paths':3991}
+          assert d['next_gate']=='fresh independent exact-head review; retain temporary qualifier and ledger workflows until review completes'
           print(d['next_gate'])
           PY
       - name: Setup PHP 8.5.10
