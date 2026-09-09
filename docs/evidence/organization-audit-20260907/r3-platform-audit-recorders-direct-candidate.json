@@ -85,6 +85,15 @@
     "platform_unverified_paths": 1896,
     "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617"
   },
+  "initial_projection": {
+    "head_sha": "e68726c9590f0ea611871abfbf1bd3238b635c6c",
+    "workflow_run": 34347577287,
+    "job": 102452733285,
+    "artifact": 10102358530,
+    "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f",
+    "note": "This mechanically reproduced digest used the pre-binding execution-evidence placeholder and is retained as provenance only; it is not the adoption target digest."
+  },
+  "planned_execution_evidence": "Primary qualification head e68726c9590f0ea611871abfbf1bd3238b635c6c, run 34347577287, job 102452733285, artifact 10102358530: frozen Platform de917b3477a1de0667531380de3660e8b2ab59aa on MariaDB 11.8.9; exact 3 test files / 25 cases / 89 assertions / 0 failures / 0 errors / 0 skips; bounded full-file recorder source review; not product readiness.",
   "projected_accounting": {
     "source_rows": 4325,
     "direct_paths": 223,
@@ -94,24 +103,30 @@
     "platform_direct_paths": 158,
     "platform_grouped_paths": 113,
     "platform_unverified_paths": 1894,
-    "ledger_sha256": "PENDING_MECHANICAL_REBUILD"
+    "ledger_sha256": "PENDING_FINAL_EVIDENCE_REPRODUCTION"
   },
   "qualification": {
-    "status": "PENDING_PRIMARY_QUALIFICATION",
-    "workflow_run": null,
-    "job": null,
+    "status": "PRIMARY_QUALIFICATION_SUCCESS",
+    "head_sha": "e68726c9590f0ea611871abfbf1bd3238b635c6c",
+    "workflow_run": 34347577287,
+    "job": 102452733285,
+    "artifact": 10102358530,
+    "artifact_sha256": "eda15a09fdffedbec2bcecc2591d2ba6674be21993c9f2555a8cdd5b2df6b24d",
+    "mariadb_image": "mariadb:11.8.9",
+    "db_connection": "mysql",
+    "db_port": 3306,
     "test_files": 3,
-    "cases": null,
-    "assertions": null,
-    "failures": null,
-    "errors": null,
-    "skipped": null
+    "cases": 25,
+    "assertions": 89,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
   },
   "limitations": [
     "DIRECT here is a bounded semantic source-review disposition, not a product or production-readiness PASS.",
     "The two migration files and three focused test files are qualification dependencies only and are not promoted by this candidate.",
     "The focused test set is representative, not an exhaustive execution of all AdminAuditRecorder callers or all 31 SecurityEventRecorder event types.",
     "No later Platform main, live deployment state, branch protection, Merge Queue state, or runtime incident status is inferred from this frozen source qualification.",
-    "Canonical coverage-review.tsv, report counts, and ledger digest remain unchanged until primary qualification and a mechanically reproduced projected ledger are bound."
+    "Canonical coverage-review.tsv, report counts, and ledger digest remain unchanged until the final planned execution-evidence projection is reproduced and adoption is separately proved."
   ]
 }

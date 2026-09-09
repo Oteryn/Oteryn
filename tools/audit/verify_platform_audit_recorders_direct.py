@@ -2,8 +2,8 @@
 """Fail-closed verifier for the two-file frozen Platform audit-recorder DIRECT candidate.
 
 This verifies source identity, bounded semantic oracles, persistence/test bindings,
-pre-adoption non-overlap, and (optionally) a mechanically projected canonical ledger.
-It does not execute provider code and never turns DIRECT into product readiness.
+pre-adoption non-overlap, bound primary qualification, and a mechanically projected
+canonical ledger. It never turns DIRECT into product readiness.
 """
 from __future__ import annotations
 
@@ -24,6 +24,19 @@ SUMMARY_REL = Path("docs/evidence/organization-audit-20260907/coverage-summary.j
 REPORT_REL = Path("docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json")
 SOURCE_COMMIT = "de917b3477a1de0667531380de3660e8b2ab59aa"
 SOURCE_TREE = "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e"
+PRIMARY_HEAD = "e68726c9590f0ea611871abfbf1bd3238b635c6c"
+PRIMARY_RUN = 34347577287
+PRIMARY_JOB = 102452733285
+PRIMARY_ARTIFACT = 10102358530
+PRIMARY_ARTIFACT_SHA256 = "eda15a09fdffedbec2bcecc2591d2ba6674be21993c9f2555a8cdd5b2df6b24d"
+INITIAL_PROJECTED_LEDGER = "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f"
+PENDING_FINAL_DIGEST = "PENDING_FINAL_EVIDENCE_REPRODUCTION"
+PLANNED_EXECUTION_EVIDENCE = (
+    "Primary qualification head e68726c9590f0ea611871abfbf1bd3238b635c6c, run 34347577287, "
+    "job 102452733285, artifact 10102358530: frozen Platform de917b3477a1de0667531380de3660e8b2ab59aa "
+    "on MariaDB 11.8.9; exact 3 test files / 25 cases / 89 assertions / 0 failures / 0 errors / 0 skips; "
+    "bounded full-file recorder source review; not product readiness."
+)
 EXPECTED_PATHS = {
     "app/Audit/AdminAuditRecorder.php": "78a757d143036aa4c9c13e40c96a9f1fb66cb6a4",
     "app/Audit/SecurityEventRecorder.php": "cdf63637dc6902f575abceeaa106525173f08e5f",
@@ -38,6 +51,7 @@ EXPECTED_TESTS = {
     "tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php": "1fdf519959d61086f2c32e2415761a4a53369ab4",
 }
 SHA = re.compile(r"[0-9a-f]{40}\Z")
+SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
 
 def require(condition: bool, message: str) -> None:
@@ -59,13 +73,8 @@ def read_json(path: Path) -> dict:
 
 def git(cwd: Path, *args: str) -> str:
     return subprocess.run(
-        ["git", "-c", "core.hooksPath=/dev/null", *args],
-        cwd=cwd,
-        check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        timeout=60,
+        ["git", "-c", "core.hooksPath=/dev/null", *args], cwd=cwd, check=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60,
     ).stdout.strip()
 
 
@@ -85,17 +94,15 @@ def validate_candidate_shape(c: dict) -> None:
     require(c.get("disposition") == "DIRECT_CANDIDATE_NOT_ADOPTED", "candidate disposition")
     require(c.get("coverage_adopted") is False, "candidate must remain pre-adoption")
     source = c.get("source") or {}
-    require(source.get("repository") == "Oteryn/Oteryn-Platform", "source repository")
-    require(source.get("commit_sha") == SOURCE_COMMIT and source.get("tree_sha") == SOURCE_TREE, "source coordinates")
+    require(source == {"repository": "Oteryn/Oteryn-Platform", "commit_sha": SOURCE_COMMIT, "tree_sha": SOURCE_TREE}, "source coordinates")
 
     paths = c.get("paths") or []
     require(isinstance(paths, list) and len(paths) == 2, "exactly two DIRECT candidates required")
-    actual = {row.get("path"): row.get("blob_sha") for row in paths}
-    require(actual == EXPECTED_PATHS, "candidate path/blob set drift")
+    require({row.get("path"): row.get("blob_sha") for row in paths} == EXPECTED_PATHS, "candidate path/blob set drift")
     for row in paths:
         require(row.get("depth") == "SCOPED_SEMANTIC_REVIEW", "candidate depth")
         require(isinstance(row.get("scope"), str) and row["scope"].strip(), "candidate scope")
-        require(row.get("line_ranges") == [], "this full-file review uses explicit empty bounded line-range metadata")
+        require(row.get("line_ranges") == [], "full-file review line-range metadata")
         tokens = row.get("semantic_assertions")
         require(isinstance(tokens, list) and tokens and all(isinstance(x, str) and x for x in tokens), "semantic assertions")
     security = next(row for row in paths if row["path"].endswith("SecurityEventRecorder.php"))
@@ -108,25 +115,34 @@ def validate_candidate_shape(c: dict) -> None:
     require({row.get("path"): row.get("blob_sha") for row in tests} == EXPECTED_TESTS, "focused test binding drift")
     require(all(row.get("role") == "REPRESENTATIVE_EXECUTION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE" for row in tests), "test role")
 
-    baseline = c.get("baseline_accounting") or {}
-    require(baseline == {
+    require(c.get("baseline_accounting") == {
         "source_rows": 4325, "direct_paths": 221, "grouped_paths": 113, "unverified_paths": 3991,
-        "semantically_classified_paths": 334, "platform_direct_paths": 156,
-        "platform_grouped_paths": 113, "platform_unverified_paths": 1896,
-        "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
+        "semantically_classified_paths": 334, "platform_direct_paths": 156, "platform_grouped_paths": 113,
+        "platform_unverified_paths": 1896, "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
     }, "baseline accounting drift")
+    require(c.get("initial_projection") == {
+        "head_sha": PRIMARY_HEAD, "workflow_run": PRIMARY_RUN, "job": PRIMARY_JOB, "artifact": PRIMARY_ARTIFACT,
+        "ledger_sha256": INITIAL_PROJECTED_LEDGER,
+        "note": "This mechanically reproduced digest used the pre-binding execution-evidence placeholder and is retained as provenance only; it is not the adoption target digest.",
+    }, "initial projection provenance drift")
+    require(c.get("planned_execution_evidence") == PLANNED_EXECUTION_EVIDENCE, "planned execution evidence drift")
+
     projected = c.get("projected_accounting") or {}
-    require(projected == {
+    require({k: projected.get(k) for k in ["source_rows", "direct_paths", "grouped_paths", "unverified_paths", "semantically_classified_paths", "platform_direct_paths", "platform_grouped_paths", "platform_unverified_paths"]} == {
         "source_rows": 4325, "direct_paths": 223, "grouped_paths": 113, "unverified_paths": 3989,
-        "semantically_classified_paths": 336, "platform_direct_paths": 158,
-        "platform_grouped_paths": 113, "platform_unverified_paths": 1894,
-        "ledger_sha256": "PENDING_MECHANICAL_REBUILD",
+        "semantically_classified_paths": 336, "platform_direct_paths": 158, "platform_grouped_paths": 113,
+        "platform_unverified_paths": 1894,
     }, "projected accounting drift")
-    qualification = c.get("qualification") or {}
-    require(qualification.get("status") == "PENDING_PRIMARY_QUALIFICATION", "qualification must be pending")
-    require(qualification.get("workflow_run") is None and qualification.get("job") is None, "unearned qualification identity")
-    require(qualification.get("test_files") == 3, "focused test-file count")
-    require(all(qualification.get(k) is None for k in ["cases", "assertions", "failures", "errors", "skipped"]), "unearned test totals")
+    digest = projected.get("ledger_sha256")
+    require(digest == PENDING_FINAL_DIGEST or (isinstance(digest, str) and SHA256.fullmatch(digest)), "projected ledger digest binding")
+
+    require(c.get("qualification") == {
+        "status": "PRIMARY_QUALIFICATION_SUCCESS", "head_sha": PRIMARY_HEAD, "workflow_run": PRIMARY_RUN,
+        "job": PRIMARY_JOB, "artifact": PRIMARY_ARTIFACT, "artifact_sha256": PRIMARY_ARTIFACT_SHA256,
+        "mariadb_image": "mariadb:11.8.9", "db_connection": "mysql", "db_port": 3306,
+        "test_files": 3, "cases": 25, "assertions": 89, "failures": 0, "errors": 0, "skipped": 0,
+    }, "bound primary qualification drift")
+
     limits = c.get("limitations") or []
     require(isinstance(limits, list) and len(limits) >= 5, "limitations missing")
     joined = " ".join(limits)
@@ -150,7 +166,6 @@ def validate_platform(c: dict, platform_root: Path) -> None:
         require(tree_blob(platform_root, path) == oid, "frozen blob identity drift: " + path)
     for path, row in rows.items():
         validate_source_text(path, (platform_root / path).read_text(encoding="utf-8"), row)
-
     admin_migration = (platform_root / "database/migrations/2026_07_20_093300_create_admin_audit_events_table.php").read_text(encoding="utf-8")
     for token in ["Schema::create('admin_audit_events'", "'actor_identity_id'", "'action', 96", "'target_type', 80", "'target_id', 191", "'metadata'", "'occurred_at'"]:
         require(token in admin_migration, "admin audit persistence oracle missing: " + token)
@@ -158,8 +173,7 @@ def validate_platform(c: dict, platform_root: Path) -> None:
     for token in ["Schema::create('identity_security_events'", "'identity_id'", "'event_type', 100", "'occurred_at'", "['identity_id', 'event_type']"]:
         require(token in security_migration, "security persistence oracle missing: " + token)
     for row in c["focused_current_tests"]:
-        text = (platform_root / row["path"]).read_text(encoding="utf-8")
-        require(row["required_text"] in text, "focused test lost persistence assertion surface: " + row["path"])
+        require(row["required_text"] in (platform_root / row["path"]).read_text(encoding="utf-8"), "focused test lost persistence assertion surface: " + row["path"])
 
 
 def load_review_rows(path: Path) -> list[dict]:
@@ -184,33 +198,19 @@ def validate_pre_adoption_docs(c: dict, review_rows: list[dict], summary: dict, 
 
 
 def validate_pre_adoption(c: dict, audit_root: Path) -> None:
-    validate_pre_adoption_docs(
-        c,
-        load_review_rows(audit_root / REVIEW_REL),
-        read_json(audit_root / SUMMARY_REL),
-        read_json(audit_root / REPORT_REL),
-    )
+    validate_pre_adoption_docs(c, load_review_rows(audit_root / REVIEW_REL), read_json(audit_root / SUMMARY_REL), read_json(audit_root / REPORT_REL))
 
 
 def projected_review_rows(c: dict) -> list[dict]:
-    return [
-        {
-            "repository": "platform",
-            "path": row["path"],
-            "blob_sha": row["blob_sha"],
-            "depth": row["depth"],
-            "scope": row["scope"],
-            "line_ranges": "[]",
-            "execution_evidence": "PLATFORM-AUDIT-RECORDERS-PRIMARY-QUALIFICATION-PENDING-BINDING",
-        }
-        for row in c["paths"]
-    ]
+    return [{
+        "repository": "platform", "path": row["path"], "blob_sha": row["blob_sha"], "depth": row["depth"],
+        "scope": row["scope"], "line_ranges": "[]", "execution_evidence": c["planned_execution_evidence"],
+    } for row in c["paths"]]
 
 
 def project_ledger(c: dict, audit_root: Path, inventory_dir: Path) -> dict:
     sys.path.insert(0, str((audit_root / "tools/audit").resolve()))
     import verify_report as vr
-
     report_path = audit_root / REPORT_REL
     doc = vr.read_json(report_path)
     base = report_path.parent / doc["evidence_directory"]
@@ -222,23 +222,21 @@ def project_ledger(c: dict, audit_root: Path, inventory_dir: Path) -> dict:
     raw, grouped_counts = vr.build_ledger(doc, review + additions, groups, inventory_dir)
     rows = list(csv.DictReader(io.StringIO(raw.decode("utf-8"))))
     counts = Counter(row["disposition"] for row in rows)
-    expected = {"DIRECT": 223, "GROUPED": 113, "UNVERIFIED": 3989}
-    require(len(rows) == 4325 and dict(counts) == expected, f"projected ledger count drift: rows={len(rows)} counts={dict(counts)}")
+    require(len(rows) == 4325 and dict(counts) == {"DIRECT": 223, "GROUPED": 113, "UNVERIFIED": 3989}, f"projected ledger count drift: rows={len(rows)} counts={dict(counts)}")
     require(grouped_counts.get("platform") == 113, "projected Platform GROUPED drift")
     platform_direct = sum(row["repository_id"] == "platform" and row["disposition"] == "DIRECT" for row in rows)
     platform_unverified = sum(row["repository_id"] == "platform" and row["disposition"] == "UNVERIFIED" for row in rows)
     require(platform_direct == 158 and platform_unverified == 1894, "projected Platform accounting drift")
+    digest = hashlib.sha256(raw).hexdigest()
+    bound = c["projected_accounting"]["ledger_sha256"]
+    if bound != PENDING_FINAL_DIGEST:
+        require(digest == bound, "bound projected ledger digest drift")
     return {
         "result": "PLATFORM_AUDIT_RECORDERS_PROJECTED_LEDGER_NOT_ADOPTED_NOT_PRODUCT_PASS",
-        "source_rows": len(rows),
-        "direct_paths": counts["DIRECT"],
-        "grouped_paths": counts["GROUPED"],
-        "unverified_paths": counts["UNVERIFIED"],
-        "semantically_classified_paths": counts["DIRECT"] + counts["GROUPED"],
-        "platform_direct_paths": platform_direct,
-        "platform_grouped_paths": grouped_counts["platform"],
-        "platform_unverified_paths": platform_unverified,
-        "ledger_sha256": hashlib.sha256(raw).hexdigest(),
+        "source_rows": len(rows), "direct_paths": counts["DIRECT"], "grouped_paths": counts["GROUPED"],
+        "unverified_paths": counts["UNVERIFIED"], "semantically_classified_paths": counts["DIRECT"] + counts["GROUPED"],
+        "platform_direct_paths": platform_direct, "platform_grouped_paths": grouped_counts["platform"],
+        "platform_unverified_paths": platform_unverified, "ledger_sha256": digest,
     }
 
 
@@ -249,14 +247,9 @@ def run(audit_root: Path, platform_root: Path, inventory_dir: Path | None) -> di
     validate_platform(c, platform_root)
     result = {
         "result": "PLATFORM_AUDIT_RECORDERS_DIRECT_CANDIDATE_REVALIDATED_NOT_ADOPTED_NOT_PRODUCT_PASS",
-        "source_commit": SOURCE_COMMIT,
-        "source_tree": SOURCE_TREE,
-        "paths": 2,
-        "path_blobs_verified": 2,
-        "persistence_bindings_verified": 2,
-        "focused_test_files_bound": 3,
-        "security_event_constants_verified": 31,
-        "coverage_adopted": False,
+        "source_commit": SOURCE_COMMIT, "source_tree": SOURCE_TREE, "paths": 2, "path_blobs_verified": 2,
+        "persistence_bindings_verified": 2, "focused_test_files_bound": 3, "security_event_constants_verified": 31,
+        "coverage_adopted": False, "primary_qualification_run": PRIMARY_RUN, "primary_qualification_job": PRIMARY_JOB,
     }
     if inventory_dir is not None:
         result["projected_ledger"] = project_ledger(c, audit_root, inventory_dir)
