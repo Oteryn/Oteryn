@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Adversarial tests for the Announcements projection-only transform."""
 from copy import deepcopy
+import errno
 from pathlib import Path
 import tempfile
 import unittest
@@ -161,6 +162,45 @@ class AnnouncementsProjectionTest(unittest.TestCase):
             self.assertEqual(first.read_bytes(),b'unrelated replacement')
             self.assertEqual(renamed.read_bytes(),b'ledger')
             self.assertFalse(second.exists())
+
+    def test_rollback_atomically_captures_replacement_before_ownership_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); first=root/'first'; renamed=root/'renamed'; second=root/'second'
+            real_rename=projector._rename_noreplace
+            attacked=False
+            def replace_immediately_before_capture(old_name,new_name,parent_fd):
+                nonlocal attacked
+                if old_name == 'first' and not attacked:
+                    attacked=True
+                    first.rename(renamed)
+                    first.write_bytes(b'unrelated replacement')
+                return real_rename(old_name,new_name,parent_fd)
+            with mock.patch.object(projector.os,'fsync',side_effect=[None,OSError('simulated second fsync failure')]), \
+                 mock.patch.object(projector,'_rename_noreplace',side_effect=replace_immediately_before_capture):
+                with self.assertRaisesRegex(OSError,'simulated second fsync failure'):
+                    projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
+            self.assertTrue(attacked)
+            self.assertEqual(first.read_bytes(),b'unrelated replacement')
+            self.assertEqual(renamed.read_bytes(),b'ledger')
+            self.assertFalse(second.exists())
+
+    def test_quarantine_name_collision_is_retried(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); first=root/'first'; second=root/'second'
+            real_rename=projector._rename_noreplace
+            collisions=0
+            def collide_once(old_name,new_name,parent_fd):
+                nonlocal collisions
+                if old_name == 'first' and collisions == 0:
+                    collisions += 1
+                    raise FileExistsError(errno.EEXIST,'collision')
+                return real_rename(old_name,new_name,parent_fd)
+            with mock.patch.object(projector.os,'fsync',side_effect=[None,OSError('simulated second fsync failure')]), \
+                 mock.patch.object(projector,'_rename_noreplace',side_effect=collide_once):
+                with self.assertRaisesRegex(OSError,'simulated second fsync failure'):
+                    projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
+            self.assertEqual(collisions,1)
+            self.assertFalse(first.exists()); self.assertFalse(second.exists())
 
 
 if __name__=='__main__': unittest.main()

@@ -9,7 +9,9 @@ source files.
 from __future__ import annotations
 
 import argparse
+import ctypes
 import csv
+import errno
 import hashlib
 import io
 import json
@@ -32,6 +34,9 @@ LIMITATIONS = (
     'the Polish editorial_translations join branch is not directly executed and no dedicated simultaneous-writer race is proven. '
     'No later Platform state, whole-product readiness, organization-wide audit completion, or independent score is inferred.'
 )
+
+_LIBC = ctypes.CDLL(None, use_errno=True)
+_RENAME_NOREPLACE = 1
 
 
 def require(condition: bool, message: str) -> None:
@@ -77,6 +82,51 @@ def _validate_output_destination(path: Path) -> None:
         os.close(parent_fd)
 
 
+def _rename_noreplace(old_name: str, new_name: str, parent_fd: int) -> None:
+    """Atomically rename a directory entry without replacing the destination."""
+    renameat2 = getattr(_LIBC, 'renameat2', None)
+    if renameat2 is None:
+        raise OSError(errno.ENOSYS, 'renameat2 is required for ownership-safe rollback')
+    result = renameat2(
+        ctypes.c_int(parent_fd), ctypes.c_char_p(os.fsencode(old_name)),
+        ctypes.c_int(parent_fd), ctypes.c_char_p(os.fsencode(new_name)),
+        ctypes.c_uint(_RENAME_NOREPLACE),
+    )
+    if result != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), old_name, new_name)
+
+
+def _rollback_created_entry(parent_fd: int, name: str, created_dev: int, created_ino: int) -> None:
+    """Capture an active entry before deciding whether this invocation owns it."""
+    quarantine_name = ''
+    for _ in range(128):
+        candidate = f'.{name}.rollback-{os.urandom(16).hex()}'
+        try:
+            _rename_noreplace(name, candidate, parent_fd)
+            quarantine_name = candidate
+            break
+        except FileExistsError:
+            continue
+        except FileNotFoundError:
+            return
+    if not quarantine_name:
+        raise FileExistsError('unable to allocate collision-safe rollback quarantine entry')
+
+    captured = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
+    if (captured.st_dev, captured.st_ino) == (created_dev, created_ino):
+        os.unlink(quarantine_name, dir_fd=parent_fd)
+        return
+
+    # The captured entry is unrelated. Restore it only if the active name is
+    # still free; otherwise leave it intact in quarantine rather than overwrite
+    # a concurrently installed entry or delete unrelated bytes.
+    try:
+        _rename_noreplace(quarantine_name, name, parent_fd)
+    except FileExistsError:
+        pass
+
+
 def write_outputs_exclusive(projected_path: Path, projected: bytes, overlay_path: Path, overlay: bytes,
                             input_paths: tuple[Path, ...] = ()) -> None:
     outputs = [Path(os.path.abspath(projected_path)), Path(os.path.abspath(overlay_path))]
@@ -103,9 +153,7 @@ def write_outputs_exclusive(projected_path: Path, projected: bytes, overlay_path
             except OSError: pass
         for _, parent_fd, name, created_dev, created_ino in reversed(created):
             try:
-                current_stat = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-                if (current_stat.st_dev, current_stat.st_ino) == (created_dev, created_ino):
-                    os.unlink(name, dir_fd=parent_fd)
+                _rollback_created_entry(parent_fd, name, created_dev, created_ino)
             except OSError:
                 pass
         raise
