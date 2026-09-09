@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Fail-closed pre-adoption verifier for frozen Platform app/Announcements/**.
 
-This proves exact candidate/source identity and binds the completed primary
-qualification. It cannot promote coverage: all ten paths remain UNVERIFIED
-until a separate projection, adoption, post-adoption proof and independent
-review complete.
+This proves exact candidate/source identity and binds completed primary
+qualification plus mechanical projection. It cannot promote coverage: all ten
+paths remain UNVERIFIED until explicit canonical adoption, post-adoption proof
+and independent review complete.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import re
 import subprocess
 
 CANDIDATE_REL = Path('docs/evidence/organization-audit-20260907/r3-platform-announcements-direct-candidate.json')
-CANDIDATE_BLOB = '378b80656470c445a0cae9163d2246615dd039c5'
+CANDIDATE_BLOB = '04053223b8670cf5f5c39818d85d175742270b82'
 SOURCE_COMMIT = 'de917b3477a1de0667531380de3660e8b2ab59aa'
 SOURCE_TREE = 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e'
 BASE_LEDGER_SHA = '2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f'
@@ -68,6 +68,29 @@ EXPECTED_QUALIFICATION = {
     'primary_artifact_id': 10115614293,
     'primary_artifact_sha256': 'eb577820be531bfbb5451cf8d964ffeb6a78eeb47d06c36c872ab2e04637141f',
 }
+EXPECTED_PROJECTION = {
+    'status': 'PROJECTION_SUCCESS_NOT_ADOPTED',
+    'adopted_paths': 0,
+    'candidate_paths': 10,
+    'projection_audit_head': 'bd53573a6afca830efbda546ff7136d5bc0c8a54',
+    'projection_run_id': 34381252145,
+    'projection_job_id': 102566378504,
+    'projection_artifact_id': 10115927478,
+    'projection_artifact_sha256': '1fda0f2dbfb7b2d28c4df8eedee8171397b7a09d4272c16b27f7f9563be4832c',
+    'projected_ledger_sha256': '73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9',
+    'generated_overlay_sha256': '5e9b4832b886cf9049f49be00fa32b76abab5b896e63a1711688c47fb5addcb2',
+    'changed_path_count': 10,
+    'expected_delta_if_later_adopted': {
+        'direct_paths': 10, 'grouped_paths': 0, 'unverified_paths': -10,
+        'semantically_classified_paths': 10,
+    },
+    'expected_accounting_if_later_adopted': {
+        'source_rows': 4325, 'direct_paths': 233, 'grouped_paths': 113,
+        'unverified_paths': 3979, 'semantically_classified_paths': 346,
+        'platform_direct_paths': 168, 'platform_grouped_paths': 113,
+        'platform_unverified_paths': 1884,
+    },
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -94,8 +117,6 @@ def canonical_blob(candidate: dict) -> str:
 
 
 def validate_candidate_shape(candidate: dict) -> None:
-    # The Git blob pin makes the complete ordered/type-sensitive candidate immutable,
-    # while the explicit assertions below document the safety boundary.
     require(canonical_blob(candidate) == CANDIDATE_BLOB, 'candidate complete content drift')
     require(candidate['schema_version'] == 1 and type(candidate['schema_version']) is int, 'schema version drift')
     require(candidate['id'] == 'platform-announcements-direct-candidate-20260909', 'candidate id drift')
@@ -119,12 +140,10 @@ def validate_candidate_shape(candidate: dict) -> None:
     }], 'candidate focused test binding drift')
     require(candidate['baseline_accounting'] == EXPECTED_BASELINE, 'candidate baseline accounting drift')
     require(candidate['qualification'] == EXPECTED_QUALIFICATION, 'candidate qualification state/provenance drift')
-    require(candidate['projection']['status'] == 'NOT_RUN_NO_CANONICAL_CHANGE', 'candidate projection status drift')
-    require(candidate['projection']['adopted_paths'] == 0, 'candidate projection must not adopt paths')
-    require(candidate['projection']['candidate_paths'] == 10, 'candidate projection path count drift')
+    require(candidate['projection'] == EXPECTED_PROJECTION, 'candidate projection state/provenance drift')
     limitations = candidate['limitations']
     require(len(limitations) == 5, 'candidate limitations drift')
-    require('remain UNVERIFIED' in limitations[0], 'pre-adoption limitation missing')
+    require('projection is complete' in limitations[0] and 'remain UNVERIFIED' in limitations[0], 'pre-adoption/projection limitation missing')
     require('does not directly execute the Polish editorial_translations join branch' in limitations[1], 'locale execution limitation missing')
     require('not a dedicated simultaneous-writer race test' in limitations[2], 'concurrency limitation missing')
     require('do not promote their paths' in limitations[3], 'dependency promotion limitation missing')
@@ -157,19 +176,16 @@ def validate_source(candidate: dict, platform_root: Path) -> None:
     require(git(platform_root, 'rev-parse', 'HEAD^{tree}') == SOURCE_TREE, 'frozen Platform tree drift')
     leaves = [line for line in git(platform_root, 'ls-tree', '-r', '--name-only', 'HEAD', '--', 'app/Announcements').splitlines() if line]
     require(leaves == list(EXPECTED_PATH_BLOBS), 'frozen app/Announcements leaf set/order drift')
-
     for row in candidate['paths']:
         path = row['path']
         require(tree_blob(platform_root, path) == row['blob_sha'], 'source blob drift: ' + path)
         text = source_text(platform_root, path)
         for assertion in row['semantic_assertions']:
             require(assertion in text, 'source semantic assertion absent: ' + path + ': ' + assertion)
-
     for dep in candidate['dependency_bindings']:
         path = dep['path']
         require(tree_blob(platform_root, path) == dep['blob_sha'], 'dependency blob drift: ' + path)
         require(dep['required_text'] in source_text(platform_root, path), 'dependency required text absent: ' + path)
-
     test = candidate['focused_current_tests'][0]
     require(tree_blob(platform_root, test['path']) == test['blob_sha'], 'focused test blob drift')
     text = source_text(platform_root, test['path'])
@@ -188,7 +204,7 @@ def main() -> int:
     require(git(args.audit_root, 'rev-parse', 'HEAD:' + str(CANDIDATE_REL)) == CANDIDATE_BLOB, 'tracked candidate blob drift')
     validate_source(candidate, args.platform_root)
     print(json.dumps({
-        'result': 'ANNOUNCEMENTS_PRIMARY_QUALIFICATION_BOUND_NOT_ADOPTED',
+        'result': 'ANNOUNCEMENTS_PROJECTION_BOUND_NOT_ADOPTED',
         'source_commit': SOURCE_COMMIT,
         'candidate_paths': 10,
         'coverage_adopted': False,
@@ -197,12 +213,21 @@ def main() -> int:
         'primary_run_id': 34380399141,
         'primary_job_id': 102563546379,
         'primary_artifact_id': 10115614293,
+        'projection_run_id': 34381252145,
+        'projection_job_id': 102566378504,
+        'projection_artifact_id': 10115927478,
+        'projected_direct_paths': 233,
+        'projected_grouped_paths': 113,
+        'projected_unverified_paths': 3979,
+        'projected_semantically_classified_paths': 346,
+        'projected_ledger_sha256': EXPECTED_PROJECTION['projected_ledger_sha256'],
+        'generated_overlay_sha256': EXPECTED_PROJECTION['generated_overlay_sha256'],
         'canonical_direct_paths': 223,
         'canonical_grouped_paths': 113,
         'canonical_unverified_paths': 3989,
         'canonical_semantically_classified_paths': 336,
         'canonical_ledger_sha256': BASE_LEDGER_SHA,
-        'next_gate': 'mechanical projection only; canonical coverage must remain unchanged until explicit adoption',
+        'next_gate': 'explicit canonical adoption followed by exact post-adoption proof; independent review remains required',
         'product_readiness_claimed': False,
         'audit_completion_claimed': False,
     }, sort_keys=True))
