@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 import verify_report as audit
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -175,5 +176,18 @@ class AuditValidationTest(unittest.TestCase):
         link.symlink_to(provider,target_is_directory=True)
         with self.assertRaises(ValueError):audit.write_new_file_no_symlinks(link/'ledger.csv',b'new')
         self.assertFalse((provider/'ledger.csv').exists())
+    def test_ledger_write_failure_preserves_concurrent_replacement(self):
+        path=self.root/'ledger.csv';calls=0
+        def replace_then_fail(_fd):
+            nonlocal calls
+            calls+=1
+            path.write_bytes(b'unrelated replacement')
+            raise OSError('simulated ledger write failure')
+        with mock.patch.object(audit.os,'fsync',side_effect=replace_then_fail), \
+             mock.patch.object(audit.os,'unlink',side_effect=AssertionError('pathname rollback is forbidden')):
+            with self.assertRaisesRegex(ValueError,'refusing ledger'):
+                audit.write_new_file_no_symlinks(path,b'generated ledger')
+        self.assertEqual(calls,1)
+        self.assertEqual(path.read_bytes(),b'unrelated replacement')
 
 if __name__=='__main__':unittest.main()

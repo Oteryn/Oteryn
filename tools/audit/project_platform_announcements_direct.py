@@ -36,7 +36,7 @@ LIMITATIONS = (
 )
 
 _LIBC = ctypes.CDLL(None, use_errno=True)
-_RENAME_NOREPLACE = 1
+_AT_EMPTY_PATH = 0x1000
 
 
 def require(condition: bool, message: str) -> None:
@@ -59,12 +59,14 @@ def _open_parent_without_symlinks(path: Path) -> tuple[int, str]:
         raise
 
 
-def _exclusive_create(path: Path) -> tuple[int, int, str, int, int]:
+def _open_unnamed_output(path: Path) -> tuple[int, int, str]:
     parent_fd, name = _open_parent_without_symlinks(path)
     try:
-        fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644, dir_fd=parent_fd)
-        created_stat = os.fstat(fd)
-        return fd, parent_fd, name, created_stat.st_dev, created_stat.st_ino
+        tmpfile = getattr(os, 'O_TMPFILE', 0)
+        if not tmpfile:
+            raise OSError(errno.ENOSYS, 'O_TMPFILE is required for ownership-safe output creation')
+        fd = os.open('.', os.O_RDWR | tmpfile, 0o644, dir_fd=parent_fd)
+        return fd, parent_fd, name
     except Exception:
         os.close(parent_fd)
         raise
@@ -82,49 +84,19 @@ def _validate_output_destination(path: Path) -> None:
         os.close(parent_fd)
 
 
-def _rename_noreplace(old_name: str, new_name: str, parent_fd: int) -> None:
-    """Atomically rename a directory entry without replacing the destination."""
-    renameat2 = getattr(_LIBC, 'renameat2', None)
-    if renameat2 is None:
-        raise OSError(errno.ENOSYS, 'renameat2 is required for ownership-safe rollback')
-    result = renameat2(
-        ctypes.c_int(parent_fd), ctypes.c_char_p(os.fsencode(old_name)),
-        ctypes.c_int(parent_fd), ctypes.c_char_p(os.fsencode(new_name)),
-        ctypes.c_uint(_RENAME_NOREPLACE),
+def _publish_unnamed(fd: int, parent_fd: int, name: str) -> None:
+    """Link an owned open inode at ``name`` without replacing any entry."""
+    linkat = getattr(_LIBC, 'linkat', None)
+    if linkat is None:
+        raise OSError(errno.ENOSYS, 'linkat is required for ownership-safe output publication')
+    result = linkat(
+        ctypes.c_int(fd), ctypes.c_char_p(b''),
+        ctypes.c_int(parent_fd), ctypes.c_char_p(os.fsencode(name)),
+        ctypes.c_int(_AT_EMPTY_PATH),
     )
     if result != 0:
         error = ctypes.get_errno()
-        raise OSError(error, os.strerror(error), old_name, new_name)
-
-
-def _rollback_created_entry(parent_fd: int, name: str, created_dev: int, created_ino: int) -> None:
-    """Capture an active entry before deciding whether this invocation owns it."""
-    quarantine_name = ''
-    for _ in range(128):
-        candidate = f'.{name}.rollback-{os.urandom(16).hex()}'
-        try:
-            _rename_noreplace(name, candidate, parent_fd)
-            quarantine_name = candidate
-            break
-        except FileExistsError:
-            continue
-        except FileNotFoundError:
-            return
-    if not quarantine_name:
-        raise FileExistsError('unable to allocate collision-safe rollback quarantine entry')
-
-    captured = os.stat(quarantine_name, dir_fd=parent_fd, follow_symlinks=False)
-    if (captured.st_dev, captured.st_ino) == (created_dev, created_ino):
-        os.unlink(quarantine_name, dir_fd=parent_fd)
-        return
-
-    # The captured entry is unrelated. Restore it only if the active name is
-    # still free; otherwise leave it intact in quarantine rather than overwrite
-    # a concurrently installed entry or delete unrelated bytes.
-    try:
-        _rename_noreplace(quarantine_name, name, parent_fd)
-    except FileExistsError:
-        pass
+        raise OSError(error, os.strerror(error), name)
 
 
 def write_outputs_exclusive(projected_path: Path, projected: bytes, overlay_path: Path, overlay: bytes,
@@ -138,27 +110,23 @@ def write_outputs_exclusive(projected_path: Path, projected: bytes, overlay_path
     for path in outputs:
         _validate_output_destination(path)
 
-    created: list[tuple[int, int, str, int, int]] = []
+    created: list[tuple[int, int, str]] = []
     try:
-        created.append(_exclusive_create(outputs[0]))
-        created.append(_exclusive_create(outputs[1]))
-        for (fd, _, _, _, _), raw in zip(created, (projected, overlay), strict=True):
+        created.append(_open_unnamed_output(outputs[0]))
+        created.append(_open_unnamed_output(outputs[1]))
+        for (fd, _, _), raw in zip(created, (projected, overlay), strict=True):
             with os.fdopen(fd, 'wb', closefd=False) as handle:
                 handle.write(raw)
                 handle.flush()
                 os.fsync(fd)
-    except Exception:
-        for fd, _, _, _, _ in created:
-            try: os.close(fd)
-            except OSError: pass
-        for _, parent_fd, name, created_dev, created_ino in reversed(created):
-            try:
-                _rollback_created_entry(parent_fd, name, created_dev, created_ino)
-            except OSError:
-                pass
-        raise
+        # All failure-prone content generation is complete before either inode
+        # becomes visible. Publication is descriptor-bound and never followed
+        # by pathname-based rollback. If the second link races, preserve the
+        # first published inode rather than guessing which pathname is owned.
+        for fd, parent_fd, name in created:
+            _publish_unnamed(fd, parent_fd, name)
     finally:
-        for fd, parent_fd, _, _, _ in created:
+        for fd, parent_fd, _ in created:
             try: os.close(fd)
             except OSError: pass
             os.close(parent_fd)

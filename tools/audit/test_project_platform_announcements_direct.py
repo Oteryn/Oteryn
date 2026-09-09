@@ -125,14 +125,14 @@ class AnnouncementsProjectionTest(unittest.TestCase):
     def test_second_output_failure_rolls_back_first(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); first=root/'first'; second=root/'second'
-            real=projector._exclusive_create
+            real=projector._open_unnamed_output
             calls=0
             def fail_second(path):
                 nonlocal calls
                 calls += 1
                 if calls == 2: raise OSError('simulated second create failure')
                 return real(path)
-            with mock.patch.object(projector,'_exclusive_create',side_effect=fail_second):
+            with mock.patch.object(projector,'_open_unnamed_output',side_effect=fail_second):
                 with self.assertRaisesRegex(OSError,'simulated'):
                     projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
             self.assertFalse(first.exists()); self.assertFalse(second.exists())
@@ -145,86 +145,43 @@ class AnnouncementsProjectionTest(unittest.TestCase):
                     projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
             self.assertFalse(first.exists()); self.assertFalse(second.exists())
 
-    def test_rollback_preserves_replacement_of_first_output(self):
+    def test_second_publication_race_preserves_replacement(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); first=root/'first'; renamed=root/'renamed'; second=root/'second'
+            real_publish=projector._publish_unnamed
             calls=0
-            def replace_first_then_fail(_fd):
+            def replace_first_then_fail(fd,parent_fd,name):
                 nonlocal calls
                 calls += 1
+                if calls == 1:
+                    return real_publish(fd,parent_fd,name)
                 if calls == 2:
                     first.rename(renamed)
                     first.write_bytes(b'unrelated replacement')
-                    raise OSError('simulated write failure after replacement')
-            with mock.patch.object(projector.os,'fsync',side_effect=replace_first_then_fail):
-                with self.assertRaisesRegex(OSError,'simulated write failure after replacement'):
+                    raise OSError('simulated second publication failure')
+            with mock.patch.object(projector,'_publish_unnamed',side_effect=replace_first_then_fail), \
+                 mock.patch.object(projector.os,'unlink',side_effect=AssertionError('pathname rollback is forbidden')):
+                with self.assertRaisesRegex(OSError,'simulated second publication failure'):
                     projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
             self.assertEqual(first.read_bytes(),b'unrelated replacement')
             self.assertEqual(renamed.read_bytes(),b'ledger')
             self.assertFalse(second.exists())
 
-    def test_rollback_atomically_captures_replacement_before_ownership_check(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); first=root/'first'; renamed=root/'renamed'; second=root/'second'
-            real_rename=projector._rename_noreplace
-            attacked=False
-            def replace_immediately_before_capture(old_name,new_name,parent_fd):
-                nonlocal attacked
-                if old_name == 'first' and not attacked:
-                    attacked=True
-                    first.rename(renamed)
-                    first.write_bytes(b'unrelated replacement')
-                return real_rename(old_name,new_name,parent_fd)
-            with mock.patch.object(projector.os,'fsync',side_effect=[None,OSError('simulated second fsync failure')]), \
-                 mock.patch.object(projector,'_rename_noreplace',side_effect=replace_immediately_before_capture):
-                with self.assertRaisesRegex(OSError,'simulated second fsync failure'):
-                    projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
-            self.assertTrue(attacked)
-            self.assertEqual(first.read_bytes(),b'unrelated replacement')
-            self.assertEqual(renamed.read_bytes(),b'ledger')
-            self.assertFalse(second.exists())
-
-    def test_ownership_check_interception_cannot_replace_captured_pathname(self):
+    def test_write_failure_before_publication_preserves_unrelated_destination(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); first=root/'first'; second=root/'second'
-            real_stat=projector.os.stat
-            attacked=False
-            def replace_active_name_after_check(path,*args,**kwargs):
-                nonlocal attacked
-                observed=real_stat(path,*args,**kwargs)
-                if isinstance(path,str) and path.startswith('.first.rollback-') and not attacked:
-                    attacked=True
-                    # The tool-owned inode has already been atomically captured
-                    # under ``path``.  Reusing the published name now must not
-                    # expose these unrelated bytes to the subsequent unlink.
+            calls=0
+            def install_replacement_then_fail(_fd):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
                     first.write_bytes(b'unrelated replacement')
-                return observed
-            with mock.patch.object(projector.os,'fsync',side_effect=[None,OSError('simulated second fsync failure')]), \
-                 mock.patch.object(projector.os,'stat',side_effect=replace_active_name_after_check):
+                    raise OSError('simulated second fsync failure')
+            with mock.patch.object(projector.os,'fsync',side_effect=install_replacement_then_fail), \
+                 mock.patch.object(projector.os,'unlink',side_effect=AssertionError('pathname rollback is forbidden')):
                 with self.assertRaisesRegex(OSError,'simulated second fsync failure'):
                     projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
-            self.assertTrue(attacked)
             self.assertEqual(first.read_bytes(),b'unrelated replacement')
             self.assertFalse(second.exists())
-            self.assertEqual(list(root.glob('.first.rollback-*')),[])
-
-    def test_quarantine_name_collision_is_retried(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp); first=root/'first'; second=root/'second'
-            real_rename=projector._rename_noreplace
-            collisions=0
-            def collide_once(old_name,new_name,parent_fd):
-                nonlocal collisions
-                if old_name == 'first' and collisions == 0:
-                    collisions += 1
-                    raise FileExistsError(errno.EEXIST,'collision')
-                return real_rename(old_name,new_name,parent_fd)
-            with mock.patch.object(projector.os,'fsync',side_effect=[None,OSError('simulated second fsync failure')]), \
-                 mock.patch.object(projector,'_rename_noreplace',side_effect=collide_once):
-                with self.assertRaisesRegex(OSError,'simulated second fsync failure'):
-                    projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
-            self.assertEqual(collisions,1)
-            self.assertFalse(first.exists()); self.assertFalse(second.exists())
-
 
 if __name__=='__main__': unittest.main()

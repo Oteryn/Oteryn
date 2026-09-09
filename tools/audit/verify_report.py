@@ -9,7 +9,9 @@ product/audit-semantic PASS.
 """
 from __future__ import annotations
 import argparse
+import ctypes
 import csv
+import errno
 import hashlib
 import io
 import json
@@ -29,6 +31,8 @@ DIRECT_ADDITIONS = 'coverage-review-canonical-additions.tsv'
 DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-canonical-additions.tsv'
 RECORDER_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
 ANNOUNCEMENTS_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-announcements-additions.tsv'
+_LIBC = ctypes.CDLL(None, use_errno=True)
+_AT_EMPTY_PATH = 0x1000
 
 
 def write_new_file_no_symlinks(path: Path, raw: bytes) -> None:
@@ -42,17 +46,19 @@ def write_new_file_no_symlinks(path: Path, raw: bytes) -> None:
             try: child=os.open(part,flags,dir_fd=descriptor)
             except OSError as exc: raise ValueError('ledger output ancestry must contain only directories, not symlinks') from exc
             os.close(descriptor);descriptor=child
-        file_flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL
-        if hasattr(os,'O_NOFOLLOW'): file_flags|=os.O_NOFOLLOW
-        try: output=os.open(absolute.name,file_flags,0o666,dir_fd=descriptor)
-        except OSError as exc: raise ValueError('refusing ledger overwrite or symlink') from exc
+        tmpfile=getattr(os,'O_TMPFILE',0)
+        if not tmpfile: raise ValueError('O_TMPFILE is required for ownership-safe ledger output')
         try:
+            output=os.open('.',os.O_RDWR|tmpfile,0o666,dir_fd=descriptor)
             with os.fdopen(output,'wb') as handle:
                 handle.write(raw)
-        except Exception:
-            try: os.unlink(absolute.name,dir_fd=descriptor)
-            except OSError: pass
-            raise
+                handle.flush();os.fsync(handle.fileno())
+                linkat=getattr(_LIBC,'linkat',None)
+                if linkat is None: raise OSError(errno.ENOSYS,'linkat is required for ownership-safe ledger output')
+                result=linkat(ctypes.c_int(handle.fileno()),ctypes.c_char_p(b''),ctypes.c_int(descriptor),ctypes.c_char_p(os.fsencode(absolute.name)),ctypes.c_int(_AT_EMPTY_PATH))
+                if result != 0:
+                    error=ctypes.get_errno();raise OSError(error,os.strerror(error),absolute.name)
+        except OSError as exc: raise ValueError('refusing ledger overwrite or symlink') from exc
     finally: os.close(descriptor)
 SEMANTIC_COVERAGE_UNKNOWN = {
     'id': 'SEMANTIC-COVERAGE',
