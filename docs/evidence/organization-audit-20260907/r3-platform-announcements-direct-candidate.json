@@ -170,7 +170,7 @@
     {
       "path": "routes/web.php",
       "blob_sha": "339e7573b2bc04c7bdd9183cd739c099448d8421",
-      "required_text": "foreach ($modules as $module) {",
+      "required_text": "foreach ($moduleRouteFiles as $moduleRouteFile) {",
       "role": "ROUTE_MODULE_LOADING_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE"
     },
     {
