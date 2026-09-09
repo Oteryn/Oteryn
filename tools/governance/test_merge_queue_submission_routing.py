@@ -330,7 +330,7 @@ def test_policy_requires_atomic_head_and_base_queue_fence() -> None:
         "`expectedHeadOid`",
         "does not expose an expected base/queue precondition",
         "`dequeuePullRequest` targets the pull request ID",
-        "post-mutation readback cannot repair",
+        "Post-mutation readback cannot repair",
         "`BLOCKED_CAPABILITY_UNAVAILABLE`",
         "`enablePullRequestAutoMerge` is not a governed agent enqueue capability",
     ):
