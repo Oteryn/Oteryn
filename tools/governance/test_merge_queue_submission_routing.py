@@ -42,6 +42,21 @@ def freeze(**overrides):
     return routing.CandidateFreeze(**values)
 
 
+def authorization(**overrides):
+    values = {
+        "source": routing.AUTHORIZATION_SOURCE,
+        "repository": REPOSITORY,
+        "pr_number": PR_NUMBER,
+        "base_ref": BASE_REF,
+        "pr_head_sha": PR_HEAD,
+        "integration_authorized": True,
+        "pr_eligible": True,
+        "observed_at_epoch_seconds": NOW,
+    }
+    values.update(overrides)
+    return routing.SubmissionAuthorization(**values)
+
+
 def capabilities(**overrides):
     values = {
         "async_merge_available": False,
@@ -52,18 +67,18 @@ def capabilities(**overrides):
         "protected_executor_available": False,
         "protected_executor_expected_head_fence": False,
         "protected_executor_trusted_default_branch": False,
-        "integration_authorized": True,
-        "pr_eligible": True,
     }
     values.update(overrides)
     return routing.SubmissionCapabilities(**values)
 
 
-def route(*, current_attempt=None, current_freeze=None, current_capabilities=None):
+def route(*, current_attempt=None, current_freeze=None, current_authorization=None, current_capabilities=None, now=NOW):
     return routing.choose_submission_route(
         current_attempt or attempt(),
         current_freeze or freeze(),
+        current_authorization or authorization(),
         current_capabilities or capabilities(),
+        now_epoch_seconds=now,
     )
 
 
@@ -182,16 +197,38 @@ def test_no_generic_auto_merge_or_direct_merge_route_exists() -> None:
     assert route() == routing.BLOCKED_CAPABILITY_UNAVAILABLE
 
 
-def test_authority_eligibility_and_exact_candidate_freeze_fail_closed() -> None:
+def test_authorization_and_eligibility_are_exact_target_bound_and_fresh() -> None:
     safe = capabilities(
         async_merge_available=True,
         async_merge_expected_head_fence=True,
         async_merge_merge_queue_action=True,
     )
-    assert route(current_capabilities=safe._replace(integration_authorized=False)) == routing.BLOCKED_NOT_AUTHORIZED
-    assert route(current_capabilities=safe._replace(pr_eligible=False)) == routing.BLOCKED_NOT_ELIGIBLE
+    assert route(current_authorization=authorization(integration_authorized=False), current_capabilities=safe) == routing.BLOCKED_NOT_AUTHORIZED
+    assert route(current_authorization=authorization(pr_eligible=False), current_capabilities=safe) == routing.BLOCKED_NOT_ELIGIBLE
+    for changes in (
+        {"source": "cached_authorization"},
+        {"repository": "Oteryn/Oteryn-Game"},
+        {"pr_number": PR_NUMBER + 1},
+        {"base_ref": "release"},
+        {"pr_head_sha": OTHER_HEAD},
+        {"observed_at_epoch_seconds": NOW - routing.MAX_AUTHORIZATION_AGE_SECONDS - 1},
+        {"observed_at_epoch_seconds": NOW + 1},
+        {"integration_authorized": 1},
+        {"pr_eligible": 1},
+    ):
+        assert route(current_authorization=authorization(**changes), current_capabilities=safe) == routing.BLOCKED_STALE_STATE, changes
+
+
+def test_exact_candidate_freeze_still_fail_closed() -> None:
+    safe = capabilities(
+        async_merge_available=True,
+        async_merge_expected_head_fence=True,
+        async_merge_merge_queue_action=True,
+    )
     assert route(current_freeze=freeze(head_sha=OTHER_HEAD), current_capabilities=safe) == routing.BLOCKED_FROZEN_HEAD_MISMATCH
-    assert route(current_attempt=attempt(live_pr_head_sha=OTHER_HEAD), current_capabilities=safe) == routing.BLOCKED_FROZEN_HEAD_MISMATCH
+    moved_attempt = attempt(live_pr_head_sha=OTHER_HEAD)
+    moved_auth = authorization(pr_head_sha=OTHER_HEAD)
+    assert route(current_attempt=moved_attempt, current_authorization=moved_auth, current_capabilities=safe) == routing.BLOCKED_FROZEN_HEAD_MISMATCH
 
 
 def test_invalid_targets_and_branch_coordinates_fail_closed() -> None:
@@ -248,6 +285,7 @@ def test_policy_prefers_native_async_merge_queue_and_keeps_safe_fallbacks() -> N
         "`merge-async`",
         '`merge_action="merge_queue"`',
         "exact qualified/frozen PR head",
+        "fresh target-bound authorization/eligibility observation",
         "`enqueuePullRequest`",
         "`expectedHeadOid`",
         "`enablePullRequestAutoMerge` is not a governed agent enqueue capability",
