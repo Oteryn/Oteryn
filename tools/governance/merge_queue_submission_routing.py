@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Iterable, NamedTuple
 
@@ -71,6 +72,15 @@ class BranchQueueObservation(NamedTuple):
     workflow_sha: str
     observed_at_epoch_seconds: int
     expires_at_epoch_seconds: int
+
+
+class ProofCommentObservation(NamedTuple):
+    repository: str
+    issue_number: int
+    comment_id: int
+    author_login: str
+    body: str
+    observed_at_epoch_seconds: int
 
 
 class WorkflowRunObservation(NamedTuple):
@@ -198,6 +208,59 @@ def _fresh(observed_at: object, now: object, max_age: int) -> bool:
     )
 
 
+def _proof_payload(observation: BranchQueueObservation) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "attempt_id": observation.attempt_id,
+        "observation_id": observation.observation_id,
+        "source": observation.source,
+        "control_repository": observation.control_repository,
+        "control_issue_number": observation.control_issue_number,
+        "repository": observation.repository,
+        "pr_number": observation.pr_number,
+        "base_ref": observation.base_ref,
+        "pr_head_sha": observation.pr_head_sha,
+        "merge_queue_required": observation.merge_queue_required,
+        "queue_id": observation.queue_id,
+        "resource_path": observation.resource_path,
+        "url": observation.url,
+        "trigger_comment_id": observation.trigger_comment_id,
+        "proof_comment_id": observation.proof_comment_id,
+        "proof_comment_author_login": observation.proof_comment_author_login,
+        "workflow_run_id": observation.workflow_run_id,
+        "workflow_run_attempt": observation.workflow_run_attempt,
+        "workflow_sha": observation.workflow_sha,
+        "observed_at_epoch_seconds": observation.observed_at_epoch_seconds,
+        "expires_at_epoch_seconds": observation.expires_at_epoch_seconds,
+    }
+
+
+def _proof_comment_matches(
+    observation: BranchQueueObservation,
+    proof_comment: ProofCommentObservation,
+    *,
+    now_epoch_seconds: int,
+) -> bool:
+    if not isinstance(proof_comment, ProofCommentObservation):
+        return False
+    canonical = json.dumps(_proof_payload(observation), sort_keys=True, separators=(",", ":"))
+    expected_body = "OTERYN_MQ_PREFLIGHT_V1\n```json\n" + canonical + "\n```"
+    return (
+        proof_comment.repository == CONTROL_REPOSITORY
+        and proof_comment.issue_number == CONTROL_ISSUE_NUMBER
+        and proof_comment.comment_id == observation.proof_comment_id
+        and proof_comment.author_login == PREFLIGHT_PROOF_AUTHOR
+        and proof_comment.author_login == observation.proof_comment_author_login
+        and proof_comment.body == expected_body
+        and _fresh(
+            proof_comment.observed_at_epoch_seconds,
+            now_epoch_seconds,
+            MAX_PREMUTATION_RULE_AGE_SECONDS,
+        )
+        and proof_comment.observed_at_epoch_seconds >= observation.observed_at_epoch_seconds
+    )
+
+
 def _workflow_run_matches(
     observation: BranchQueueObservation,
     workflow: WorkflowRunObservation,
@@ -227,6 +290,7 @@ def _workflow_run_matches(
 def _branch_observation_matches(
     attempt: SubmissionAttempt,
     observation: BranchQueueObservation,
+    proof_comment: ProofCommentObservation,
     workflow: WorkflowRunObservation,
     *,
     now_epoch_seconds: int,
@@ -279,6 +343,8 @@ def _branch_observation_matches(
         != observation.observed_at_epoch_seconds + MAX_PREMUTATION_RULE_AGE_SECONDS
         or now_epoch_seconds > observation.expires_at_epoch_seconds
     ):
+        return False
+    if not _proof_comment_matches(observation, proof_comment, now_epoch_seconds=now_epoch_seconds):
         return False
     if not _workflow_run_matches(observation, workflow, now_epoch_seconds=now_epoch_seconds):
         return False
@@ -334,6 +400,7 @@ def _freeze_matches(attempt: SubmissionAttempt, freeze: CandidateFreeze) -> bool
 def choose_submission_route(
     attempt: SubmissionAttempt,
     branch_observation: BranchQueueObservation,
+    proof_comment_observation: ProofCommentObservation,
     workflow_run_observation: WorkflowRunObservation,
     live_head_observation: LiveHeadObservation,
     freeze: CandidateFreeze,
@@ -358,6 +425,7 @@ def choose_submission_route(
     if not _branch_observation_matches(
         attempt,
         branch_observation,
+        proof_comment_observation,
         workflow_run_observation,
         now_epoch_seconds=now_epoch_seconds,
     ):
