@@ -1,0 +1,124 @@
+{
+  "kind": "direct file inspection; source content treated as evidence not activation",
+  "scope": "one known local Codex installation; private location and config values omitted",
+  "global_agents": {
+    "lines_read": 30,
+    "scope": "bounded local worker routing, verified outputs, separate from collaboration",
+    "read_in": "R2"
+  },
+  "entrypoints": [
+    {
+      "path": "CODEX_HOME/skills/.system/imagegen/SKILL.md",
+      "sha256": "706d4d96e1d5c9e6023fe3ccabba1bb34b364024d344fd25b8515ec7d28fe3c4",
+      "bytes": 19516,
+      "lines": 315,
+      "body_review": "DIRECT_FULL",
+      "metadata_path": "CODEX_HOME/skills/.system/imagegen/agents/openai.yaml",
+      "metadata_review": "DIRECT_FULL",
+      "metadata_sha256": "1797be4076717806df54aa9331c07ac8eebe32c69f32132d5858712b05406146",
+      "explicit_allow_implicit_invocation": "KEY_ABSENT_NOT_INFERRED",
+      "trigger": "raster image generation/editing, explicit CLI fallback",
+      "assessment": "Not activated: no image requested. Explicit API fallback/asset overwrite boundaries preserved; helper code is outside META audit."
+    },
+    {
+      "path": "CODEX_HOME/skills/.system/openai-docs/SKILL.md",
+      "sha256": "4371fcc6652d78309ccf5e7710a4fd22314ad7f1f4928a6c172ddae80c87cc87",
+      "bytes": 5484,
+      "lines": 38,
+      "body_review": "DIRECT_FULL",
+      "metadata_path": "CODEX_HOME/skills/.system/openai-docs/agents/openai.yaml",
+      "metadata_review": "DIRECT_FULL",
+      "metadata_sha256": "0dd6c5ffa81a09782fd24cfa9fe1ec5c9633c90500b166ae18a462e613e876be",
+      "explicit_allow_implicit_invocation": "KEY_ABSENT_NOT_INFERRED",
+      "trigger": "official OpenAI/Codex documentation lookup",
+      "assessment": "Docs-first instructions cannot replace repository inspection. No product model claims inferred from this local guide; conditional references not automatically loaded."
+    },
+    {
+      "path": "CODEX_HOME/skills/.system/plugin-creator/SKILL.md",
+      "sha256": "9dba03c079abfbc680e8fca146069f054c1b0c5e9bcb5e5a9effcf86a95f67c6",
+      "bytes": 11716,
+      "lines": 249,
+      "body_review": "DIRECT_FULL",
+      "metadata_path": "CODEX_HOME/skills/.system/plugin-creator/agents/openai.yaml",
+      "metadata_review": "DIRECT_FULL",
+      "metadata_sha256": "693e1667acc879a7b966cf073fee6cf1f268974983c00b6b779dab031d79185e",
+      "explicit_allow_implicit_invocation": "KEY_ABSENT_NOT_INFERRED",
+      "trigger": "plugin scaffolding and marketplace updates",
+      "assessment": "Not activated: publication of an audit is not plugin creation. Personal marketplace defaults and force flags are conditional on actual creation/update authorization."
+    },
+    {
+      "path": "CODEX_HOME/skills/.system/review-agent/SKILL.md",
+      "sha256": "bb46315f6bc4b7051c05f807d19b1689b20418ac6c42590406d805c10fa2fd1a",
+      "bytes": 2718,
+      "lines": 57,
+      "body_review": "DIRECT_FULL",
+      "metadata_path": "CODEX_HOME/skills/.system/review-agent/agents/openai.yaml",
+      "metadata_review": "DIRECT_FULL",
+      "metadata_sha256": "579774dde24f21ee57d5cb63f69c2fce0da04b81538c636a0e0dd37dc836c811",
+      "explicit_allow_implicit_invocation": false,
+      "trigger": "change-only independent review",
+      "assessment": "Full-repository audit must include pre-existing problems, whereas this skill intentionally filters to introduced regressions. Explicit-only invocation metadata reduces accidental activation; no evidence it was activated."
+    },
+    {
+      "path": "CODEX_HOME/skills/.system/skill-creator/SKILL.md",
+      "sha256": "cccd291077ec57c6f50ca6529f0f3fb93212da09473effb2fcec808e81b21288",
+      "bytes": 15540,
+      "lines": 229,
+      "body_review": "DIRECT_FULL",
+      "metadata_path": "CODEX_HOME/skills/.system/skill-creator/agents/openai.yaml",
+      "metadata_review": "DIRECT_FULL",
+      "metadata_sha256": "b750627cdd588fdbb5b46e854d3384d1a504fad3b8ed73ca5d7ead3804df78b6",
+      "explicit_allow_implicit_invocation": "KEY_ABSENT_NOT_INFERRED",
+      "trigger": "create/update skills",
+      "assessment": "Not activated as a creator. Progressive disclosure and proportional validation are relevant audit material. Automatic discovery instructions are not mutation authority or proof of client behavior."
+    },
+    {
+      "path": "CODEX_HOME/skills/.system/skill-installer/SKILL.md",
+      "sha256": "2892d8b2fb11631132118f340aed80ae17e59d5a571fc2c4f4a4a7e73f139d52",
+      "bytes": 3425,
+      "lines": 58,
+      "body_review": "DIRECT_FULL",
+      "metadata_path": "CODEX_HOME/skills/.system/skill-installer/agents/openai.yaml",
+      "metadata_review": "DIRECT_FULL",
+      "metadata_sha256": "bd64b4d6893138706b3e3540f266ab809ccdcd08375652ae9f9d1e029fe50d02",
+      "explicit_allow_implicit_invocation": "KEY_ABSENT_NOT_INFERRED",
+      "trigger": "install/list skills",
+      "assessment": "Not activated: no installation requested. Escalation/install/overwrite steps must not gate unrelated read-only work."
+    },
+    {
+      "path": "CODEX_HOME/skills/playwright/SKILL.md",
+      "sha256": "c52cc95125b720cdc3c9829b0294c2752d4ae9b85a5282aa153da8bba929af87",
+      "bytes": 3918,
+      "lines": 147,
+      "body_review": "DIRECT_FULL",
+      "metadata_path": "CODEX_HOME/skills/playwright/agents/openai.yaml",
+      "metadata_review": "DIRECT_FULL",
+      "metadata_sha256": "dfc22e6c764f025e5e520fe2e1781e119f6262f406feddafe84ff8aaf9a4ff21",
+      "explicit_allow_implicit_invocation": "KEY_ABSENT_NOT_INFERRED",
+      "trigger": "terminal browser automation",
+      "assessment": "Not activated: no META UI acceptance task. Missing-npx install/pause directions apply only to this browser route, not completion of unrelated repo inspection."
+    }
+  ],
+  "body_reads_in_R3": 5,
+  "body_reads_previously_complete": 2,
+  "metadata_files_read_in_R3": 7,
+  "hash_readback_process": 4760,
+  "loading_trace": "UNVERIFIED",
+  "not_included": [
+    "All referenced assets/helpers are not instructions needed for this META task and were not executed.",
+    "No audit of all installed plugin packages, OS, private chats, credentials or other clients."
+  ],
+  "safety_note": "Observed local profile did not itself provide a read-only enforcement boundary. Values withheld from public publication; no configuration changed.",
+  "historical_absent_paths": [
+    "CODEX_HOME\\AGENTS.override.md",
+    "USER_HOME\\.agents\\skills",
+    "CODEX_HOME\\rules",
+    "CODEX_HOME\\agents",
+    "CODEX_HOME\\hooks",
+    "CODEX_HOME\\hooks.json",
+    "USER_HOME\\AGENTS.md",
+    "USER_HOME\\AGENTS.override.md"
+  ],
+  "absence_limit": "Only enumerated paths on the known installation; not every app or machine. R2 read-only process 14280.",
+  "git_core_hooksPath_query": "No configured value returned in isolated clone"
+}

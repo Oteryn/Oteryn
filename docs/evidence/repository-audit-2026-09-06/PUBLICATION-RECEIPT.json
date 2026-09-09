@@ -1,0 +1,36 @@
+{
+  "audited_main": "0c493896040072badeff1f333eb83d7114a993ff",
+  "branch": "docs/20260906-complete-repository-audit",
+  "ci": {
+    "conclusion": "success",
+    "job_id": 101561557270,
+    "job_name": "meta-gate",
+    "run_id": 34061061093,
+    "workflow": "META CI"
+  },
+  "note": "This follow-up receipt records the already-published R3 material commit and CI result. It intentionally does not embed the later commit that adds this receipt, avoiding self-reference.",
+  "publication_base_main": "d0d5a54c5f06db9423d14b17e7f8eadefd15c6fb",
+  "pull_request": 153,
+  "r3_material_commit": "e3c3fb39ee8735f8d49cfe78d820a1bea20c02f9",
+  "r3_tree": "71cf3b42160d7704ad04ae15ee99300b42fbbb62",
+  "report_git_blob": "5824287d48b7f6e92e80d0a19168578663fe541c",
+  "repository": "Oteryn/Oteryn",
+  "scope": "Audit documentation/evidence only; no implementation, test source, workflow, provider, protected-setting or production change.",
+  "status_at_receipt_creation": {
+    "pull_request_draft": false,
+    "pull_request_mergeable": true,
+    "pull_request_merged": false,
+    "pull_request_open": true
+  },
+  "verification": {
+    "all_prepared_bytes_matched_r3_material_tree": true,
+    "domains": 23,
+    "material_files_before_receipt": 24,
+    "original_prompt_sha256": "c51a6d60dddb1d2bd13fe3329723703f651b09d690522b757402988b0c569c1d",
+    "p2": 11,
+    "p3": 3,
+    "r3_material_tree": "71cf3b42160d7704ad04ae15ee99300b42fbbb62",
+    "report_sections": 15,
+    "unique_findings": 14
+  }
+}

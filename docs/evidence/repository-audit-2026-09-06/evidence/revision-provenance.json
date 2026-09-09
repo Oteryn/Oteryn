@@ -1,0 +1,39 @@
+{
+  "audited_commit": "0c493896040072badeff1f333eb83d7114a993ff",
+  "audited_tree": "77c33f4c2d3bffcd5983e35928d870d618cb5f68",
+  "original_prompt_sha256": "c51a6d60dddb1d2bd13fe3329723703f651b09d690522b757402988b0c569c1d",
+  "delivered_R2_sha256": "53c18d5fe11a9f3a193e08fa5f75e0ad54575cfdd848057e8c400cb06b88e7c7",
+  "published_R2_git_blob": "fa2237b6d26988cbf11250a7e6a675b7b322b11d",
+  "published_R2_commit": "ad0680d838a8169bf244b46639486329d30e83a5",
+  "current_main_readback": "d0d5a54c5f06db9423d14b17e7f8eadefd15c6fb",
+  "subsequent_delta": {
+    "pr": 152,
+    "path": "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md",
+    "additions": 21,
+    "deletions": 0,
+    "scope": "separately inspected documentation delta, not silently included in original inventory"
+  },
+  "current_branch": "docs/20260906-complete-repository-audit",
+  "current_pr": 153,
+  "review_comments_readback": [],
+  "publication_scope": "audit documents and inert evidence only",
+  "private_redactions": [
+    "absolute user filesystem paths",
+    "host identity",
+    "machine-specific configuration values; preserve security implication"
+  ],
+  "corrections": [
+    "SCR-01 -> AUD-10, P2",
+    "SCR-02 -> AUD-11, P2",
+    "PR151-02 restored to P2, J/P",
+    "AUD-05 extended with active merge-up / ADR 0005 conflict",
+    "SCR-04 CI timing/head projection recovered and recomputed",
+    "all seven known SKILL bodies and invocation metadata assessed"
+  ],
+  "not_claimed": [
+    "new full organization/product audit",
+    "fresh re-execution of all historical tests/settings reads",
+    "adoption of recommendations",
+    "absence of all defects"
+  ]
+}
