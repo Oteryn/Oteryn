@@ -107,6 +107,11 @@ class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
     def test_companion_markdown_closeout_is_exact_and_fail_closed(self):
         text = MARKDOWN_REPORT.read_text(encoding='utf-8')
         verifier.validate_companion_report_text(text)
+        adjacent_claims = (
+            'This batch establishes full product readiness.',
+            'This batch is still awaiting independent review.',
+            'Arbitrary equivalent Marketplace batch status text.',
+        )
         mutations = [
             text.replace(verifier.MARKETPLACE_CLOSEOUT, 'The Marketplace batch still needs review.', 1),
             text.replace(verifier.MARKETPLACE_CLOSEOUT, verifier.MARKETPLACE_CLOSEOUT + ' This batch establishes production readiness.', 1),
@@ -115,10 +120,21 @@ class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
             text.replace(verifier.MARKETPLACE_CLOSEOUT, verifier.MARKETPLACE_CLOSEOUT + ' Arbitrary contradictory closeout.', 1),
             text + '\n\n' + verifier.MARKETPLACE_CLOSEOUT + '\n',
         ]
+        for claim in adjacent_claims:
+            mutations.extend((
+                text.replace(verifier.MARKETPLACE_CLOSEOUT, verifier.MARKETPLACE_CLOSEOUT + '\n\n' + claim, 1),
+                text.replace(verifier.MARKETPLACE_CLOSEOUT, claim + '\n\n' + verifier.MARKETPLACE_CLOSEOUT, 1),
+            ))
         for stale in verifier.STALE_MARKETPLACE_GATES:
             mutations.append(text + '\n\n' + stale + '\n')
         for mutated in mutations:
             with self.assertRaisesRegex(ValueError, 'companion Markdown'): verifier.validate_companion_report_text(mutated)
+
+    def test_companion_markdown_allows_unrelated_prose_outside_closeout_slot(self):
+        text = MARKDOWN_REPORT.read_text(encoding='utf-8')
+        mutated = text.replace('## 8. Reproduction, retention and integration boundary',
+                               'An unrelated retention note remains permitted here.\n\n## 8. Reproduction, retention and integration boundary', 1)
+        verifier.validate_companion_report_text(mutated)
 
     def test_verification_index_row_preserves_historical_batch_digest(self):
         i = self.index(); row = i['r3_platform_marketplace_tests_qualification']

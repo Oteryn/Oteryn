@@ -33,6 +33,12 @@ MARKETPLACE_CLOSEOUT = (
     '`7f53b509791aae6d56637522aee65891e449914c` with no new P0/P1/P2; its two temporary qualifier/ledger workflows '
     'were removed on cleanup head `fbe839699782ad1d6df7a5841162d4a467d60c10`, whose META CI `34341624468` succeeded.'
 )
+MARKETPLACE_CLOSEOUT_PREDECESSOR = (
+    '`DIRECT` is a bounded review with the stated scope, not full approval of the entire file or every dependency.'
+)
+MARKETPLACE_CLOSEOUT_SUCCESSOR = (
+    'Two additional frozen Platform leaves are now adopted as DIRECT bounded full-file reviews:'
+)
 STALE_MARKETPLACE_GATES = (
     'Post-adoption exact-head proof and fresh independent review are still required.',
     'The remaining gate for this six-path batch is fresh independent exact-head review',
@@ -238,6 +244,13 @@ def validate_companion_report_text(text: str) -> None:
     closeout_paragraphs = [paragraph for paragraph in paragraphs if MARKETPLACE_CLOSEOUT in paragraph]
     require(closeout_paragraphs == [MARKETPLACE_CLOSEOUT],
             'Marketplace-test companion Markdown complete closeout paragraph missing/duplicated/drifted')
+    predecessor_indexes = [i for i, paragraph in enumerate(paragraphs)
+                           if paragraph.startswith(MARKETPLACE_CLOSEOUT_PREDECESSOR)]
+    successor_indexes = [i for i, paragraph in enumerate(paragraphs)
+                         if paragraph.startswith(MARKETPLACE_CLOSEOUT_SUCCESSOR)]
+    closeout_index = paragraphs.index(MARKETPLACE_CLOSEOUT)
+    require(predecessor_indexes == [closeout_index - 1] and successor_indexes == [closeout_index + 1],
+            'Marketplace-test companion Markdown bounded closeout slot has inserted/missing/drifted paragraphs')
     for stale in STALE_MARKETPLACE_GATES:
         require(stale not in text, 'Marketplace-test companion Markdown retains stale review/workflow gate')
 
