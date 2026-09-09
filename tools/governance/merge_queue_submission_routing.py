@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Fail-closed routing for exact-target GitHub Merge Queue submission.
+"""Current-contract guard for exact-target GitHub Merge Queue submission.
 
-A governed autonomous submission must bind both the qualified PR head and the
-intended base/queue at the mutation boundary. Post-mutation readback cannot make
-an already-applied wrong-base enqueue safe under concurrency. Generic auto-merge
-and direct merge are intentionally not representable.
+Oteryn requires one mutation to atomically fence both the qualified PR head and
+the intended base/queue. The currently documented GitHub queue primitives can
+fence the head but do not expose an expected base/queue precondition, so this
+module deliberately has no positive autonomous submission route. A future
+primitive must be added here by reviewed code change; callers cannot enable one
+by asserting capability booleans.
 """
 
 from __future__ import annotations
@@ -12,29 +14,17 @@ from __future__ import annotations
 import re
 from typing import NamedTuple
 
-ASYNC_MERGE_QUEUE = "ASYNC_MERGE_QUEUE"
-EXPLICIT_ENQUEUE = "EXPLICIT_ENQUEUE"
-PROTECTED_EXECUTOR_ENQUEUE = "PROTECTED_EXECUTOR_ENQUEUE"
 BLOCKED_NOT_AUTHORIZED = "BLOCKED_NOT_AUTHORIZED"
 BLOCKED_NOT_ELIGIBLE = "BLOCKED_NOT_ELIGIBLE"
 BLOCKED_STALE_STATE = "BLOCKED_STALE_STATE"
 BLOCKED_FROZEN_HEAD_MISMATCH = "BLOCKED_FROZEN_HEAD_MISMATCH"
 BLOCKED_CAPABILITY_UNAVAILABLE = "BLOCKED_CAPABILITY_UNAVAILABLE"
-SUBMISSION_ACCEPTED = "SUBMISSION_ACCEPTED"
-ENQUEUED = "ENQUEUED"
-BLOCKED_QUEUE_ADMISSION_UNPROVEN = "BLOCKED_QUEUE_ADMISSION_UNPROVEN"
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 ATTEMPT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
-QUEUE_ENTRY_RE = re.compile(r"^MQE_[A-Za-z0-9_-]+$")
-UUID_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
-    re.IGNORECASE,
-)
 AUTHORIZATION_SOURCE = "live_authenticated_target_authorization"
 MAX_AUTHORIZATION_AGE_SECONDS = 10
-MAX_RECEIPT_AGE_SECONDS = 60
 ALLOWED_TARGET_REPOSITORIES = frozenset(
     {
         "Oteryn/Oteryn",
@@ -60,7 +50,7 @@ class CandidateFreeze(NamedTuple):
 
 
 class SubmissionAuthorization(NamedTuple):
-    """Fresh authenticated authorization/eligibility for one exact target candidate."""
+    """Fresh authenticated authorization/eligibility for one exact candidate."""
 
     source: str
     repository: str
@@ -72,52 +62,37 @@ class SubmissionAuthorization(NamedTuple):
     observed_at_epoch_seconds: int
 
 
-class SubmissionCapabilities(NamedTuple):
-    """Authenticated mutation guarantees exposed by the caller.
+class DocumentedQueuePrimitive(NamedTuple):
+    """Semantic guarantees documented for a GitHub queue mutation.
 
-    The expected-base fields mean a server-side/atomic precondition on the same
-    mutation that adds the PR to a queue. A preceding base read or a later queue
-    readback does not satisfy these fields.
+    These values are repository-owned policy evidence, not caller-provided
+    capability switches. Changing them is a material governance code change.
     """
 
-    async_merge_available: bool
-    async_merge_expected_head_fence: bool
-    async_merge_expected_base_fence: bool
-    async_merge_merge_queue_action: bool
-    explicit_enqueue_available: bool
-    explicit_enqueue_expected_head_fence: bool
-    explicit_enqueue_expected_base_fence: bool
-    protected_executor_available: bool
-    protected_executor_expected_head_fence: bool
-    protected_executor_expected_base_fence: bool
-    protected_executor_trusted_default_branch: bool
+    operation: str
+    queue_specific: bool
+    expected_head_fence: bool
+    expected_base_queue_fence: bool
 
 
-class AsyncMergeReceipt(NamedTuple):
-    route: str
-    attempt_id: str
-    repository: str
-    pr_number: int
-    base_ref: str
-    expected_head_sha: str
-    merge_action: str
-    request_uuid: str
-    http_status: int
-    observed_at_epoch_seconds: int
-
-
-class EnqueueReceipt(NamedTuple):
-    route: str
-    attempt_id: str
-    repository: str
-    pr_number: int
-    base_ref: str
-    expected_head_sha: str
-    merge_queue_entry_id: str
-    merge_queue_id: str
-    merge_queue_resource_path: str
-    merge_queue_url: str
-    observed_at_epoch_seconds: int
+# Current GitHub documentation exposes an exact-head fence on both native queue
+# paths, but no expected base/queue coordinate on the same mutation. Keep these
+# facts explicit so deterministic tests fail if someone tries to treat either
+# current primitive as an atomic exact-target route.
+DOCUMENTED_QUEUE_PRIMITIVES = (
+    DocumentedQueuePrimitive(
+        operation="merge-async",
+        queue_specific=True,
+        expected_head_fence=True,
+        expected_base_queue_fence=False,
+    ),
+    DocumentedQueuePrimitive(
+        operation="enqueuePullRequest",
+        queue_specific=True,
+        expected_head_fence=True,
+        expected_base_queue_fence=False,
+    ),
+)
 
 
 def _fullmatch(pattern: re.Pattern[str], value: object) -> bool:
@@ -177,12 +152,6 @@ def _freeze_matches(attempt: SubmissionAttempt, freeze: object) -> bool:
     )
 
 
-def _valid_capabilities(capabilities: object) -> bool:
-    return isinstance(capabilities, SubmissionCapabilities) and all(
-        isinstance(value, bool) for value in capabilities
-    )
-
-
 def _authorization_matches(
     attempt: SubmissionAttempt,
     authorization: object,
@@ -209,25 +178,24 @@ def _authorization_matches(
     )
 
 
-def _valid_time_window(
-    observed_at_epoch_seconds: object,
-    *,
-    submission_started_at_epoch_seconds: object,
-    now_epoch_seconds: object,
-) -> bool:
+def primitive_has_atomic_exact_target_fence(primitive: object) -> bool:
+    """Return true only for a repository-declared atomic exact-target primitive."""
+
     return (
-        isinstance(submission_started_at_epoch_seconds, int)
-        and not isinstance(submission_started_at_epoch_seconds, bool)
-        and isinstance(now_epoch_seconds, int)
-        and not isinstance(now_epoch_seconds, bool)
-        and isinstance(observed_at_epoch_seconds, int)
-        and not isinstance(observed_at_epoch_seconds, bool)
-        and submission_started_at_epoch_seconds >= 0
-        and now_epoch_seconds >= submission_started_at_epoch_seconds
-        and submission_started_at_epoch_seconds
-        <= observed_at_epoch_seconds
-        <= now_epoch_seconds
-        and now_epoch_seconds - observed_at_epoch_seconds <= MAX_RECEIPT_AGE_SECONDS
+        isinstance(primitive, DocumentedQueuePrimitive)
+        and primitive.queue_specific is True
+        and primitive.expected_head_fence is True
+        and primitive.expected_base_queue_fence is True
+    )
+
+
+def current_documented_atomic_routes() -> tuple[str, ...]:
+    """Current reviewed GitHub primitives satisfying Oteryn's complete fence."""
+
+    return tuple(
+        primitive.operation
+        for primitive in DOCUMENTED_QUEUE_PRIMITIVES
+        if primitive_has_atomic_exact_target_fence(primitive)
     )
 
 
@@ -235,12 +203,17 @@ def choose_submission_route(
     attempt: SubmissionAttempt,
     freeze: CandidateFreeze,
     authorization: SubmissionAuthorization,
-    capabilities: SubmissionCapabilities,
     *,
     now_epoch_seconds: int,
 ) -> str:
-    """Choose only a queue route that atomically fences exact head and base."""
-    if not _valid_attempt(attempt) or not _valid_capabilities(capabilities):
+    """Fail closed until reviewed source declares a real atomic queue primitive.
+
+    Caller-provided capability claims are intentionally absent. If GitHub adds a
+    mutation-time expected-base/queue fence, update DOCUMENTED_QUEUE_PRIMITIVES
+    and the invocation adapter in a separately reviewed material change.
+    """
+
+    if not _valid_attempt(attempt):
         return BLOCKED_STALE_STATE
     if not _authorization_matches(
         attempt,
@@ -255,102 +228,12 @@ def choose_submission_route(
     if not _freeze_matches(attempt, freeze):
         return BLOCKED_FROZEN_HEAD_MISMATCH
 
-    if (
-        capabilities.async_merge_available
-        and capabilities.async_merge_expected_head_fence
-        and capabilities.async_merge_expected_base_fence
-        and capabilities.async_merge_merge_queue_action
-    ):
-        return ASYNC_MERGE_QUEUE
+    # No current documented primitive satisfies both atomic coordinates. Do not
+    # accept a synthetic/hypothetical capability from the caller as authority.
+    if not current_documented_atomic_routes():
+        return BLOCKED_CAPABILITY_UNAVAILABLE
 
-    if (
-        capabilities.explicit_enqueue_available
-        and capabilities.explicit_enqueue_expected_head_fence
-        and capabilities.explicit_enqueue_expected_base_fence
-    ):
-        return EXPLICIT_ENQUEUE
-
-    if (
-        capabilities.protected_executor_available
-        and capabilities.protected_executor_expected_head_fence
-        and capabilities.protected_executor_expected_base_fence
-        and capabilities.protected_executor_trusted_default_branch
-    ):
-        return PROTECTED_EXECUTOR_ENQUEUE
-
+    # A future source change must add a concrete invocation adapter and return
+    # type together with the primitive update. This guard intentionally refuses
+    # to infer execution authority from documentation facts alone.
     return BLOCKED_CAPABILITY_UNAVAILABLE
-
-
-def verify_async_merge_receipt(
-    attempt: SubmissionAttempt,
-    receipt: AsyncMergeReceipt,
-    *,
-    submission_started_at_epoch_seconds: int,
-    now_epoch_seconds: int,
-) -> str:
-    """Validate the immediate receipt only after a base-fenced route was selected."""
-    if not _valid_attempt(attempt) or not isinstance(receipt, AsyncMergeReceipt):
-        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    if not _valid_time_window(
-        receipt.observed_at_epoch_seconds,
-        submission_started_at_epoch_seconds=submission_started_at_epoch_seconds,
-        now_epoch_seconds=now_epoch_seconds,
-    ):
-        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    if (
-        receipt.route != ASYNC_MERGE_QUEUE
-        or receipt.attempt_id != attempt.attempt_id
-        or receipt.repository != attempt.repository
-        or receipt.pr_number != attempt.pr_number
-        or receipt.base_ref != attempt.base_ref
-        or receipt.expected_head_sha != attempt.live_pr_head_sha
-        or not _fullmatch(SHA_RE, receipt.expected_head_sha)
-        or receipt.merge_action != "merge_queue"
-        or receipt.http_status != 202
-        or not _fullmatch(UUID_RE, receipt.request_uuid)
-    ):
-        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    return SUBMISSION_ACCEPTED
-
-
-def verify_enqueue_receipt(
-    route: str,
-    attempt: SubmissionAttempt,
-    receipt: EnqueueReceipt,
-    *,
-    submission_started_at_epoch_seconds: int,
-    now_epoch_seconds: int,
-) -> str:
-    """Accept only an exact-target, exact-main-queue receipt after a safe route."""
-    if not isinstance(route, str) or route not in {
-        EXPLICIT_ENQUEUE,
-        PROTECTED_EXECUTOR_ENQUEUE,
-    }:
-        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    if not _valid_attempt(attempt) or not isinstance(receipt, EnqueueReceipt):
-        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    if not _valid_time_window(
-        receipt.observed_at_epoch_seconds,
-        submission_started_at_epoch_seconds=submission_started_at_epoch_seconds,
-        now_epoch_seconds=now_epoch_seconds,
-    ):
-        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-
-    expected_resource_path = f"/{attempt.repository}/queue/{attempt.base_ref}"
-    expected_url = f"https://github.com/{attempt.repository}/queue/{attempt.base_ref}"
-    if (
-        receipt.route != route
-        or receipt.attempt_id != attempt.attempt_id
-        or receipt.repository != attempt.repository
-        or receipt.pr_number != attempt.pr_number
-        or receipt.base_ref != attempt.base_ref
-        or receipt.expected_head_sha != attempt.live_pr_head_sha
-        or not _fullmatch(SHA_RE, receipt.expected_head_sha)
-        or not _fullmatch(QUEUE_ENTRY_RE, receipt.merge_queue_entry_id)
-        or not isinstance(receipt.merge_queue_id, str)
-        or not receipt.merge_queue_id
-        or receipt.merge_queue_resource_path != expected_resource_path
-        or receipt.merge_queue_url != expected_url
-    ):
-        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    return ENQUEUED
