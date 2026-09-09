@@ -19,6 +19,7 @@ jobs:
       github.repository == 'Oteryn/Oteryn' &&
       github.event.issue.number == 190 &&
       !github.event.issue.pull_request &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association) &&
       startsWith(github.event.comment.body, '/oteryn-mq-submit ')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -71,10 +72,12 @@ jobs:
         env:
           MQ_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           COMMAND: ${{ github.event.comment.body }}
+          COMMENT_ACTOR: ${{ github.event.comment.user.login }}
           RECEIPT_PATH: ${{ runner.temp }}/mq-submission-receipt.json
         run: >-
           python tools/governance/merge_queue_submission_executor.py execute
           --command "$COMMAND"
+          --actor "$COMMENT_ACTOR"
           --receipt-path "$RECEIPT_PATH"
 
       - name: Render canonical success receipt
