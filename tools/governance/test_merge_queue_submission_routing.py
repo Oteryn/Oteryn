@@ -234,7 +234,7 @@ def test_policy_documents_authenticated_attempt_bound_route() -> None:
         "`enablePullRequestAutoMerge`",
         "`/oteryn-mq-preflight <attempt_id> <owner/repo> <pr_number> <expected_head_sha>`",
         "`Oteryn/Oteryn#189`",
-        "current `write`, `maintain` or `admin` permission",
+        "currently has `write`, `maintain` or `admin` permission",
         "GitHub-authored proof comment",
         "successful `issue_comment` workflow run",
         "fresh connector live-head read",
