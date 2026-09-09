@@ -15,6 +15,7 @@ import subprocess
 
 CANDIDATE = Path('docs/evidence/organization-audit-20260907/r3-platform-marketplace-payments-wallet-candidate.json')
 GROUPS = Path('docs/evidence/organization-audit-20260907/coverage-groups.json')
+INDEX = Path('docs/evidence/organization-audit-20260907/verification-index.json')
 SOURCE_COMMIT = 'de917b3477a1de0667531380de3660e8b2ab59aa'
 SOURCE_TREE = 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e'
 HISTORICAL_COMMIT = '3b2ea1c7392187d5d22488673073dc8f8305a374'
@@ -129,6 +130,64 @@ GROUP_LIMITATIONS = (
 )
 
 
+CANDIDATE_LIMITATIONS = (
+    'Adopted only as bounded GROUPED carry-forward after exact historical/source identity, the exact 23-path '
+    'dependent binding set, the exact ordered 13-file frozen-current qualification and bound 45-case/444-assertion '
+    'all-green result. This does not establish production readiness, later-current-main status, provider remediation, '
+    'complete payment/marketplace correctness/security, or organization-wide audit completion.'
+)
+CANDIDATE_REQUIRED_CHECKS = (
+    'historical audit publication commit/tree and evidence blob match exactly',
+    'historical evidence contains the exact 49-file Marketplace/Payments/Wallet direct-read statement exactly once',
+    'historical and frozen current app trees are byte-identical',
+    'each family tree matches its exact SHA and exact regular-file count on historical and frozen sources',
+    'each family has identical historical/current path/blob entries and no changed path under its prefix',
+    'the dependent binding map is exactly the required 23 paths and contains all 13 focused test files',
+    'fresh frozen-current qualification executes all 13 focused files with zero failures/errors/skips, including four real-MariaDB integration/concurrency files',
+)
+EXPECTED_INDEX_ROW = {
+    'frozen_source_commit': SOURCE_COMMIT,
+    'historical_source_commit': HISTORICAL_COMMIT,
+    'primary_qualification_head': PRIMARY_QUALIFICATION['qualification_head'],
+    'primary_run': PRIMARY_QUALIFICATION['workflow_run'],
+    'primary_job': PRIMARY_QUALIFICATION['job'],
+    'primary_verifier_unit_tests': PRIMARY_QUALIFICATION['verifier_unit_tests'],
+    'exact_family_counts': [21, 24, 4],
+    'exact_total_paths': 49,
+    'dependent_blob_bindings': 23,
+    'focused_test_files': 13,
+    'focused_cases': 45,
+    'focused_assertions': 444,
+    'failures': 0,
+    'errors': 0,
+    'skips': 0,
+    'php': '8.5.10',
+    'mariadb': '11.8.9',
+    'tracked_source_clean_after_execution': True,
+    'hardening_head': '53dc22290da5c952fc76aa4cb7222ad450be6974',
+    'hardening_meta_ci_run': 34284712709,
+    'hardening_qualification_run': 34284712575,
+    'ledger_reproduction_head': 'adc884f64982e71609415ef946d97b445488c3e0',
+    'ledger_reproduction_run': 34284837901,
+    'ledger_reproduction_artifact': 10079037530,
+    'pre_adoption_ledger_sha256': 'b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459',
+    'projected_adopted_ledger_sha256': POST_ADOPTION['ledger_sha256'],
+    'qualification': 'BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS',
+    'post_adoption_head': POST_ADOPTION['audit_head'],
+    'post_adoption_run': POST_ADOPTION['workflow_run'],
+    'post_adoption_job': POST_ADOPTION['job'],
+    'post_adoption_verifier_unit_tests': POST_ADOPTION['verifier_unit_tests'],
+    'post_adoption_meta_ci_run': POST_ADOPTION['meta_ci_run'],
+    'post_adoption_ledger_run': POST_ADOPTION['ledger_reproduction_run'],
+    'post_adoption_ledger_job': POST_ADOPTION['ledger_reproduction_job'],
+    'post_adoption_ledger_artifact': POST_ADOPTION['ledger_reproduction_artifact'],
+    'post_adoption_ledger_sha256': POST_ADOPTION['ledger_sha256'],
+    'post_adoption_grouped_paths': POST_ADOPTION['ledger_counts']['grouped_paths'],
+    'post_adoption_unverified_paths': POST_ADOPTION['ledger_counts']['unverified_paths'],
+    'post_adoption_result': POST_ADOPTION['canonical_group_state'],
+}
+
+
 def require(ok: bool, message: str) -> None:
     if not ok:
         raise ValueError(message)
@@ -241,6 +300,54 @@ def expected_group(candidate: dict, spec: tuple[str, str, int, str]) -> dict:
     }
 
 
+def expected_candidate(adopted: bool) -> dict:
+    expected = {
+        'schema_version': 1,
+        'candidate_id': 'PLATFORM-MARKETPLACE-PAYMENTS-WALLET-HISTORICAL-DIRECT-CARRYFORWARD',
+        'repository': 'Oteryn/Oteryn-Platform',
+        'state': ADOPTED if adopted else QUALIFIED_PENDING,
+        'expected_total': 49,
+        'historical_evidence': {
+            'repository': 'Oteryn/Oteryn-Platform',
+            'publication_commit': EVIDENCE_COMMIT,
+            'publication_tree': EVIDENCE_TREE,
+            'evidence_path': EVIDENCE_PATH,
+            'evidence_blob': EVIDENCE_BLOB,
+            'audited_main_sha': HISTORICAL_COMMIT,
+            'audited_main_tree': HISTORICAL_TREE,
+            'exact_statement': EXACT_STATEMENT,
+            'basis': 'historical direct read of the documented 49-file Marketplace/Payments/Wallet production batch',
+        },
+        'current_revalidation': {
+            'source_commit': SOURCE_COMMIT,
+            'source_tree': SOURCE_TREE,
+            'historical_app_tree': APP_TREE,
+            'current_app_tree': APP_TREE,
+            'families': [
+                {'id': family_id, 'path_prefix': prefix, 'expected_count': count, 'tree_sha': tree_sha}
+                for family_id, prefix, count, tree_sha in EXPECTED_FAMILIES
+            ],
+            'dependent_blobs': EXPECTED_DEPENDENT_BLOBS,
+            'focused_test_files': list(FOCUSED_TEST_FILES),
+            'required_checks': list(CANDIDATE_REQUIRED_CHECKS),
+        },
+        'coverage_adopted': adopted,
+        'limitations': CANDIDATE_LIMITATIONS,
+        'qualification': PRIMARY_QUALIFICATION,
+    }
+    if adopted:
+        expected['post_adoption_revalidation'] = POST_ADOPTION
+    return expected
+
+
+def validate_verification_index(index_doc: dict) -> None:
+    require(type(index_doc.get('schema_version')) is int and index_doc['schema_version'] == 1, 'verification-index schema')
+    require(
+        json_exact(index_doc.get('r3_platform_marketplace_payments_wallet_qualification'), EXPECTED_INDEX_ROW),
+        'Marketplace verification-index record must exactly match bound candidate evidence',
+    )
+
+
 def validate_candidate_shape(candidate) -> bool:
     require(type(candidate.get('schema_version')) is int and candidate['schema_version'] == 1, 'candidate schema')
     require(candidate.get('candidate_id') == 'PLATFORM-MARKETPLACE-PAYMENTS-WALLET-HISTORICAL-DIRECT-CARRYFORWARD', 'candidate id')
@@ -284,6 +391,7 @@ def validate_candidate_shape(candidate) -> bool:
         require(json_exact(candidate.get('post_adoption_revalidation'), POST_ADOPTION), 'post-adoption evidence must be bound only after adopted-state requalification')
     else:
         require('post_adoption_revalidation' not in candidate, 'pending adoption candidate cannot carry post-adoption revalidation')
+    require(json_exact(candidate, expected_candidate(adopted)), 'candidate canonical evidence fields/key sets drift')
     return adopted
 
 
@@ -307,6 +415,7 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
     candidate = read_json(audit_root / CANDIDATE)
     adopted = validate_candidate_shape(candidate)
     validate_group_state(candidate, read_json(audit_root / GROUPS), adopted)
+    validate_verification_index(read_json(audit_root / INDEX))
     hist = candidate['historical_evidence']
     current = candidate['current_revalidation']
 

@@ -9,6 +9,7 @@ import verify_platform_marketplace_payments_wallet_group as verifier
 ROOT = Path(__file__).resolve().parents[2]
 CANDIDATE = ROOT / verifier.CANDIDATE
 GROUPS = ROOT / verifier.GROUPS
+INDEX = ROOT / verifier.INDEX
 
 
 class PlatformMarketplacePaymentsWalletCandidateTests(unittest.TestCase):
@@ -17,6 +18,9 @@ class PlatformMarketplacePaymentsWalletCandidateTests(unittest.TestCase):
 
     def groups_fixture(self):
         return deepcopy(json.loads(GROUPS.read_text(encoding='utf-8')))
+
+    def index_fixture(self):
+        return deepcopy(json.loads(INDEX.read_text(encoding='utf-8')))
 
     def pending_fixture(self):
         data = self.fixture()
@@ -35,6 +39,7 @@ class PlatformMarketplacePaymentsWalletCandidateTests(unittest.TestCase):
         data = self.fixture()
         self.assertTrue(verifier.validate_candidate_shape(data))
         verifier.validate_group_state(data, self.groups_fixture(), True)
+        verifier.validate_verification_index(self.index_fixture())
         self.assertEqual(sum(row['expected_count'] for row in data['current_revalidation']['families']), 49)
         self.assertEqual(len(data['current_revalidation']['dependent_blobs']), 23)
         self.assertEqual(len(data['current_revalidation']['focused_test_files']), 13)
@@ -137,6 +142,27 @@ class PlatformMarketplacePaymentsWalletCandidateTests(unittest.TestCase):
         data = self.pending_fixture()
         with self.assertRaisesRegex(ValueError, 'qualified pending .* already has accepted group records'):
             verifier.validate_group_state(data, self.groups_fixture(), False)
+
+    def test_candidate_claim_fields_and_key_sets_fail_closed(self):
+        mutations = []
+        data = self.fixture(); data['limitations'] = 'production ready'; mutations.append(data)
+        data = self.fixture(); data['historical_evidence']['basis'] += ' changed'; mutations.append(data)
+        data = self.fixture(); data['current_revalidation']['required_checks'].pop(); mutations.append(data)
+        data = self.fixture(); data['unexpected_claim'] = 'complete'; mutations.append(data)
+        for data in mutations:
+            with self.assertRaisesRegex(ValueError, 'canonical evidence fields/key sets drift'):
+                verifier.validate_candidate_shape(data)
+
+    def test_verification_index_primary_post_and_key_drift_fail_closed(self):
+        data = self.index_fixture(); data['r3_platform_marketplace_payments_wallet_qualification']['primary_run'] += 1
+        with self.assertRaisesRegex(ValueError, 'verification-index record must exactly match'):
+            verifier.validate_verification_index(data)
+        data = self.index_fixture(); data['r3_platform_marketplace_payments_wallet_qualification']['post_adoption_ledger_sha256'] = '0' * 64
+        with self.assertRaisesRegex(ValueError, 'verification-index record must exactly match'):
+            verifier.validate_verification_index(data)
+        data = self.index_fixture(); data['r3_platform_marketplace_payments_wallet_qualification']['unexpected'] = True
+        with self.assertRaisesRegex(ValueError, 'verification-index record must exactly match'):
+            verifier.validate_verification_index(data)
 
     def test_bool_total_is_not_integer_49(self):
         data = self.fixture(); data['expected_total'] = True
