@@ -228,9 +228,17 @@
     "primary_artifact_sha256": "eb577820be531bfbb5451cf8d964ffeb6a78eeb47d06c36c872ab2e04637141f"
   },
   "projection": {
-    "status": "NOT_RUN_NO_CANONICAL_CHANGE",
+    "status": "PROJECTION_SUCCESS_NOT_ADOPTED",
     "adopted_paths": 0,
     "candidate_paths": 10,
+    "projection_audit_head": "bd53573a6afca830efbda546ff7136d5bc0c8a54",
+    "projection_run_id": 34381252145,
+    "projection_job_id": 102566378504,
+    "projection_artifact_id": 10115927478,
+    "projection_artifact_sha256": "1fda0f2dbfb7b2d28c4df8eedee8171397b7a09d4272c16b27f7f9563be4832c",
+    "projected_ledger_sha256": "73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9",
+    "generated_overlay_sha256": "5e9b4832b886cf9049f49be00fa32b76abab5b896e63a1711688c47fb5addcb2",
+    "changed_path_count": 10,
     "expected_delta_if_later_adopted": {
       "direct_paths": 10,
       "grouped_paths": 0,
@@ -249,7 +257,7 @@
     }
   },
   "limitations": [
-    "This file is a pre-adoption DIRECT candidate only; all 10 app/Announcements/** paths remain UNVERIFIED in canonical accounting until a separate projection, adoption, post-adoption proof and independent review complete.",
+    "This file is a pre-adoption DIRECT candidate only; the projection is complete, but all 10 app/Announcements/** paths remain UNVERIFIED in canonical accounting until explicit adoption, post-adoption proof and independent review complete.",
     "The focused AnnouncementsModuleTest executes four representative module cases but does not directly execute the Polish editorial_translations join branch in ActiveAnnouncementQuery.",
     "The focused test proves sequential stale-edit conflict handling on the requested database backend; it is not a dedicated simultaneous-writer race test.",
     "Dependency bindings are qualification context only and do not promote their paths.",
