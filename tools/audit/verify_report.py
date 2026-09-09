@@ -44,6 +44,7 @@ def read_json(path):
 
 
 def read_tsv(path):
+    require(path.is_file(), 'missing TSV: '+path.name)
     with path.open(encoding='utf-8', newline='') as handle:
         reader=csv.DictReader(handle, delimiter='\t')
         require(reader.fieldnames and len(reader.fieldnames)==len(set(reader.fieldnames)), 'duplicate/absent TSV header')
