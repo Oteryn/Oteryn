@@ -106,8 +106,21 @@ def route(*, current_attempt=None, current_freeze=None, current_authorization=No
 def test_merge_async_is_the_only_current_operational_exact_head_route() -> None:
     by_operation = {p.operation: p for p in routing.DOCUMENTED_QUEUE_PRIMITIVES}
     assert set(by_operation) == {"merge-async", "enqueuePullRequest"}
-    assert routing.primitive_is_operational_exact_head_route(by_operation["merge-async"])
-    assert not routing.primitive_is_operational_exact_head_route(by_operation["enqueuePullRequest"])
+
+    native = by_operation["merge-async"]
+    assert native.queue_specific is True
+    assert native.expected_head_fence is True
+    assert native.expected_base_queue_fence is False
+    assert native.operationally_approved is True
+    assert routing.primitive_is_operational_exact_head_route(native)
+
+    graphql = by_operation["enqueuePullRequest"]
+    assert graphql.queue_specific is True
+    assert graphql.expected_head_fence is True
+    assert graphql.expected_base_queue_fence is False
+    assert graphql.operationally_approved is False
+    assert not routing.primitive_is_operational_exact_head_route(graphql)
+
     assert routing.current_documented_operational_routes() == ("merge-async",)
     assert route() == routing.ASYNC_MERGE_QUEUE
 
@@ -151,6 +164,8 @@ def test_merge_async_request_is_exact_head_explicit_queue_and_auth_bound() -> No
         assert request is not None
         assert request.method == "PUT"
         assert request.endpoint == f"/repos/{REPOSITORY}/pulls/{PR_NUMBER}/merge-async"
+        assert request.repository == REPOSITORY
+        assert request.pr_number == PR_NUMBER
         assert request.sha == PR_HEAD
         assert request.merge_action == "merge_queue"
     assert routing.build_merge_async_request(
@@ -224,11 +239,23 @@ def test_post_submission_target_readback_is_mandatory_and_exact() -> None:
     assert routing.verify_post_submission_target(
         attempt(), current_receipt, post_observation(), now_epoch_seconds=NOW
     ) == routing.POST_SUBMISSION_TARGET_CONFIRMED
+
+    # Causal order comes from the executor-owned sequence, not whole-second time.
     for sequence in (RECEIPT_SEQUENCE - 1, RECEIPT_SEQUENCE):
         assert routing.verify_post_submission_target(
             attempt(), current_receipt, post_observation(executor_sequence=sequence),
             now_epoch_seconds=NOW,
         ) == routing.BLOCKED_POST_SUBMISSION_TARGET_MISMATCH
+
+    # A readback timestamp before the accepted receipt is stale even if its
+    # sequence was otherwise greater.
+    assert routing.verify_post_submission_target(
+        attempt(),
+        current_receipt,
+        post_observation(observed_at_epoch_seconds=NOW - 1),
+        now_epoch_seconds=NOW,
+    ) == routing.BLOCKED_POST_SUBMISSION_TARGET_MISMATCH
+
     for changes in (
         {"source": "cached_post_readback"},
         {"repository": "Oteryn/Oteryn-Game"},
@@ -244,6 +271,12 @@ def test_post_submission_target_readback_is_mandatory_and_exact() -> None:
         assert routing.verify_post_submission_target(
             attempt(), current_receipt, post_observation(**changes), now_epoch_seconds=NOW
         ) == routing.BLOCKED_POST_SUBMISSION_TARGET_MISMATCH, changes
+
+    # Reconciliation states are not accepted receipts and therefore cannot be
+    # promoted to a post-submission confirmation.
+    assert routing.verify_post_submission_target(
+        attempt(), receipt(http_status=409), post_observation(), now_epoch_seconds=NOW
+    ) == routing.BLOCKED_RECEIPT_INVALID
 
 
 def test_no_generic_auto_merge_direct_merge_or_ambiguous_cleanup_route_exists() -> None:
