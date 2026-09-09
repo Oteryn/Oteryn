@@ -374,6 +374,7 @@ def verify_post_submission_target(
         or not isinstance(now_epoch_seconds, int)
         or isinstance(now_epoch_seconds, bool)
         or not 0 <= observation.observed_at_epoch_seconds <= now_epoch_seconds
+        or observation.observed_at_epoch_seconds < receipt.observed_at_epoch_seconds
         or now_epoch_seconds - observation.observed_at_epoch_seconds
         > MAX_POST_SUBMISSION_AGE_SECONDS
     ):
