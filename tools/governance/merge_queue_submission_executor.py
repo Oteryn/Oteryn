@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Protected-default-branch executor for exact-head GitHub Merge Queue submission.
+"""Protected-default-branch executor for exact-head Merge Queue submission.
 
-The executor is intentionally narrow: it accepts one versioned command, authenticates
-its caller against META and the exact target repository, re-reads one allowed target
-PR and its exact aggregate gate, and performs only GraphQL
-`enqueuePullRequest(expectedHeadOid=...)`. It has no direct-merge or generic
-auto-merge path.
+The executor accepts one authenticated control comment, binds authorization to the
+exact requested repository/PR/base/head, qualifies the exact candidate, and performs
+only GraphQL enqueuePullRequest(expectedHeadOid=...). If the enqueue result shows a
+base/queue race or otherwise cannot be verified, it reconciles by dequeuing the PR
+before returning failure. It has no direct-merge or generic auto-merge path.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ ALLOWED_TARGETS = {
     "Oteryn/Oteryn-Platform": "platform-gate",
     "Oteryn/Oteryn-Atlas": "atlas-gate",
 }
-ALLOWED_CONTROL_PERMISSIONS = {"write", "maintain", "admin"}
+ALLOWED_PERMISSIONS = {"write", "maintain", "admin"}
 
 
 class SubmissionError(RuntimeError):
@@ -43,7 +43,6 @@ class SubmissionError(RuntimeError):
 
 class Client(Protocol):
     def rest(self, method: str, path: str) -> Mapping[str, Any]: ...
-
     def graphql(self, query: str, variables: Mapping[str, Any]) -> Mapping[str, Any]: ...
 
 
@@ -55,11 +54,7 @@ class GitHubClient:
         self.api_url = api_url.rstrip("/")
 
     def _request(
-        self,
-        url: str,
-        *,
-        method: str,
-        body: Mapping[str, Any] | None = None,
+        self, url: str, *, method: str, body: Mapping[str, Any] | None = None
     ) -> Mapping[str, Any]:
         data = None if body is None else json.dumps(body).encode("utf-8")
         request = urllib.request.Request(
@@ -84,6 +79,7 @@ class GitHubClient:
             ) from exc
         except urllib.error.URLError as exc:
             raise SubmissionError(f"GitHub API {method} {url} failed: {exc.reason}") from exc
+
         if not raw:
             return {}
         try:
@@ -105,7 +101,9 @@ class GitHubClient:
         )
         errors = response.get("errors")
         if errors:
-            raise SubmissionError(f"GitHub GraphQL returned errors: {json.dumps(errors, sort_keys=True)}")
+            raise SubmissionError(
+                f"GitHub GraphQL returned errors: {json.dumps(errors, sort_keys=True)}"
+            )
         data = response.get("data")
         if not isinstance(data, dict):
             raise SubmissionError("GitHub GraphQL response is missing object data")
@@ -120,6 +118,20 @@ class SubmissionRequest:
     pr_number: int
     expected_head_sha: str
     required_gate: str
+
+
+@dataclass(frozen=True)
+class TargetAuthorization:
+    source: str
+    actor: str
+    control_issue: int
+    control_comment_id: int
+    repository: str
+    pr_number: int
+    base_ref: str
+    expected_head_sha: str
+    permission: str
+    owner_decision: bool
 
 
 @dataclass(frozen=True)
@@ -152,7 +164,9 @@ def parse_command(command: object) -> SubmissionRequest:
         raise SubmissionError("PR number must be positive")
     expected_head_sha = expected_head_sha.lower()
     if not SHA_RE.fullmatch(expected_head_sha):
-        raise SubmissionError("expected head must be a full 40-character lowercase hexadecimal SHA")
+        raise SubmissionError(
+            "expected head must be a full 40-character lowercase hexadecimal SHA"
+        )
     return SubmissionRequest(
         attempt_id=attempt_id,
         repository=repository,
@@ -170,21 +184,16 @@ def _validated_actor(actor: object) -> str:
 
 
 def _require_repository_permission(
-    client: Client,
-    *,
-    repository: str,
-    actor: object,
-    purpose: str,
+    client: Client, *, repository: str, actor: object, purpose: str
 ) -> str:
     actor_name = _validated_actor(actor)
     owner, name = repository.split("/", 1)
     encoded_actor = urllib.parse.quote(actor_name, safe="")
     response = client.rest(
-        "GET",
-        f"/repos/{owner}/{name}/collaborators/{encoded_actor}/permission",
+        "GET", f"/repos/{owner}/{name}/collaborators/{encoded_actor}/permission"
     )
     permission = response.get("permission")
-    if permission not in ALLOWED_CONTROL_PERMISSIONS:
+    if permission not in ALLOWED_PERMISSIONS:
         raise SubmissionError(
             f"comment actor lacks current write/maintain/admin permission on {purpose}"
         )
@@ -199,27 +208,77 @@ def authorize_actor(
     actual_control_issue: object,
 ) -> str:
     if actual_control_repository != CONTROL_REPOSITORY or actual_control_issue != CONTROL_ISSUE:
-        raise SubmissionError("submission command did not originate from the canonical control endpoint")
+        raise SubmissionError(
+            "submission command did not originate from the canonical control endpoint"
+        )
     return _require_repository_permission(
-        client,
-        repository=CONTROL_REPOSITORY,
-        actor=actor,
-        purpose="META",
+        client, repository=CONTROL_REPOSITORY, actor=actor, purpose="META"
     )
 
 
-def authorize_target_actor(
+def authorize_target_submission(
     client: Client,
     request: SubmissionRequest,
     *,
     actor: object,
-) -> str:
-    """Require current target-repository write authority before using the App token."""
-    return _require_repository_permission(
+    actual_control_issue: object,
+    control_comment_id: object,
+    control_owner_actor: object,
+) -> TargetAuthorization:
+    """Bind one authenticated control comment to one exact target candidate."""
+
+    actor_name = _validated_actor(actor)
+    if actual_control_issue != CONTROL_ISSUE:
+        raise SubmissionError("target authorization is not bound to the canonical control Issue")
+    if not isinstance(control_comment_id, int) or isinstance(control_comment_id, bool) or control_comment_id <= 0:
+        raise SubmissionError("control comment ID must be a positive integer")
+
+    permission = _require_repository_permission(
         client,
         repository=request.repository,
-        actor=actor,
+        actor=actor_name,
         purpose=f"target repository {request.repository}",
+    )
+
+    owner_decision = False
+    if request.repository == CONTROL_REPOSITORY:
+        if not isinstance(control_owner_actor, str) or not control_owner_actor:
+            raise SubmissionError("control endpoint owner identity is missing")
+        if actor_name != control_owner_actor or permission != "admin":
+            raise SubmissionError(
+                "META control-plane submission requires the control endpoint owner with current admin permission"
+            )
+        owner_decision = True
+
+    return TargetAuthorization(
+        source="authenticated_control_comment",
+        actor=actor_name,
+        control_issue=CONTROL_ISSUE,
+        control_comment_id=control_comment_id,
+        repository=request.repository,
+        pr_number=request.pr_number,
+        base_ref="main",
+        expected_head_sha=request.expected_head_sha,
+        permission=permission,
+        owner_decision=owner_decision,
+    )
+
+
+def _authorization_matches_request(
+    authorization: TargetAuthorization, request: SubmissionRequest
+) -> bool:
+    return (
+        authorization.source == "authenticated_control_comment"
+        and authorization.control_issue == CONTROL_ISSUE
+        and authorization.repository == request.repository
+        and authorization.pr_number == request.pr_number
+        and authorization.base_ref == "main"
+        and authorization.expected_head_sha == request.expected_head_sha
+        and authorization.permission in ALLOWED_PERMISSIONS
+        and (
+            request.repository != CONTROL_REPOSITORY
+            or (authorization.owner_decision and authorization.permission == "admin")
+        )
     )
 
 
@@ -241,7 +300,8 @@ def qualify_pull_request(client: Client, request: SubmissionRequest) -> Qualifie
     actual_head = str(head.get("sha") or "").lower()
     if actual_head != request.expected_head_sha:
         raise SubmissionError(
-            f"target pull request head changed: expected {request.expected_head_sha}, found {actual_head or 'UNKNOWN'}"
+            f"target pull request head changed: expected {request.expected_head_sha}, "
+            f"found {actual_head or 'UNKNOWN'}"
         )
     head_repo = head.get("repo")
     if not isinstance(head_repo, dict) or head_repo.get("full_name") != request.repository:
@@ -262,18 +322,21 @@ def qualify_pull_request(client: Client, request: SubmissionRequest) -> Qualifie
     if not isinstance(raw_runs, list) or not raw_runs:
         raise SubmissionError(f"no exact-head {request.required_gate} check run was found")
     matching = [
-        run
-        for run in raw_runs
+        run for run in raw_runs
         if isinstance(run, dict)
         and run.get("name") == request.required_gate
         and str(run.get("head_sha") or "").lower() == request.expected_head_sha
     ]
     if not matching:
-        raise SubmissionError(f"no {request.required_gate} check run matches the exact expected head")
+        raise SubmissionError(
+            f"no {request.required_gate} check run matches the exact expected head"
+        )
     latest = max(matching, key=lambda run: int(run.get("id") or 0))
     app = latest.get("app")
     if not isinstance(app, dict) or app.get("id") != GITHUB_ACTIONS_APP_ID:
-        raise SubmissionError(f"latest exact-head {request.required_gate} is not the GitHub Actions gate")
+        raise SubmissionError(
+            f"latest exact-head {request.required_gate} is not the GitHub Actions gate"
+        )
     if latest.get("status") != "completed" or latest.get("conclusion") != "success":
         raise SubmissionError(
             f"latest exact-head {request.required_gate} must be completed/success, found "
@@ -337,6 +400,23 @@ mutation EnqueuePullRequest(
 }
 """.strip()
 
+DEQUEUE_MUTATION = """
+mutation DequeuePullRequest($pullRequestId: ID!, $clientMutationId: String!) {
+  dequeuePullRequest(input: {
+    id: $pullRequestId,
+    clientMutationId: $clientMutationId
+  }) {
+    clientMutationId
+    mergeQueueEntry {
+      id
+      position
+      state
+      mergeQueue { id resourcePath url }
+    }
+  }
+}
+""".strip()
+
 
 def _validate_queue_identity(request: SubmissionRequest, queue: object) -> Mapping[str, Any]:
     if not isinstance(queue, dict):
@@ -359,16 +439,15 @@ def _normalize_entry(
 ) -> Mapping[str, Any]:
     if not isinstance(entry, dict):
         raise SubmissionError("merge queue entry is missing")
-    entry_id = entry.get("id")
-    if not isinstance(entry_id, str) or not entry_id:
+    if not isinstance(entry.get("id"), str) or not entry["id"]:
         raise SubmissionError("merge queue entry ID is missing")
     position = entry.get("position")
     if not isinstance(position, int) or isinstance(position, bool) or position < 0:
         raise SubmissionError("merge queue entry position is invalid")
-    state = entry.get("state")
-    if not isinstance(state, str) or not state:
+    if not isinstance(entry.get("state"), str) or not entry["state"]:
         raise SubmissionError("merge queue entry state is missing")
     _validate_queue_identity(request, entry.get("mergeQueue"))
+
     if require_pull_request:
         pull = entry.get("pullRequest")
         if not isinstance(pull, dict):
@@ -381,19 +460,24 @@ def _normalize_entry(
             or str(pull.get("headRefOid") or "").lower() != request.expected_head_sha
             or pull.get("baseRefName") != "main"
         ):
-            raise SubmissionError("enqueue response pull request identity does not match the exact target")
+            raise SubmissionError(
+                "enqueue response pull request identity does not match the exact target"
+            )
     return entry
 
 
-def get_existing_queue_entry(
-    client: Client,
-    request: SubmissionRequest,
-    pull: QualifiedPullRequest,
-) -> Mapping[str, Any] | None:
-    data = client.graphql(QUEUE_ENTRY_QUERY, {"pullRequestId": pull.node_id})
+def _query_queue_node(client: Client, pull_node_id: str) -> Mapping[str, Any]:
+    data = client.graphql(QUEUE_ENTRY_QUERY, {"pullRequestId": pull_node_id})
     node = data.get("node")
     if not isinstance(node, dict):
-        raise SubmissionError("queue-entry query did not return the target pull request")
+        raise SubmissionError("queue-entry query did not return a pull request")
+    return node
+
+
+def get_existing_queue_entry(
+    client: Client, request: SubmissionRequest, pull: QualifiedPullRequest
+) -> Mapping[str, Any] | None:
+    node = _query_queue_node(client, pull.node_id)
     repository = node.get("repository")
     if (
         node.get("id") != pull.node_id
@@ -403,11 +487,53 @@ def get_existing_queue_entry(
         or not isinstance(repository, dict)
         or repository.get("nameWithOwner") != request.repository
     ):
-        raise SubmissionError("queue-entry query target identity does not match the exact request")
+        raise SubmissionError(
+            "queue-entry query target identity does not match the exact request"
+        )
     entry = node.get("mergeQueueEntry")
     if entry is None:
         return None
     return _normalize_entry(request, entry, require_pull_request=False)
+
+
+def _reconcile_after_indeterminate_enqueue(
+    client: Client,
+    *,
+    pull_node_id: str,
+    attempt_id: str,
+    original_error: Exception,
+) -> None:
+    """Remove any queue entry created during an indeterminate or mismatched enqueue."""
+
+    try:
+        node = _query_queue_node(client, pull_node_id)
+        if node.get("mergeQueueEntry") is not None:
+            response = client.graphql(
+                DEQUEUE_MUTATION,
+                {
+                    "pullRequestId": pull_node_id,
+                    "clientMutationId": f"{attempt_id}:reconcile",
+                },
+            )
+            payload = response.get("dequeuePullRequest")
+            if not isinstance(payload, dict):
+                raise SubmissionError("dequeuePullRequest response payload is missing")
+            if payload.get("clientMutationId") != f"{attempt_id}:reconcile":
+                raise SubmissionError("dequeuePullRequest response clientMutationId mismatch")
+
+        after = _query_queue_node(client, pull_node_id)
+        if after.get("mergeQueueEntry") is not None:
+            raise SubmissionError("queue entry still exists after reconciliation")
+    except Exception as reconciliation_error:
+        raise SubmissionError(
+            "enqueue result was not safely verifiable and queue reconciliation failed: "
+            f"{reconciliation_error}; original error: {original_error}"
+        ) from reconciliation_error
+
+    raise SubmissionError(
+        "enqueue result was not safely verifiable; any current queue entry was reconciled/dequeued: "
+        f"{original_error}"
+    ) from original_error
 
 
 def enqueue_pull_request(
@@ -419,34 +545,59 @@ def enqueue_pull_request(
     if existing is not None:
         return "ALREADY_ENQUEUED_EXACT_HEAD", existing
 
-    data = client.graphql(
-        ENQUEUE_MUTATION,
-        {
-            "pullRequestId": pull.node_id,
-            "expectedHeadOid": request.expected_head_sha,
-            "clientMutationId": request.attempt_id,
-        },
-    )
-    payload = data.get("enqueuePullRequest")
-    if not isinstance(payload, dict):
-        raise SubmissionError("enqueuePullRequest response payload is missing")
-    if payload.get("clientMutationId") != request.attempt_id:
-        raise SubmissionError("enqueuePullRequest response clientMutationId mismatch")
-    entry = _normalize_entry(request, payload.get("mergeQueueEntry"), require_pull_request=True)
-    return "ENQUEUED", entry
+    try:
+        data = client.graphql(
+            ENQUEUE_MUTATION,
+            {
+                "pullRequestId": pull.node_id,
+                "expectedHeadOid": request.expected_head_sha,
+                "clientMutationId": request.attempt_id,
+            },
+        )
+        payload = data.get("enqueuePullRequest")
+        if not isinstance(payload, dict):
+            raise SubmissionError("enqueuePullRequest response payload is missing")
+        if payload.get("clientMutationId") != request.attempt_id:
+            raise SubmissionError("enqueuePullRequest response clientMutationId mismatch")
+
+        response_entry = _normalize_entry(
+            request, payload.get("mergeQueueEntry"), require_pull_request=True
+        )
+        live_entry = get_existing_queue_entry(client, request, pull)
+        if live_entry is None:
+            raise SubmissionError("fresh post-enqueue read found no queue entry")
+        if live_entry.get("id") != response_entry.get("id"):
+            raise SubmissionError("fresh post-enqueue queue entry differs from mutation receipt")
+        return "ENQUEUED", live_entry
+    except SubmissionError as exc:
+        _reconcile_after_indeterminate_enqueue(
+            client,
+            pull_node_id=pull.node_id,
+            attempt_id=request.attempt_id,
+            original_error=exc,
+        )
+        raise AssertionError("unreachable")
 
 
 def receipt(
     request: SubmissionRequest,
+    authorization: TargetAuthorization,
     *,
     status: str,
     entry: Mapping[str, Any],
 ) -> Mapping[str, Any]:
+    if not _authorization_matches_request(authorization, request):
+        raise SubmissionError("target authorization no longer matches the exact submission request")
     queue = entry["mergeQueue"]
     return {
         "schema": "OTERYN_MQ_SUBMISSION_V1",
         "status": status,
         "attempt_id": request.attempt_id,
+        "authorization_source": authorization.source,
+        "authorization_actor": authorization.actor,
+        "authorization_comment_id": authorization.control_comment_id,
+        "authorization_permission": authorization.permission,
+        "owner_decision": authorization.owner_decision,
         "repository": request.repository,
         "pr_number": request.pr_number,
         "base_ref": "main",
@@ -473,7 +624,9 @@ def write_github_outputs(request: SubmissionRequest, path: str) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Fail-closed Oteryn Merge Queue submission executor")
+    parser = argparse.ArgumentParser(
+        description="Fail-closed Oteryn Merge Queue submission executor"
+    )
     subparsers = parser.add_subparsers(dest="mode", required=True)
 
     parse = subparsers.add_parser("parse")
@@ -488,6 +641,9 @@ def parse_args() -> argparse.Namespace:
     execute = subparsers.add_parser("execute")
     execute.add_argument("--command", required=True)
     execute.add_argument("--actor", required=True)
+    execute.add_argument("--control-issue", required=True, type=int)
+    execute.add_argument("--control-comment-id", required=True, type=int)
+    execute.add_argument("--control-owner", required=True)
     execute.add_argument("--receipt-path", required=True)
 
     return parser.parse_args()
@@ -503,7 +659,9 @@ def main() -> int:
 
         if args.mode == "authorize":
             token = os.environ.get("CONTROL_GITHUB_TOKEN", "")
-            client = GitHubClient(token, os.environ.get("GITHUB_API_URL", "https://api.github.com"))
+            client = GitHubClient(
+                token, os.environ.get("GITHUB_API_URL", "https://api.github.com")
+            )
             permission = authorize_actor(
                 client,
                 actor=args.actor,
@@ -515,20 +673,29 @@ def main() -> int:
 
         request = parse_command(args.command)
         target_token = os.environ.get("MQ_GITHUB_TOKEN", "")
-        client = GitHubClient(target_token, os.environ.get("GITHUB_API_URL", "https://api.github.com"))
-        target_permission = authorize_target_actor(client, request, actor=args.actor)
+        client = GitHubClient(
+            target_token, os.environ.get("GITHUB_API_URL", "https://api.github.com")
+        )
+        authorization = authorize_target_submission(
+            client,
+            request,
+            actor=args.actor,
+            actual_control_issue=args.control_issue,
+            control_comment_id=args.control_comment_id,
+            control_owner_actor=args.control_owner,
+        )
+        if not _authorization_matches_request(authorization, request):
+            raise SubmissionError(
+                "authenticated target authorization does not match the exact submission request"
+            )
+
         pull = qualify_pull_request(client, request)
         status, entry = enqueue_pull_request(client, request, pull)
-        result = receipt(request, status=status, entry=entry)
+        result = receipt(request, authorization, status=status, entry=entry)
         with open(args.receipt_path, "w", encoding="utf-8") as handle:
             json.dump(result, handle, sort_keys=True)
             handle.write("\n")
-        print(
-            json.dumps(
-                {**result, "target_actor_permission": target_permission},
-                sort_keys=True,
-            )
-        )
+        print(json.dumps(result, sort_keys=True))
         return 0
     except (SubmissionError, OSError, ValueError) as exc:
         print(f"Merge Queue submission rejected: {exc}", file=sys.stderr)

@@ -68,16 +68,22 @@ jobs:
           permission-pull-requests: read
           permission-merge-queues: write
 
-      - name: Enqueue exact qualified pull request
+      - name: Authorize exact target and enqueue qualified pull request
         env:
           MQ_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           COMMAND: ${{ github.event.comment.body }}
           COMMENT_ACTOR: ${{ github.event.comment.user.login }}
+          CONTROL_ISSUE: ${{ github.event.issue.number }}
+          CONTROL_COMMENT_ID: ${{ github.event.comment.id }}
+          CONTROL_OWNER: ${{ github.event.issue.user.login }}
           RECEIPT_PATH: ${{ runner.temp }}/mq-submission-receipt.json
         run: >-
           python tools/governance/merge_queue_submission_executor.py execute
           --command "$COMMAND"
           --actor "$COMMENT_ACTOR"
+          --control-issue "$CONTROL_ISSUE"
+          --control-comment-id "$CONTROL_COMMENT_ID"
+          --control-owner "$CONTROL_OWNER"
           --receipt-path "$RECEIPT_PATH"
 
       - name: Render canonical success receipt
@@ -97,10 +103,13 @@ jobs:
               "## Merge Queue submission receipt\n\n"
               f"- status: `{receipt['status']}`\n"
               f"- attempt: `{receipt['attempt_id']}`\n"
+              f"- authorization comment: `{receipt['authorization_comment_id']}`\n"
+              f"- authorization actor: `{receipt['authorization_actor']}`\n"
               f"- target: `{receipt['repository']}#{receipt['pr_number']}`\n"
               f"- exact head: `{receipt['expected_head_sha']}`\n"
               f"- required gate: `{receipt['required_gate']}`\n"
               f"- queue entry: `{receipt['merge_queue_entry_id']}`\n"
+              f"- queue id: `{receipt['merge_queue_id']}`\n"
               f"- queue: `{receipt['merge_queue_resource_path']}`\n"
               f"- workflow run: `{os.environ['GITHUB_RUN_ID']}` attempt `{os.environ['GITHUB_RUN_ATTEMPT']}`\n"
               f"- trusted workflow SHA: `{os.environ['GITHUB_SHA']}`\n\n"
@@ -116,7 +125,7 @@ jobs:
           RECEIPT_BODY: ${{ runner.temp }}/mq-submission-receipt.md
         run: gh issue comment 190 --repo Oteryn/Oteryn --body-file "$RECEIPT_BODY"
 
-      - name: Publish fail-closed result to control endpoint
+      - name: Publish reconciled or fail-closed result to control endpoint
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
@@ -125,6 +134,6 @@ jobs:
             '<!-- OTERYN_MQ_SUBMISSION_V1 -->' \
             '## Merge Queue submission blocked' \
             '' \
-            "Protected executor run \`${GITHUB_RUN_ID}\` attempt \`${GITHUB_RUN_ATTEMPT}\` failed closed. No direct-merge or generic auto-merge fallback is attempted. Inspect the authenticated workflow run for the first failing validation." \
+            "Protected executor run \`${GITHUB_RUN_ID}\` attempt \`${GITHUB_RUN_ATTEMPT}\` failed or reconciled closed. No direct-merge or generic auto-merge fallback is attempted. Inspect the authenticated workflow run for the first failing validation and any dequeue reconciliation result." \
             > "$RUNNER_TEMP/mq-submission-failure.md"
           gh issue comment 190 --repo Oteryn/Oteryn --body-file "$RUNNER_TEMP/mq-submission-failure.md"
