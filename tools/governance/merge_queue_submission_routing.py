@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Fail-closed routing for GitHub-native Merge Queue submission capabilities."""
+"""Fail-closed routing for exact-head-fenced GitHub Merge Queue enqueue capabilities.
+
+This module classifies already-authenticated capability facts. It never grants merge
+or repository authority and it deliberately has no ordinary auto-merge route.
+"""
 
 from __future__ import annotations
 
-import json
 import re
-from typing import Iterable, NamedTuple
+from typing import NamedTuple
 
 EXPLICIT_ENQUEUE = "EXPLICIT_ENQUEUE"
-AUTO_MERGE_MQ_SUBMISSION = "AUTO_MERGE_MQ_SUBMISSION"
-NOT_MQ_TARGET = "NOT_MQ_TARGET"
+PROTECTED_EXECUTOR_ENQUEUE = "PROTECTED_EXECUTOR_ENQUEUE"
 BLOCKED_NOT_AUTHORIZED = "BLOCKED_NOT_AUTHORIZED"
 BLOCKED_NOT_ELIGIBLE = "BLOCKED_NOT_ELIGIBLE"
 BLOCKED_STALE_STATE = "BLOCKED_STALE_STATE"
@@ -21,23 +23,16 @@ BLOCKED_QUEUE_ADMISSION_UNPROVEN = "BLOCKED_QUEUE_ADMISSION_UNPROVEN"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 ATTEMPT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
-OBSERVATION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
-QUEUE_ID_RE = re.compile(r"^MQ_[A-Za-z0-9_-]+$")
-MAX_PREMUTATION_RULE_AGE_SECONDS = 30
-MAX_LIVE_HEAD_AGE_SECONDS = 10
-MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS = 60
-PREFLIGHT_SOURCE = "protected_meta_control_preflight"
-LIVE_HEAD_SOURCE = "connector_live_pr_read"
-CONTROL_REPOSITORY = "Oteryn/Oteryn"
-CONTROL_ISSUE_NUMBER = 189
-PREFLIGHT_WORKFLOW_PATH = ".github/workflows/merge-queue-preflight.yml"
-PREFLIGHT_PROOF_AUTHOR = "github-actions[bot]"
-ALLOWED_TARGET_REPOSITORIES = frozenset({
-    "Oteryn/Oteryn",
-    "Oteryn/Oteryn-Game",
-    "Oteryn/Oteryn-Platform",
-    "Oteryn/Oteryn-Atlas",
-})
+QUEUE_ENTRY_RE = re.compile(r"^MQE_[A-Za-z0-9_-]+$")
+MAX_RECEIPT_AGE_SECONDS = 60
+ALLOWED_TARGET_REPOSITORIES = frozenset(
+    {
+        "Oteryn/Oteryn",
+        "Oteryn/Oteryn-Game",
+        "Oteryn/Oteryn-Platform",
+        "Oteryn/Oteryn-Atlas",
+    }
+)
 
 
 class SubmissionAttempt(NamedTuple):
@@ -48,61 +43,6 @@ class SubmissionAttempt(NamedTuple):
     live_pr_head_sha: str
 
 
-class BranchQueueObservation(NamedTuple):
-    attempt_id: str
-    observation_id: str
-    source: str
-    control_repository: str
-    control_issue_number: int
-    repository: str
-    pr_number: int
-    base_ref: str
-    pr_head_sha: str
-    merge_queue_required: bool
-    queue_id: str | None
-    resource_path: str | None
-    url: str | None
-    trigger_comment_id: int
-    proof_comment_id: int
-    proof_comment_author_login: str
-    workflow_run_id: int
-    workflow_run_attempt: int
-    workflow_sha: str
-    observed_at_epoch_seconds: int
-    expires_at_epoch_seconds: int
-
-
-class ProofCommentObservation(NamedTuple):
-    repository: str
-    issue_number: int
-    comment_id: int
-    author_login: str
-    body: str
-    observed_at_epoch_seconds: int
-
-
-class WorkflowRunObservation(NamedTuple):
-    repository: str
-    workflow_run_id: int
-    workflow_run_attempt: int
-    workflow_path: str
-    event: str
-    status: str
-    conclusion: str
-    head_branch: str
-    head_sha: str
-    observed_at_epoch_seconds: int
-
-
-class LiveHeadObservation(NamedTuple):
-    source: str
-    repository: str
-    pr_number: int
-    base_ref: str
-    pr_head_sha: str
-    observed_at_epoch_seconds: int
-
-
 class CandidateFreeze(NamedTuple):
     repository: str
     pr_number: int
@@ -110,51 +50,27 @@ class CandidateFreeze(NamedTuple):
 
 
 class SubmissionCapabilities(NamedTuple):
+    """Authenticated facts about exact-head-fenced enqueue operations available now."""
+
     explicit_enqueue_available: bool
-    auto_merge_available: bool
+    explicit_enqueue_expected_head_fence: bool
+    protected_executor_available: bool
+    protected_executor_expected_head_fence: bool
+    protected_executor_trusted_default_branch: bool
     integration_authorized: bool
     pr_eligible: bool
 
 
-class QueueIdentity(NamedTuple):
-    repository: str
-    base_ref: str
-    queue_id: str
-    resource_path: str
-    url: str
+class EnqueueReceipt(NamedTuple):
+    """Receipt returned by the exact enqueue operation, not a historical timeline event."""
 
-
-class QueueEntryObservation(NamedTuple):
+    route: str
     attempt_id: str
-    observation_id: str
     repository: str
     pr_number: int
     base_ref: str
-    pr_head_sha: str
-    queue_id: str
-    resource_path: str
-    url: str
-    queue_entry_id: str
-    active: bool
-    observed_at_epoch_seconds: int
-
-
-class MergeGroupMember(NamedTuple):
-    repository: str
-    pr_number: int
-    pr_head_sha: str
-
-
-class MergeGroupObservation(NamedTuple):
-    attempt_id: str
-    observation_id: str
-    repository: str
-    base_ref: str
-    queue_id: str
-    resource_path: str
-    url: str
-    integration_head_sha: str
-    members: tuple[MergeGroupMember, ...]
+    expected_head_sha: str
+    merge_queue_entry_id: str
     observed_at_epoch_seconds: int
 
 
@@ -166,189 +82,75 @@ def _positive_int(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 1
 
 
-def _boolean_fields(value: object, names: tuple[str, ...]) -> bool:
-    return all(isinstance(getattr(value, name, None), bool) for name in names)
-
-
 def _valid_branch_name(value: object) -> bool:
+    """Apply the relevant `git check-ref-format --branch` constraints."""
     if not isinstance(value, str) or not value or value == "@" or value.startswith("-"):
         return False
     identity = f"refs/heads/{value}"
     return (
         not identity.endswith(".")
-        and not any(part == "" or part.startswith(".") or part.endswith(".lock") for part in identity.split("/"))
+        and not any(
+            part == "" or part.startswith(".") or part.endswith(".lock")
+            for part in identity.split("/")
+        )
         and ".." not in identity
         and "@{" not in identity
-        and not any(ord(char) <= 32 or ord(char) == 127 or char in "~^:?*[\\" for char in identity)
+        and not any(
+            ord(char) <= 32 or ord(char) == 127 or char in "~^:?*[\\"
+            for char in identity
+        )
     )
 
 
 def _allowed_repository(value: object) -> bool:
-    return isinstance(value, str) and value in ALLOWED_TARGET_REPOSITORIES and _fullmatch(REPOSITORY_RE, value)
+    return (
+        isinstance(value, str)
+        and value in ALLOWED_TARGET_REPOSITORIES
+        and _fullmatch(REPOSITORY_RE, value)
+    )
 
 
-def _valid_attempt(attempt: SubmissionAttempt) -> bool:
+def _valid_attempt(attempt: object) -> bool:
     return (
         isinstance(attempt, SubmissionAttempt)
         and _fullmatch(ATTEMPT_RE, attempt.attempt_id)
         and _allowed_repository(attempt.repository)
         and _positive_int(attempt.pr_number)
+        and attempt.base_ref == "main"
         and _valid_branch_name(attempt.base_ref)
         and _fullmatch(SHA_RE, attempt.live_pr_head_sha)
     )
 
 
-def _fresh(observed_at: object, now: object, max_age: int) -> bool:
+def _freeze_matches(attempt: SubmissionAttempt, freeze: object) -> bool:
     return (
-        isinstance(observed_at, int)
-        and not isinstance(observed_at, bool)
-        and isinstance(now, int)
-        and not isinstance(now, bool)
-        and isinstance(max_age, int)
-        and not isinstance(max_age, bool)
-        and max_age >= 0
-        and 0 <= observed_at <= now
-        and now - observed_at <= max_age
+        isinstance(freeze, CandidateFreeze)
+        and freeze.repository == attempt.repository
+        and freeze.pr_number == attempt.pr_number
+        and freeze.head_sha == attempt.live_pr_head_sha
+        and _fullmatch(SHA_RE, freeze.head_sha)
     )
 
 
-def _proof_payload(observation: BranchQueueObservation) -> dict[str, object]:
-    return {
-        "schema_version": 1,
-        "attempt_id": observation.attempt_id,
-        "observation_id": observation.observation_id,
-        "source": observation.source,
-        "control_repository": observation.control_repository,
-        "control_issue_number": observation.control_issue_number,
-        "repository": observation.repository,
-        "pr_number": observation.pr_number,
-        "base_ref": observation.base_ref,
-        "pr_head_sha": observation.pr_head_sha,
-        "merge_queue_required": observation.merge_queue_required,
-        "queue_id": observation.queue_id,
-        "resource_path": observation.resource_path,
-        "url": observation.url,
-        "trigger_comment_id": observation.trigger_comment_id,
-        "proof_comment_id": observation.proof_comment_id,
-        "proof_comment_author_login": observation.proof_comment_author_login,
-        "workflow_run_id": observation.workflow_run_id,
-        "workflow_run_attempt": observation.workflow_run_attempt,
-        "workflow_sha": observation.workflow_sha,
-        "observed_at_epoch_seconds": observation.observed_at_epoch_seconds,
-        "expires_at_epoch_seconds": observation.expires_at_epoch_seconds,
-    }
+def _valid_capabilities(capabilities: object) -> bool:
+    if not isinstance(capabilities, SubmissionCapabilities):
+        return False
+    return all(isinstance(value, bool) for value in capabilities)
 
 
-def _proof_comment_matches(observation: BranchQueueObservation, proof_comment: ProofCommentObservation, *, now_epoch_seconds: int) -> bool:
-    if not isinstance(proof_comment, ProofCommentObservation):
-        return False
-    try:
-        canonical = json.dumps(_proof_payload(observation), sort_keys=True, separators=(",", ":"))
-    except (TypeError, ValueError, OverflowError):
-        return False
-    expected_body = "OTERYN_MQ_PREFLIGHT_V1\n```json\n" + canonical + "\n```"
-    return (
-        proof_comment.repository == CONTROL_REPOSITORY
-        and proof_comment.issue_number == CONTROL_ISSUE_NUMBER
-        and proof_comment.comment_id == observation.proof_comment_id
-        and proof_comment.author_login == PREFLIGHT_PROOF_AUTHOR
-        and proof_comment.author_login == observation.proof_comment_author_login
-        and proof_comment.body == expected_body
-        and _fresh(proof_comment.observed_at_epoch_seconds, now_epoch_seconds, MAX_PREMUTATION_RULE_AGE_SECONDS)
-        and proof_comment.observed_at_epoch_seconds >= observation.observed_at_epoch_seconds
-    )
+def choose_submission_route(
+    attempt: SubmissionAttempt,
+    freeze: CandidateFreeze,
+    capabilities: SubmissionCapabilities,
+) -> str:
+    """Choose only a queue-specific operation with a server-side exact-head fence.
 
-
-def _workflow_run_matches(observation: BranchQueueObservation, workflow: WorkflowRunObservation, *, now_epoch_seconds: int) -> bool:
-    return (
-        isinstance(workflow, WorkflowRunObservation)
-        and workflow.repository == CONTROL_REPOSITORY
-        and workflow.workflow_run_id == observation.workflow_run_id
-        and workflow.workflow_run_attempt == observation.workflow_run_attempt
-        and workflow.workflow_path == PREFLIGHT_WORKFLOW_PATH
-        and workflow.event == "issue_comment"
-        and workflow.status == "completed"
-        and workflow.conclusion == "success"
-        and workflow.head_branch == "main"
-        and workflow.head_sha == observation.workflow_sha
-        and _fullmatch(SHA_RE, workflow.head_sha)
-        and _fresh(workflow.observed_at_epoch_seconds, now_epoch_seconds, MAX_PREMUTATION_RULE_AGE_SECONDS)
-    )
-
-
-def _branch_observation_matches(attempt: SubmissionAttempt, observation: BranchQueueObservation, proof_comment: ProofCommentObservation, workflow: WorkflowRunObservation, *, now_epoch_seconds: int) -> bool:
-    if not isinstance(observation, BranchQueueObservation):
-        return False
-    if observation.attempt_id != attempt.attempt_id or observation.source != PREFLIGHT_SOURCE:
-        return False
-    if (
-        observation.control_repository != CONTROL_REPOSITORY
-        or observation.control_issue_number != CONTROL_ISSUE_NUMBER
-        or observation.repository != attempt.repository
-        or observation.pr_number != attempt.pr_number
-        or observation.base_ref != attempt.base_ref
-        or observation.pr_head_sha != attempt.live_pr_head_sha
-    ):
-        return False
-    if not _fullmatch(SHA_RE, observation.pr_head_sha) or not _fullmatch(SHA_RE, observation.workflow_sha):
-        return False
-    if not all(_positive_int(value) for value in (observation.trigger_comment_id, observation.proof_comment_id, observation.workflow_run_id, observation.workflow_run_attempt)):
-        return False
-    if observation.proof_comment_author_login != PREFLIGHT_PROOF_AUTHOR:
-        return False
-    expected_observation_id = f"mq-preflight-{observation.workflow_run_id}-{observation.workflow_run_attempt}-{observation.trigger_comment_id}"
-    if observation.observation_id != expected_observation_id or not isinstance(observation.merge_queue_required, bool):
-        return False
-    if not _fresh(observation.observed_at_epoch_seconds, now_epoch_seconds, MAX_PREMUTATION_RULE_AGE_SECONDS):
-        return False
-    if (
-        not isinstance(observation.expires_at_epoch_seconds, int)
-        or isinstance(observation.expires_at_epoch_seconds, bool)
-        or observation.expires_at_epoch_seconds != observation.observed_at_epoch_seconds + MAX_PREMUTATION_RULE_AGE_SECONDS
-        or now_epoch_seconds > observation.expires_at_epoch_seconds
-    ):
-        return False
-    if not _proof_comment_matches(observation, proof_comment, now_epoch_seconds=now_epoch_seconds):
-        return False
-    if not _workflow_run_matches(observation, workflow, now_epoch_seconds=now_epoch_seconds):
-        return False
-    if observation.merge_queue_required is False:
-        return observation.queue_id is None and observation.resource_path is None and observation.url is None
-    expected_resource_path = f"/{attempt.repository}/queue/{attempt.base_ref}"
-    expected_url = f"https://github.com{expected_resource_path}"
-    return _fullmatch(QUEUE_ID_RE, observation.queue_id) and observation.resource_path == expected_resource_path and observation.url == expected_url
-
-
-def _live_head_matches(attempt: SubmissionAttempt, preflight: BranchQueueObservation, proof_comment: ProofCommentObservation, workflow: WorkflowRunObservation, live_head: LiveHeadObservation, *, now_epoch_seconds: int) -> bool:
-    if not isinstance(preflight, BranchQueueObservation) or not isinstance(proof_comment, ProofCommentObservation) or not isinstance(workflow, WorkflowRunObservation):
-        return False
-    ordered_values = (preflight.observed_at_epoch_seconds, proof_comment.observed_at_epoch_seconds, workflow.observed_at_epoch_seconds)
-    if not all(isinstance(value, int) and not isinstance(value, bool) for value in ordered_values):
-        return False
-    authenticated_at = max(ordered_values)
-    return (
-        isinstance(live_head, LiveHeadObservation)
-        and live_head.source == LIVE_HEAD_SOURCE
-        and live_head.repository == attempt.repository
-        and live_head.pr_number == attempt.pr_number
-        and live_head.base_ref == attempt.base_ref
-        and live_head.pr_head_sha == attempt.live_pr_head_sha
-        and _fullmatch(SHA_RE, live_head.pr_head_sha)
-        and isinstance(live_head.observed_at_epoch_seconds, int)
-        and not isinstance(live_head.observed_at_epoch_seconds, bool)
-        and live_head.observed_at_epoch_seconds > authenticated_at
-        and _fresh(live_head.observed_at_epoch_seconds, now_epoch_seconds, MAX_LIVE_HEAD_AGE_SECONDS)
-    )
-
-
-def _freeze_matches(attempt: SubmissionAttempt, freeze: CandidateFreeze) -> bool:
-    return isinstance(freeze, CandidateFreeze) and freeze.repository == attempt.repository and freeze.pr_number == attempt.pr_number and freeze.head_sha == attempt.live_pr_head_sha and _fullmatch(SHA_RE, freeze.head_sha)
-
-
-def choose_submission_route(attempt: SubmissionAttempt, branch_observation: BranchQueueObservation, proof_comment_observation: ProofCommentObservation, workflow_run_observation: WorkflowRunObservation, live_head_observation: LiveHeadObservation, freeze: CandidateFreeze, capabilities: SubmissionCapabilities, *, now_epoch_seconds: int) -> str:
-    if not _valid_attempt(attempt):
-        return BLOCKED_STALE_STATE
-    if not isinstance(capabilities, SubmissionCapabilities) or not _boolean_fields(capabilities, ("explicit_enqueue_available", "auto_merge_available", "integration_authorized", "pr_eligible")):
+    `enablePullRequestAutoMerge` is intentionally not representable here. If an
+    explicit enqueue operation is unavailable, the only accepted alternative is a
+    protected-default-branch executor whose mutation is still GraphQL
+    `enqueuePullRequest(expectedHeadOid=...)` for the frozen candidate.
+    """
+    if not _valid_attempt(attempt) or not _valid_capabilities(capabilities):
         return BLOCKED_STALE_STATE
     if not capabilities.integration_authorized:
         return BLOCKED_NOT_AUTHORIZED
@@ -356,110 +158,62 @@ def choose_submission_route(attempt: SubmissionAttempt, branch_observation: Bran
         return BLOCKED_NOT_ELIGIBLE
     if not _freeze_matches(attempt, freeze):
         return BLOCKED_FROZEN_HEAD_MISMATCH
-    if not _branch_observation_matches(attempt, branch_observation, proof_comment_observation, workflow_run_observation, now_epoch_seconds=now_epoch_seconds):
-        return BLOCKED_STALE_STATE
-    if not _live_head_matches(attempt, branch_observation, proof_comment_observation, workflow_run_observation, live_head_observation, now_epoch_seconds=now_epoch_seconds):
-        return BLOCKED_STALE_STATE
-    if not branch_observation.merge_queue_required:
-        return NOT_MQ_TARGET
+
     if capabilities.explicit_enqueue_available:
-        return EXPLICIT_ENQUEUE
-    if capabilities.auto_merge_available:
-        return AUTO_MERGE_MQ_SUBMISSION
+        if capabilities.explicit_enqueue_expected_head_fence:
+            return EXPLICIT_ENQUEUE
+        return BLOCKED_CAPABILITY_UNAVAILABLE
+
+    if capabilities.protected_executor_available:
+        if (
+            capabilities.protected_executor_expected_head_fence
+            and capabilities.protected_executor_trusted_default_branch
+        ):
+            return PROTECTED_EXECUTOR_ENQUEUE
+        return BLOCKED_CAPABILITY_UNAVAILABLE
+
     return BLOCKED_CAPABILITY_UNAVAILABLE
 
 
-def queue_identity_from_preflight(observation: BranchQueueObservation) -> QueueIdentity | None:
+def verify_enqueue_receipt(
+    route: str,
+    attempt: SubmissionAttempt,
+    receipt: EnqueueReceipt,
+    *,
+    submission_started_at_epoch_seconds: int,
+    now_epoch_seconds: int,
+) -> str:
+    """Accept only the immediate exact-target receipt from the enqueue mutation."""
+    if route not in {EXPLICIT_ENQUEUE, PROTECTED_EXECUTOR_ENQUEUE}:
+        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    if not _valid_attempt(attempt) or not isinstance(receipt, EnqueueReceipt):
+        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
     if (
-        not isinstance(observation, BranchQueueObservation)
-        or observation.merge_queue_required is not True
-        or not _allowed_repository(observation.repository)
-        or not _valid_branch_name(observation.base_ref)
-        or not _fullmatch(QUEUE_ID_RE, observation.queue_id)
-        or not isinstance(observation.resource_path, str)
-        or not isinstance(observation.url, str)
+        not isinstance(submission_started_at_epoch_seconds, int)
+        or isinstance(submission_started_at_epoch_seconds, bool)
+        or not isinstance(now_epoch_seconds, int)
+        or isinstance(now_epoch_seconds, bool)
+        or submission_started_at_epoch_seconds < 0
+        or now_epoch_seconds < submission_started_at_epoch_seconds
     ):
-        return None
-    expected_resource_path = f"/{observation.repository}/queue/{observation.base_ref}"
-    expected_url = f"https://github.com{expected_resource_path}"
-    if observation.resource_path != expected_resource_path or observation.url != expected_url:
-        return None
-    return QueueIdentity(observation.repository, observation.base_ref, observation.queue_id, observation.resource_path, observation.url)
-
-
-def _queue_identity_matches_attempt(attempt: SubmissionAttempt, identity: QueueIdentity) -> bool:
-    if not isinstance(identity, QueueIdentity):
-        return False
-    expected_resource_path = f"/{attempt.repository}/queue/{attempt.base_ref}"
-    expected_url = f"https://github.com{expected_resource_path}"
-    return identity.repository == attempt.repository and identity.base_ref == attempt.base_ref and _fullmatch(QUEUE_ID_RE, identity.queue_id) and identity.resource_path == expected_resource_path and identity.url == expected_url
-
-
-def _observation_is_post_submission(*, attempt_id: object, observation_id: object, observed_at_epoch_seconds: object, submission_completed_at_epoch_seconds: object, now_epoch_seconds: object) -> bool:
-    return (
-        _fullmatch(ATTEMPT_RE, attempt_id)
-        and _fullmatch(OBSERVATION_RE, observation_id)
-        and isinstance(submission_completed_at_epoch_seconds, int)
-        and not isinstance(submission_completed_at_epoch_seconds, bool)
-        and isinstance(observed_at_epoch_seconds, int)
-        and not isinstance(observed_at_epoch_seconds, bool)
-        and observed_at_epoch_seconds > submission_completed_at_epoch_seconds
-        and _fresh(observed_at_epoch_seconds, now_epoch_seconds, MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS)
-    )
-
-
-def _queue_entry_matches(attempt: SubmissionAttempt, identity: QueueIdentity, observation: QueueEntryObservation, *, submission_completed_at_epoch_seconds: int, now_epoch_seconds: int) -> bool:
-    return (
-        isinstance(observation, QueueEntryObservation)
-        and observation.attempt_id == attempt.attempt_id
-        and _observation_is_post_submission(attempt_id=observation.attempt_id, observation_id=observation.observation_id, observed_at_epoch_seconds=observation.observed_at_epoch_seconds, submission_completed_at_epoch_seconds=submission_completed_at_epoch_seconds, now_epoch_seconds=now_epoch_seconds)
-        and observation.repository == attempt.repository == identity.repository
-        and observation.pr_number == attempt.pr_number
-        and observation.base_ref == attempt.base_ref == identity.base_ref
-        and observation.pr_head_sha == attempt.live_pr_head_sha
-        and _fullmatch(SHA_RE, observation.pr_head_sha)
-        and observation.queue_id == identity.queue_id
-        and observation.resource_path == identity.resource_path
-        and observation.url == identity.url
-        and _fullmatch(OBSERVATION_RE, observation.queue_entry_id)
-        and observation.active is True
-    )
-
-
-def _merge_group_matches(attempt: SubmissionAttempt, identity: QueueIdentity, observation: MergeGroupObservation, *, submission_completed_at_epoch_seconds: int, now_epoch_seconds: int) -> bool:
-    if not isinstance(observation, MergeGroupObservation) or observation.attempt_id != attempt.attempt_id:
-        return False
-    if not _observation_is_post_submission(attempt_id=observation.attempt_id, observation_id=observation.observation_id, observed_at_epoch_seconds=observation.observed_at_epoch_seconds, submission_completed_at_epoch_seconds=submission_completed_at_epoch_seconds, now_epoch_seconds=now_epoch_seconds):
-        return False
+        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
     if (
-        observation.repository != attempt.repository
-        or observation.repository != identity.repository
-        or observation.base_ref != attempt.base_ref
-        or observation.base_ref != identity.base_ref
-        or observation.queue_id != identity.queue_id
-        or observation.resource_path != identity.resource_path
-        or observation.url != identity.url
+        not isinstance(receipt.observed_at_epoch_seconds, int)
+        or isinstance(receipt.observed_at_epoch_seconds, bool)
+        or receipt.observed_at_epoch_seconds < submission_started_at_epoch_seconds
+        or receipt.observed_at_epoch_seconds > now_epoch_seconds
+        or now_epoch_seconds - receipt.observed_at_epoch_seconds > MAX_RECEIPT_AGE_SECONDS
     ):
-        return False
-    if not _fullmatch(SHA_RE, observation.integration_head_sha) or not isinstance(observation.members, tuple) or not observation.members:
-        return False
-    for member in observation.members:
-        if not isinstance(member, MergeGroupMember) or not _allowed_repository(member.repository) or not _positive_int(member.pr_number) or not _fullmatch(SHA_RE, member.pr_head_sha):
-            return False
-    return MergeGroupMember(attempt.repository, attempt.pr_number, attempt.live_pr_head_sha) in observation.members
-
-
-def verify_queue_admission(route: str, attempt: SubmissionAttempt, queue_identity: QueueIdentity, evidence: Iterable[QueueEntryObservation | MergeGroupObservation], *, submission_completed_at_epoch_seconds: int, now_epoch_seconds: int) -> str:
-    if not isinstance(route, str) or route not in {EXPLICIT_ENQUEUE, AUTO_MERGE_MQ_SUBMISSION}:
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    if not _valid_attempt(attempt) or not _queue_identity_matches_attempt(attempt, queue_identity) or not isinstance(evidence, Iterable):
+    if (
+        receipt.route != route
+        or receipt.attempt_id != attempt.attempt_id
+        or receipt.repository != attempt.repository
+        or receipt.pr_number != attempt.pr_number
+        or receipt.base_ref != attempt.base_ref
+        or receipt.expected_head_sha != attempt.live_pr_head_sha
+        or not _fullmatch(SHA_RE, receipt.expected_head_sha)
+        or not _fullmatch(QUEUE_ENTRY_RE, receipt.merge_queue_entry_id)
+    ):
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    try:
-        for item in evidence:
-            if _queue_entry_matches(attempt, queue_identity, item, submission_completed_at_epoch_seconds=submission_completed_at_epoch_seconds, now_epoch_seconds=now_epoch_seconds):
-                return ENQUEUED
-            if _merge_group_matches(attempt, queue_identity, item, submission_completed_at_epoch_seconds=submission_completed_at_epoch_seconds, now_epoch_seconds=now_epoch_seconds):
-                return ENQUEUED
-    except (TypeError, ValueError, OverflowError):
-        return BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    return BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    return ENQUEUED
