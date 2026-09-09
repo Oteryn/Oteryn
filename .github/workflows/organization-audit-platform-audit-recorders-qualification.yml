@@ -7,6 +7,7 @@ on:
       - .github/workflows/organization-audit-platform-audit-recorders-qualification.yml
       - docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
       - docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.md
+      - docs/evidence/organization-audit-20260907/README.md
       - docs/evidence/organization-audit-20260907/collection-plan.json
       - docs/evidence/organization-audit-20260907/coverage-review.tsv
       - docs/evidence/organization-audit-20260907/coverage-review-additions.tsv
@@ -17,6 +18,8 @@ on:
       - docs/evidence/organization-audit-20260907/r3-platform-marketplace-tests-candidate.json
       - docs/evidence/organization-audit-20260907/verification-index.json
       - tools/audit/organization_audit.py
+      - tools/audit/verify_readme_current_state.py
+      - tools/audit/test_verify_readme_current_state.py
       - tools/audit/verify_report.py
       - tools/audit/test_verify_report.py
       - tools/audit/verify_platform_audit_recorders_direct.py
@@ -89,9 +92,12 @@ jobs:
           git -C audit diff --exit-code
           git -C platform diff --exit-code
           (cd audit/tools/audit && python3 -m unittest -v \
+            test_verify_readme_current_state.py \
             test_verify_report.py \
             test_verify_platform_audit_recorders_direct.py \
             test_verify_platform_marketplace_tests_group.py)
+          python3 audit/tools/audit/verify_readme_current_state.py \
+            --readme audit/docs/evidence/organization-audit-20260907/README.md
           python3 audit/tools/audit/verify_platform_audit_recorders_direct.py \
             --audit-root audit --platform-root platform | tee "$RUNNER_TEMP/adopted-recorder-state.json"
       - name: Rebuild immutable audit inventories
