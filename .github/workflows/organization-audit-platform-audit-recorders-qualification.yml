@@ -1,18 +1,20 @@
-name: Organization audit Platform audit recorders qualification (temporary)
+name: Organization audit Platform audit recorders adopted proof (temporary)
 
 on:
   pull_request:
     branches: [main]
     paths:
       - .github/workflows/organization-audit-platform-audit-recorders-qualification.yml
-      - docs/evidence/organization-audit-20260907/r3-platform-audit-recorders-direct-candidate.json
+      - docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
       - docs/evidence/organization-audit-20260907/collection-plan.json
       - docs/evidence/organization-audit-20260907/coverage-review.tsv
+      - docs/evidence/organization-audit-20260907/coverage-review-additions.tsv
       - docs/evidence/organization-audit-20260907/coverage-groups.json
       - docs/evidence/organization-audit-20260907/coverage-summary.json
-      - docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
+      - docs/evidence/organization-audit-20260907/r3-platform-audit-recorders-direct-candidate.json
       - tools/audit/organization_audit.py
       - tools/audit/verify_report.py
+      - tools/audit/test_verify_report.py
       - tools/audit/verify_platform_audit_recorders_direct.py
       - tools/audit/test_verify_platform_audit_recorders_direct.py
 
@@ -20,11 +22,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: audit-185-platform-audit-recorders-qualification
+  group: audit-185-platform-audit-recorders-adopted-proof
   cancel-in-progress: false
 
 jobs:
-  qualify-audit-recorders:
+  prove-adopted-audit-recorders:
     if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
@@ -35,7 +37,8 @@ jobs:
           MARIADB_ROOT_PASSWORD: oteryn-audit-recorders-root
           MARIADB_DATABASE: oteryn_audit_recorders
           MARIADB_ROOT_HOST: "%"
-        ports: ["3306:3306"]
+        ports:
+          - 3306:3306
         options: >-
           --health-cmd="healthcheck.sh --connect --innodb_initialized"
           --health-interval=5s
@@ -56,7 +59,7 @@ jobs:
       QUEUE_CONNECTION: sync
       MAIL_MAILER: array
     steps:
-      - name: Checkout exact audit candidate
+      - name: Checkout exact adopted audit candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
@@ -69,7 +72,7 @@ jobs:
           ref: de917b3477a1de0667531380de3660e8b2ab59aa
           path: platform
           persist-credentials: false
-      - name: Verify exact coordinates and bound candidate machinery
+      - name: Verify adopted coordinates and fail-closed machinery
         shell: bash
         run: |
           set -euo pipefail
@@ -79,30 +82,35 @@ jobs:
           git -C audit diff --check
           git -C audit diff --exit-code
           git -C platform diff --exit-code
-          (cd audit/tools/audit && python3 -m unittest -v test_verify_platform_audit_recorders_direct.py)
-          python3 audit/tools/audit/verify_platform_audit_recorders_direct.py --audit-root audit --platform-root platform | tee "$RUNNER_TEMP/direct-candidate.json"
+          (cd audit/tools/audit && python3 -m unittest -v test_verify_report.py test_verify_platform_audit_recorders_direct.py)
+          python3 audit/tools/audit/verify_platform_audit_recorders_direct.py --audit-root audit --platform-root platform | tee "$RUNNER_TEMP/adopted-recorder-state.json"
       - name: Rebuild immutable audit inventories
         shell: bash
         run: |
           set -euo pipefail
-          python3 audit/tools/audit/organization_audit.py --plan audit/docs/evidence/organization-audit-20260907/collection-plan.json --output "$RUNNER_TEMP/audit-inventory"
-      - name: Mechanically project final planned DIRECT rows without adoption
+          python3 audit/tools/audit/organization_audit.py \
+            --plan audit/docs/evidence/organization-audit-20260907/collection-plan.json \
+            --output "$RUNNER_TEMP/audit-inventory"
+      - name: Reproduce exact adopted canonical ledger
         shell: bash
         run: |
           set -euo pipefail
-          python3 audit/tools/audit/verify_platform_audit_recorders_direct.py --audit-root audit --platform-root platform --inventory-dir "$RUNNER_TEMP/audit-inventory/inventories" | tee "$RUNNER_TEMP/projection.json"
-          python3 - "$RUNNER_TEMP/projection.json" <<'PY'
-          import json,re,sys
-          d=json.load(open(sys.argv[1],encoding='utf-8')); p=d['projected_ledger']
-          assert d['result']=='PLATFORM_AUDIT_RECORDERS_DIRECT_CANDIDATE_REVALIDATED_NOT_ADOPTED_NOT_PRODUCT_PASS'
-          assert d['paths']==2 and d['path_blobs_verified']==2 and d['persistence_bindings_verified']==2
-          assert d['focused_test_files_bound']==3 and d['security_event_constants_verified']==31 and d['coverage_adopted'] is False
-          assert d['primary_qualification_run']==34347577287 and d['primary_qualification_job']==102452733285
-          assert p['result']=='PLATFORM_AUDIT_RECORDERS_PROJECTED_LEDGER_NOT_ADOPTED_NOT_PRODUCT_PASS'
-          assert (p['source_rows'],p['direct_paths'],p['grouped_paths'],p['unverified_paths'],p['semantically_classified_paths'])==(4325,223,113,3989,336)
-          assert (p['platform_direct_paths'],p['platform_grouped_paths'],p['platform_unverified_paths'])==(158,113,1894)
-          assert re.fullmatch(r'[0-9a-f]{64}',p['ledger_sha256'])
-          print('FINAL_PLANNED_PROJECTED_LEDGER='+p['ledger_sha256'])
+          python3 audit/tools/audit/verify_report.py \
+            --report audit/docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json \
+            --inventory-dir "$RUNNER_TEMP/audit-inventory/inventories" \
+            --ledger-output "$RUNNER_TEMP/adopted-ledger.csv" | tee "$RUNNER_TEMP/ledger-verifier.json"
+          python3 - "$RUNNER_TEMP/adopted-ledger.csv" "$RUNNER_TEMP/ledger-proof.json" <<'PY'
+          import csv,hashlib,json,sys
+          from collections import Counter
+          raw=open(sys.argv[1],'rb').read();rows=list(csv.DictReader(raw.decode('utf-8').splitlines()));counts=Counter(r['disposition'] for r in rows);digest=hashlib.sha256(raw).hexdigest()
+          expected={'DIRECT':223,'GROUPED':113,'UNVERIFIED':3989}
+          if len(rows)!=4325 or dict(counts)!=expected: raise SystemExit(f'adopted ledger count drift: rows={len(rows)} counts={dict(counts)}')
+          if digest!='2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f': raise SystemExit('adopted ledger digest drift: '+digest)
+          required={'app/Audit/AdminAuditRecorder.php','app/Audit/SecurityEventRecorder.php'}
+          direct={r['path'] for r in rows if r['repository_id']=='platform' and r['disposition']=='DIRECT'}
+          if not required.issubset(direct): raise SystemExit('adopted recorder DIRECT rows absent from ledger')
+          proof={'audit_head':'${{ github.event.pull_request.head.sha }}','source_rows':4325,'direct_paths':223,'grouped_paths':113,'unverified_paths':3989,'semantically_classified_paths':336,'ledger_sha256':digest,'recorder_direct_paths':sorted(required)}
+          open(sys.argv[2],'w',encoding='utf-8').write(json.dumps(proof,indent=2,sort_keys=True)+'\n');print(json.dumps(proof,sort_keys=True))
           PY
       - name: Setup PHP 8.5.10
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240
@@ -125,32 +133,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          php artisan test tests/Feature/Admin/AdminRoleManagementTest.php tests/Feature/Identity/RegistrationTest.php tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php --log-junit="$RUNNER_TEMP/audit-recorders-junit.xml"
-      - name: Enforce exact qualification totals
+          php artisan test \
+            tests/Feature/Admin/AdminRoleManagementTest.php \
+            tests/Feature/Identity/RegistrationTest.php \
+            tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php \
+            --log-junit="$RUNNER_TEMP/audit-recorders-junit.xml"
+      - name: Enforce exact post-adoption qualification totals
         shell: bash
         run: |
           set -euo pipefail
           python3 - "$RUNNER_TEMP/audit-recorders-junit.xml" "$RUNNER_TEMP/test-summary.json" <<'PY'
           import json,sys,xml.etree.ElementTree as ET
-          cases=ET.parse(sys.argv[1]).getroot().findall('.//testcase'); identities=set()
-          result={'test_files':3,'cases':len(cases),'assertions':0,'failures':0,'errors':0,'skipped':0}
+          cases=ET.parse(sys.argv[1]).getroot().findall('.//testcase');identities=set();result={'test_files':3,'cases':len(cases),'assertions':0,'failures':0,'errors':0,'skipped':0}
           for case in cases:
               ident=(case.attrib.get('classname'),case.attrib.get('name'))
               if not all(ident) or ident in identities: raise SystemExit(f'duplicate/missing JUnit identity: {ident}')
-              identities.add(ident); result['assertions']+=int(case.attrib.get('assertions','0'))
-              result['failures']+=len(case.findall('failure')); result['errors']+=len(case.findall('error')); result['skipped']+=len(case.findall('skipped'))
+              identities.add(ident);result['assertions']+=int(case.attrib.get('assertions','0'));result['failures']+=len(case.findall('failure'));result['errors']+=len(case.findall('error'));result['skipped']+=len(case.findall('skipped'))
           expected={'test_files':3,'cases':25,'assertions':89,'failures':0,'errors':0,'skipped':0}
-          if result != expected: raise SystemExit('exact qualification totals drift: '+json.dumps(result,sort_keys=True))
-          open(sys.argv[2],'w',encoding='utf-8').write(json.dumps(result,indent=2,sort_keys=True)+'\n')
-          print('EXACT_QUALIFICATION='+json.dumps(result,sort_keys=True))
+          if result!=expected: raise SystemExit('exact post-adoption totals drift: '+json.dumps(result,sort_keys=True))
+          open(sys.argv[2],'w',encoding='utf-8').write(json.dumps(result,indent=2,sort_keys=True)+'\n');print('EXACT_POST_ADOPTION='+json.dumps(result,sort_keys=True))
           PY
-      - name: Upload bounded pre-adoption proof
+      - name: Upload bounded adopted proof
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: audit185-platform-audit-recorders-pre-adoption-${{ github.run_id }}
+          name: audit185-platform-audit-recorders-adopted-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/direct-candidate.json
-            ${{ runner.temp }}/projection.json
+            ${{ runner.temp }}/adopted-recorder-state.json
+            ${{ runner.temp }}/ledger-verifier.json
+            ${{ runner.temp }}/ledger-proof.json
+            ${{ runner.temp }}/adopted-ledger.csv
             ${{ runner.temp }}/test-summary.json
           if-no-files-found: error
           retention-days: 1

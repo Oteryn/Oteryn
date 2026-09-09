@@ -3,53 +3,23 @@
   "source_leaf_total": 4325,
   "active_repository_leaf_total": 4324,
   "per_repository": {
-    "meta": {
-      "leaves": 174,
-      "direct_scoped": 20,
-      "unverified_semantics": 154,
-      "grouped": 0,
-      "not_applicable": 0
-    },
-    "game": {
-      "leaves": 830,
-      "direct_scoped": 34,
-      "unverified_semantics": 796,
-      "grouped": 0,
-      "not_applicable": 0
-    },
-    "platform": {
-      "leaves": 2165,
-      "direct_scoped": 156,
-      "unverified_semantics": 1896,
-      "grouped": 113,
-      "not_applicable": 0
-    },
-    "atlas": {
-      "leaves": 1155,
-      "direct_scoped": 10,
-      "unverified_semantics": 1145,
-      "grouped": 0,
-      "not_applicable": 0
-    },
-    "migration_archive": {
-      "leaves": 1,
-      "direct_scoped": 1,
-      "unverified_semantics": 0,
-      "grouped": 0,
-      "not_applicable": 0
-    }
+    "meta": {"leaves": 174, "direct_scoped": 20, "unverified_semantics": 154, "grouped": 0, "not_applicable": 0},
+    "game": {"leaves": 830, "direct_scoped": 34, "unverified_semantics": 796, "grouped": 0, "not_applicable": 0},
+    "platform": {"leaves": 2165, "direct_scoped": 158, "unverified_semantics": 1894, "grouped": 113, "not_applicable": 0},
+    "atlas": {"leaves": 1155, "direct_scoped": 10, "unverified_semantics": 1145, "grouped": 0, "not_applicable": 0},
+    "migration_archive": {"leaves": 1, "direct_scoped": 1, "unverified_semantics": 0, "grouped": 0, "not_applicable": 0}
   },
-  "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
+  "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f",
   "identity_coverage": "COMPLETE_FOR_PINNED_FIVE_REPOSITORIES",
   "semantic_coverage": "PARTIAL_EXPLICIT",
   "unclassified_paths": 0,
   "semantic_completion_claimed": false,
-  "durability": "Full CSV accompanies the audit delivery. Committed DIRECT review rows, immutable Git trees, explicit accepted/rejected GROUPED records and verify_report.py reproduce every disposition. Platform GameAuth contributes 27 GROUPED paths; Accounts/CanaryIntegration/CharacterProfiles/Characters contribute 31; Marketplace/Payments/Wallet production code contributes 49; the exact six-file Marketplace test directory contributes 6; the rejected 508-file Atlas candidate remains UNVERIFIED.",
-  "new_scoped_paths_since_r2": 156,
-  "scoped_review_paths": 221,
+  "durability": "Full CSV accompanies the audit delivery. Committed DIRECT review rows plus the fail-closed coverage-review-additions.tsv overlay, immutable Git trees, explicit accepted/rejected GROUPED records and verify_report.py reproduce every disposition. Platform GameAuth contributes 27 GROUPED paths; Accounts/CanaryIntegration/CharacterProfiles/Characters contribute 31; Marketplace/Payments/Wallet production code contributes 49; the exact six-file Marketplace test directory contributes 6. Two frozen Platform app/Audit recorder implementations are adopted as bounded DIRECT review rows after exact source/persistence/test binding and repeated 25-case/89-assertion MariaDB qualification. The rejected 508-file Atlas candidate remains UNVERIFIED.",
+  "new_scoped_paths_since_r2": 158,
+  "scoped_review_paths": 223,
   "grouped_revalidated_paths": 113,
-  "semantically_classified_paths": 334,
-  "unverified_semantics_total": 3991,
-  "coverage_dimension_note": "DIRECT records bounded current/source review, not universal approval. GROUPED records bounded semantic carry-forward only when historical scope, exact identity and current dependent qualification are all bound. Platform contributes 113 GROUPED paths: GameAuth 27, account/Canary/profile/character 31, Marketplace/Payments/Wallet production code 49, and the exact six-file Marketplace test directory 6. The Atlas 508-path candidate remains rejected.",
+  "semantically_classified_paths": 336,
+  "unverified_semantics_total": 3989,
+  "coverage_dimension_note": "DIRECT records bounded current/source review, not universal approval. The 223 DIRECT paths are the original 221 canonical coverage-review.tsv rows plus exactly two fail-closed coverage-review-additions.tsv rows for app/Audit/AdminAuditRecorder.php and app/Audit/SecurityEventRecorder.php. GROUPED records bounded semantic carry-forward only when historical scope, exact identity and current dependent qualification are all bound. Platform contributes 113 GROUPED paths: GameAuth 27, account/Canary/profile/character 31, Marketplace/Payments/Wallet production code 49, and the exact six-file Marketplace test directory 6. The Atlas 508-path candidate remains rejected.",
   "rejected_group_candidates": 1
 }

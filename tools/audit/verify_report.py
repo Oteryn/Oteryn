@@ -24,6 +24,8 @@ STATES = {'SOURCE_REPAIRED_TESTED','PARTIALLY_REPAIRED','RETIRED_SOURCE','SOURCE
           'REPORTED_CLOSED','LIVE_RECORD_RECONCILED','REPORTED_IMPLEMENTED_NOT_REQUALIFIED',
           'REPORTED_OPEN','OWNER_DECISION_PENDING','HISTORICAL_TERMINAL','REPORTED_OPEN_CANDIDATE'}
 DEFAULT_REASON = 'Identity enumerated; this continuation does not assert a complete semantic review of this leaf. Historical/source oracles may provide narrower evidence in the finding register.'
+DIRECT_ADDITIONS = 'coverage-review-additions.tsv'
+DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
 
 
 def require(condition, message):
@@ -53,6 +55,18 @@ def read_tsv(path):
 def unique(rows, key, label):
     values=[key(row) for row in rows]
     require(len(values)==len(set(values)), 'duplicate '+label)
+
+
+def load_review(base: Path, doc: dict):
+    review=read_tsv(base/'coverage-review.tsv')
+    additions_binding=doc.get('coverage_review_additions')
+    if additions_binding is not None:
+        require(additions_binding==DIRECT_ADDITIONS_BINDING,'coverage review additions binding drift')
+        additions=read_tsv(base/DIRECT_ADDITIONS)
+        require(additions,'coverage review additions empty')
+        review=review+additions
+    unique(review,lambda r:(r['repository'],r['path']),'review path')
+    return review
 
 
 def safe_relative(path):
@@ -175,7 +189,7 @@ def rebuild_ledger(report_path: Path, inventory_dir: Path):
     repo=doc['repositories']
     require(set(repo)=={'meta','game','platform','atlas','migration_archive'},'repository scope')
     base=report_path.parent/doc['evidence_directory']
-    review=read_tsv(base/'coverage-review.tsv');unique(review,lambda r:(r['repository'],r['path']),'review path')
+    review=load_review(base,doc)
     groups=load_groups(base,repo)
     for row in review:
         for group in groups:
@@ -212,7 +226,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(all(all(r[k].strip() for k in ['acceptance_criterion','method_and_evidence','opinion','remaining_limit','references']) for r in domains),'empty domain evidence')
     unknowns=read_json(base/'unknowns.json')['items'];unique(unknowns,lambda r:r['id'],'unknown id')
     require(len(unknowns)==doc['unresolved_unknowns'],'unknown count')
-    review=read_tsv(base/'coverage-review.tsv');unique(review,lambda r:(r['repository'],r['path']),'review path')
+    review=load_review(base,doc)
     for row in review:
         require(row['repository'] in repo and SHA.fullmatch(row['blob_sha']),'invalid review source')
         require(row['depth']=='SCOPED_SEMANTIC_REVIEW' and row['scope'].strip(),'unsupported review depth')

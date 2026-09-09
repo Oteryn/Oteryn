@@ -20,7 +20,7 @@ class AuditValidationTest(unittest.TestCase):
         self.path=self.root/REPORT
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
     def mutate(self,path,func):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
@@ -58,17 +58,13 @@ class AuditValidationTest(unittest.TestCase):
     def test_hidden_unverified_paths_rejected(self):
         self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['platform'].update(unverified_semantics=0));self.reject()
     def test_rejected_group_is_not_promoted_by_summary(self):
-        self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['atlas'].update(grouped=508,unverified_semantics=637))
-        self.reject()
-
+        self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['atlas'].update(grouped=508,unverified_semantics=637));self.reject()
     def test_rejected_candidate_is_preserved_but_not_counted(self):
-        data=audit.read_json(self.base/'coverage-groups.json')
-        rejected=data['rejected_candidates']
+        data=audit.read_json(self.base/'coverage-groups.json');rejected=data['rejected_candidates']
         self.assertEqual(len(rejected),1)
         self.assertEqual(rejected[0]['id'],'ATLAS-CREATURE-GAMEPLAY-SHARDS')
         self.assertEqual(rejected[0]['evaluation']['outcome'],'REJECTED_NOT_COUNTED_AS_GROUPED')
         self.assertNotIn(rejected[0]['id'],{row['id'] for row in data['groups']})
-
     def test_reproduction_called_pass_rejected(self):
         self.mutate(self.base/'verification-index.json',lambda d:d.update(routing_product_verdict='PASS'));self.reject()
     def test_unbound_execution_source_rejected(self):
@@ -76,17 +72,24 @@ class AuditValidationTest(unittest.TestCase):
     def test_path_escape_rejected(self):
         self.mutate(self.path,lambda d:d.update(evidence_directory='../other'));self.reject()
     def test_duplicate_json_key_rejected(self):
-        self.path.write_text('{"schema_version":2,"schema_version":2}')
-        self.reject()
+        self.path.write_text('{"schema_version":2,"schema_version":2}');self.reject()
     def test_duplicate_tsv_header_rejected(self):
         p=self.base/'finding-register.tsv';p.write_text('id\tid\na\ta\n');self.reject()
     def test_missing_unknown_rejected(self):
         self.mutate(self.base/'unknowns.json',lambda d:d['items'].pop());self.reject()
     def test_workflow_count_inflation_rejected(self):
         self.mutate(self.path,lambda d:d['workflow_census'].update(total_workflows=78));self.reject()
+    def test_direct_additions_binding_drift_rejected(self):
+        self.mutate(self.path,lambda d:d.update(coverage_review_additions='organization-audit-20260907/other.tsv'));self.reject()
+    def test_direct_additions_duplicate_base_path_rejected(self):
+        base=(self.base/'coverage-review.tsv').read_text(encoding='utf-8').splitlines()
+        p=self.base/'coverage-review-additions.tsv';header=p.read_text(encoding='utf-8').splitlines()[0]
+        p.write_text(header+'\n'+base[1]+'\n',encoding='utf-8')
+        self.reject()
+    def test_direct_additions_missing_rejected(self):
+        (self.base/'coverage-review-additions.tsv').unlink();self.reject()
     def test_tree_digest_matches_native_git(self):
-        oid='d670460b4b4aece5915caf5c68d12f560a9fe3e4'
-        raw=b'100644 a.txt\0'+bytes.fromhex(oid)
+        oid='d670460b4b4aece5915caf5c68d12f560a9fe3e4';raw=b'100644 a.txt\0'+bytes.fromhex(oid)
         expected=subprocess.run(['git','hash-object','-t','tree','--stdin'],input=raw,stdout=subprocess.PIPE,check=True,timeout=5).stdout.decode().strip()
         self.assertEqual(audit.tree_sha([{'path':'a.txt','mode':'100644','object_sha':oid}]),expected)
     def test_duplicate_inventory_path_rejected(self):
