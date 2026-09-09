@@ -92,11 +92,13 @@ def post_observation(**overrides):
     return routing.PostSubmissionTargetObservation(**values)
 
 
-def route(*, current_attempt=None, current_freeze=None, current_authorization=None, now=NOW):
+def route(*, current_attempt=None, current_freeze=None, current_authorization=None,
+          execution_auth=routing.AUTH_DIRECT_NATIVE, now=NOW):
     return routing.choose_submission_route(
         current_attempt or attempt(),
         current_freeze or freeze(),
         current_authorization or authorization(),
+        execution_auth=execution_auth,
         now_epoch_seconds=now,
     )
 
@@ -123,6 +125,23 @@ def test_merge_async_is_the_only_current_operational_exact_head_route() -> None:
     assert route() == routing.ASYNC_MERGE_QUEUE
 
 
+def test_only_direct_native_or_fine_grained_pat_auth_is_operational() -> None:
+    assert routing.mutation_auth_is_operational(routing.AUTH_DIRECT_NATIVE)
+    assert routing.mutation_auth_is_operational(routing.AUTH_FINE_GRAINED_PAT)
+    for auth in (
+        routing.AUTH_GITHUB_TOKEN,
+        routing.AUTH_CUSTOM_GITHUB_APP,
+        "graphql",
+        "auto_merge",
+        "",
+        None,
+        True,
+    ):
+        assert not routing.mutation_auth_is_operational(auth), auth
+        assert route(execution_auth=auth) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+    assert route(execution_auth=routing.AUTH_FINE_GRAINED_PAT) == routing.ASYNC_MERGE_QUEUE
+
+
 def test_callers_cannot_inject_hypothetical_execution_capabilities() -> None:
     assert not hasattr(routing, "SubmissionCapabilities")
     synthetic = routing.DocumentedQueuePrimitive(
@@ -137,22 +156,20 @@ def test_callers_cannot_inject_hypothetical_execution_capabilities() -> None:
     assert routing.current_documented_operational_routes() == ("merge-async",)
 
 
-def test_merge_async_request_is_exact_head_and_explicit_queue_only() -> None:
-    request = routing.build_merge_async_request(
-        attempt(), freeze(), authorization(), now_epoch_seconds=NOW
-    )
-    assert request is not None
-    assert request.method == "PUT"
-    assert request.endpoint == f"/repos/{REPOSITORY}/pulls/{PR_NUMBER}/merge-async"
-    assert request.repository == REPOSITORY
-    assert request.pr_number == PR_NUMBER
-    assert request.sha == PR_HEAD
-    assert request.merge_action == "merge_queue"
-
+def test_merge_async_request_is_exact_head_explicit_queue_and_auth_bound() -> None:
+    for auth in (routing.AUTH_DIRECT_NATIVE, routing.AUTH_FINE_GRAINED_PAT):
+        request = routing.build_merge_async_request(
+            attempt(), freeze(), authorization(), execution_auth=auth, now_epoch_seconds=NOW
+        )
+        assert request is not None
+        assert request.method == "PUT"
+        assert request.endpoint == f"/repos/{REPOSITORY}/pulls/{PR_NUMBER}/merge-async"
+        assert request.repository == REPOSITORY
+        assert request.pr_number == PR_NUMBER
+        assert request.sha == PR_HEAD
+        assert request.merge_action == "merge_queue"
     assert routing.build_merge_async_request(
-        attempt(),
-        freeze(head_sha=OTHER_HEAD),
-        authorization(),
+        attempt(), freeze(), authorization(), execution_auth=routing.AUTH_GITHUB_TOKEN,
         now_epoch_seconds=NOW,
     ) is None
 
@@ -193,12 +210,10 @@ def test_async_receipt_acceptance_and_reconciliation_semantics() -> None:
     assert routing.verify_async_merge_receipt(
         attempt(), receipt(), now_epoch_seconds=NOW
     ) == routing.SUBMISSION_ACCEPTED
-
     for status in (200, 409):
         assert routing.verify_async_merge_receipt(
             attempt(), receipt(http_status=status, request_uuid=""), now_epoch_seconds=NOW
         ) == routing.RECONCILE_REQUIRED
-
     for changes in (
         {"attempt_id": "attempt-20260909-other"},
         {"repository": "Oteryn/Oteryn-Game"},
@@ -225,17 +240,15 @@ def test_post_submission_target_readback_is_mandatory_and_exact() -> None:
         attempt(), current_receipt, post_observation(), now_epoch_seconds=NOW
     ) == routing.POST_SUBMISSION_TARGET_CONFIRMED
 
-    # Wall-clock seconds are freshness only, never causal-order authority. These
-    # observations share the receipt's epoch second but are causally pre-receipt
-    # or not provably post-receipt and therefore must fail closed.
+    # Causal order comes from the executor-owned sequence, not whole-second time.
     for sequence in (RECEIPT_SEQUENCE - 1, RECEIPT_SEQUENCE):
         assert routing.verify_post_submission_target(
-            attempt(),
-            current_receipt,
-            post_observation(executor_sequence=sequence),
+            attempt(), current_receipt, post_observation(executor_sequence=sequence),
             now_epoch_seconds=NOW,
         ) == routing.BLOCKED_POST_SUBMISSION_TARGET_MISMATCH
 
+    # A readback timestamp before the accepted receipt is stale even if its
+    # sequence was otherwise greater.
     assert routing.verify_post_submission_target(
         attempt(),
         current_receipt,
@@ -259,6 +272,8 @@ def test_post_submission_target_readback_is_mandatory_and_exact() -> None:
             attempt(), current_receipt, post_observation(**changes), now_epoch_seconds=NOW
         ) == routing.BLOCKED_POST_SUBMISSION_TARGET_MISMATCH, changes
 
+    # Reconciliation states are not accepted receipts and therefore cannot be
+    # promoted to a post-submission confirmation.
     assert routing.verify_post_submission_target(
         attempt(), receipt(http_status=409), post_observation(), now_epoch_seconds=NOW
     ) == routing.BLOCKED_RECEIPT_INVALID
@@ -275,21 +290,19 @@ def test_no_generic_auto_merge_direct_merge_or_ambiguous_cleanup_route_exists() 
         assert forbidden not in text, forbidden
 
 
-def test_policy_declares_exact_head_standard_and_residual_risk_truthfully() -> None:
+def test_policy_declares_app_free_auth_and_terminal_proof() -> None:
     text = POLICY.read_text(encoding="utf-8")
     for marker in (
         "Policy version: `3.1.0`",
         "merge_action=\"merge_queue\"",
-        "residual retarget race is narrow but real",
-        "immediately before and immediately after accepted submission",
-        "Post-mutation readback is detection rather than retroactive atomic prevention",
-        "ambiguous automated `dequeuePullRequest` cleanup",
-        "`enablePullRequestAutoMerge` is not a governed agent enqueue capability",
+        "does **not** require or authorize creating a dedicated custom GitHub App",
+        "fine-grained personal access token",
+        "keep built-in `GITHUB_TOKEN` read-only",
+        "Do not use `GITHUB_TOKEN` as the queue mutation credential",
         "`BLOCKED_CAPABILITY_UNAVAILABLE`",
         "`merge_group` aggregate gate",
     ):
         assert marker in text, marker
-
     policy_json = json.loads(POLICY_JSON.read_text(encoding="utf-8"))
     assert policy_json["policy_version"] == "3.1.0"
 
