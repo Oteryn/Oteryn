@@ -24,7 +24,7 @@ EVIDENCE_BLOB = '34361414339a5ca57ec5cd13e332ad196aa9e35f'
 MARKETPLACE_TEST_TREE = '03f7d3735dee4140bf75960f0e106c3ba3d3b37b'
 PREFIX = 'tests/Feature/Marketplace/'
 EXACT_STATEMENT = '**FACT.** The following Marketplace tests were read directly during continuation:'
-ADOPTED_PENDING = 'QUALIFIED_ADOPTED_AS_GROUPED_PENDING_POST_ADOPTION_REVALIDATION'
+ADOPTED = 'QUALIFIED_ADOPTED_AS_GROUPED'
 LEDGER_SHA = '25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617'
 
 EXPECTED_PATH_BLOBS = {
@@ -85,12 +85,13 @@ PROJECTED_LEDGER = {
     'new_grouped_paths': sorted(EXPECTED_PATH_BLOBS),
     'ledger_sha256': LEDGER_SHA, 'outcome': 'PROJECTED_LEDGER_PASS',
 }
+POST_ADOPTION = {'audit_head': 'c67c1e9d7622612affdd431b2af9fae05d0d11ef', 'workflow_run': 34333058684, 'job': 102405922454, 'result': 'PASS', 'canonical_group_state': 'MARKETPLACE_TESTS_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS', 'verifier_unit_tests': 14, 'focused_current_tests': {'test_files': 6, 'junit_files': 3, 'cases': 17, 'assertions': 179, 'failures': 0, 'errors': 0, 'skipped': 0, 'junit': [{'file': 'ordinary.xml', 'cases': 14, 'assertions': 110, 'failures': 0, 'errors': 0, 'skipped': 0}, {'file': 'transfer-concurrency.xml', 'cases': 1, 'assertions': 54, 'failures': 0, 'errors': 0, 'skipped': 0}, {'file': 'transfer.xml', 'cases': 2, 'assertions': 15, 'failures': 0, 'errors': 0, 'skipped': 0}]}, 'php': '8.5.10', 'mariadb': '11.8.9', 'meta_ci_run': 34333058582, 'meta_ci_result': 'SUCCESS', 'ledger_reproduction_run': 34333058620, 'ledger_reproduction_job': 102405921741, 'ledger_reproduction_artifact': 10096546256, 'ledger_sha256': '25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617', 'ledger_counts': {'source_rows': 4325, 'direct_paths': 221, 'grouped_paths': 113, 'unverified_paths': 3991}}
 CANDIDATE_LIMITATIONS = (
     'Adopted only as bounded GROUPED carry-forward after immutable historical direct-read evidence explicitly names all six files, '
     'exact historical/frozen tree/path/blob identity, the exact bound 17-case/179-assertion all-green qualification including both real-MariaDB tests, '
     'and projected-ledger reproduction proving only these six rows transition UNVERIFIED to GROUPED. This does not establish production readiness, '
     'complete Marketplace/payment correctness, later-current-main status, provider remediation, or organization-wide audit completion. '
-    'Post-adoption exact-head qualifier/ledger/META proof and fresh independent review are still required.'
+    'Fresh independent exact-head review remains required.'
 )
 GROUP_SCOPE = (
     'Historical direct-read evidence explicitly names every file in the exact six-file Marketplace test directory; frozen-current carry-forward '
@@ -98,7 +99,7 @@ GROUP_SCOPE = (
 )
 GROUP_LIMITATIONS = (
     'Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, complete Marketplace/payment correctness, '
-    'later-current-main status, provider remediation, or organization-wide audit completion. Post-adoption exact-head proof and fresh independent review remain required.'
+    'later-current-main status, provider remediation, or organization-wide audit completion. Fresh independent exact-head review remains required.'
 )
 
 def require(ok: bool, message: str) -> None:
@@ -130,7 +131,7 @@ def expected_candidate() -> dict:
         'schema_version': 1,
         'candidate_id': GROUP_ID,
         'repository': 'Oteryn/Oteryn-Platform',
-        'state': ADOPTED_PENDING,
+        'state': ADOPTED,
         'expected_total': 6,
         'historical_evidence': {
             'publication_commit': EVIDENCE_COMMIT, 'publication_tree': EVIDENCE_TREE,
@@ -150,6 +151,7 @@ def expected_candidate() -> dict:
         'qualification': PRIMARY,
         'pre_adoption_revalidation': PRE_ADOPTION,
         'projected_ledger': PROJECTED_LEDGER,
+        'post_adoption_revalidation': POST_ADOPTION,
     }
 
 def expected_group() -> dict:
@@ -180,7 +182,8 @@ def expected_group() -> dict:
             'focused_current_tests': PRIMARY['focused_current_tests'],
             'pre_adoption_revalidation': PRE_ADOPTION,
             'projected_ledger': PROJECTED_LEDGER,
-            'outcome': 'ADOPTED_GROUPED_CARRY_FORWARD_PENDING_POST_ADOPTION_REVALIDATION',
+            'post_adoption_revalidation': POST_ADOPTION,
+            'outcome': 'ADOPTED_GROUPED_CARRY_FORWARD',
         },
     }
 
@@ -214,7 +217,18 @@ def expected_index_row() -> dict:
         'projected_grouped_paths': 113,
         'projected_unverified_paths': 3991,
         'qualification': 'BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS',
-        'post_adoption_status': 'PENDING',
+        'post_adoption_head': POST_ADOPTION['audit_head'],
+        'post_adoption_run': POST_ADOPTION['workflow_run'],
+        'post_adoption_job': POST_ADOPTION['job'],
+        'post_adoption_verifier_unit_tests': POST_ADOPTION['verifier_unit_tests'],
+        'post_adoption_meta_ci_run': POST_ADOPTION['meta_ci_run'],
+        'post_adoption_ledger_run': POST_ADOPTION['ledger_reproduction_run'],
+        'post_adoption_ledger_job': POST_ADOPTION['ledger_reproduction_job'],
+        'post_adoption_ledger_artifact': POST_ADOPTION['ledger_reproduction_artifact'],
+        'post_adoption_ledger_sha256': POST_ADOPTION['ledger_sha256'],
+        'post_adoption_grouped_paths': POST_ADOPTION['ledger_counts']['grouped_paths'],
+        'post_adoption_unverified_paths': POST_ADOPTION['ledger_counts']['unverified_paths'],
+        'post_adoption_result': POST_ADOPTION['canonical_group_state'],
     }
 
 def validate_candidate_shape(candidate: dict) -> None:
@@ -291,7 +305,7 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path) -> dict:
     for path in EXPECTED_PATH_BLOBS:
         require(evidence_text.count(f'`{path}`') == 1, f'historical evidence missing/duplicates exact Marketplace test path: {path}')
     return {
-        'result': 'MARKETPLACE_TESTS_GROUPED_ADOPTION_PENDING_POST_ADOPTION_PROOF_NOT_PRODUCT_PASS',
+        'result': 'MARKETPLACE_TESTS_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS',
         'candidate_id': GROUP_ID,
         'historical_source': HISTORICAL_COMMIT,
         'current_source': SOURCE_COMMIT,
@@ -303,9 +317,10 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path) -> dict:
         'primary_qualification': PRIMARY,
         'pre_adoption_revalidation': PRE_ADOPTION,
         'projected_ledger': PROJECTED_LEDGER,
+        'post_adoption_revalidation': POST_ADOPTION,
         'coverage_adopted': True,
         'ledger_sha256': LEDGER_SHA,
-        'next_gate': 'fresh exact-head qualifier + immutable 4,325-row ledger reproduction + META CI; bind those proof coordinates before independent review',
+        'next_gate': 'fresh independent exact-head review; retain temporary qualifier and ledger workflows until review completes',
     }
 
 def main() -> None:

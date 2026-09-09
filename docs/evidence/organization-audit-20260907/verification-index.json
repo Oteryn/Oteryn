@@ -368,6 +368,17 @@
     "projected_grouped_paths": 113,
     "projected_unverified_paths": 3991,
     "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS",
-    "post_adoption_status": "PENDING"
+    "post_adoption_head": "c67c1e9d7622612affdd431b2af9fae05d0d11ef",
+    "post_adoption_run": 34333058684,
+    "post_adoption_job": 102405922454,
+    "post_adoption_verifier_unit_tests": 14,
+    "post_adoption_meta_ci_run": 34333058582,
+    "post_adoption_ledger_run": 34333058620,
+    "post_adoption_ledger_job": 102405921741,
+    "post_adoption_ledger_artifact": 10096546256,
+    "post_adoption_ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
+    "post_adoption_grouped_paths": 113,
+    "post_adoption_unverified_paths": 3991,
+    "post_adoption_result": "MARKETPLACE_TESTS_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS"
   }
 }

@@ -73,8 +73,12 @@ class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'candidate canonical'):
                 verifier.validate_candidate_shape(data)
 
-    def test_post_adoption_preclaim_fails_closed(self):
-        d=self.candidate(); d['post_adoption_revalidation']={'result':'PASS'}
+    def test_post_adoption_evidence_drift_fails_closed(self):
+        for key, value in (('audit_head','0'*40),('workflow_run',1),('job',1),('verifier_unit_tests',13),('meta_ci_result','FAILURE'),('ledger_reproduction_artifact',1),('ledger_sha256','0'*64)):
+            d=self.candidate(); d['post_adoption_revalidation'][key]=value
+            with self.assertRaisesRegex(ValueError,'candidate canonical'):
+                verifier.validate_candidate_shape(d)
+        d=self.candidate(); d['post_adoption_revalidation']['ledger_counts']['grouped_paths']=112
         with self.assertRaisesRegex(ValueError,'candidate canonical'):
             verifier.validate_candidate_shape(d)
 
@@ -90,10 +94,13 @@ class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
             verifier.validate_group_state(g)
 
     def test_group_evaluation_or_projected_proof_drift_fails_closed(self):
-        g=self.groups(); row=next(x for x in g['groups'] if x.get('id')==verifier.GROUP_ID); row['evaluation']['outcome']='ADOPTED_GROUPED_CARRY_FORWARD'
+        g=self.groups(); row=next(x for x in g['groups'] if x.get('id')==verifier.GROUP_ID); row['evaluation']['outcome']='BROKEN'
         with self.assertRaisesRegex(ValueError,'canonical group drift'):
             verifier.validate_group_state(g)
         g=self.groups(); row=next(x for x in g['groups'] if x.get('id')==verifier.GROUP_ID); row['evaluation']['projected_ledger']['artifact']+=1
+        with self.assertRaisesRegex(ValueError,'canonical group drift'):
+            verifier.validate_group_state(g)
+        g=self.groups(); row=next(x for x in g['groups'] if x.get('id')==verifier.GROUP_ID); row['evaluation']['post_adoption_revalidation']['workflow_run']+=1
         with self.assertRaisesRegex(ValueError,'canonical group drift'):
             verifier.validate_group_state(g)
 
@@ -118,6 +125,8 @@ class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
         i=self.index()
         self.assertTrue(verifier.json_exact(i['r3_platform_marketplace_tests_qualification'],verifier.expected_index_row()))
         i['r3_platform_marketplace_tests_qualification']['projected_ledger_sha256']='0'*64
+        self.assertFalse(verifier.json_exact(i['r3_platform_marketplace_tests_qualification'],verifier.expected_index_row()))
+        i=self.index(); i['r3_platform_marketplace_tests_qualification']['post_adoption_ledger_artifact']+=1
         self.assertFalse(verifier.json_exact(i['r3_platform_marketplace_tests_qualification'],verifier.expected_index_row()))
 
     def test_strict_json_types_reject_bool_integer_alias(self):

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "candidate_id": "PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD",
   "repository": "Oteryn/Oteryn-Platform",
-  "state": "QUALIFIED_ADOPTED_AS_GROUPED_PENDING_POST_ADOPTION_REVALIDATION",
+  "state": "QUALIFIED_ADOPTED_AS_GROUPED",
   "expected_total": 6,
   "historical_evidence": {
     "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
@@ -46,7 +46,7 @@
     ]
   },
   "coverage_adopted": true,
-  "limitations": "Adopted only as bounded GROUPED carry-forward after immutable historical direct-read evidence explicitly names all six files, exact historical/frozen tree/path/blob identity, the exact bound 17-case/179-assertion all-green qualification including both real-MariaDB tests, and projected-ledger reproduction proving only these six rows transition UNVERIFIED to GROUPED. This does not establish production readiness, complete Marketplace/payment correctness, later-current-main status, provider remediation, or organization-wide audit completion. Post-adoption exact-head qualifier/ledger/META proof and fresh independent review are still required.",
+  "limitations": "Adopted only as bounded GROUPED carry-forward after immutable historical direct-read evidence explicitly names all six files, exact historical/frozen tree/path/blob identity, the exact bound 17-case/179-assertion all-green qualification including both real-MariaDB tests, and projected-ledger reproduction proving only these six rows transition UNVERIFIED to GROUPED. This does not establish production readiness, complete Marketplace/payment correctness, later-current-main status, provider remediation, or organization-wide audit completion. Fresh independent exact-head review remains required.",
   "qualification": {
     "qualification_head": "f54e5b0640945d7a5f0a7c471ac81105436214ae",
     "workflow_run": 34323945126,
@@ -159,5 +159,62 @@
     ],
     "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
     "outcome": "PROJECTED_LEDGER_PASS"
+  },
+  "post_adoption_revalidation": {
+    "audit_head": "c67c1e9d7622612affdd431b2af9fae05d0d11ef",
+    "workflow_run": 34333058684,
+    "job": 102405922454,
+    "result": "PASS",
+    "canonical_group_state": "MARKETPLACE_TESTS_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS",
+    "verifier_unit_tests": 14,
+    "focused_current_tests": {
+      "test_files": 6,
+      "junit_files": 3,
+      "cases": 17,
+      "assertions": 179,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit": [
+        {
+          "file": "ordinary.xml",
+          "cases": 14,
+          "assertions": 110,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "file": "transfer-concurrency.xml",
+          "cases": 1,
+          "assertions": 54,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "file": "transfer.xml",
+          "cases": 2,
+          "assertions": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "php": "8.5.10",
+    "mariadb": "11.8.9",
+    "meta_ci_run": 34333058582,
+    "meta_ci_result": "SUCCESS",
+    "ledger_reproduction_run": 34333058620,
+    "ledger_reproduction_job": 102405921741,
+    "ledger_reproduction_artifact": 10096546256,
+    "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
+    "ledger_counts": {
+      "source_rows": 4325,
+      "direct_paths": 221,
+      "grouped_paths": 113,
+      "unverified_paths": 3991
+    }
   }
 }
