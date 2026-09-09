@@ -95,9 +95,7 @@ class FakeClient:
         self.pull_response = pull_response if pull_response is not None else pull()
         self.check_response = check_response if check_response is not None else checks()
         self.existing_entry = existing_entry
-        self.mutation_entry = (
-            mutation_entry if mutation_entry is not None else queue_entry(include_pull=True)
-        )
+        self.mutation_entry = mutation_entry if mutation_entry is not None else queue_entry(include_pull=True)
         self.mutation_client_id = mutation_client_id
         self.rest_calls = []
         self.graphql_calls = []
@@ -161,7 +159,6 @@ def test_command_parser_is_closed_and_target_allowlisted() -> None:
     assert parsed.pr_number == PR_NUMBER
     assert parsed.expected_head_sha == HEAD
     assert parsed.required_gate == "platform-gate"
-
     for bad in (
         "",
         f"{executor.COMMAND_PREFIX} short {REPOSITORY} {PR_NUMBER} {HEAD}",
@@ -182,7 +179,7 @@ def test_control_actor_requires_exact_endpoint_and_current_write_permission() ->
         actual_control_repository=executor.CONTROL_REPOSITORY,
         actual_control_issue=executor.CONTROL_ISSUE,
     ) == "write"
-    assert client.rest_calls[-1][1].endswith("/collaborators/blakinio/permission")
+    assert client.rest_calls[-1][1].endswith("/repos/Oteryn/Oteryn/collaborators/blakinio/permission")
 
     for permission in ("read", "triage", "none", None):
         denied = FakeClient(permission=permission)
@@ -195,7 +192,6 @@ def test_control_actor_requires_exact_endpoint_and_current_write_permission() ->
             ),
             "lacks current write/maintain/admin",
         )
-
     assert_submission_error(
         lambda: executor.authorize_actor(
             FakeClient(),
@@ -214,6 +210,29 @@ def test_control_actor_requires_exact_endpoint_and_current_write_permission() ->
         ),
         "canonical control endpoint",
     )
+
+
+def test_target_actor_requires_current_target_repository_write_permission() -> None:
+    client = FakeClient(permission="maintain")
+    assert executor.authorize_target_actor(client, request(), actor="blakinio") == "maintain"
+    assert client.rest_calls[-1][1].endswith(
+        "/repos/Oteryn/Oteryn-Platform/collaborators/blakinio/permission"
+    )
+    for permission in ("read", "triage", "none", None):
+        denied = FakeClient(permission=permission)
+        assert_submission_error(
+            lambda denied=denied: executor.authorize_target_actor(
+                denied, request(), actor="reader"
+            ),
+            "target repository Oteryn/Oteryn-Platform",
+        )
+    for actor in ("", "bad/name", None):
+        assert_submission_error(
+            lambda actor=actor: executor.authorize_target_actor(
+                FakeClient(), request(), actor=actor
+            ),
+            "invalid comment actor",
+        )
 
 
 def test_pull_qualification_binds_open_ready_same_repo_main_exact_head_and_gate() -> None:
@@ -272,12 +291,10 @@ def test_enqueue_mutation_uses_expected_head_and_attempt_id_and_binds_response()
         "expectedHeadOid": HEAD,
         "clientMutationId": ATTEMPT_ID,
     }
-    mutation_text = executor.ENQUEUE_MUTATION
-    assert "enqueuePullRequest" in mutation_text
-    assert "expectedHeadOid" in mutation_text
-    assert "clientMutationId" in mutation_text
+    for marker in ("enqueuePullRequest", "expectedHeadOid", "clientMutationId"):
+        assert marker in executor.ENQUEUE_MUTATION
     for forbidden in ("enablePullRequestAutoMerge", "mergePullRequest", "direct_merge"):
-        assert forbidden not in mutation_text
+        assert forbidden not in executor.ENQUEUE_MUTATION
 
 
 def test_queue_and_mutation_response_identity_fail_closed() -> None:
@@ -287,8 +304,7 @@ def test_queue_and_mutation_response_identity_fail_closed() -> None:
         queue_identity(id=""),
     )
     for bad_queue in bad_queues:
-        entry = queue_entry(mergeQueue=bad_queue)
-        client = FakeClient(existing_entry=entry)
+        client = FakeClient(existing_entry=queue_entry(mergeQueue=bad_queue))
         pull_result = executor.qualify_pull_request(client, request())
         assert_submission_error(
             lambda client=client, pull_result=pull_result: executor.enqueue_pull_request(
@@ -298,10 +314,7 @@ def test_queue_and_mutation_response_identity_fail_closed() -> None:
         )
 
     wrong_pull_entry = queue_entry(include_pull=True)
-    wrong_pull_entry["pullRequest"] = {
-        **wrong_pull_entry["pullRequest"],
-        "headRefOid": OTHER_HEAD,
-    }
+    wrong_pull_entry["pullRequest"] = {**wrong_pull_entry["pullRequest"], "headRefOid": OTHER_HEAD}
     client = FakeClient(existing_entry=None, mutation_entry=wrong_pull_entry)
     pull_result = executor.qualify_pull_request(client, request())
     assert_submission_error(
@@ -318,8 +331,7 @@ def test_queue_and_mutation_response_identity_fail_closed() -> None:
 
 
 def test_receipt_contains_only_exact_submission_coordinates() -> None:
-    result = executor.receipt(request(), status="ENQUEUED", entry=queue_entry())
-    assert result == {
+    assert executor.receipt(request(), status="ENQUEUED", entry=queue_entry()) == {
         "schema": "OTERYN_MQ_SUBMISSION_V1",
         "status": "ENQUEUED",
         "attempt_id": ATTEMPT_ID,
@@ -344,6 +356,7 @@ def test_workflow_is_protected_comment_triggered_least_privilege_and_exact_targe
         "types: [created]",
         "github.event.issue.number == 190",
         "!github.event.issue.pull_request",
+        "github.event.comment.author_association",
         "startsWith(github.event.comment.body, '/oteryn-mq-submit ')",
         "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
         "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
@@ -355,11 +368,12 @@ def test_workflow_is_protected_comment_triggered_least_privilege_and_exact_targe
         "permission-merge-queues: write",
         "CONTROL_GITHUB_TOKEN: ${{ github.token }}",
         "MQ_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}",
+        "COMMENT_ACTOR: ${{ github.event.comment.user.login }}",
+        "--actor \"$COMMENT_ACTOR\"",
         "OTERYN_MQ_APP_CLIENT_ID",
         "OTERYN_MQ_APP_PRIVATE_KEY",
     ):
         assert marker in text, marker
-
     assert text.index("Authorize current control-endpoint actor") < text.index(
         "Mint target-repository Merge Queue App token"
     )
@@ -382,6 +396,7 @@ def test_executor_has_no_direct_merge_or_generic_auto_merge_operation() -> None:
     text = MODULE_PATH.read_text(encoding="utf-8")
     assert "enqueuePullRequest" in text
     assert "expectedHeadOid" in text
+    assert "authorize_target_actor" in text
     for forbidden in (
         "enablePullRequestAutoMerge",
         "mergePullRequest(input",
