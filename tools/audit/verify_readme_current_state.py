@@ -33,11 +33,12 @@ EXPECTED_DURABILITY_CLOSEOUT = (
     'Marketplace/Payments/Wallet qualification, ledger-reproduction and projection workflows and the six-file '
     'Marketplace-test temporary proof workflows were removed after their completed review/cleanup. The '
     'Announcements pre-adoption qualification and projection workflows are removed after their bound successful '
-    'runs; canonical adoption is verified by the temporary Platform Announcements adopted-proof workflow. The '
-    'current tree retains two bounded audit-proof workflows: the Platform audit-recorder adopted-proof workflow '
-    'and the Platform Announcements adopted-proof workflow. Their independent-review lifecycle/outcome is external '
-    'PR #185 metadata, and PR #185 remains Draft. No provider writes, deployment, new required gate, automatic '
-    'background worker, full semantic completion, product readiness, or self-awarded score is implied.'
+    'runs. The temporary Platform audit-recorder adopted-proof workflow and temporary Platform Announcements '
+    'adopted-proof workflow are also absent after their bounded exact-head proof lifecycle. The current tree '
+    'retains no bounded audit-proof workflows. Historical Actions run/artifact provenance remains external GitHub '
+    'Actions metadata; mutable independent-review lifecycle/outcome remains external PR #185 metadata, and PR #185 '
+    'remains Draft. No provider writes, deployment, new required gate, automatic background worker, full semantic '
+    'completion, product readiness, or self-awarded score is implied.'
 )
 STALE_MARKERS = (
     '221 DIRECT scoped path reviews',
@@ -49,6 +50,8 @@ STALE_MARKERS = (
     'Temporary Marketplace/Payments/Wallet qualification, ledger-reproduction and projection workflows remain',
     '49-path adoption is rebound and independently reviewed',
     'only the temporary Platform audit-recorder adopted-proof workflow remains',
+    'canonical adoption is verified by the temporary Platform Announcements adopted-proof workflow',
+    'The current tree retains two bounded audit-proof workflows',
 )
 
 
@@ -92,10 +95,7 @@ def validate_text(text: str) -> dict[str, object]:
         'grouped_paths': 113,
         'unverified_paths': 3979,
         'semantically_classified_paths': 346,
-        'remaining_bounded_proof_workflows': [
-            'organization-audit-platform-audit-recorders-qualification.yml',
-            'organization-audit-platform-announcements-adopted-proof.yml',
-        ],
+        'remaining_bounded_proof_workflows': [],
         'product_readiness_claimed': False,
         'audit_completion_claimed': False,
     }

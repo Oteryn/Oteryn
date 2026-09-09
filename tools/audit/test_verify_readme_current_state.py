@@ -25,10 +25,7 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         self.assertEqual(result['grouped_paths'], 113)
         self.assertEqual(result['unverified_paths'], 3979)
         self.assertEqual(result['semantically_classified_paths'], 346)
-        self.assertEqual(result['remaining_bounded_proof_workflows'], [
-            'organization-audit-platform-audit-recorders-qualification.yml',
-            'organization-audit-platform-announcements-adopted-proof.yml',
-        ])
+        self.assertEqual(result['remaining_bounded_proof_workflows'], [])
         self.assertFalse(result['product_readiness_claimed'])
         self.assertFalse(result['audit_completion_claimed'])
 
@@ -55,8 +52,16 @@ class ReadmeCurrentStateTest(unittest.TestCase):
 
     def test_announcements_pre_adoption_workflow_wording_rejected(self):
         mutated = self.current.replace(
-            'The Announcements pre-adoption qualification and projection workflows are removed after their bound successful runs; canonical adoption is verified by the temporary Platform Announcements adopted-proof workflow.',
+            'The Announcements pre-adoption qualification and projection workflows are removed after their bound successful runs.',
             'The Announcements pre-adoption qualification and projection workflows remain active.',
+            1,
+        )
+        self.reject(mutated)
+
+    def test_terminal_bounded_proof_workflow_wording_rejected(self):
+        mutated = self.current.replace(
+            'The current tree retains no bounded audit-proof workflows.',
+            'The current tree retains two bounded audit-proof workflows: the Platform audit-recorder adopted-proof workflow and the Platform Announcements adopted-proof workflow.',
             1,
         )
         self.reject(mutated)
