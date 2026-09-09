@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Fail-closed routing for GitHub-native Merge Queue submission capabilities.
+"""Fail-closed routing for exact-target GitHub Merge Queue submission.
 
-The preferred route is GitHub's asynchronous pull-request merge API with an
-exact `sha` fence and `merge_action="merge_queue"`. Explicit GraphQL enqueue
-and a trusted protected-default-branch executor remain safe fallbacks. Generic
-auto-merge and direct merge are intentionally not representable.
+A governed autonomous submission must bind both the qualified PR head and the
+intended base/queue at the mutation boundary. Post-mutation readback cannot make
+an already-applied wrong-base enqueue safe under concurrency. Generic auto-merge
+and direct merge are intentionally not representable.
 """
 
 from __future__ import annotations
@@ -73,21 +73,27 @@ class SubmissionAuthorization(NamedTuple):
 
 
 class SubmissionCapabilities(NamedTuple):
-    """Authenticated facts about queue-specific operations exposed by the caller."""
+    """Authenticated mutation guarantees exposed by the caller.
+
+    The expected-base fields mean a server-side/atomic precondition on the same
+    mutation that adds the PR to a queue. A preceding base read or a later queue
+    readback does not satisfy these fields.
+    """
 
     async_merge_available: bool
     async_merge_expected_head_fence: bool
+    async_merge_expected_base_fence: bool
     async_merge_merge_queue_action: bool
     explicit_enqueue_available: bool
     explicit_enqueue_expected_head_fence: bool
+    explicit_enqueue_expected_base_fence: bool
     protected_executor_available: bool
     protected_executor_expected_head_fence: bool
+    protected_executor_expected_base_fence: bool
     protected_executor_trusted_default_branch: bool
 
 
 class AsyncMergeReceipt(NamedTuple):
-    """Immediate receipt from PUT .../pulls/{number}/merge-async."""
-
     route: str
     attempt_id: str
     repository: str
@@ -101,13 +107,6 @@ class AsyncMergeReceipt(NamedTuple):
 
 
 class EnqueueReceipt(NamedTuple):
-    """Immediate receipt from exact GraphQL enqueuePullRequest.
-
-    Queue identity is retained rather than reduced to a queue-entry ID. This is
-    required because repository/PR/head fields can otherwise be copied around an
-    entry that actually belongs to another base queue.
-    """
-
     route: str
     attempt_id: str
     repository: str
@@ -240,7 +239,7 @@ def choose_submission_route(
     *,
     now_epoch_seconds: int,
 ) -> str:
-    """Choose the simplest safe queue-specific operation for one exact target."""
+    """Choose only a queue route that atomically fences exact head and base."""
     if not _valid_attempt(attempt) or not _valid_capabilities(capabilities):
         return BLOCKED_STALE_STATE
     if not _authorization_matches(
@@ -259,6 +258,7 @@ def choose_submission_route(
     if (
         capabilities.async_merge_available
         and capabilities.async_merge_expected_head_fence
+        and capabilities.async_merge_expected_base_fence
         and capabilities.async_merge_merge_queue_action
     ):
         return ASYNC_MERGE_QUEUE
@@ -266,12 +266,14 @@ def choose_submission_route(
     if (
         capabilities.explicit_enqueue_available
         and capabilities.explicit_enqueue_expected_head_fence
+        and capabilities.explicit_enqueue_expected_base_fence
     ):
         return EXPLICIT_ENQUEUE
 
     if (
         capabilities.protected_executor_available
         and capabilities.protected_executor_expected_head_fence
+        and capabilities.protected_executor_expected_base_fence
         and capabilities.protected_executor_trusted_default_branch
     ):
         return PROTECTED_EXECUTOR_ENQUEUE
@@ -286,7 +288,7 @@ def verify_async_merge_receipt(
     submission_started_at_epoch_seconds: int,
     now_epoch_seconds: int,
 ) -> str:
-    """Validate a newly accepted exact-head Merge Queue async request."""
+    """Validate the immediate receipt only after a base-fenced route was selected."""
     if not _valid_attempt(attempt) or not isinstance(receipt, AsyncMergeReceipt):
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
     if not _valid_time_window(
@@ -319,7 +321,7 @@ def verify_enqueue_receipt(
     submission_started_at_epoch_seconds: int,
     now_epoch_seconds: int,
 ) -> str:
-    """Accept only an exact-target, exact-main-queue enqueue receipt."""
+    """Accept only an exact-target, exact-main-queue receipt after a safe route."""
     if not isinstance(route, str) or route not in {
         EXPLICIT_ENQUEUE,
         PROTECTED_EXECUTOR_ENQUEUE,
