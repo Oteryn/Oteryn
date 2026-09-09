@@ -110,6 +110,9 @@ class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
         mutations = [
             text.replace(verifier.MARKETPLACE_CLOSEOUT, 'The Marketplace batch still needs review.', 1),
             text.replace(verifier.MARKETPLACE_CLOSEOUT, verifier.MARKETPLACE_CLOSEOUT + ' This batch establishes production readiness.', 1),
+            text.replace(verifier.MARKETPLACE_CLOSEOUT, verifier.MARKETPLACE_CLOSEOUT + ' This batch establishes full product readiness.', 1),
+            text.replace(verifier.MARKETPLACE_CLOSEOUT, verifier.MARKETPLACE_CLOSEOUT + ' This batch is still awaiting independent review.', 1),
+            text.replace(verifier.MARKETPLACE_CLOSEOUT, verifier.MARKETPLACE_CLOSEOUT + ' Arbitrary contradictory closeout.', 1),
             text + '\n\n' + verifier.MARKETPLACE_CLOSEOUT + '\n',
         ]
         for stale in verifier.STALE_MARKETPLACE_GATES:

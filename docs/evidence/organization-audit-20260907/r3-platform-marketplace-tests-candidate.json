@@ -46,7 +46,7 @@
     ]
   },
   "coverage_adopted": true,
-  "limitations": "Adopted only as bounded GROUPED carry-forward after immutable historical direct-read evidence explicitly names all six files, exact historical/frozen tree/path/blob identity, the exact bound 17-case/179-assertion all-green qualification including both real-MariaDB tests, and projected-ledger reproduction proving only these six rows transition UNVERIFIED to GROUPED. This does not establish production readiness, complete Marketplace/payment correctness, later-current-main status, provider remediation, or organization-wide audit completion. Fresh independent exact-head review remains required.",
+  "limitations": "Adopted only as bounded GROUPED carry-forward after immutable historical direct-read evidence explicitly names all six files, exact historical/frozen tree/path/blob identity, the exact bound 17-case/179-assertion all-green qualification including both real-MariaDB tests, and projected-ledger reproduction proving only these six rows transition UNVERIFIED to GROUPED. Fresh independent exact-head review completed at 7f53b509791aae6d56637522aee65891e449914c with no new P0/P1/P2; the temporary qualifier and ledger workflows were removed at cleanup head fbe839699782ad1d6df7a5841162d4a467d60c10. This does not establish production readiness, complete Marketplace/payment correctness, later-current-main status, provider remediation, or organization-wide audit completion.",
   "qualification": {
     "qualification_head": "f54e5b0640945d7a5f0a7c471ac81105436214ae",
     "workflow_run": 34323945126,

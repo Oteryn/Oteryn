@@ -108,17 +108,20 @@ POST_ADOPTION = {
 CANDIDATE_LIMITATIONS = (
     'Adopted only as bounded GROUPED carry-forward after immutable historical direct-read evidence explicitly names all six files, '
     'exact historical/frozen tree/path/blob identity, the exact bound 17-case/179-assertion all-green qualification including both real-MariaDB tests, '
-    'and projected-ledger reproduction proving only these six rows transition UNVERIFIED to GROUPED. This does not establish production readiness, '
-    'complete Marketplace/payment correctness, later-current-main status, provider remediation, or organization-wide audit completion. '
-    'Fresh independent exact-head review remains required.'
+    'and projected-ledger reproduction proving only these six rows transition UNVERIFIED to GROUPED. Fresh independent exact-head review completed at '
+    '7f53b509791aae6d56637522aee65891e449914c with no new P0/P1/P2; the temporary qualifier and ledger workflows were removed at cleanup head '
+    'fbe839699782ad1d6df7a5841162d4a467d60c10. This does not establish production readiness, complete Marketplace/payment correctness, '
+    'later-current-main status, provider remediation, or organization-wide audit completion.'
 )
 GROUP_SCOPE = (
     'Historical direct-read evidence explicitly names every file in the exact six-file Marketplace test directory; frozen-current carry-forward '
     'is bounded by exact tree/path/blob identity and the bound 17-case/179-assertion all-green qualification including both real-MariaDB tests.'
 )
 GROUP_LIMITATIONS = (
-    'Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, complete Marketplace/payment correctness, '
-    'later-current-main status, provider remediation, or organization-wide audit completion. Fresh independent exact-head review remains required.'
+    'Adopted only as bounded GROUPED carry-forward. Fresh independent exact-head review completed at '
+    '7f53b509791aae6d56637522aee65891e449914c with no new P0/P1/P2; the temporary qualifier and ledger workflows were removed at cleanup head '
+    'fbe839699782ad1d6df7a5841162d4a467d60c10. This does not establish production readiness, complete Marketplace/payment correctness, '
+    'later-current-main status, provider remediation, or organization-wide audit completion.'
 )
 
 
@@ -231,11 +234,12 @@ def validate_group_state(groups_doc: dict) -> None:
 
 
 def validate_companion_report_text(text: str) -> None:
-    require(text.count(MARKETPLACE_CLOSEOUT) == 1, 'Marketplace-test companion Markdown closeout missing/duplicated/drifted')
+    paragraphs = [paragraph.replace('\n', ' ').strip() for paragraph in text.split('\n\n')]
+    closeout_paragraphs = [paragraph for paragraph in paragraphs if MARKETPLACE_CLOSEOUT in paragraph]
+    require(closeout_paragraphs == [MARKETPLACE_CLOSEOUT],
+            'Marketplace-test companion Markdown complete closeout paragraph missing/duplicated/drifted')
     for stale in STALE_MARKETPLACE_GATES:
         require(stale not in text, 'Marketplace-test companion Markdown retains stale review/workflow gate')
-    marker = MARKETPLACE_CLOSEOUT + ' This batch establishes production readiness.'
-    require(marker not in text, 'Marketplace-test companion Markdown appends product-readiness claim')
 
 
 def validate_accounting(audit_root: Path) -> None:
