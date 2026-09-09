@@ -56,7 +56,8 @@ def checks(**kw):
 class FakeClient:
     def __init__(self, *, permissions=None, pull_response=None, check_response=None,
                  existing_entry=None, mutation_entry=None, mutation_client_id=ATTEMPT_ID,
-                 fail_dequeue=False):
+                 fail_dequeue=False, mutation_error=None,
+                 concurrent_entry_on_mutation_error=None):
         self.permissions = permissions or {
             "Oteryn/Oteryn": "admin",
             REPOSITORY: "write",
@@ -64,9 +65,12 @@ class FakeClient:
         self.pull_response = pull_response if pull_response is not None else pull()
         self.check_response = check_response if check_response is not None else checks()
         self.current_entry = existing_entry
+        self.current_head = HEAD
         self.mutation_entry = mutation_entry if mutation_entry is not None else queue_entry(include_pull=True)
         self.mutation_client_id = mutation_client_id
         self.fail_dequeue = fail_dequeue
+        self.mutation_error = mutation_error
+        self.concurrent_entry_on_mutation_error = concurrent_entry_on_mutation_error
         self.rest_calls = []
         self.graphql_calls = []
 
@@ -89,11 +93,16 @@ class FakeClient:
             if self.current_entry and self.current_entry.get("pullRequest"):
                 base = self.current_entry["pullRequest"].get("baseRefName", "main")
             return {"node": {
-                "id": "PR_node_1378", "number": PR_NUMBER, "headRefOid": HEAD,
+                "id": "PR_node_1378", "number": PR_NUMBER, "headRefOid": self.current_head,
                 "baseRefName": base, "repository": {"nameWithOwner": REPOSITORY},
                 "mergeQueueEntry": self.current_entry,
             }}
         if query == executor.ENQUEUE_MUTATION:
+            if self.mutation_error is not None:
+                if self.concurrent_entry_on_mutation_error is not None:
+                    self.current_entry = self.concurrent_entry_on_mutation_error
+                    self.current_head = OTHER_HEAD
+                raise executor.SubmissionError(self.mutation_error)
             self.current_entry = self.mutation_entry
             return {"enqueuePullRequest": {
                 "clientMutationId": self.mutation_client_id,
@@ -199,6 +208,24 @@ def test_base_or_queue_race_is_reconciled_by_dequeue():
                  "reconciled/dequeued")
     assert client.current_entry is None
     assert any(qry == executor.DEQUEUE_MUTATION for qry, _ in client.graphql_calls)
+
+
+def test_failed_enqueue_preserves_concurrent_new_head_entry():
+    concurrent = queue_entry(include_pull=True, id="MQE_new_head_002")
+    concurrent["pullRequest"] = {
+        **concurrent["pullRequest"],
+        "headRefOid": OTHER_HEAD,
+    }
+    client = FakeClient(
+        mutation_error="expectedHeadOid mismatch after concurrent push",
+        concurrent_entry_on_mutation_error=concurrent,
+    )
+    q = executor.qualify_pull_request(client, request())
+    assert_error(lambda: executor.enqueue_pull_request(client, request(), q),
+                 "concurrent entries were left untouched")
+    assert client.current_entry is concurrent
+    assert client.current_head == OTHER_HEAD
+    assert not any(qry == executor.DEQUEUE_MUTATION for qry, _ in client.graphql_calls)
 
 
 def test_failed_reconciliation_is_material_failure():
