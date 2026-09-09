@@ -1,6 +1,6 @@
 # Oteryn Prompt Evaluation Standard
 
-Policy: `OTERYN_ORGANIZATION_AGENT_POLICY@3.0.0`
+Policy: `OTERYN_ORGANIZATION_AGENT_POLICY@3.1.0`
 
 Evaluate material instruction/harness changes with the same representative cases before and after the change. Optimize the cost of correctly completed tasks, not Markdown size alone.
 
