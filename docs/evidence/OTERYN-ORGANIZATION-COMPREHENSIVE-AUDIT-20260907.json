@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "report_id": "OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907",
-  "revision": "R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-107",
+  "revision": "R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113",
   "status": "QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE",
   "governing_issue": "Oteryn/Oteryn#186",
   "pull_request": "Oteryn/Oteryn#185",
@@ -118,8 +118,8 @@
     "GAME-CANDIDATE-361"
   ],
   "scoped_review_paths": 221,
-  "grouped_revalidated_paths": 107,
-  "semantically_classified_paths": 328,
+  "grouped_revalidated_paths": 113,
+  "semantically_classified_paths": 334,
   "r3_native_results": "organization-audit-20260907/r3-native-results.json",
   "r3_source_review": "organization-audit-20260907/r3-source-review.md",
   "r3_visual_review": "organization-audit-20260907/r3-visual-review.json",
@@ -144,7 +144,7 @@
       "gameauth_review_threads_resolved_after_readback": 2,
       "account_character_batch_review": "PASS_NO_NEW_P0_P1_P2"
     },
-    "fresh_rereview_reason": "The 49-path Platform Marketplace/Payments/Wallet GROUPED expansion and its exact qualification/accounting machinery are material evidence added after the clean f7f200bd account/character review."
+    "fresh_rereview_reason": "The exact six-file Platform Marketplace test GROUPED expansion is new material after the clean d34f3ac Marketplace/Payments/Wallet production-code re-review; fresh independent exact-head review is required after post-adoption qualifier/ledger/META proof is bound."
   },
   "audit_completion": "NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial",
   "source_cut_policy": "Immutable original pinned generations are retained. Later lifecycle observations are separate evidence; this is not an all-repositories current-main acceptance snapshot.",
@@ -153,5 +153,6 @@
   "r3_platform_gameauth_candidate": "organization-audit-20260907/r3-platform-gameauth-candidate.json",
   "r3_continuation_checkpoint": "organization-audit-20260907/r3-continuation-checkpoint-20260908.json",
   "r3_platform_account_character_candidate": "organization-audit-20260907/r3-platform-account-character-candidate.json",
-  "r3_platform_marketplace_payments_wallet_candidate": "organization-audit-20260907/r3-platform-marketplace-payments-wallet-candidate.json"
+  "r3_platform_marketplace_payments_wallet_candidate": "organization-audit-20260907/r3-platform-marketplace-payments-wallet-candidate.json",
+  "r3_platform_marketplace_tests_candidate": "organization-audit-20260907/r3-platform-marketplace-tests-candidate.json"
 }

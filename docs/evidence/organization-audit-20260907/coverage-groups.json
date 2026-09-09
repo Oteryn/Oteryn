@@ -901,6 +901,168 @@
         },
         "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
       }
+    },
+    {
+      "id": "PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD",
+      "repository": "platform",
+      "disposition": "GROUPED",
+      "path_prefix": "tests/Feature/Marketplace/",
+      "expected_count": 6,
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Historical direct-read evidence explicitly names every file in the exact six-file Marketplace test directory; frozen-current carry-forward is bounded by exact tree/path/blob identity and the bound 17-case/179-assertion all-green qualification including both real-MariaDB tests.",
+      "limitations": "Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, complete Marketplace/payment correctness, later-current-main status, provider remediation, or organization-wide audit completion. Post-adoption exact-head proof and fresh independent review remain required.",
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Platform",
+        "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+        "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+        "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+        "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+        "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+        "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+        "exact_statement": "**FACT.** The following Marketplace tests were read directly during continuation:",
+        "pattern": "tests/Feature/Marketplace/**",
+        "count": 6,
+        "basis": "immutable historical evidence explicitly names every file in the six-file Marketplace test directory"
+      },
+      "current_revalidation": {
+        "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "family_tree": "03f7d3735dee4140bf75960f0e106c3ba3d3b37b",
+        "changed_paths_under_group_prefix": 0,
+        "historical_to_current_compare_status": "ahead",
+        "current_blobs": {
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php": "f9b9a17d34003132acf877a9755b998d6cfa5403",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php": "14aa475be873476523eae72775b02acad956c8df",
+          "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php": "41df060eb0b14828e6331aa78e86e6f1a27b5334",
+          "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php": "a3e70ea8019ceaa636afd3c4030c84190c68e077",
+          "tests/Feature/Marketplace/MarketplaceModuleTest.php": "cd545576fba348f5f17e5e527882e8b4c142c6ad",
+          "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php": "e1a8bd57d63a9c86427f0d0140e23147147b6dd2"
+        },
+        "required_checks": [
+          "historical audit publication commit/tree/evidence blob match exactly",
+          "historical evidence contains the direct-read statement and all six exact Marketplace test paths",
+          "historical and frozen-current Marketplace test directory tree SHAs are identical",
+          "both generations contain exactly the same six regular files and exact blob identities",
+          "the exact frozen-current six-file qualification is bound to its exact head/run/job and JUnit totals",
+          "fresh frozen-current execution repeats all six files with zero failures/errors/skips including both real-MariaDB tests"
+        ],
+        "focused_test_files": [
+          "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php",
+          "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php",
+          "tests/Feature/Marketplace/MarketplaceModuleTest.php",
+          "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php"
+        ]
+      },
+      "evaluation": {
+        "qualification_head": "f54e5b0640945d7a5f0a7c471ac81105436214ae",
+        "qualification_run": 34323945126,
+        "qualification_job": 102376779500,
+        "verifier_unit_tests": 10,
+        "focused_current_tests": {
+          "test_files": 6,
+          "junit_files": 3,
+          "cases": 17,
+          "assertions": 179,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "junit": [
+            {
+              "file": "ordinary.xml",
+              "cases": 14,
+              "assertions": 110,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "transfer-concurrency.xml",
+              "cases": 1,
+              "assertions": 54,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "transfer.xml",
+              "cases": 2,
+              "assertions": 15,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            }
+          ]
+        },
+        "pre_adoption_revalidation": {
+          "audit_head": "1999409a1205b7bdb5663a809992b9c44efd8dbb",
+          "workflow_run": 34329669372,
+          "job": 102395040735,
+          "result": "PASS",
+          "verifier_unit_tests": 13,
+          "focused_current_tests": {
+            "test_files": 6,
+            "junit_files": 3,
+            "cases": 17,
+            "assertions": 179,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit": [
+              {
+                "file": "ordinary.xml",
+                "cases": 14,
+                "assertions": 110,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              },
+              {
+                "file": "transfer-concurrency.xml",
+                "cases": 1,
+                "assertions": 54,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              },
+              {
+                "file": "transfer.xml",
+                "cases": 2,
+                "assertions": 15,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              }
+            ]
+          },
+          "php": "8.5.10",
+          "mariadb": "11.8.9",
+          "meta_ci_run": 34329669391,
+          "meta_ci_result": "SUCCESS"
+        },
+        "projected_ledger": {
+          "projection_head": "1999409a1205b7bdb5663a809992b9c44efd8dbb",
+          "workflow_run": 34329669431,
+          "job": 102395041138,
+          "artifact": 10095210015,
+          "source_rows": 4325,
+          "direct_paths": 221,
+          "grouped_paths": 113,
+          "unverified_paths": 3991,
+          "new_grouped_paths": [
+            "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php",
+            "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php",
+            "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php",
+            "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php",
+            "tests/Feature/Marketplace/MarketplaceModuleTest.php",
+            "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php"
+          ],
+          "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
+          "outcome": "PROJECTED_LEDGER_PASS"
+        },
+        "outcome": "ADOPTED_GROUPED_CARRY_FORWARD_PENDING_POST_ADOPTION_REVALIDATION"
+      }
     }
   ],
   "rejected_candidates": [
