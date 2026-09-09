@@ -218,6 +218,13 @@ def test_post_submission_target_readback_is_mandatory_and_exact() -> None:
         attempt(), current_receipt, post_observation(), now_epoch_seconds=NOW
     ) == routing.POST_SUBMISSION_TARGET_CONFIRMED
 
+    assert routing.verify_post_submission_target(
+        attempt(),
+        current_receipt,
+        post_observation(observed_at_epoch_seconds=NOW - 1),
+        now_epoch_seconds=NOW,
+    ) == routing.BLOCKED_POST_SUBMISSION_TARGET_MISMATCH
+
     for changes in (
         {"source": "cached_post_readback"},
         {"repository": "Oteryn/Oteryn-Game"},
