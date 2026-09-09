@@ -144,5 +144,23 @@ class AnnouncementsProjectionTest(unittest.TestCase):
                     projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
             self.assertFalse(first.exists()); self.assertFalse(second.exists())
 
+    def test_rollback_preserves_replacement_of_first_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); first=root/'first'; renamed=root/'renamed'; second=root/'second'
+            calls=0
+            def replace_first_then_fail(_fd):
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    first.rename(renamed)
+                    first.write_bytes(b'unrelated replacement')
+                    raise OSError('simulated write failure after replacement')
+            with mock.patch.object(projector.os,'fsync',side_effect=replace_first_then_fail):
+                with self.assertRaisesRegex(OSError,'simulated write failure after replacement'):
+                    projector.write_outputs_exclusive(first,b'ledger',second,b'overlay')
+            self.assertEqual(first.read_bytes(),b'unrelated replacement')
+            self.assertEqual(renamed.read_bytes(),b'ledger')
+            self.assertFalse(second.exists())
+
 
 if __name__=='__main__': unittest.main()

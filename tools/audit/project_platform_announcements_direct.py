@@ -54,11 +54,12 @@ def _open_parent_without_symlinks(path: Path) -> tuple[int, str]:
         raise
 
 
-def _exclusive_create(path: Path) -> tuple[int, int, str]:
+def _exclusive_create(path: Path) -> tuple[int, int, str, int, int]:
     parent_fd, name = _open_parent_without_symlinks(path)
     try:
         fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644, dir_fd=parent_fd)
-        return fd, parent_fd, name
+        created_stat = os.fstat(fd)
+        return fd, parent_fd, name, created_stat.st_dev, created_stat.st_ino
     except Exception:
         os.close(parent_fd)
         raise
@@ -87,25 +88,29 @@ def write_outputs_exclusive(projected_path: Path, projected: bytes, overlay_path
     for path in outputs:
         _validate_output_destination(path)
 
-    created: list[tuple[int, int, str]] = []
+    created: list[tuple[int, int, str, int, int]] = []
     try:
         created.append(_exclusive_create(outputs[0]))
         created.append(_exclusive_create(outputs[1]))
-        for (fd, _, _), raw in zip(created, (projected, overlay), strict=True):
+        for (fd, _, _, _, _), raw in zip(created, (projected, overlay), strict=True):
             with os.fdopen(fd, 'wb', closefd=False) as handle:
                 handle.write(raw)
                 handle.flush()
                 os.fsync(fd)
     except Exception:
-        for fd, _, _ in created:
+        for fd, _, _, _, _ in created:
             try: os.close(fd)
             except OSError: pass
-        for _, parent_fd, name in reversed(created):
-            try: os.unlink(name, dir_fd=parent_fd)
-            except FileNotFoundError: pass
+        for _, parent_fd, name, created_dev, created_ino in reversed(created):
+            try:
+                current_stat = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                if (current_stat.st_dev, current_stat.st_ino) == (created_dev, created_ino):
+                    os.unlink(name, dir_fd=parent_fd)
+            except OSError:
+                pass
         raise
     finally:
-        for fd, parent_fd, _ in created:
+        for fd, parent_fd, _, _, _ in created:
             try: os.close(fd)
             except OSError: pass
             os.close(parent_fd)
