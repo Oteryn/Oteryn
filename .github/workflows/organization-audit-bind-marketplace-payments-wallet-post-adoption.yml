@@ -1,0 +1,168 @@
+name: Organization audit bind Marketplace-Payments-Wallet post-adoption proof (temporary)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/organization-audit-bind-marketplace-payments-wallet-post-adoption.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: audit-185-bind-marketplace-payments-wallet-post-adoption
+  cancel-in-progress: false
+
+jobs:
+  bind-post-adoption-proof:
+    if: github.event.pull_request.number == 185 && github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'docs/20260907-org-comprehensive-audit'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PROOF_HEAD: 5ba21f04dde762a28fdcc04765bfbcfd929ba54a
+    steps:
+      - name: Checkout exact binding trigger
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: true
+
+      - name: Bind trigger parent
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "$PROOF_HEAD"
+          mapfile -t changed < <(git diff --name-only "$PROOF_HEAD" HEAD)
+          test "${#changed[@]}" -eq 1
+          test "${changed[0]}" = '.github/workflows/organization-audit-bind-marketplace-payments-wallet-post-adoption.yml'
+
+      - name: Persist exact post-adoption evidence and fail-closed binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from copy import deepcopy
+          import json
+          from pathlib import Path
+
+          candidate_path = Path('docs/evidence/organization-audit-20260907/r3-platform-marketplace-payments-wallet-candidate.json')
+          verifier_path = Path('tools/audit/verify_platform_marketplace_payments_wallet_group.py')
+          index_path = Path('docs/evidence/organization-audit-20260907/verification-index.json')
+
+          focused = {
+              'test_files': 13,
+              'junit_files': 5,
+              'cases': 45,
+              'assertions': 444,
+              'failures': 0,
+              'errors': 0,
+              'skipped': 0,
+              'junit': [
+                  {'file': 'marketplace-transfer-concurrency.xml', 'cases': 1, 'assertions': 54, 'failures': 0, 'errors': 0, 'skipped': 0},
+                  {'file': 'marketplace-transfer.xml', 'cases': 2, 'assertions': 15, 'failures': 0, 'errors': 0, 'skipped': 0},
+                  {'file': 'ordinary.xml', 'cases': 40, 'assertions': 327, 'failures': 0, 'errors': 0, 'skipped': 0},
+                  {'file': 'payment-event-concurrency.xml', 'cases': 1, 'assertions': 23, 'failures': 0, 'errors': 0, 'skipped': 0},
+                  {'file': 'payment-refund-concurrency.xml', 'cases': 1, 'assertions': 25, 'failures': 0, 'errors': 0, 'skipped': 0},
+              ],
+          }
+          post = {
+              'audit_head': '5ba21f04dde762a28fdcc04765bfbcfd929ba54a',
+              'workflow_run': 34285636501,
+              'job': 102260463521,
+              'result': 'PASS',
+              'canonical_group_state': 'MARKETPLACE_PAYMENTS_WALLET_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS',
+              'verifier_unit_tests': 14,
+              'focused_current_tests': deepcopy(focused),
+              'php': '8.5.10',
+              'mariadb': '11.8.9',
+              'meta_ci_run': 34285636467,
+              'meta_ci_result': 'SUCCESS',
+              'ledger_reproduction_run': 34285636466,
+              'ledger_reproduction_job': 102260463287,
+              'ledger_reproduction_artifact': 10079336853,
+              'ledger_sha256': '742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406',
+              'ledger_counts': {
+                  'source_rows': 4325,
+                  'direct_paths': 221,
+                  'grouped_paths': 107,
+                  'unverified_paths': 3997,
+              },
+          }
+
+          candidate = json.loads(candidate_path.read_text(encoding='utf-8'))
+          if candidate.get('state') != 'QUALIFIED_ADOPTED_AS_GROUPED' or candidate.get('coverage_adopted') is not True:
+              raise SystemExit('candidate is not in exact adopted state')
+          if 'post_adoption_revalidation' in candidate:
+              raise SystemExit('post-adoption evidence already present')
+          q = candidate.get('qualification') or {}
+          if q.get('qualification_head') != '13f6933c543db98848450e063e61f8c0dd2fa3d3' or q.get('workflow_run') != 34283717767 or q.get('job') != 102254287765:
+              raise SystemExit('primary qualification binding drift')
+          if q.get('focused_current_tests', {}).get('cases') != 45 or q.get('focused_current_tests', {}).get('assertions') != 444:
+              raise SystemExit('primary qualification result drift')
+          candidate['post_adoption_revalidation'] = deepcopy(post)
+          candidate_path.write_text(json.dumps(candidate, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+          verifier = verifier_path.read_text(encoding='utf-8')
+          anchor = "GROUP_SCOPE = (\n"
+          if verifier.count(anchor) != 1:
+              raise SystemExit('verifier GROUP_SCOPE anchor drift')
+          verifier = verifier.replace(anchor, "POST_ADOPTION = " + repr(post) + "\n" + anchor, 1)
+
+          old = "    if adopted:\n        require('post_adoption_revalidation' not in candidate, 'post-adoption evidence must be bound only after adopted-state requalification')\n    else:\n        require('post_adoption_revalidation' not in candidate, 'pending adoption candidate cannot carry post-adoption revalidation')\n"
+          new = "    if adopted:\n        require(json_exact(candidate.get('post_adoption_revalidation'), POST_ADOPTION), 'post-adoption evidence must be bound only after adopted-state requalification')\n    else:\n        require('post_adoption_revalidation' not in candidate, 'pending adoption candidate cannot carry post-adoption revalidation')\n"
+          if verifier.count(old) != 1:
+              raise SystemExit('verifier post-adoption validation anchor drift')
+          verifier = verifier.replace(old, new, 1)
+
+          old_gate = "        next_gate = 'run exact-head adopted-state hosted requalification and bind post-adoption evidence before cleanup'\n"
+          new_gate = "        next_gate = 'fresh independent exact-head review; retain temporary qualification and ledger evidence until review completes'\n"
+          if verifier.count(old_gate) != 1:
+              raise SystemExit('verifier next-gate anchor drift')
+          verifier = verifier.replace(old_gate, new_gate, 1)
+          verifier_path.write_text(verifier, encoding='utf-8')
+
+          index = json.loads(index_path.read_text(encoding='utf-8'))
+          row = index['r3_platform_marketplace_payments_wallet_qualification']
+          if row.get('primary_run') != 34283717767 or row.get('primary_job') != 102254287765:
+              raise SystemExit('verification index primary binding drift')
+          row['post_adoption_head'] = post['audit_head']
+          row['post_adoption_run'] = post['workflow_run']
+          row['post_adoption_job'] = post['job']
+          row['post_adoption_verifier_unit_tests'] = post['verifier_unit_tests']
+          row['post_adoption_meta_ci_run'] = post['meta_ci_run']
+          row['post_adoption_ledger_run'] = post['ledger_reproduction_run']
+          row['post_adoption_ledger_job'] = post['ledger_reproduction_job']
+          row['post_adoption_ledger_artifact'] = post['ledger_reproduction_artifact']
+          row['post_adoption_ledger_sha256'] = post['ledger_sha256']
+          row['post_adoption_grouped_paths'] = post['ledger_counts']['grouped_paths']
+          row['post_adoption_unverified_paths'] = post['ledger_counts']['unverified_paths']
+          row['post_adoption_result'] = post['canonical_group_state']
+          index_path.write_text(json.dumps(index, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+          PY
+
+          (cd tools/audit && PYTHONDONTWRITEBYTECODE=1 python3 -m unittest -v test_verify_platform_marketplace_payments_wallet_group.py)
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/verify_report.py --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json
+          git diff --check
+          mapfile -t actual < <(git diff --name-only | LC_ALL=C sort)
+          expected=(
+            'docs/evidence/organization-audit-20260907/r3-platform-marketplace-payments-wallet-candidate.json'
+            'docs/evidence/organization-audit-20260907/verification-index.json'
+            'tools/audit/verify_platform_marketplace_payments_wallet_group.py'
+          )
+          diff -u <(printf '%s\n' "${expected[@]}" | LC_ALL=C sort) <(printf '%s\n' "${actual[@]}")
+
+      - name: Publish one fast-forward evidence-binding commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_HEAD_REF"
+          test "$(git rev-parse FETCH_HEAD)" = "${{ github.event.pull_request.head.sha }}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- \
+            docs/evidence/organization-audit-20260907/r3-platform-marketplace-payments-wallet-candidate.json \
+            docs/evidence/organization-audit-20260907/verification-index.json \
+            tools/audit/verify_platform_marketplace_payments_wallet_group.py
+          git commit -m 'docs(audit): bind Marketplace-Payments-Wallet post-adoption evidence (#186)'
+          git push origin "HEAD:refs/heads/$GITHUB_HEAD_REF"
