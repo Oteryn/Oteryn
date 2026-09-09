@@ -32,6 +32,8 @@ UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
     re.IGNORECASE,
 )
+AUTHORIZATION_SOURCE = "live_authenticated_target_authorization"
+MAX_AUTHORIZATION_AGE_SECONDS = 10
 MAX_RECEIPT_AGE_SECONDS = 60
 ALLOWED_TARGET_REPOSITORIES = frozenset(
     {
@@ -57,8 +59,21 @@ class CandidateFreeze(NamedTuple):
     head_sha: str
 
 
+class SubmissionAuthorization(NamedTuple):
+    """Fresh authenticated authorization/eligibility for one exact target candidate."""
+
+    source: str
+    repository: str
+    pr_number: int
+    base_ref: str
+    pr_head_sha: str
+    integration_authorized: bool
+    pr_eligible: bool
+    observed_at_epoch_seconds: int
+
+
 class SubmissionCapabilities(NamedTuple):
-    """Authenticated facts about safe queue-specific operations available now."""
+    """Authenticated facts about queue-specific operations exposed by the caller."""
 
     async_merge_available: bool
     async_merge_expected_head_fence: bool
@@ -68,8 +83,6 @@ class SubmissionCapabilities(NamedTuple):
     protected_executor_available: bool
     protected_executor_expected_head_fence: bool
     protected_executor_trusted_default_branch: bool
-    integration_authorized: bool
-    pr_eligible: bool
 
 
 class AsyncMergeReceipt(NamedTuple):
@@ -163,6 +176,32 @@ def _valid_capabilities(capabilities: object) -> bool:
     )
 
 
+def _authorization_matches(
+    attempt: SubmissionAttempt,
+    authorization: object,
+    *,
+    now_epoch_seconds: object,
+) -> bool:
+    return (
+        isinstance(authorization, SubmissionAuthorization)
+        and authorization.source == AUTHORIZATION_SOURCE
+        and authorization.repository == attempt.repository
+        and authorization.pr_number == attempt.pr_number
+        and authorization.base_ref == attempt.base_ref
+        and authorization.pr_head_sha == attempt.live_pr_head_sha
+        and _fullmatch(SHA_RE, authorization.pr_head_sha)
+        and isinstance(authorization.integration_authorized, bool)
+        and isinstance(authorization.pr_eligible, bool)
+        and isinstance(authorization.observed_at_epoch_seconds, int)
+        and not isinstance(authorization.observed_at_epoch_seconds, bool)
+        and isinstance(now_epoch_seconds, int)
+        and not isinstance(now_epoch_seconds, bool)
+        and 0 <= authorization.observed_at_epoch_seconds <= now_epoch_seconds
+        and now_epoch_seconds - authorization.observed_at_epoch_seconds
+        <= MAX_AUTHORIZATION_AGE_SECONDS
+    )
+
+
 def _valid_time_window(
     observed_at_epoch_seconds: object,
     *,
@@ -188,14 +227,23 @@ def _valid_time_window(
 def choose_submission_route(
     attempt: SubmissionAttempt,
     freeze: CandidateFreeze,
+    authorization: SubmissionAuthorization,
     capabilities: SubmissionCapabilities,
+    *,
+    now_epoch_seconds: int,
 ) -> str:
-    """Choose the simplest safe queue-specific operation available."""
+    """Choose the simplest safe queue-specific operation for one exact target."""
     if not _valid_attempt(attempt) or not _valid_capabilities(capabilities):
         return BLOCKED_STALE_STATE
-    if not capabilities.integration_authorized:
+    if not _authorization_matches(
+        attempt,
+        authorization,
+        now_epoch_seconds=now_epoch_seconds,
+    ):
+        return BLOCKED_STALE_STATE
+    if not authorization.integration_authorized:
         return BLOCKED_NOT_AUTHORIZED
-    if not capabilities.pr_eligible:
+    if not authorization.pr_eligible:
         return BLOCKED_NOT_ELIGIBLE
     if not _freeze_matches(attempt, freeze):
         return BLOCKED_FROZEN_HEAD_MISMATCH
