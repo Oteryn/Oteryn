@@ -65,11 +65,23 @@ export function publishArtifactLeaf(descriptorPath, name, bytes) {
   finally { fs.closeSync(fd); }
 }
 
+export function verifyOwnedArtifactEntry(descriptorPath, name, ownedFd) {
+  const owned = fs.fstatSync(ownedFd);
+  if (!owned.isFile()) throw Error('owned artifact is not a regular file');
+  const entryFd = fs.openSync(leafPath(descriptorPath, name), fs.constants.O_RDONLY | NOFOLLOW);
+  try {
+    const entry = fs.fstatSync(entryFd);
+    if (!entry.isFile() || entry.dev !== owned.dev || entry.ino !== owned.ino) {
+      throw Error(`artifact entry no longer identifies owned inode: ${name}`);
+    }
+  } finally { fs.closeSync(entryFd); }
+}
+
 function inside(candidate, root) {
   return candidate === root || candidate.startsWith(root + path.sep);
 }
 
-export function createNewOutputDirectory(rootArg, outputArg) {
+export function createNewOutputDirectory(rootArg, outputArg, hooks = {}) {
   const root = fs.realpathSync(rootArg);
   const requested = path.resolve(outputArg);
   const parentRequested = path.dirname(requested);
@@ -77,22 +89,31 @@ export function createNewOutputDirectory(rootArg, outputArg) {
   if (!parentStat.isDirectory() || parentStat.isSymbolicLink()) {
     throw Error('existing nonsymlink output parent required');
   }
-  const parent = fs.realpathSync(parentRequested);
-  const out = path.join(parent, path.basename(requested));
-  if (inside(out, root)) throw Error('new output outside provider required');
-  if (fs.lstatSync(out, { throwIfNoEntry: false })) throw Error('refusing existing output path or symlink');
-  fs.mkdirSync(out, { recursive: false, mode: 0o700 });
-  const canonical = fs.realpathSync(out);
-  if (canonical !== out || inside(canonical, root)) throw Error('unsafe output resolution');
   const flags = fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | (fs.constants.O_NOFOLLOW ?? 0);
-  const fd = fs.openSync(out, flags);
+  if (!fs.constants.O_NOFOLLOW || !fs.existsSync('/proc/self/fd')) {
+    throw Error('descriptor-relative output creation unavailable');
+  }
+  const parentFd = fs.openSync(parentRequested, flags);
+  let fd;
+  try {
+    const openedParent = fs.fstatSync(parentFd);
+    if (openedParent.dev !== parentStat.dev || openedParent.ino !== parentStat.ino) {
+      throw Error('output parent changed during validation');
+    }
+    const parentDescriptorPath = `/proc/self/fd/${parentFd}`;
+    const parent = fs.realpathSync(parentDescriptorPath);
+    if (inside(parent, root)) throw Error('new output outside provider required');
+    hooks.afterParentOpened?.({ parentFd, parent, parentDescriptorPath });
+    const leaf = path.basename(requested);
+    const descriptorOut = leafPath(parentDescriptorPath, leaf);
+    if (fs.lstatSync(descriptorOut, { throwIfNoEntry: false })) throw Error('refusing existing output path or symlink');
+    fs.mkdirSync(descriptorOut, { recursive: false, mode: 0o700 });
+    fd = fs.openSync(descriptorOut, flags);
+  } finally { fs.closeSync(parentFd); }
   const descriptorPath = `/proc/self/fd/${fd}`;
   let descriptorCanonical;
   try { descriptorCanonical = fs.realpathSync(descriptorPath); }
   catch (error) { fs.closeSync(fd); throw Error(`descriptor-backed output unavailable: ${error.message}`); }
-  if (descriptorCanonical !== canonical) {
-    fs.closeSync(fd);
-    throw Error('created output descriptor mismatch');
-  }
-  return { root, out, fd, descriptorPath };
+  if (inside(descriptorCanonical, root)) { fs.closeSync(fd); throw Error('unsafe output resolution'); }
+  return { root, out: descriptorCanonical, fd, descriptorPath };
 }
