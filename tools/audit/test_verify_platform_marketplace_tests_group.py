@@ -12,6 +12,7 @@ CANDIDATE = ROOT / verifier.CANDIDATE
 GROUPS = ROOT / verifier.GROUPS
 SUMMARY = ROOT / verifier.SUMMARY
 REPORT = ROOT / verifier.REPORT
+MARKDOWN_REPORT = ROOT / verifier.MARKDOWN_REPORT
 INDEX = ROOT / verifier.INDEX
 
 class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
@@ -120,6 +121,18 @@ class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
         self.assertEqual(r['revision'],'R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113')
         self.assertEqual((r['scoped_review_paths'],r['grouped_revalidated_paths'],r['semantically_classified_paths']),(221,113,334))
         self.assertEqual(r['r3_platform_marketplace_tests_candidate'],'organization-audit-20260907/r3-platform-marketplace-tests-candidate.json')
+
+    def test_companion_markdown_gate_is_exact_and_fail_closed(self):
+        text = MARKDOWN_REPORT.read_text(encoding='utf-8')
+        verifier.validate_companion_report_text(text)
+        mutations = [
+            text.replace(verifier.COMPANION_GATE, verifier.STALE_COMPANION_GATE, 1),
+            text.replace(verifier.COMPANION_GATE, 'This batch establishes production readiness.', 1),
+            text + '\n' + verifier.COMPANION_GATE + '\n',
+        ]
+        for mutated in mutations:
+            with self.assertRaisesRegex(ValueError, 'companion Markdown'):
+                verifier.validate_companion_report_text(mutated)
 
     def test_verification_index_row_is_exact(self):
         i=self.index()

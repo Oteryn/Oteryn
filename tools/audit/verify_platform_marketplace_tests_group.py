@@ -10,6 +10,7 @@ CANDIDATE = Path('docs/evidence/organization-audit-20260907/r3-platform-marketpl
 GROUPS = Path('docs/evidence/organization-audit-20260907/coverage-groups.json')
 SUMMARY = Path('docs/evidence/organization-audit-20260907/coverage-summary.json')
 REPORT = Path('docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json')
+MARKDOWN_REPORT = Path('docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.md')
 INDEX = Path('docs/evidence/organization-audit-20260907/verification-index.json')
 EVIDENCE_PATH = 'docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md'
 
@@ -26,6 +27,11 @@ PREFIX = 'tests/Feature/Marketplace/'
 EXACT_STATEMENT = '**FACT.** The following Marketplace tests were read directly during continuation:'
 ADOPTED = 'QUALIFIED_ADOPTED_AS_GROUPED'
 LEDGER_SHA = '25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617'
+COMPANION_GATE = (
+    'Post-adoption exact-head proof is complete and bound. The remaining gate for this six-path batch is fresh independent '
+    'exact-head review of the current stable audit head; temporary qualifier and ledger workflows remain until that review completes.'
+)
+STALE_COMPANION_GATE = 'Post-adoption exact-head proof and fresh independent review are still required.'
 
 EXPECTED_PATH_BLOBS = {
     'tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php': 'f9b9a17d34003132acf877a9755b998d6cfa5403',
@@ -252,7 +258,13 @@ def validate_group_state(groups_doc: dict) -> None:
         if isinstance(paths, list):
             require(not target_paths.intersection(paths), f'Marketplace-test explicit overlap with group {group.get("id")}')
 
+def validate_companion_report_text(text: str) -> None:
+    require(text.count(COMPANION_GATE) == 1, 'Marketplace-test companion Markdown gate missing/duplicated/drifted')
+    require(STALE_COMPANION_GATE not in text, 'Marketplace-test companion Markdown retains completed post-adoption gate')
+
+
 def validate_accounting(audit_root: Path) -> None:
+    validate_companion_report_text((audit_root / MARKDOWN_REPORT).read_text(encoding='utf-8'))
     summary = read_json(audit_root / SUMMARY)
     platform = summary['per_repository']['platform']
     require((platform['leaves'], platform['direct_scoped'], platform['grouped'], platform['unverified_semantics']) == (2165, 156, 113, 1896), 'Marketplace-test summary platform accounting drift')
