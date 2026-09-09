@@ -23,10 +23,14 @@ ATTEMPT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
 OBSERVATION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{15,127}$")
 QUEUE_ID_RE = re.compile(r"^MQ_[A-Za-z0-9_-]+$")
 MAX_PREMUTATION_RULE_AGE_SECONDS = 30
+MAX_LIVE_HEAD_AGE_SECONDS = 10
 MAX_POSTMUTATION_EVIDENCE_AGE_SECONDS = 60
 PREFLIGHT_SOURCE = "protected_meta_control_preflight"
+LIVE_HEAD_SOURCE = "connector_live_pr_read"
 CONTROL_REPOSITORY = "Oteryn/Oteryn"
 CONTROL_ISSUE_NUMBER = 189
+PREFLIGHT_WORKFLOW_PATH = ".github/workflows/merge-queue-preflight.yml"
+PREFLIGHT_PROOF_AUTHOR = "github-actions[bot]"
 ALLOWED_TARGET_REPOSITORIES = frozenset(
     {
         "Oteryn/Oteryn",
@@ -60,10 +64,35 @@ class BranchQueueObservation(NamedTuple):
     resource_path: str | None
     url: str | None
     trigger_comment_id: int
+    proof_comment_id: int
+    proof_comment_author_login: str
     workflow_run_id: int
     workflow_run_attempt: int
+    workflow_sha: str
     observed_at_epoch_seconds: int
     expires_at_epoch_seconds: int
+
+
+class WorkflowRunObservation(NamedTuple):
+    repository: str
+    workflow_run_id: int
+    workflow_run_attempt: int
+    workflow_path: str
+    event: str
+    status: str
+    conclusion: str
+    head_branch: str
+    head_sha: str
+    observed_at_epoch_seconds: int
+
+
+class LiveHeadObservation(NamedTuple):
+    source: str
+    repository: str
+    pr_number: int
+    base_ref: str
+    pr_head_sha: str
+    observed_at_epoch_seconds: int
 
 
 class CandidateFreeze(NamedTuple):
@@ -136,12 +165,19 @@ def _valid_branch_name(value: object) -> bool:
     )
 
 
+def _allowed_repository(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and value in ALLOWED_TARGET_REPOSITORIES
+        and _fullmatch(REPOSITORY_RE, value)
+    )
+
+
 def _valid_attempt(attempt: SubmissionAttempt) -> bool:
     return (
         isinstance(attempt, SubmissionAttempt)
         and _fullmatch(ATTEMPT_RE, attempt.attempt_id)
-        and attempt.repository in ALLOWED_TARGET_REPOSITORIES
-        and _fullmatch(REPOSITORY_RE, attempt.repository)
+        and _allowed_repository(attempt.repository)
         and _positive_int(attempt.pr_number)
         and _valid_branch_name(attempt.base_ref)
         and _fullmatch(SHA_RE, attempt.live_pr_head_sha)
@@ -162,9 +198,36 @@ def _fresh(observed_at: object, now: object, max_age: int) -> bool:
     )
 
 
+def _workflow_run_matches(
+    observation: BranchQueueObservation,
+    workflow: WorkflowRunObservation,
+    *,
+    now_epoch_seconds: int,
+) -> bool:
+    return (
+        isinstance(workflow, WorkflowRunObservation)
+        and workflow.repository == CONTROL_REPOSITORY
+        and workflow.workflow_run_id == observation.workflow_run_id
+        and workflow.workflow_run_attempt == observation.workflow_run_attempt
+        and workflow.workflow_path == PREFLIGHT_WORKFLOW_PATH
+        and workflow.event == "issue_comment"
+        and workflow.status == "completed"
+        and workflow.conclusion == "success"
+        and workflow.head_branch == "main"
+        and workflow.head_sha == observation.workflow_sha
+        and _fullmatch(SHA_RE, workflow.head_sha)
+        and _fresh(
+            workflow.observed_at_epoch_seconds,
+            now_epoch_seconds,
+            MAX_PREMUTATION_RULE_AGE_SECONDS,
+        )
+    )
+
+
 def _branch_observation_matches(
     attempt: SubmissionAttempt,
     observation: BranchQueueObservation,
+    workflow: WorkflowRunObservation,
     *,
     now_epoch_seconds: int,
 ) -> bool:
@@ -181,16 +244,19 @@ def _branch_observation_matches(
         or observation.pr_head_sha != attempt.live_pr_head_sha
     ):
         return False
-    if not _fullmatch(SHA_RE, observation.pr_head_sha):
+    if not _fullmatch(SHA_RE, observation.pr_head_sha) or not _fullmatch(SHA_RE, observation.workflow_sha):
         return False
     if not all(
         _positive_int(value)
         for value in (
             observation.trigger_comment_id,
+            observation.proof_comment_id,
             observation.workflow_run_id,
             observation.workflow_run_attempt,
         )
     ):
+        return False
+    if observation.proof_comment_author_login != PREFLIGHT_PROOF_AUTHOR:
         return False
     expected_observation_id = (
         f"mq-preflight-{observation.workflow_run_id}-"
@@ -214,6 +280,8 @@ def _branch_observation_matches(
         or now_epoch_seconds > observation.expires_at_epoch_seconds
     ):
         return False
+    if not _workflow_run_matches(observation, workflow, now_epoch_seconds=now_epoch_seconds):
+        return False
 
     if observation.merge_queue_required is False:
         return observation.queue_id is None and observation.resource_path is None and observation.url is None
@@ -224,6 +292,32 @@ def _branch_observation_matches(
         _fullmatch(QUEUE_ID_RE, observation.queue_id)
         and observation.resource_path == expected_resource_path
         and observation.url == expected_url
+    )
+
+
+def _live_head_matches(
+    attempt: SubmissionAttempt,
+    preflight: BranchQueueObservation,
+    live_head: LiveHeadObservation,
+    *,
+    now_epoch_seconds: int,
+) -> bool:
+    return (
+        isinstance(live_head, LiveHeadObservation)
+        and live_head.source == LIVE_HEAD_SOURCE
+        and live_head.repository == attempt.repository
+        and live_head.pr_number == attempt.pr_number
+        and live_head.base_ref == attempt.base_ref
+        and live_head.pr_head_sha == attempt.live_pr_head_sha
+        and _fullmatch(SHA_RE, live_head.pr_head_sha)
+        and isinstance(live_head.observed_at_epoch_seconds, int)
+        and not isinstance(live_head.observed_at_epoch_seconds, bool)
+        and live_head.observed_at_epoch_seconds >= preflight.observed_at_epoch_seconds
+        and _fresh(
+            live_head.observed_at_epoch_seconds,
+            now_epoch_seconds,
+            MAX_LIVE_HEAD_AGE_SECONDS,
+        )
     )
 
 
@@ -240,12 +334,14 @@ def _freeze_matches(attempt: SubmissionAttempt, freeze: CandidateFreeze) -> bool
 def choose_submission_route(
     attempt: SubmissionAttempt,
     branch_observation: BranchQueueObservation,
+    workflow_run_observation: WorkflowRunObservation,
+    live_head_observation: LiveHeadObservation,
     freeze: CandidateFreeze,
     capabilities: SubmissionCapabilities,
     *,
     now_epoch_seconds: int,
 ) -> str:
-    """Choose a protected submission route from one fresh central preflight attempt."""
+    """Choose a protected submission route from authenticated fresh GitHub observations."""
     if not _valid_attempt(attempt):
         return BLOCKED_STALE_STATE
     if not isinstance(capabilities, SubmissionCapabilities) or not _boolean_fields(
@@ -259,7 +355,19 @@ def choose_submission_route(
         return BLOCKED_NOT_ELIGIBLE
     if not _freeze_matches(attempt, freeze):
         return BLOCKED_FROZEN_HEAD_MISMATCH
-    if not _branch_observation_matches(attempt, branch_observation, now_epoch_seconds=now_epoch_seconds):
+    if not _branch_observation_matches(
+        attempt,
+        branch_observation,
+        workflow_run_observation,
+        now_epoch_seconds=now_epoch_seconds,
+    ):
+        return BLOCKED_STALE_STATE
+    if not _live_head_matches(
+        attempt,
+        branch_observation,
+        live_head_observation,
+        now_epoch_seconds=now_epoch_seconds,
+    ):
         return BLOCKED_STALE_STATE
     if not branch_observation.merge_queue_required:
         return NOT_MQ_TARGET
@@ -342,11 +450,9 @@ def _merge_group_matches(
     for member in observation.members:
         if not isinstance(member, MergeGroupMember):
             return False
-        if member.repository not in ALLOWED_TARGET_REPOSITORIES:
+        if not _allowed_repository(member.repository):
             return False
-        if not _fullmatch(REPOSITORY_RE, member.repository) or not _positive_int(member.pr_number):
-            return False
-        if not _fullmatch(SHA_RE, member.pr_head_sha):
+        if not _positive_int(member.pr_number) or not _fullmatch(SHA_RE, member.pr_head_sha):
             return False
     expected = MergeGroupMember(
         repository=attempt.repository,
