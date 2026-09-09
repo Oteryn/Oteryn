@@ -29,7 +29,9 @@ COMMENT_ID = 5593000001
 PROOF_COMMENT_ID = 5593000002
 NOW = 1_800_000_000
 OBSERVED_AT = NOW - 3
-LIVE_HEAD_AT = NOW - 1
+PROOF_READ_AT = NOW - 2
+WORKFLOW_READ_AT = NOW - 1
+LIVE_HEAD_AT = NOW
 OBSERVATION_ID = f"mq-preflight-{RUN_ID}-{RUN_ATTEMPT}-{COMMENT_ID}"
 QUEUE_ID = "MQ_queue123456789"
 RESOURCE_PATH = f"/{REPOSITORY}/queue/{BASE_REF}"
@@ -79,7 +81,7 @@ def proof_comment(observation=None, **overrides):
         "comment_id": observation.proof_comment_id,
         "author_login": routing.PREFLIGHT_PROOF_AUTHOR,
         "body": "OTERYN_MQ_PREFLIGHT_V1\n```json\n" + canonical + "\n```",
-        "observed_at_epoch_seconds": NOW - 1,
+        "observed_at_epoch_seconds": PROOF_READ_AT,
     }
     values.update(overrides)
     return routing.ProofCommentObservation(**values)
@@ -96,7 +98,7 @@ def workflow_run(**overrides):
         "conclusion": "success",
         "head_branch": "main",
         "head_sha": WORKFLOW_SHA,
-        "observed_at_epoch_seconds": NOW - 1,
+        "observed_at_epoch_seconds": WORKFLOW_READ_AT,
     }
     values.update(overrides)
     return routing.WorkflowRunObservation(**values)
@@ -127,6 +129,12 @@ def capabilities(**overrides):
     return routing.SubmissionCapabilities(**values)
 
 
+def queue_identity(**overrides):
+    values = {"repository": REPOSITORY, "base_ref": BASE_REF, "queue_id": QUEUE_ID, "resource_path": RESOURCE_PATH, "url": QUEUE_URL}
+    values.update(overrides)
+    return routing.QueueIdentity(**values)
+
+
 def route(*, current_attempt=None, observation=None, proof=None, workflow=None, head_read=None, current_freeze=None, current_capabilities=None, now=NOW):
     current_observation = observation or branch_observation()
     return routing.choose_submission_route(
@@ -137,7 +145,20 @@ def route(*, current_attempt=None, observation=None, proof=None, workflow=None, 
 
 
 def queue_entry(**overrides):
-    values = {"attempt_id": ATTEMPT_ID, "observation_id": "queue-observation-0001", "repository": REPOSITORY, "pr_number": PR_NUMBER, "pr_head_sha": PR_HEAD, "queue_entry_id": "queue-entry-00000001", "active": True, "observed_at_epoch_seconds": NOW - 1}
+    values = {
+        "attempt_id": ATTEMPT_ID,
+        "observation_id": "queue-observation-0001",
+        "repository": REPOSITORY,
+        "pr_number": PR_NUMBER,
+        "base_ref": BASE_REF,
+        "pr_head_sha": PR_HEAD,
+        "queue_id": QUEUE_ID,
+        "resource_path": RESOURCE_PATH,
+        "url": QUEUE_URL,
+        "queue_entry_id": "queue-entry-00000001",
+        "active": True,
+        "observed_at_epoch_seconds": NOW - 1,
+    }
     values.update(overrides)
     return routing.QueueEntryObservation(**values)
 
@@ -149,15 +170,27 @@ def member(**overrides):
 
 
 def merge_group(**overrides):
-    values = {"attempt_id": ATTEMPT_ID, "observation_id": "merge-group-observation-0001", "integration_head_sha": INTEGRATION_HEAD, "members": (member(),), "observed_at_epoch_seconds": NOW - 1}
+    values = {
+        "attempt_id": ATTEMPT_ID,
+        "observation_id": "merge-group-observation-0001",
+        "repository": REPOSITORY,
+        "base_ref": BASE_REF,
+        "queue_id": QUEUE_ID,
+        "resource_path": RESOURCE_PATH,
+        "url": QUEUE_URL,
+        "integration_head_sha": INTEGRATION_HEAD,
+        "members": (member(),),
+        "observed_at_epoch_seconds": NOW - 1,
+    }
     values.update(overrides)
     return routing.MergeGroupObservation(**values)
 
 
-def verify(items, *, submitted_at=NOW - 2, current_route=None):
+def verify(items, *, submitted_at=NOW - 2, current_route=None, identity=None):
     return routing.verify_queue_admission(
         routing.AUTO_MERGE_MQ_SUBMISSION if current_route is None else current_route,
-        attempt(), items, submission_completed_at_epoch_seconds=submitted_at, now_epoch_seconds=NOW,
+        attempt(), identity or queue_identity(), items,
+        submission_completed_at_epoch_seconds=submitted_at, now_epoch_seconds=NOW,
     )
 
 
@@ -206,7 +239,7 @@ def test_proof_comment_must_be_fresh_github_authored_exact_body_and_identity() -
         assert route(observation=observation, proof=proof_comment(observation, **changes)) == routing.BLOCKED_STALE_STATE, changes
 
 
-def test_live_head_must_be_fresh_exact_and_after_preflight() -> None:
+def test_live_head_must_be_fresh_exact_and_strictly_after_authenticated_reads() -> None:
     assert route() == routing.AUTO_MERGE_MQ_SUBMISSION
     for changes in (
         {"source": "cached_pr"},
@@ -215,9 +248,18 @@ def test_live_head_must_be_fresh_exact_and_after_preflight() -> None:
         {"base_ref": "release"},
         {"pr_head_sha": OTHER_HEAD},
         {"observed_at_epoch_seconds": OBSERVED_AT - 1},
+        {"observed_at_epoch_seconds": WORKFLOW_READ_AT},
         {"observed_at_epoch_seconds": NOW - routing.MAX_LIVE_HEAD_AGE_SECONDS - 1},
     ):
         assert route(head_read=live_head(**changes)) == routing.BLOCKED_STALE_STATE, changes
+    assert route(
+        workflow=workflow_run(observed_at_epoch_seconds=NOW),
+        head_read=live_head(observed_at_epoch_seconds=NOW),
+    ) == routing.BLOCKED_STALE_STATE
+    assert route(
+        proof=proof_comment(observed_at_epoch_seconds=NOW),
+        head_read=live_head(observed_at_epoch_seconds=NOW),
+    ) == routing.BLOCKED_STALE_STATE
 
 
 def test_only_four_oteryn_targets_and_unhashable_repository_fail_closed() -> None:
@@ -225,6 +267,18 @@ def test_only_four_oteryn_targets_and_unhashable_repository_fail_closed() -> Non
     assert route(current_attempt=attempt(repository="Oteryn/Other")) == routing.BLOCKED_STALE_STATE
     for repository in ([], {}, set()):
         assert route(current_attempt=attempt(repository=repository)) == routing.BLOCKED_STALE_STATE
+
+
+def test_malformed_proof_payload_fields_fail_closed_before_serialization() -> None:
+    normal_proof = proof_comment()
+    for changes in (
+        {"queue_id": set()},
+        {"resource_path": set()},
+        {"url": set()},
+    ):
+        malformed = branch_observation(**changes)
+        assert route(observation=malformed, proof=normal_proof) == routing.BLOCKED_STALE_STATE, changes
+        assert routing.queue_identity_from_preflight(malformed) is None
 
 
 def test_preflight_freshness_freeze_authority_and_capability_fail_closed() -> None:
@@ -239,15 +293,35 @@ def test_preflight_freshness_freeze_authority_and_capability_fail_closed() -> No
     assert route(current_capabilities=capabilities(explicit_enqueue_available=True)) == routing.EXPLICIT_ENQUEUE
 
 
-def test_post_mutation_queue_evidence_is_strictly_later_and_exact() -> None:
+def test_preflight_queue_identity_is_exact_and_reusable_for_admission() -> None:
+    identity = routing.queue_identity_from_preflight(branch_observation())
+    assert identity == queue_identity()
+    for changed in (
+        branch_observation(base_ref="release", resource_path=f"/{REPOSITORY}/queue/release", url=f"https://github.com/{REPOSITORY}/queue/release"),
+        branch_observation(queue_id="wrong"),
+        branch_observation(resource_path=f"/{REPOSITORY}/queue/release"),
+        branch_observation(url=f"https://github.com/{REPOSITORY}/queue/release"),
+    ):
+        assert routing.queue_identity_from_preflight(changed) is None
+
+
+def test_post_mutation_queue_evidence_is_strictly_later_exact_and_same_queue() -> None:
     assert verify([queue_entry()]) == routing.ENQUEUED
     assert verify([queue_entry(observed_at_epoch_seconds=NOW - 2)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([queue_entry(pr_head_sha=OTHER_HEAD)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([queue_entry(repository="Oteryn/Oteryn-Game")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry(base_ref="release")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry(queue_id="MQ_otherqueue")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry(resource_path=f"/{REPOSITORY}/queue/release")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry(url=f"https://github.com/{REPOSITORY}/queue/release")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([queue_entry(active=False)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([merge_group()]) == routing.ENQUEUED
     assert verify([merge_group(observed_at_epoch_seconds=NOW - 2)]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     assert verify([merge_group(members=(member(pr_number=999),))]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([merge_group(base_ref="release")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([merge_group(queue_id="MQ_otherqueue")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([merge_group(resource_path=f"/{REPOSITORY}/queue/release")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([merge_group(url=f"https://github.com/{REPOSITORY}/queue/release")]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
 
 
 def test_historical_timeline_blocked_routes_invalid_refs_and_direct_merge_never_pass() -> None:
@@ -255,6 +329,7 @@ def test_historical_timeline_blocked_routes_invalid_refs_and_direct_merge_never_
     assert verify([historical]) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     for blocked in (routing.NOT_MQ_TARGET, routing.BLOCKED_NOT_AUTHORIZED, routing.BLOCKED_NOT_ELIGIBLE, routing.BLOCKED_STALE_STATE, routing.BLOCKED_FROZEN_HEAD_MISMATCH, routing.BLOCKED_CAPABILITY_UNAVAILABLE):
         assert verify([queue_entry()], current_route=blocked) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    assert verify([queue_entry()], identity=queue_identity(base_ref="release")) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     for base_ref in ("", "@", "-foo", "/main", "main/", "foo//bar", "foo..bar", "main.", ".main", "main.lock", "foo@{bar", "foo bar", "foo~bar", "foo^bar", "foo:bar", "foo?bar", "foo*bar", "foo[bar", "foo\\bar"):
         assert route(current_attempt=attempt(base_ref=base_ref)) == routing.BLOCKED_STALE_STATE
     values = {v for k, v in vars(routing).items() if k.isupper() and isinstance(v, str)}
