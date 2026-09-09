@@ -101,7 +101,12 @@ class AsyncMergeReceipt(NamedTuple):
 
 
 class EnqueueReceipt(NamedTuple):
-    """Immediate receipt from exact GraphQL enqueuePullRequest."""
+    """Immediate receipt from exact GraphQL enqueuePullRequest.
+
+    Queue identity is retained rather than reduced to a queue-entry ID. This is
+    required because repository/PR/head fields can otherwise be copied around an
+    entry that actually belongs to another base queue.
+    """
 
     route: str
     attempt_id: str
@@ -110,6 +115,9 @@ class EnqueueReceipt(NamedTuple):
     base_ref: str
     expected_head_sha: str
     merge_queue_entry_id: str
+    merge_queue_id: str
+    merge_queue_resource_path: str
+    merge_queue_url: str
     observed_at_epoch_seconds: int
 
 
@@ -311,7 +319,7 @@ def verify_enqueue_receipt(
     submission_started_at_epoch_seconds: int,
     now_epoch_seconds: int,
 ) -> str:
-    """Accept only the immediate exact-target receipt from direct enqueue."""
+    """Accept only an exact-target, exact-main-queue enqueue receipt."""
     if not isinstance(route, str) or route not in {
         EXPLICIT_ENQUEUE,
         PROTECTED_EXECUTOR_ENQUEUE,
@@ -325,6 +333,9 @@ def verify_enqueue_receipt(
         now_epoch_seconds=now_epoch_seconds,
     ):
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
+
+    expected_resource_path = f"/{attempt.repository}/queue/{attempt.base_ref}"
+    expected_url = f"https://github.com/{attempt.repository}/queue/{attempt.base_ref}"
     if (
         receipt.route != route
         or receipt.attempt_id != attempt.attempt_id
@@ -334,6 +345,10 @@ def verify_enqueue_receipt(
         or receipt.expected_head_sha != attempt.live_pr_head_sha
         or not _fullmatch(SHA_RE, receipt.expected_head_sha)
         or not _fullmatch(QUEUE_ENTRY_RE, receipt.merge_queue_entry_id)
+        or not isinstance(receipt.merge_queue_id, str)
+        or not receipt.merge_queue_id
+        or receipt.merge_queue_resource_path != expected_resource_path
+        or receipt.merge_queue_url != expected_url
     ):
         return BLOCKED_QUEUE_ADMISSION_UNPROVEN
     return ENQUEUED
