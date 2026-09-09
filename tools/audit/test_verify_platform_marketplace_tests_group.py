@@ -22,11 +22,13 @@ class PlatformMarketplaceTestsCandidateTests(unittest.TestCase):
     def groups_fixture(self):
         return deepcopy(json.loads(GROUPS.read_text(encoding='utf-8')))
 
-    def test_committed_pending_candidate_shape_and_group_absence_are_exact(self):
+    def test_committed_qualified_candidate_shape_and_group_absence_are_exact(self):
         data = self.fixture()
         verifier.validate_candidate_shape(data)
         verifier.validate_group_absence(self.groups_fixture())
         self.assertTrue(verifier.json_exact(data, verifier.expected_candidate()))
+        self.assertEqual(data['qualification']['focused_current_tests']['cases'], 17)
+        self.assertEqual(data['qualification']['focused_current_tests']['assertions'], 179)
 
     def test_bool_total_is_not_integer_six(self):
         data = self.fixture()
@@ -79,11 +81,11 @@ class PlatformMarketplaceTestsCandidateTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'canonical evidence fields/key sets drift'):
                 verifier.validate_candidate_shape(data)
 
-    def test_pending_candidate_cannot_preclaim_adoption_or_qualification(self):
+    def test_qualified_candidate_cannot_preclaim_adoption(self):
         mutations = []
         data = self.fixture(); data['state'] = 'QUALIFIED_ADOPTED_AS_GROUPED'; mutations.append(data)
         data = self.fixture(); data['coverage_adopted'] = True; mutations.append(data)
-        data = self.fixture(); data['qualification'] = {'result': 'PASS'}; mutations.append(data)
+        data = self.fixture(); data['post_adoption_revalidation'] = {'result': 'PASS'}; mutations.append(data)
         for data in mutations:
             with self.assertRaisesRegex(ValueError, 'canonical evidence fields/key sets drift'):
                 verifier.validate_candidate_shape(data)
@@ -96,6 +98,44 @@ class PlatformMarketplaceTestsCandidateTests(unittest.TestCase):
         for data in mutations:
             with self.assertRaisesRegex(ValueError, 'canonical evidence fields/key sets drift'):
                 verifier.validate_candidate_shape(data)
+
+    def test_qualification_head_run_job_or_unit_result_drift_fails_closed(self):
+        mutations = []
+        data = self.fixture(); data['qualification']['qualification_head'] = '0' * 40; mutations.append(data)
+        data = self.fixture(); data['qualification']['workflow_run'] += 1; mutations.append(data)
+        data = self.fixture(); data['qualification']['job'] += 1; mutations.append(data)
+        data = self.fixture(); data['qualification']['verifier_unit_tests'] = 9; mutations.append(data)
+        data = self.fixture(); data['qualification']['verifier_unit_result'] = 'FAIL'; mutations.append(data)
+        for data in mutations:
+            with self.assertRaisesRegex(ValueError, 'canonical evidence fields/key sets drift'):
+                verifier.validate_candidate_shape(data)
+
+    def test_qualification_aggregate_or_failure_drift_fails_closed(self):
+        for key, value in (
+            ('cases', 16),
+            ('assertions', 178),
+            ('failures', 1),
+            ('errors', 1),
+            ('skipped', 1),
+        ):
+            data = self.fixture()
+            data['qualification']['focused_current_tests'][key] = value
+            with self.assertRaisesRegex(ValueError, 'canonical evidence fields/key sets drift'):
+                verifier.validate_candidate_shape(data)
+
+    def test_qualification_junit_subset_reorder_or_count_drift_fails_closed(self):
+        data = self.fixture()
+        data['qualification']['focused_current_tests']['junit'].pop()
+        with self.assertRaisesRegex(ValueError, 'canonical evidence fields/key sets drift'):
+            verifier.validate_candidate_shape(data)
+        data = self.fixture()
+        data['qualification']['focused_current_tests']['junit'].reverse()
+        with self.assertRaisesRegex(ValueError, 'canonical evidence fields/key sets drift'):
+            verifier.validate_candidate_shape(data)
+        data = self.fixture()
+        data['qualification']['focused_current_tests']['junit'][0]['assertions'] -= 1
+        with self.assertRaisesRegex(ValueError, 'canonical evidence fields/key sets drift'):
+            verifier.validate_candidate_shape(data)
 
     def test_existing_group_prefix_overlap_fails_closed(self):
         groups = self.groups_fixture()

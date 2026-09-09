@@ -19,7 +19,8 @@ EVIDENCE_BLOB = '34361414339a5ca57ec5cd13e332ad196aa9e35f'
 MARKETPLACE_TEST_TREE = '03f7d3735dee4140bf75960f0e106c3ba3d3b37b'
 PREFIX = 'tests/Feature/Marketplace/'
 EXACT_STATEMENT = '**FACT.** The following Marketplace tests were read directly during continuation:'
-PENDING = 'CANDIDATE_PENDING_QUALIFICATION'
+QUALIFIED = 'QUALIFIED_PENDING_ADOPTION'
+
 EXPECTED_PATH_BLOBS = {
     'tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php': 'f9b9a17d34003132acf877a9755b998d6cfa5403',
     'tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php': '14aa475be873476523eae72775b02acad956c8df',
@@ -41,13 +42,42 @@ REQUIRED_CHECKS = (
     'historical evidence contains the direct-read statement and all six exact Marketplace test paths',
     'historical and frozen-current Marketplace test directory tree SHAs are identical',
     'both generations contain exactly the same six regular files and exact blob identities',
-    'fresh frozen-current execution runs all six files with zero failures/errors/skips including both real-MariaDB tests',
+    'the exact frozen-current six-file qualification is bound to its exact head/run/job and JUnit totals',
+    'fresh frozen-current execution repeats all six files with zero failures/errors/skips including both real-MariaDB tests',
 )
 LIMITATIONS = (
-    'Pending qualification only. Historical direct-read evidence plus byte identity does not establish current execution, '
-    'production correctness, complete Marketplace/payment correctness, or organization-wide audit completion. No GROUPED '
-    'coverage is adopted until the exact six-file qualification is bound and independently reviewed.'
+    'Qualified frozen-current carry-forward candidate only. Historical direct-read evidence, byte identity and the bound '
+    '17-case/179-assertion all-green qualification do not establish production correctness, complete Marketplace/payment '
+    'correctness, later-current-main status, or organization-wide audit completion. No GROUPED coverage is adopted until '
+    'projected-ledger reproduction and atomic canonical adoption pass, followed by post-adoption revalidation and '
+    'independent exact-head review.'
 )
+PRIMARY_QUALIFICATION = {
+    'qualification_head': 'f54e5b0640945d7a5f0a7c471ac81105436214ae',
+    'workflow_run': 34323945126,
+    'job': 102376779500,
+    'verifier_unit_tests': 10,
+    'verifier_unit_result': 'PASS',
+    'focused_current_tests': {
+        'test_files': 6,
+        'junit_files': 3,
+        'cases': 17,
+        'assertions': 179,
+        'failures': 0,
+        'errors': 0,
+        'skipped': 0,
+        'junit': [
+            {'file': 'ordinary.xml', 'cases': 14, 'assertions': 110, 'failures': 0, 'errors': 0, 'skipped': 0},
+            {'file': 'transfer-concurrency.xml', 'cases': 1, 'assertions': 54, 'failures': 0, 'errors': 0, 'skipped': 0},
+            {'file': 'transfer.xml', 'cases': 2, 'assertions': 15, 'failures': 0, 'errors': 0, 'skipped': 0},
+        ],
+    },
+    'php': '8.5.10',
+    'mariadb': '11.8.9',
+    'composer_validate': 'PASS',
+    'tracked_source_clean_after_execution': True,
+    'outcome': 'QUALIFIED_PRIMARY_NOT_YET_ADOPTED',
+}
 
 
 def json_exact(left, right) -> bool:
@@ -66,7 +96,14 @@ def require(ok: bool, message: str) -> None:
 
 
 def read_json(path: Path) -> dict:
-    data = json.loads(path.read_text(encoding='utf-8'))
+    def pairs(items):
+        out = {}
+        for key, value in items:
+            require(key not in out, f'duplicate JSON key in {path}: {key}')
+            out[key] = value
+        return out
+
+    data = json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=pairs)
     require(isinstance(data, dict), f'{path} must contain a JSON object')
     return data
 
@@ -76,7 +113,7 @@ def expected_candidate() -> dict:
         'schema_version': 1,
         'candidate_id': 'PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD',
         'repository': 'Oteryn/Oteryn-Platform',
-        'state': PENDING,
+        'state': QUALIFIED,
         'expected_total': 6,
         'historical_evidence': {
             'publication_commit': EVIDENCE_COMMIT,
@@ -100,6 +137,7 @@ def expected_candidate() -> dict:
         },
         'coverage_adopted': False,
         'limitations': LIMITATIONS,
+        'qualification': PRIMARY_QUALIFICATION,
     }
 
 
@@ -113,17 +151,24 @@ def validate_group_absence(groups_doc: dict) -> None:
     require(isinstance(groups, list), 'coverage-groups groups must be a list')
     for group in groups:
         require(isinstance(group, dict), 'coverage group must be an object')
-        require(group.get('id') != 'PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD', 'pending Marketplace-test group already exists')
+        require(group.get('id') != 'PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD', 'qualified Marketplace-test group already exists')
         prefix = group.get('path_prefix')
         if isinstance(prefix, str):
-            require(not any(path.startswith(prefix) for path in EXPECTED_PATH_BLOBS), f'pending Marketplace tests overlap existing group {group.get("id")}')
+            require(not any(path.startswith(prefix) for path in EXPECTED_PATH_BLOBS), f'qualified Marketplace tests overlap existing group {group.get("id")}')
         paths = group.get('paths')
         if isinstance(paths, list):
-            require(not set(paths).intersection(EXPECTED_PATH_BLOBS), f'pending Marketplace tests overlap explicit existing group {group.get("id")}')
+            require(not set(paths).intersection(EXPECTED_PATH_BLOBS), f'qualified Marketplace tests overlap explicit existing group {group.get("id")}')
 
 
 def git(root: Path, *args: str) -> str:
-    result = subprocess.run(['git', '-C', str(root), *args], check=True, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result = subprocess.run(
+        ['git', '-C', str(root), *args],
+        check=True,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
     return result.stdout.strip()
 
 
@@ -133,6 +178,7 @@ def tree_entries(root: Path, commit: str) -> dict[str, tuple[str, str]]:
         check=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        timeout=30,
     ).stdout
     entries: dict[str, tuple[str, str]] = {}
     for item in raw.split(b'\0'):
@@ -167,13 +213,13 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path) -> dict:
     require(git(evidence_root, 'rev-parse', 'HEAD') == EVIDENCE_COMMIT, 'historical evidence HEAD drift')
     require(git(evidence_root, 'rev-parse', 'HEAD^{tree}') == EVIDENCE_TREE, 'historical evidence tree drift')
     require(git(evidence_root, 'rev-parse', f'HEAD:{EVIDENCE_PATH}') == EVIDENCE_BLOB, 'historical evidence blob drift')
-    text = (evidence_root / EVIDENCE_PATH).read_text(encoding='utf-8')
-    require(text.count(EXACT_STATEMENT) == 1, 'historical Marketplace-test direct-read statement missing/duplicated')
+    evidence_text = (evidence_root / EVIDENCE_PATH).read_text(encoding='utf-8')
+    require(evidence_text.count(EXACT_STATEMENT) == 1, 'historical Marketplace-test direct-read statement missing/duplicated')
     for path in EXPECTED_PATH_BLOBS:
-        require(text.count(f'`{path}`') == 1, f'historical evidence missing/duplicates exact Marketplace test path: {path}')
+        require(evidence_text.count(f'`{path}`') == 1, f'historical evidence missing/duplicates exact Marketplace test path: {path}')
 
     return {
-        'result': 'MARKETPLACE_TESTS_IDENTITY_AND_HISTORICAL_DIRECT_EVIDENCE_REVALIDATED_TESTS_STILL_REQUIRED',
+        'result': 'MARKETPLACE_TESTS_PRIMARY_QUALIFIED_NOT_ADOPTED',
         'candidate_id': candidate['candidate_id'],
         'historical_source': HISTORICAL_COMMIT,
         'current_source': SOURCE_COMMIT,
@@ -182,8 +228,9 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path) -> dict:
         'paths': 6,
         'path_blobs_verified': 6,
         'focused_test_files_bound': 6,
+        'primary_qualification': PRIMARY_QUALIFICATION,
         'coverage_adopted': False,
-        'next_gate': 'fresh frozen-current six-file PHP 8.5.10 qualification including both real-MariaDB tests must pass before GROUPED adoption',
+        'next_gate': 'reproduce projected 4,325-row ledger with exactly six additional GROUPED paths, then atomically adopt or reject the batch',
     }
 
 

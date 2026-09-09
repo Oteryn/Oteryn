@@ -2,7 +2,7 @@
   "schema_version": 1,
   "candidate_id": "PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD",
   "repository": "Oteryn/Oteryn-Platform",
-  "state": "CANDIDATE_PENDING_QUALIFICATION",
+  "state": "QUALIFIED_PENDING_ADOPTION",
   "expected_total": 6,
   "historical_evidence": {
     "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
@@ -41,9 +41,57 @@
       "historical evidence contains the direct-read statement and all six exact Marketplace test paths",
       "historical and frozen-current Marketplace test directory tree SHAs are identical",
       "both generations contain exactly the same six regular files and exact blob identities",
-      "fresh frozen-current execution runs all six files with zero failures/errors/skips including both real-MariaDB tests"
+      "the exact frozen-current six-file qualification is bound to its exact head/run/job and JUnit totals",
+      "fresh frozen-current execution repeats all six files with zero failures/errors/skips including both real-MariaDB tests"
     ]
   },
   "coverage_adopted": false,
-  "limitations": "Pending qualification only. Historical direct-read evidence plus byte identity does not establish current execution, production correctness, complete Marketplace/payment correctness, or organization-wide audit completion. No GROUPED coverage is adopted until the exact six-file qualification is bound and independently reviewed."
+  "limitations": "Qualified frozen-current carry-forward candidate only. Historical direct-read evidence, byte identity and the bound 17-case/179-assertion all-green qualification do not establish production correctness, complete Marketplace/payment correctness, later-current-main status, or organization-wide audit completion. No GROUPED coverage is adopted until projected-ledger reproduction and atomic canonical adoption pass, followed by post-adoption revalidation and independent exact-head review.",
+  "qualification": {
+    "qualification_head": "f54e5b0640945d7a5f0a7c471ac81105436214ae",
+    "workflow_run": 34323945126,
+    "job": 102376779500,
+    "verifier_unit_tests": 10,
+    "verifier_unit_result": "PASS",
+    "focused_current_tests": {
+      "test_files": 6,
+      "junit_files": 3,
+      "cases": 17,
+      "assertions": 179,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit": [
+        {
+          "file": "ordinary.xml",
+          "cases": 14,
+          "assertions": 110,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "file": "transfer-concurrency.xml",
+          "cases": 1,
+          "assertions": 54,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "file": "transfer.xml",
+          "cases": 2,
+          "assertions": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "php": "8.5.10",
+    "mariadb": "11.8.9",
+    "composer_validate": "PASS",
+    "tracked_source_clean_after_execution": true,
+    "outcome": "QUALIFIED_PRIMARY_NOT_YET_ADOPTED"
+  }
 }
