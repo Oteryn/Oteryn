@@ -93,6 +93,7 @@ def validate_adopted_docs(candidate: dict, audit_root: Path) -> None:
     require(len(old_rows)==2,'recorder overlay row count drift')
     expected_paths={row['path'] for row in candidate['paths']}
     require({row['path'] for row in old_rows}==expected_paths,'recorder overlay membership drift')
+    require(len(old_rows)==len({row['path'] for row in old_rows}),'recorder overlay duplicate path')
 
     report_path=audit_root/'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'
     report=vr.read_json(report_path)
@@ -110,10 +111,11 @@ def validate_adopted_docs(candidate: dict, audit_root: Path) -> None:
     review=vr.load_review(base,report)
     require(len(review)==233,'current composed DIRECT count drift')
     by_path={(row['repository'],row['path']):row for row in review}
-    for row in candidate['paths']:
-        current=by_path.get(('platform',row['path']))
-        require(current is not None,'recorder missing from current canonical composition: '+row['path'])
-        require(current['blob_sha']==row['blob_sha'] and current['depth']==row['depth'] and current['scope']==row['scope'],'recorder current canonical row drift: '+row['path'])
+    old_by_path={(row['repository'],row['path']):row for row in old_rows}
+    for key, expected in old_by_path.items():
+        current=by_path.get(key)
+        require(current is not None,'recorder missing from current canonical composition: '+key[1])
+        require(vr.json_exact(current,expected),'recorder complete current canonical row drift: '+key[1])
 
 
 def validate_source(candidate: dict, platform_root: Path) -> None:

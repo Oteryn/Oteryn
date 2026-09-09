@@ -13,6 +13,7 @@ import csv
 import hashlib
 import io
 import json
+import os
 from collections import Counter
 from pathlib import Path
 
@@ -36,6 +37,78 @@ LIMITATIONS = (
 def require(condition: bool, message: str) -> None:
     if not condition:
         raise ValueError(message)
+
+
+def _open_parent_without_symlinks(path: Path) -> tuple[int, str]:
+    absolute = Path(os.path.abspath(path))
+    require(absolute.name not in ('', '.', '..'), 'invalid output path')
+    fd = os.open(absolute.anchor, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for component in absolute.parent.parts[1:]:
+            next_fd = os.open(component, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=fd)
+            os.close(fd)
+            fd = next_fd
+        return fd, absolute.name
+    except Exception:
+        os.close(fd)
+        raise
+
+
+def _exclusive_create(path: Path) -> tuple[int, int, str]:
+    parent_fd, name = _open_parent_without_symlinks(path)
+    try:
+        fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644, dir_fd=parent_fd)
+        return fd, parent_fd, name
+    except Exception:
+        os.close(parent_fd)
+        raise
+
+
+def _validate_output_destination(path: Path) -> None:
+    parent_fd, name = _open_parent_without_symlinks(path)
+    try:
+        try:
+            os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        raise FileExistsError(f'projection output already exists: {path}')
+    finally:
+        os.close(parent_fd)
+
+
+def write_outputs_exclusive(projected_path: Path, projected: bytes, overlay_path: Path, overlay: bytes,
+                            input_paths: tuple[Path, ...] = ()) -> None:
+    outputs = [Path(os.path.abspath(projected_path)), Path(os.path.abspath(overlay_path))]
+    inputs = {Path(os.path.abspath(path)) for path in input_paths}
+    require(outputs[0] != outputs[1], 'projection outputs alias each other')
+    require(not any(path in inputs for path in outputs), 'projection output aliases an input')
+
+    # Validate both destinations before mutation. Exclusive opens below close races.
+    for path in outputs:
+        _validate_output_destination(path)
+
+    created: list[tuple[int, int, str]] = []
+    try:
+        created.append(_exclusive_create(outputs[0]))
+        created.append(_exclusive_create(outputs[1]))
+        for (fd, _, _), raw in zip(created, (projected, overlay), strict=True):
+            with os.fdopen(fd, 'wb', closefd=False) as handle:
+                handle.write(raw)
+                handle.flush()
+                os.fsync(fd)
+    except Exception:
+        for fd, _, _ in created:
+            try: os.close(fd)
+            except OSError: pass
+        for _, parent_fd, name in reversed(created):
+            try: os.unlink(name, dir_fd=parent_fd)
+            except FileNotFoundError: pass
+        raise
+    finally:
+        for fd, parent_fd, _ in created:
+            try: os.close(fd)
+            except OSError: pass
+            os.close(parent_fd)
 
 
 def read_ledger(path: Path) -> tuple[bytes, list[dict[str,str]]]:
@@ -113,8 +186,11 @@ def main() -> int:
     require(len(projected)==4325 and counts==Counter({'UNVERIFIED':3979,'DIRECT':233,'GROUPED':113}), 'projected accounting drift')
     require(sum(1 for r in projected if r['disposition']!='UNVERIFIED')==346, 'projected classified count drift')
     projected_sha=hashlib.sha256(raw).hexdigest()
-    args.projected_ledger_output.write_bytes(raw)
-    overlay=overlay_bytes(candidate,args.platform_root); args.overlay_output.write_bytes(overlay)
+    overlay=overlay_bytes(candidate,args.platform_root)
+    write_outputs_exclusive(
+        args.projected_ledger_output, raw, args.overlay_output, overlay,
+        (args.canonical_ledger, args.audit_root/candidate_verifier.CANDIDATE_REL),
+    )
     result={
         'result':'ANNOUNCEMENTS_DIRECT_PROJECTION_VALID_NOT_ADOPTED',
         'canonical_ledger_sha256':CANONICAL_SHA,'projected_ledger_sha256':projected_sha,

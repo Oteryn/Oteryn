@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import copy
+import csv
+import io
 from pathlib import Path
 import unittest
 
@@ -92,6 +94,34 @@ class AuditRecorderDirectVerifierTests(unittest.TestCase):
 
     def test_overlay_blob_hash_is_exact(self):
         self.assertEqual(v.blob_sha((ROOT / v.OVERLAY_REL).read_bytes()), v.OVERLAY_BLOB)
+
+    def test_canonical_recorder_rows_reject_complete_contract_drift(self):
+        canonical = ROOT / v.CANONICAL_OVERLAY_REL
+        original = canonical.read_text(encoding='utf-8')
+        reader = csv.DictReader(io.StringIO(original), delimiter='\t')
+        rows = list(reader)
+
+        mutations = []
+        for field, value in (
+            ('execution_evidence', 'No MariaDB proof; this establishes product readiness.'),
+            ('line_ranges', '[[1,1]]'),
+        ):
+            changed = copy.deepcopy(rows)
+            changed[0][field] = value
+            mutations.append((list(reader.fieldnames), changed))
+        mutations.append((list(reader.fieldnames) + ['unexpected'], [dict(row, unexpected='claim') for row in rows]))
+        mutations.append(([field for field in reader.fieldnames if field != 'execution_evidence'], rows))
+
+        for fields, changed in mutations:
+            output = io.StringIO(newline='')
+            writer = csv.DictWriter(output, fieldnames=fields, delimiter='\t', lineterminator='\n', extrasaction='ignore')
+            writer.writeheader(); writer.writerows(changed)
+            try:
+                canonical.write_text(output.getvalue(), encoding='utf-8')
+                with self.assertRaisesRegex(ValueError, 'recorder complete current canonical row drift'):
+                    v.validate_adopted_docs(copy.deepcopy(self.candidate), ROOT)
+            finally:
+                canonical.write_text(original, encoding='utf-8')
 
 
 if __name__ == '__main__':
