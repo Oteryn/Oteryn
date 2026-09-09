@@ -3,10 +3,9 @@
 
 Oteryn accepts REST ``merge-async`` with the qualified PR head in ``sha`` and
 explicit ``merge_action=merge_queue`` as the native autonomous queue route.
-GitHub does not expose an expected-base precondition on that mutation, so the
-contract requires fresh exact-target preflight plus immediate post-submission
-live readback. That readback detects a retarget race; it does not pretend to
-make the mutation atomically base-fenced.
+Authentication may come from a direct native execution surface or a bounded
+fine-grained PAT. A custom Oteryn GitHub App bootstrap and workflow GITHUB_TOKEN
+mutation are not operational routes.
 """
 
 from __future__ import annotations
@@ -26,6 +25,12 @@ BLOCKED_FROZEN_HEAD_MISMATCH = "BLOCKED_FROZEN_HEAD_MISMATCH"
 BLOCKED_CAPABILITY_UNAVAILABLE = "BLOCKED_CAPABILITY_UNAVAILABLE"
 BLOCKED_RECEIPT_INVALID = "BLOCKED_RECEIPT_INVALID"
 BLOCKED_POST_SUBMISSION_TARGET_MISMATCH = "BLOCKED_POST_SUBMISSION_TARGET_MISMATCH"
+
+AUTH_DIRECT_NATIVE = "direct_native_merge_async"
+AUTH_FINE_GRAINED_PAT = "fine_grained_pat"
+AUTH_GITHUB_TOKEN = "github_token"
+AUTH_CUSTOM_GITHUB_APP = "custom_github_app"
+OPERATIONAL_MUTATION_AUTH = frozenset({AUTH_DIRECT_NATIVE, AUTH_FINE_GRAINED_PAT})
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 UUID_RE = re.compile(
@@ -64,8 +69,6 @@ class CandidateFreeze(NamedTuple):
 
 
 class SubmissionAuthorization(NamedTuple):
-    """Fresh authenticated authorization/eligibility for one exact candidate."""
-
     source: str
     repository: str
     pr_number: int
@@ -77,8 +80,6 @@ class SubmissionAuthorization(NamedTuple):
 
 
 class DocumentedQueuePrimitive(NamedTuple):
-    """Repository-owned facts for one documented GitHub queue mutation."""
-
     operation: str
     queue_specific: bool
     expected_head_fence: bool
@@ -87,8 +88,6 @@ class DocumentedQueuePrimitive(NamedTuple):
 
 
 class MergeAsyncRequest(NamedTuple):
-    """Exact request contract for GitHub REST merge-async."""
-
     method: str
     endpoint: str
     repository: str
@@ -98,8 +97,6 @@ class MergeAsyncRequest(NamedTuple):
 
 
 class AsyncMergeReceipt(NamedTuple):
-    """Observed acceptance/reconciliation evidence for one merge-async request."""
-
     attempt_id: str
     repository: str
     pr_number: int
@@ -113,14 +110,6 @@ class AsyncMergeReceipt(NamedTuple):
 
 
 class PostSubmissionTargetObservation(NamedTuple):
-    """Immediate live PR readback after an accepted queue request.
-
-    ``accepted_request_uuid`` binds the readback to the exact GitHub async
-    receipt. ``executor_sequence`` is an executor-owned monotonic causal marker;
-    it must be strictly greater than the receipt marker. Whole-second wall-clock
-    timestamps are used only for bounded freshness, never causal ordering.
-    """
-
     source: str
     repository: str
     pr_number: int
@@ -131,11 +120,6 @@ class PostSubmissionTargetObservation(NamedTuple):
     executor_sequence: int
 
 
-# ``merge-async`` is the selected Oteryn native route. Its exact-head fence and
-# explicit queue action are strong enough for the accepted operational standard;
-# the missing expected-base coordinate is mitigated by mandatory live pre/post
-# target validation. GraphQL enqueuePullRequest is documented but is not selected
-# by this policy revision.
 DOCUMENTED_QUEUE_PRIMITIVES = (
     DocumentedQueuePrimitive(
         operation="merge-async",
@@ -237,9 +221,13 @@ def _authorization_matches(
     )
 
 
-def primitive_is_operational_exact_head_route(primitive: object) -> bool:
-    """Return true only for a reviewed queue-specific exact-head route."""
+def mutation_auth_is_operational(value: object) -> bool:
+    """Approve only app-free auth that can preserve downstream merge_group CI."""
 
+    return isinstance(value, str) and value in OPERATIONAL_MUTATION_AUTH
+
+
+def primitive_is_operational_exact_head_route(primitive: object) -> bool:
     return (
         isinstance(primitive, DocumentedQueuePrimitive)
         and primitive.queue_specific is True
@@ -249,8 +237,6 @@ def primitive_is_operational_exact_head_route(primitive: object) -> bool:
 
 
 def current_documented_operational_routes() -> tuple[str, ...]:
-    """Reviewed GitHub primitives approved by the current Oteryn policy."""
-
     return tuple(
         primitive.operation
         for primitive in DOCUMENTED_QUEUE_PRIMITIVES
@@ -263,9 +249,10 @@ def choose_submission_route(
     freeze: CandidateFreeze,
     authorization: SubmissionAuthorization,
     *,
+    execution_auth: str,
     now_epoch_seconds: int,
 ) -> str:
-    """Select native merge-async only after fresh exact-target preflight."""
+    """Select native merge-async only after exact-target and auth preflight."""
 
     if not _valid_attempt(attempt):
         return BLOCKED_STALE_STATE
@@ -281,6 +268,8 @@ def choose_submission_route(
         return BLOCKED_NOT_ELIGIBLE
     if not _freeze_matches(attempt, freeze):
         return BLOCKED_FROZEN_HEAD_MISMATCH
+    if not mutation_auth_is_operational(execution_auth):
+        return BLOCKED_CAPABILITY_UNAVAILABLE
 
     if current_documented_operational_routes() == ("merge-async",):
         return ASYNC_MERGE_QUEUE
@@ -292,15 +281,15 @@ def build_merge_async_request(
     freeze: CandidateFreeze,
     authorization: SubmissionAuthorization,
     *,
+    execution_auth: str,
     now_epoch_seconds: int,
 ) -> MergeAsyncRequest | None:
-    """Build the only approved native request; never infer default/direct mode."""
-
     if (
         choose_submission_route(
             attempt,
             freeze,
             authorization,
+            execution_auth=execution_auth,
             now_epoch_seconds=now_epoch_seconds,
         )
         != ASYNC_MERGE_QUEUE
@@ -322,8 +311,6 @@ def verify_async_merge_receipt(
     *,
     now_epoch_seconds: int,
 ) -> str:
-    """Verify request acceptance; 200/409 require reconciliation, not success."""
-
     if not _valid_attempt(attempt) or not isinstance(receipt, AsyncMergeReceipt):
         return BLOCKED_RECEIPT_INVALID
     if (
@@ -359,8 +346,6 @@ def verify_post_submission_target(
     *,
     now_epoch_seconds: int,
 ) -> str:
-    """Require receipt-bound, causally post-response live target readback."""
-
     if (
         verify_async_merge_receipt(
             attempt,
