@@ -16,6 +16,7 @@ jobs:
     with:
       command_body: ${{ github.event.comment.body }}
       author_association: ${{ github.event.comment.author_association }}
+      comment_author_login: ${{ github.event.comment.user.login }}
       control_repository: ${{ github.repository }}
       control_issue_number: ${{ github.event.issue.number }}
       trigger_comment_id: ${{ github.event.comment.id }}
