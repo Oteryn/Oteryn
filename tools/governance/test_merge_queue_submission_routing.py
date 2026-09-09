@@ -22,6 +22,8 @@ PR_HEAD = "a" * 40
 OTHER_HEAD = "c" * 40
 ATTEMPT_ID = "attempt-20260909-0001"
 REQUEST_UUID = "123e4567-e89b-12d3-a456-426614174000"
+RECEIPT_SEQUENCE = 100
+POST_SEQUENCE = 101
 NOW = 1_800_000_000
 
 
@@ -69,6 +71,7 @@ def receipt(**overrides):
         "http_status": 202,
         "request_uuid": REQUEST_UUID,
         "observed_at_epoch_seconds": NOW,
+        "executor_sequence": RECEIPT_SEQUENCE,
     }
     values.update(overrides)
     return routing.AsyncMergeReceipt(**values)
@@ -81,7 +84,9 @@ def post_observation(**overrides):
         "pr_number": PR_NUMBER,
         "base_ref": "main",
         "pr_head_sha": PR_HEAD,
+        "accepted_request_uuid": REQUEST_UUID,
         "observed_at_epoch_seconds": NOW,
+        "executor_sequence": POST_SEQUENCE,
     }
     values.update(overrides)
     return routing.PostSubmissionTargetObservation(**values)
@@ -206,6 +211,8 @@ def test_async_receipt_acceptance_and_reconciliation_semantics() -> None:
         {"request_uuid": "not-a-uuid"},
         {"observed_at_epoch_seconds": NOW - routing.MAX_RECEIPT_AGE_SECONDS - 1},
         {"observed_at_epoch_seconds": NOW + 1},
+        {"executor_sequence": 0},
+        {"executor_sequence": True},
     ):
         assert routing.verify_async_merge_receipt(
             attempt(), receipt(**changes), now_epoch_seconds=NOW
@@ -217,6 +224,17 @@ def test_post_submission_target_readback_is_mandatory_and_exact() -> None:
     assert routing.verify_post_submission_target(
         attempt(), current_receipt, post_observation(), now_epoch_seconds=NOW
     ) == routing.POST_SUBMISSION_TARGET_CONFIRMED
+
+    # Wall-clock seconds are freshness only, never causal-order authority. These
+    # observations share the receipt's epoch second but are causally pre-receipt
+    # or not provably post-receipt and therefore must fail closed.
+    for sequence in (RECEIPT_SEQUENCE - 1, RECEIPT_SEQUENCE):
+        assert routing.verify_post_submission_target(
+            attempt(),
+            current_receipt,
+            post_observation(executor_sequence=sequence),
+            now_epoch_seconds=NOW,
+        ) == routing.BLOCKED_POST_SUBMISSION_TARGET_MISMATCH
 
     assert routing.verify_post_submission_target(
         attempt(),
@@ -231,8 +249,11 @@ def test_post_submission_target_readback_is_mandatory_and_exact() -> None:
         {"pr_number": PR_NUMBER + 1},
         {"base_ref": "release"},
         {"pr_head_sha": OTHER_HEAD},
+        {"accepted_request_uuid": "223e4567-e89b-12d3-a456-426614174000"},
         {"observed_at_epoch_seconds": NOW - routing.MAX_POST_SUBMISSION_AGE_SECONDS - 1},
         {"observed_at_epoch_seconds": NOW + 1},
+        {"executor_sequence": 0},
+        {"executor_sequence": True},
     ):
         assert routing.verify_post_submission_target(
             attempt(), current_receipt, post_observation(**changes), now_epoch_seconds=NOW
