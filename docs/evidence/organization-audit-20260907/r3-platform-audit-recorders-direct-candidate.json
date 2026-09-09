@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "platform-audit-recorders-direct-20260909",
   "repository": "platform",
-  "disposition": "DIRECT_ADOPTED_PENDING_POST_ADOPTION_PROOF",
+  "disposition": "DIRECT_ADOPTED_POST_PROOF_COMPLETE_PENDING_INDEPENDENT_REVIEW",
   "coverage_adopted": true,
   "source": {
     "repository": "Oteryn/Oteryn-Platform",
@@ -102,7 +102,7 @@
     "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f"
   },
   "adoption": {
-    "status": "ADOPTED_PENDING_POST_ADOPTION_REVALIDATION_AND_INDEPENDENT_REVIEW",
+    "status": "ADOPTED_POST_PROOF_COMPLETE_PENDING_INDEPENDENT_REVIEW",
     "direct_overlay_path": "docs/evidence/organization-audit-20260907/coverage-review-additions.tsv",
     "direct_overlay_blob_sha": "9b5c1afc0d1ac39641077510fb4d6c20222e04d5",
     "adopted_paths": 2,
@@ -114,23 +114,23 @@
     "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f"
   },
   "post_adoption_revalidation": {
-    "status": "PENDING_EXACT_HEAD_PROOF",
-    "head_sha": null,
-    "workflow_run": null,
-    "job": null,
-    "artifact": null,
-    "artifact_sha256": null,
-    "meta_ci_run": null,
-    "verifier_unit_tests": null,
-    "cases": null,
-    "assertions": null,
-    "ledger_sha256": null
+    "status": "SUCCESS",
+    "head_sha": "8d2c412955a283de54c40bec2995a961d2322d9d",
+    "workflow_run": 34355682587,
+    "job": 102479632543,
+    "artifact": 10105627207,
+    "artifact_sha256": "b0e9f04185f16904dbd6f290e0d559aeb2515512e6bd378a83c5d90524ba7c2e",
+    "meta_ci_run": 34355682545,
+    "verifier_unit_tests": 14,
+    "cases": 25,
+    "assertions": 89,
+    "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f"
   },
   "limitations": [
     "DIRECT here is a bounded semantic source-review disposition, not a product or production-readiness PASS.",
     "The two migration files and three focused test files are qualification dependencies only and are not promoted by this candidate.",
     "The focused test set is representative, not an exhaustive execution of all AdminAuditRecorder callers or all 31 SecurityEventRecorder event types.",
     "No later Platform main, live deployment state, branch protection, Merge Queue state, or runtime incident status is inferred from this frozen source qualification.",
-    "The two DIRECT rows are adopted only through the named fail-closed overlay and exact projected digest. Exact-head post-adoption qualifier/ledger proof plus fresh independent review remain required before this slice is considered closed."
+    "Exact-head post-adoption proof is complete and bound at 8d2c412955a283de54c40bec2995a961d2322d9d; fresh independent review of the stable recorder-adoption audit head remains required before this slice is considered closed."
   ]
 }
