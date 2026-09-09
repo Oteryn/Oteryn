@@ -128,6 +128,8 @@ class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
         mutations = [
             text.replace(verifier.COMPANION_GATE, verifier.STALE_COMPANION_GATE, 1),
             text.replace(verifier.COMPANION_GATE, 'This batch establishes production readiness.', 1),
+            text.replace(verifier.COMPANION_GATE, verifier.COMPANION_GATE + ' This batch establishes production readiness.', 1),
+            text.replace(verifier.COMPANION_GATE, verifier.COMPANION_GATE + ' Organization-wide audit completion is established.', 1),
             text + '\n' + verifier.COMPANION_GATE + '\n',
         ]
         for mutated in mutations:

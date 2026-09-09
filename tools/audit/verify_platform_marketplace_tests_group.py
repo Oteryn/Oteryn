@@ -32,6 +32,7 @@ COMPANION_GATE = (
     'exact-head review of the current stable audit head; temporary qualifier and ledger workflows remain until that review completes.'
 )
 STALE_COMPANION_GATE = 'Post-adoption exact-head proof and fresh independent review are still required.'
+COMPANION_PARAGRAPH = '`DIRECT` is a bounded review with the stated scope, not full approval of the entire file or every dependency. R2 had 65 scoped entries; the current revision adds 156 DIRECT paths and extends some existing scopes. It reads all 50 Platform migration files, control fields of all 77 workflow files and all 19 files in the frozen Platform routes tree. The prior Platform audit statement that there were 21 route files was rejected fail-closed; the frozen tree contains 19 and all 19 were read directly here. Exactly 113 Platform leaves are additionally GROUPED. GameAuth contributes 27 paths after exact historical/source identity, 23 dependent bindings and 61 focused cases / 565 assertions. Four account/Canary/profile/character families contribute 31 paths after exact 23 dependent bindings and an ordered 15-file qualification producing 86 cases / 586 assertions. Three Marketplace/Payments/Wallet families contribute 49 paths — `app/Marketplace/**` (21), `app/Payments/**` (24), `app/Wallet/**` (4) — after exact historical direct-read evidence, byte-identical family trees, exact 23 dependent bindings and an ordered 13-file PHP 8.5.10/MariaDB 11.8.9 qualification producing 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips, including four real-MariaDB integration/concurrency files. The exact six-file `tests/Feature/Marketplace/**` directory contributes a further 6 GROUPED paths after immutable historical evidence explicitly names every file, exact byte identity, a bound 17-case / 179-assertion all-green qualification including both real-MariaDB tests, and projected-ledger reproduction proving only those six rows transition from UNVERIFIED to GROUPED. Post-adoption exact-head proof is complete and bound. The remaining gate for this six-path batch is fresh independent exact-head review of the current stable audit head; temporary qualifier and ledger workflows remain until that review completes. GROUPED is bounded semantic carry-forward, not product/security readiness. The rejected Atlas 508-path candidate remains UNVERIFIED. Full CSV is reproducible from immutable inventories, `coverage-review.tsv`, `coverage-groups.json` and ledger SHA-256 `25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617`.'
 
 EXPECTED_PATH_BLOBS = {
     'tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php': 'f9b9a17d34003132acf877a9755b998d6cfa5403',
@@ -259,6 +260,8 @@ def validate_group_state(groups_doc: dict) -> None:
             require(not target_paths.intersection(paths), f'Marketplace-test explicit overlap with group {group.get("id")}')
 
 def validate_companion_report_text(text: str) -> None:
+    paragraphs = text.split('\n\n')
+    require(paragraphs.count(COMPANION_PARAGRAPH) == 1, 'Marketplace-test companion Markdown bounded paragraph missing/duplicated/drifted')
     require(text.count(COMPANION_GATE) == 1, 'Marketplace-test companion Markdown gate missing/duplicated/drifted')
     require(STALE_COMPANION_GATE not in text, 'Marketplace-test companion Markdown retains completed post-adoption gate')
 
