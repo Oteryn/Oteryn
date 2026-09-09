@@ -78,6 +78,23 @@ class CollectorTest(unittest.TestCase):
             with self.assertRaises(ValueError): audit.collect(self.plan, Path(tmp))
             git.assert_not_called()
 
+    def test_symlinked_output_ancestor_rejected_without_network_or_write(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(audit, "git") as git:
+            root=Path(tmp); provider=root/'provider'; provider.mkdir()
+            (root/'provider-link').symlink_to(provider, target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                audit.collect(self.plan, root/'provider-link'/'deep'/'out')
+            self.assertFalse((provider/'deep').exists())
+            git.assert_not_called()
+
+    def test_dangling_deep_output_ancestor_rejected_without_network(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(audit, "git") as git:
+            root=Path(tmp); (root/'dangling').symlink_to(root/'missing')
+            with self.assertRaisesRegex(ValueError, "symlink"):
+                audit.collect(self.plan, root/'dangling'/'deep'/'out')
+            self.assertFalse((root/'missing').exists())
+            git.assert_not_called()
+
     def test_wrong_tree_aborts(self):
         self.plan["snapshots"][0]["expected_tree_sha"] = "c" * 40
         with tempfile.TemporaryDirectory() as tmp, patch.object(audit, "git", side_effect=[b"", b"", b"a"*40+b"\n", b"d"*40+b"\n"]):

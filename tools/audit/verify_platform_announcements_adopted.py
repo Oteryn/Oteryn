@@ -27,6 +27,17 @@ EXPECTED_LINE_RANGES = {
     'app/Announcements/ViewModels/AnnouncementTicker.php': '[[1,21]]',
     'app/Announcements/ViewModels/AnnouncementTickerState.php': '[[1,10]]',
 }
+EXECUTION_EVIDENCE_BASE = ('Primary qualification: GitHub Actions run 34380399141, job 102563546379, '
+    'artifact 10115614293 (SHA-256 eb577820be531bfbb5451cf8d964ffeb6a78eeb47d06c36c872ab2e04637141f), '
+    'MariaDB 11.8.9; AnnouncementsModuleTest 4 cases / 20 assertions / 0 failures / 0 errors / 0 skips. '
+    'Projection run 34381252145 proved this path is one of exactly ten UNVERIFIED-to-DIRECT changes; '
+    'bounded evidence only.')
+EXPECTED_EXECUTION_EVIDENCE = {
+    path: EXECUTION_EVIDENCE_BASE + (
+        ' The Polish editorial_translations join branch remains a stated execution limitation.'
+        if path == 'app/Announcements/Queries/ActiveAnnouncementQuery.php' else '')
+    for path in EXPECTED_LINE_RANGES
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -94,6 +105,8 @@ def validate_adopted_docs(candidate: dict, audit_root: Path) -> None:
         require(current is not None,'Announcements path missing from canonical composition: '+row['path'])
         for key in ('blob_sha','depth','scope','line_ranges'):
             require(current[key]==row[key],'Announcements canonical row drift: '+row['path']+': '+key)
+        require(current['execution_evidence']==EXPECTED_EXECUTION_EVIDENCE[row['path']],
+                'Announcements canonical row drift: '+row['path']+': execution_evidence')
 
 
 def main() -> int:

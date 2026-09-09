@@ -13,6 +13,7 @@ import csv
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import re
 
@@ -28,6 +29,31 @@ DIRECT_ADDITIONS = 'coverage-review-canonical-additions.tsv'
 DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-canonical-additions.tsv'
 RECORDER_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
 ANNOUNCEMENTS_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-announcements-additions.tsv'
+
+
+def write_new_file_no_symlinks(path: Path, raw: bytes) -> None:
+    """Create one file exclusively without following its final or ancestor symlinks."""
+    absolute=Path(os.path.abspath(path));parent=absolute.parent
+    flags=os.O_RDONLY|os.O_DIRECTORY
+    if hasattr(os,'O_NOFOLLOW'): flags|=os.O_NOFOLLOW
+    descriptor=os.open(parent.anchor,flags)
+    try:
+        for part in parent.parts[1:]:
+            try: child=os.open(part,flags,dir_fd=descriptor)
+            except OSError as exc: raise ValueError('ledger output ancestry must contain only directories, not symlinks') from exc
+            os.close(descriptor);descriptor=child
+        file_flags=os.O_WRONLY|os.O_CREAT|os.O_EXCL
+        if hasattr(os,'O_NOFOLLOW'): file_flags|=os.O_NOFOLLOW
+        try: output=os.open(absolute.name,file_flags,0o666,dir_fd=descriptor)
+        except OSError as exc: raise ValueError('refusing ledger overwrite or symlink') from exc
+        try:
+            with os.fdopen(output,'wb') as handle:
+                handle.write(raw)
+        except Exception:
+            try: os.unlink(absolute.name,dir_fd=descriptor)
+            except OSError: pass
+            raise
+    finally: os.close(descriptor)
 SEMANTIC_COVERAGE_UNKNOWN = {
     'id': 'SEMANTIC-COVERAGE',
     'missing': '3979 source leaves retain UNVERIFIED semantics; 346 of 4325 leaves are semantically classified',
@@ -310,7 +336,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
         require(isinstance(expected,str) and re.fullmatch(r'[0-9a-f]{64}',expected),'ledger digest not finalized')
         require(hashlib.sha256(raw).hexdigest()==expected,'ledger digest mismatch')
         if ledger_output is not None:
-            require(not ledger_output.exists(),'refusing ledger overwrite');ledger_output.write_bytes(raw)
+            write_new_file_no_symlinks(ledger_output,raw)
     elif ledger_output is not None:
         raise ValueError('inventories required for ledger output')
     return {'result':'ACCOUNTING_VALID_NOT_SEMANTIC_PASS','findings':len(findings),'domains':len(domains),'source_leaves':coverage['source_leaf_total'],'source_snapshot_p1':len(p1),'scoped_review_paths':len(review),'grouped_revalidated_paths':grouped_total,'semantically_classified_paths':len(review)+grouped_total,'unverified_semantics':coverage['unverified_semantics_total'],'tree_and_ledger_verified':inventory_dir is not None,'semantic_coverage':doc['semantic_coverage']}

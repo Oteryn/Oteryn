@@ -159,4 +159,21 @@ class AuditValidationTest(unittest.TestCase):
     def test_ledger_requires_inventories(self):
         with self.assertRaises(ValueError):audit.validate(self.path,ledger_output=self.root/'ledger.csv')
 
+    def test_ledger_output_regular_create(self):
+        path=self.root/'ledger.csv';audit.write_new_file_no_symlinks(path,b'ledger')
+        self.assertEqual(path.read_bytes(),b'ledger')
+    def test_ledger_output_existing_file_preserved(self):
+        path=self.root/'ledger.csv';path.write_bytes(b'original')
+        with self.assertRaises(ValueError):audit.write_new_file_no_symlinks(path,b'new')
+        self.assertEqual(path.read_bytes(),b'original')
+    def test_ledger_output_dangling_final_symlink_rejected(self):
+        target=self.root/'target.csv';link=self.root/'ledger.csv';link.symlink_to(target)
+        with self.assertRaises(ValueError):audit.write_new_file_no_symlinks(link,b'new')
+        self.assertFalse(target.exists())
+    def test_ledger_output_symlinked_ancestor_rejected(self):
+        provider=self.root/'provider';provider.mkdir();link=self.root/'provider-link'
+        link.symlink_to(provider,target_is_directory=True)
+        with self.assertRaises(ValueError):audit.write_new_file_no_symlinks(link/'ledger.csv',b'new')
+        self.assertFalse((provider/'ledger.csv').exists())
+
 if __name__=='__main__':unittest.main()

@@ -3,6 +3,7 @@
 from pathlib import Path
 import copy
 import unittest
+from unittest.mock import patch
 
 import verify_platform_announcements_adopted as adopted
 import verify_platform_announcements_direct as pre
@@ -31,6 +32,17 @@ class AnnouncementsAdoptedVerifierTest(unittest.TestCase):
     def test_line_range_contract_covers_exact_ten_paths(self):
         self.assertEqual(set(adopted.EXPECTED_LINE_RANGES),{row['path'] for row in self.candidate['paths']})
         self.assertEqual(len(adopted.EXPECTED_LINE_RANGES),10)
+
+    def test_contradictory_canonical_execution_evidence_fails_closed(self):
+        canonical=adopted.vr.load_review(
+            ROOT/'docs/evidence/organization-audit-20260907',
+            adopted.vr.read_json(ROOT/'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'))
+        mutated=copy.deepcopy(canonical)
+        target=next(row for row in mutated if row['path'].startswith('app/Announcements/'))
+        target['execution_evidence']='Contradictory execution claim.'
+        with patch.object(adopted.vr,'load_review',return_value=mutated):
+            with self.assertRaisesRegex(ValueError,'execution_evidence'):
+                adopted.validate_adopted_docs(copy.deepcopy(self.candidate),ROOT)
 
 
 if __name__=='__main__':unittest.main()

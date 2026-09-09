@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import os
+import stat
 from pathlib import Path
 import re
 import subprocess
@@ -96,11 +97,48 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, ensure_ascii=True, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def create_directory_no_symlinks(path: Path) -> Path:
+    """Create a new directory without following any lexical ancestor symlink."""
+    absolute = Path(os.path.abspath(path))
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        try:
+            mode = os.lstat(current).st_mode
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(mode):
+            raise ValueError("output ancestry must not contain symlinks")
+    if os.path.lexists(absolute):
+        raise ValueError("output must be a new directory; refusing overwrite or symlink")
+
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(absolute.anchor, flags)
+    try:
+        for index, part in enumerate(absolute.parts[1:]):
+            final = index == len(absolute.parts[1:]) - 1
+            try:
+                child = os.open(part, flags, dir_fd=descriptor)
+                if final:
+                    os.close(child)
+                    raise ValueError("output must be a new directory; refusing overwrite or symlink")
+            except FileNotFoundError:
+                os.mkdir(part, dir_fd=descriptor)
+                child = os.open(part, flags, dir_fd=descriptor)
+            except OSError as exc:
+                raise ValueError("output ancestry must contain only directories, not symlinks") from exc
+            os.close(descriptor)
+            descriptor = child
+    finally:
+        os.close(descriptor)
+    return absolute
+
+
 def collect(plan: dict, output: Path, include_objects: bool = False) -> dict:
     rows = validate_plan(plan)
-    if output.exists():
-        raise ValueError("output must be a new directory; refusing overwrite or symlink")
-    output.mkdir(parents=True)
+    output = create_directory_no_symlinks(output)
     inventories = output / "inventories"
     inventories.mkdir()
     results, exported, exported_bytes = [], set(), 0
