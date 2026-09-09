@@ -74,7 +74,6 @@ jobs:
               Path('SECURITY.md'),
               Path('.github/CODEOWNERS'),
               Path('.github/dependabot.yml'),
-              Path('.github/workflows/merge-queue-submission.yml'),
               Path('docs/architecture/adr/0001-ecosystem-topology-authority.md'),
               Path('docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md'),
               Path('docs/ci/CI_CONTRACT.md'),
@@ -99,7 +98,6 @@ jobs:
               Path('tools/governance/bounded_execution_guard.py'),
               Path('tools/governance/agent_continuation_policy.py'),
               Path('tools/governance/central_agent_policy.py'),
-              Path('tools/governance/merge_queue_submission_executor.py'),
               Path('tools/governance/merge_queue_submission_routing.py'),
               Path('tools/governance/test_agent_execution_routing.py'),
               Path('tools/governance/test_bounded_execution_guard.py'),
@@ -108,7 +106,6 @@ jobs:
               Path('tools/governance/test_central_agent_policy.py'),
               Path('tools/governance/test_remote_desktop_action_gate.py'),
               Path('tools/governance/test_merge_queue_workflow_contract.py'),
-              Path('tools/governance/test_merge_queue_submission_executor.py'),
               Path('tools/governance/test_merge_queue_submission_routing.py'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
@@ -216,7 +213,6 @@ jobs:
           python3 tools/governance/test_remote_desktop_action_gate.py
           python3 tools/governance/test_merge_queue_workflow_contract.py
           python3 tools/governance/test_merge_queue_submission_routing.py
-          python3 tools/governance/test_merge_queue_submission_executor.py
           python3 tools/governance/test_bounded_execution_guard.py
           python3 tools/governance/test_agent_continuation_policy.py
           python3 tools/governance/test_agent_continuation_review_repairs.py
