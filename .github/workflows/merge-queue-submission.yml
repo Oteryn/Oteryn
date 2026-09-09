@@ -1,0 +1,127 @@
+name: Merge Queue Submission
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: oteryn-merge-queue-submission
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    if: >-
+      github.repository == 'Oteryn/Oteryn' &&
+      github.event.issue.number == 190 &&
+      !github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/oteryn-mq-submit ')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out protected META executor
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
+      - name: Authorize current control-endpoint actor
+        env:
+          CONTROL_GITHUB_TOKEN: ${{ github.token }}
+          COMMENT_ACTOR: ${{ github.event.comment.user.login }}
+          CONTROL_REPOSITORY: ${{ github.repository }}
+          CONTROL_ISSUE: ${{ github.event.issue.number }}
+        run: >-
+          python tools/governance/merge_queue_submission_executor.py authorize
+          --actor "$COMMENT_ACTOR"
+          --control-repository "$CONTROL_REPOSITORY"
+          --control-issue "$CONTROL_ISSUE"
+
+      - name: Parse exact submission command
+        id: parse
+        env:
+          COMMAND: ${{ github.event.comment.body }}
+        run: >-
+          python tools/governance/merge_queue_submission_executor.py parse
+          --command "$COMMAND"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Mint target-repository Merge Queue App token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ vars.OTERYN_MQ_APP_CLIENT_ID }}
+          private-key: ${{ secrets.OTERYN_MQ_APP_PRIVATE_KEY }}
+          owner: Oteryn
+          repositories: ${{ steps.parse.outputs.repository_name }}
+          permission-checks: read
+          permission-pull-requests: read
+          permission-merge-queues: write
+
+      - name: Enqueue exact qualified pull request
+        env:
+          MQ_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          COMMAND: ${{ github.event.comment.body }}
+          RECEIPT_PATH: ${{ runner.temp }}/mq-submission-receipt.json
+        run: >-
+          python tools/governance/merge_queue_submission_executor.py execute
+          --command "$COMMAND"
+          --receipt-path "$RECEIPT_PATH"
+
+      - name: Render canonical success receipt
+        if: success()
+        env:
+          RECEIPT_PATH: ${{ runner.temp }}/mq-submission-receipt.json
+          RECEIPT_BODY: ${{ runner.temp }}/mq-submission-receipt.md
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          receipt = json.loads(Path(os.environ['RECEIPT_PATH']).read_text(encoding='utf-8'))
+          body = (
+              "<!-- OTERYN_MQ_SUBMISSION_V1 -->\n"
+              "## Merge Queue submission receipt\n\n"
+              f"- status: `{receipt['status']}`\n"
+              f"- attempt: `{receipt['attempt_id']}`\n"
+              f"- target: `{receipt['repository']}#{receipt['pr_number']}`\n"
+              f"- exact head: `{receipt['expected_head_sha']}`\n"
+              f"- required gate: `{receipt['required_gate']}`\n"
+              f"- queue entry: `{receipt['merge_queue_entry_id']}`\n"
+              f"- queue: `{receipt['merge_queue_resource_path']}`\n"
+              f"- workflow run: `{os.environ['GITHUB_RUN_ID']}` attempt `{os.environ['GITHUB_RUN_ATTEMPT']}`\n"
+              f"- trusted workflow SHA: `{os.environ['GITHUB_SHA']}`\n\n"
+              "This receipt proves queue submission only. Normal `merge_group` gate success and protected-main readback remain required.\n"
+          )
+          Path(os.environ['RECEIPT_BODY']).write_text(body, encoding='utf-8')
+          PY
+
+      - name: Publish success receipt to control endpoint
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECEIPT_BODY: ${{ runner.temp }}/mq-submission-receipt.md
+        run: gh issue comment 190 --repo Oteryn/Oteryn --body-file "$RECEIPT_BODY"
+
+      - name: Publish fail-closed result to control endpoint
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          printf '%s\n' \
+            '<!-- OTERYN_MQ_SUBMISSION_V1 -->' \
+            '## Merge Queue submission blocked' \
+            '' \
+            "Protected executor run \`${GITHUB_RUN_ID}\` attempt \`${GITHUB_RUN_ATTEMPT}\` failed closed. No direct-merge or generic auto-merge fallback is attempted. Inspect the authenticated workflow run for the first failing validation." \
+            > "$RUNNER_TEMP/mq-submission-failure.md"
+          gh issue comment 190 --repo Oteryn/Oteryn --body-file "$RUNNER_TEMP/mq-submission-failure.md"
