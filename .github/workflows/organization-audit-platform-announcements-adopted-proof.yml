@@ -25,6 +25,8 @@ on:
       - tools/audit/test_verify_readme_current_state.py
       - tools/audit/verify_platform_audit_recorders_direct.py
       - tools/audit/test_verify_platform_audit_recorders_direct.py
+      - tools/audit/verify_platform_marketplace_tests_group.py
+      - tools/audit/test_verify_platform_marketplace_tests_group.py
       - tools/audit/verify_platform_announcements_direct.py
       - tools/audit/test_verify_platform_announcements_direct.py
       - tools/audit/project_platform_announcements_direct.py
