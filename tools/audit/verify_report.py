@@ -26,6 +26,14 @@ STATES = {'SOURCE_REPAIRED_TESTED','PARTIALLY_REPAIRED','RETIRED_SOURCE','SOURCE
 DEFAULT_REASON = 'Identity enumerated; this continuation does not assert a complete semantic review of this leaf. Historical/source oracles may provide narrower evidence in the finding register.'
 DIRECT_ADDITIONS = 'coverage-review-additions.tsv'
 DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
+INDEPENDENT_REVIEW_UNKNOWN = {
+    'id': 'INDEPENDENT-REVIEW',
+    'missing': 'Independent review lifecycle/outcome for the two adopted Platform audit-recorder DIRECT paths',
+    'reason': 'Independent review and cleanup are complete for the 49-path Marketplace/Payments/Wallet GROUPED expansion and the six-file Marketplace-test GROUPED batch. The remaining bounded review slice is app/Audit/AdminAuditRecorder.php and app/Audit/SecurityEventRecorder.php on the current stable audit lineage; its independent-review lifecycle and outcome are external mutable PR #185 metadata and are not self-certified by this evidence object.',
+    'effect': 'No whole-audit or product-readiness conclusion and no self-awarded independent 10/10 are claimed from the two-path recorder adoption.',
+    'owner_route': 'PR185 reviewer',
+    'closure_condition': 'PR #185 review metadata records the independent exact-head disposition for the two recorder paths; this evidence object remains a durable pre-review snapshot and does not itself close unrelated product/operations obligations.',
+}
 
 
 def require(condition, message):
@@ -227,6 +235,9 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(all(all(r[k].strip() for k in ['acceptance_criterion','method_and_evidence','opinion','remaining_limit','references']) for r in domains),'empty domain evidence')
     unknowns=read_json(base/'unknowns.json')['items'];unique(unknowns,lambda r:r['id'],'unknown id')
     require(len(unknowns)==doc['unresolved_unknowns'],'unknown count')
+    independent=[row for row in unknowns if row.get('id')=='INDEPENDENT-REVIEW']
+    require(len(independent)==1,'independent-review unknown missing')
+    require(independent[0]==INDEPENDENT_REVIEW_UNKNOWN,'independent-review unknown drift')
     review=load_review(base,doc)
     for row in review:
         require(row['repository'] in repo and SHA.fullmatch(row['blob_sha']),'invalid review source')

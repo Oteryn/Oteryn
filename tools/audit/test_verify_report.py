@@ -77,6 +77,25 @@ class AuditValidationTest(unittest.TestCase):
         p=self.base/'finding-register.tsv';p.write_text('id\tid\na\ta\n');self.reject()
     def test_missing_unknown_rejected(self):
         self.mutate(self.base/'unknowns.json',lambda d:d['items'].pop());self.reject()
+    def mutate_independent_review(self, func):
+        def mutate(data):
+            func(next(row for row in data['items'] if row['id']=='INDEPENDENT-REVIEW'))
+        self.mutate(self.base/'unknowns.json',mutate)
+    def test_stale_independent_review_phase_rejected(self):
+        self.mutate_independent_review(lambda row:row.update(
+            reason='The 49-path Marketplace/Payments/Wallet expansion is unreviewed.',
+            effect='No final acceptance is claimed for the 107-GROUPED revision.'))
+        self.reject()
+    def test_changed_recorder_only_gate_rejected(self):
+        self.mutate_independent_review(lambda row:row.update(
+            missing='Independent review lifecycle/outcome for the complete audit'))
+        self.reject()
+    def test_independent_review_extra_key_rejected(self):
+        self.mutate_independent_review(lambda row:row.update(review_passed=False))
+        self.reject()
+    def test_independent_review_type_drift_rejected(self):
+        self.mutate_independent_review(lambda row:row.update(owner_route=['PR185 reviewer']))
+        self.reject()
     def test_workflow_count_inflation_rejected(self):
         self.mutate(self.path,lambda d:d['workflow_census'].update(total_workflows=78));self.reject()
     def test_direct_additions_binding_drift_rejected(self):

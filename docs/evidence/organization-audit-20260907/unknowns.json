@@ -115,11 +115,11 @@
     },
     {
       "id": "INDEPENDENT-REVIEW",
-      "missing": "Independent semantic review of this revision",
-      "reason": "A clean exact-head Codex review of f7f200bd completed for the 31-path account/character expansion. The later 49-path Marketplace/Payments/Wallet GROUPED expansion and its exact 45-case/444-assertion qualification/accounting machinery are new material and have not yet received their own fresh independent exact-head review.",
-      "effect": "No self-awarded 10/10 or final independent acceptance is claimed for the expanded 107-GROUPED revision.",
+      "missing": "Independent review lifecycle/outcome for the two adopted Platform audit-recorder DIRECT paths",
+      "reason": "Independent review and cleanup are complete for the 49-path Marketplace/Payments/Wallet GROUPED expansion and the six-file Marketplace-test GROUPED batch. The remaining bounded review slice is app/Audit/AdminAuditRecorder.php and app/Audit/SecurityEventRecorder.php on the current stable audit lineage; its independent-review lifecycle and outcome are external mutable PR #185 metadata and are not self-certified by this evidence object.",
+      "effect": "No whole-audit or product-readiness conclusion and no self-awarded independent 10/10 are claimed from the two-path recorder adoption.",
       "owner_route": "PR185 reviewer",
-      "closure_condition": "Fresh independent review of the stable post-repair head finds no unresolved material audit/evidence correctness findings; this does not itself close unrelated product/operations obligations."
+      "closure_condition": "PR #185 review metadata records the independent exact-head disposition for the two recorder paths; this evidence object remains a durable pre-review snapshot and does not itself close unrelated product/operations obligations."
     }
   ]
 }
