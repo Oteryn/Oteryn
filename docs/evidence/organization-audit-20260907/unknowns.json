@@ -112,14 +112,6 @@
       "effect": "Cannot claim confidentiality restoration, private advisory submission, current exploitability status or completed security remediation.",
       "owner_route": "Platform451 via the private reporting process in Oteryn/Oteryn-Platform SECURITY.md",
       "closure_condition": "Platform security maintainer assesses severity/reachability on relevant current source through the private reporting route, binds a deterministic regression and disposition/remediation evidence, and separately verifies any artifact deletion/expiry before claiming historical material is no longer downloadable."
-    },
-    {
-      "id": "INDEPENDENT-REVIEW",
-      "missing": "Independent review lifecycle/outcome for the adopted Platform audit-recorder and Announcements DIRECT slices",
-      "reason": "Independent review and cleanup are complete for the 49-path Marketplace/Payments/Wallet GROUPED expansion and the six-file Marketplace-test GROUPED batch. The current stable audit lineage additionally adopts two app/Audit recorder paths and ten app/Announcements/** paths as bounded DIRECT reviews. Their independent-review lifecycle and outcome are external mutable PR #185 metadata and are not self-certified by this evidence object.",
-      "effect": "No whole-audit or product-readiness conclusion and no self-awarded independent 10/10 are claimed from these twelve post-Marketplace DIRECT paths.",
-      "owner_route": "PR185 reviewer",
-      "closure_condition": "PR #185 review metadata records the independent exact-head disposition for the recorder and Announcements DIRECT slices; this evidence object remains a durable pre-review snapshot and does not itself close unrelated product/operations obligations."
     }
   ]
 }

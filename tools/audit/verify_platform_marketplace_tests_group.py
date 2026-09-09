@@ -66,8 +66,9 @@ MARKETPLACE_CLOSEOUT_SUCCESSOR = (
     'reproduced 4,325 rows as 223 DIRECT / 113 GROUPED / 3,989 UNVERIFIED with digest '
     '`2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f` and repeated the exact 25/89 MariaDB result; '
     'META CI `34355682545` succeeded. This is bounded audit evidence, not product readiness, exhaustive '
-    'caller/security-workflow validation or later-current-main Platform acceptance. Fresh independent review of the '
-    'stable recorder-adoption audit head remains required before this two-path slice is closed.'
+    'caller/security-workflow validation or later-current-main Platform acceptance. A fresh independent review later '
+    'completed cleanly on reviewed implementation `3eb62ef72c1e13412fa45d5b25d597d112d9ae7d`; that outcome is observed external '
+    'mutable PR #185 metadata, not author evidence or product readiness.'
 )
 STALE_MARKETPLACE_GATES = (
     'Post-adoption exact-head proof and fresh independent review are still required.',

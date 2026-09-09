@@ -23,6 +23,10 @@ class AuditRecorderDirectVerifierTests(unittest.TestCase):
     def test_committed_adopted_docs_pass(self):
         v.validate_adopted_docs(copy.deepcopy(self.candidate), ROOT)
 
+    def test_current_lifecycle_is_external_review_metadata_not_pending(self):
+        self.assertIn('3eb62ef72c1e13412fa45d5b25d597d112d9ae7d', v.REVIEW_PROVENANCE)
+        self.assertIn('Not self-certified evidence', v.REVIEW_PROVENANCE)
+
     def test_source_coordinate_drift_fails_closed(self):
         c = copy.deepcopy(self.candidate); c['source']['commit_sha'] = '0' * 40
         with self.assertRaisesRegex(ValueError, 'complete audit-recorder candidate'): v.validate_candidate_shape(c)

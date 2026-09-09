@@ -19,6 +19,11 @@ class AnnouncementsAdoptedVerifierTest(unittest.TestCase):
     def test_current_adopted_docs_pass(self):
         adopted.validate_adopted_docs(copy.deepcopy(self.candidate),ROOT)
 
+    def test_current_lifecycle_is_external_review_metadata_not_pending(self):
+        self.assertNotIn('PENDING',adopted.LIFECYCLE_RESULT)
+        self.assertIn('3eb62ef72c1e13412fa45d5b25d597d112d9ae7d',adopted.REVIEW_PROVENANCE)
+        self.assertIn('Not self-certified evidence',adopted.REVIEW_PROVENANCE)
+
     def test_historical_candidate_remains_pre_adoption(self):
         self.assertFalse(self.candidate['coverage_adopted'])
         self.assertEqual(self.candidate['projection']['status'],'PROJECTION_SUCCESS_NOT_ADOPTED')

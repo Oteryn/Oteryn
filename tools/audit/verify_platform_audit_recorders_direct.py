@@ -25,6 +25,7 @@ CANONICAL_OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/coverage
 SOURCE_COMMIT = 'de917b3477a1de0667531380de3660e8b2ab59aa'
 SOURCE_TREE = 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e'
 CURRENT_LEDGER_SHA = '73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9'
+REVIEW_PROVENANCE = 'External mutable PR #185 metadata: reviewed implementation 3eb62ef72c1e13412fa45d5b25d597d112d9ae7d; review comment 5609072309. Not self-certified evidence.'
 SHA = re.compile(r'[0-9a-f]{40}\Z')
 
 
@@ -149,7 +150,8 @@ def main() -> int:
         'current_unverified_paths':3979,
         'current_semantically_classified_paths':346,
         'current_ledger_sha256':CURRENT_LEDGER_SHA,
-        'independent_review_required':True,
+        'independent_review_required':False,
+        'review_provenance':REVIEW_PROVENANCE,
         'product_readiness_claimed':False,
         'audit_completion_claimed':False,
     },sort_keys=True))

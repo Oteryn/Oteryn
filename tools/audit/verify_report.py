@@ -68,16 +68,39 @@ SEMANTIC_COVERAGE_UNKNOWN = {
     'owner_route': 'META186 plus provider audit owners',
     'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review changed/uncovered authored families, and retain justified grouping/N/A.',
 }
-INDEPENDENT_REVIEW_UNKNOWN = {
-    'id': 'INDEPENDENT-REVIEW',
-    'missing': 'Independent review lifecycle/outcome for the adopted Platform audit-recorder and Announcements DIRECT slices',
-    'reason': 'Independent review and cleanup are complete for the 49-path Marketplace/Payments/Wallet GROUPED expansion and the six-file Marketplace-test GROUPED batch. The current stable audit lineage additionally adopts two app/Audit recorder paths and ten app/Announcements/** paths as bounded DIRECT reviews. Their independent-review lifecycle and outcome are external mutable PR #185 metadata and are not self-certified by this evidence object.',
-    'effect': 'No whole-audit or product-readiness conclusion and no self-awarded independent 10/10 are claimed from these twelve post-Marketplace DIRECT paths.',
-    'owner_route': 'PR185 reviewer',
-    'closure_condition': 'PR #185 review metadata records the independent exact-head disposition for the recorder and Announcements DIRECT slices; this evidence object remains a durable pre-review snapshot and does not itself close unrelated product/operations obligations.',
+R3_REVIEW = {
+    'reviewed_head': '9096edd135d42f31da4824f4c4fb50ee187de2c9',
+    'result': 'CHANGES_REQUIRED',
+    'p1': 4,
+    'p2': 1,
+    'author_remediation': 'PUBLISHED_AND_SUBSEQUENTLY_HARDENED',
+    'fresh_independent_rereview_required': False,
+    'latest_repair_rereview_requested_head': '3eb62ef72c1e13412fa45d5b25d597d112d9ae7d',
+    'security_disclosure_state': 'PUBLIC_ANCESTOR_HISTORY_AND_ARTIFACTS_TREATED_AS_DISCLOSED; current report does not repeat mechanism details; deletion/expiry not established',
+    'latest_completed_rereview': {
+        'reviewed_head': '3eb62ef72c1e13412fa45d5b25d597d112d9ae7d',
+        'result': 'PASS_NO_NEW_P0_P1_P2',
+        'review_summary': 'Completed for 3eb62ef',
+        'review_comment_id': 5609072309,
+        'review_comment': "Codex Review: Didn't find any major issues",
+        'provenance': 'Observed external mutable GitHub PR #185 metadata; not author-generated audit evidence.',
+        'p1': 0,
+        'p2': 0,
+        'new_material_findings': [],
+    },
+    'fresh_rereview_reason': 'SATISFIED_BY_EXTERNAL_PR_METADATA: fresh independent exact-head review completed cleanly on reviewed implementation 3eb62ef72c1e13412fa45d5b25d597d112d9ae7d (comment 5609072309). Later terminal cleanup head 12d6ee2f76f3ed23ee6a5d78131f2f64eaa2c97d removes only the two bounded proof workflows and records remaining_bounded_proof_workflows=[]; post-cleanup META CI run 34408192898/job 102656129082 succeeded and terminal read-only verifier comment 5609155461 reported 10/10 current-state tests PASS. These are external mutable lifecycle facts, not author evidence, whole-audit PASS, independent 10/10, or product readiness.',
+    'reviewed_implementation_head': '3eb62ef72c1e13412fa45d5b25d597d112d9ae7d',
+    'terminal_cleanup': {
+        'head': '12d6ee2f76f3ed23ee6a5d78131f2f64eaa2c97d',
+        'remaining_bounded_proof_workflows': [],
+        'meta_ci_run_id': 34408192898,
+        'meta_ci_job_id': 102656129082,
+        'meta_ci_result': 'SUCCESS',
+        'terminal_verifier_comment_id': 5609155461,
+        'terminal_verifier_tests': '10/10 PASS',
+        'provenance': 'Observed external mutable GitHub PR #185 metadata and read-only verifier output; not author-generated audit evidence.',
+    },
 }
-
-
 def require(condition, message):
     if not condition:
         raise ValueError(message)
@@ -275,6 +298,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(doc.get('coverage_review_additions')==DIRECT_ADDITIONS_BINDING,'canonical direct additions binding drift')
     require(doc.get('coverage_review_recorder_additions')==RECORDER_ADDITIONS_BINDING,'recorder additions evidence binding drift')
     require(doc.get('coverage_review_announcements_additions')==ANNOUNCEMENTS_ADDITIONS_BINDING,'Announcements additions evidence binding drift')
+    require(json_exact(doc.get('r3_review'),R3_REVIEW),'R3 review lifecycle drift')
     base=report_path.parent/doc['evidence_directory']
     findings=read_tsv(base/'finding-register.tsv');unique(findings,lambda r:r['id'],'finding id')
     require(len(findings)==doc['reconciled_register_rows'],'finding count mismatch')
@@ -295,8 +319,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(len(semantic_coverage)==1,'semantic-coverage unknown missing')
     require(json_exact(semantic_coverage[0],SEMANTIC_COVERAGE_UNKNOWN),'semantic-coverage unknown drift')
     independent=[row for row in unknowns if row.get('id')=='INDEPENDENT-REVIEW']
-    require(len(independent)==1,'independent-review unknown missing')
-    require(json_exact(independent[0],INDEPENDENT_REVIEW_UNKNOWN),'independent-review unknown drift')
+    require(not independent,'resolved independent-review unknown was reintroduced')
     review=load_review(base,doc)
     for row in review:
         require(row['repository'] in repo and SHA.fullmatch(row['blob_sha']),'invalid review source')

@@ -15,6 +15,8 @@ ANNOUNCEMENTS_OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/cove
 ANNOUNCEMENTS_OVERLAY_BLOB = '7822ad14cb7c9311267fd7bbf52490ca320762e9'
 ANNOUNCEMENTS_OVERLAY_SHA256 = '5e9b4832b886cf9049f49be00fa32b76abab5b896e63a1711688c47fb5addcb2'
 CANONICAL_LEDGER_SHA = '73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9'
+LIFECYCLE_RESULT = 'ANNOUNCEMENTS_DIRECT_CANONICAL_ADOPTION_VALID_REVIEW_OBSERVED_IN_EXTERNAL_PR_METADATA'
+REVIEW_PROVENANCE = 'External mutable PR #185 metadata: reviewed implementation 3eb62ef72c1e13412fa45d5b25d597d112d9ae7d; review comment 5609072309. Not self-certified evidence.'
 EXPECTED_LINE_RANGES = {
     'app/Announcements/Actions/SaveAnnouncement.php': '[[1,134]]',
     'app/Announcements/Factories/SiteAnnouncementFactory.php': '[[1,33]]',
@@ -119,7 +121,7 @@ def main() -> int:
     pre.validate_source(candidate,args.platform_root)
     validate_adopted_docs(candidate,args.audit_root)
     print(json.dumps({
-        'result':'ANNOUNCEMENTS_DIRECT_CANONICAL_ADOPTION_VALID_PENDING_POST_PROOF_AND_INDEPENDENT_REVIEW',
+        'result':LIFECYCLE_RESULT,
         'source_commit':pre.SOURCE_COMMIT,
         'adopted_paths':10,
         'direct_paths':233,
@@ -131,7 +133,8 @@ def main() -> int:
         'primary_assertions':20,
         'polish_locale_join_directly_executed':False,
         'dedicated_simultaneous_writer_race_executed':False,
-        'independent_review_required':True,
+        'independent_review_required':False,
+        'review_provenance':REVIEW_PROVENANCE,
         'product_readiness_claimed':False,
         'audit_completion_claimed':False,
     },sort_keys=True))

@@ -22,7 +22,7 @@
   "reconciled_register_rows": 78,
   "historical_source_ids_accounted": 74,
   "additional_followup_ids": 4,
-  "unresolved_unknowns": 15,
+  "unresolved_unknowns": 14,
   "audit_domains_accounted": 23,
   "audit_domains_all_pass": false,
   "workflow_census": {
@@ -73,23 +73,32 @@
     "p1": 4,
     "p2": 1,
     "author_remediation": "PUBLISHED_AND_SUBSEQUENTLY_HARDENED",
-    "fresh_independent_rereview_required": true,
-    "latest_repair_rereview_requested_head": "7f53b509791aae6d56637522aee65891e449914c",
+    "fresh_independent_rereview_required": false,
+    "latest_repair_rereview_requested_head": "3eb62ef72c1e13412fa45d5b25d597d112d9ae7d",
     "security_disclosure_state": "PUBLIC_ANCESTOR_HISTORY_AND_ARTIFACTS_TREATED_AS_DISCLOSED; current report does not repeat mechanism details; deletion/expiry not established",
     "latest_completed_rereview": {
-      "reviewed_head": "7f53b509791aae6d56637522aee65891e449914c",
-      "completed_at_utc": "2026-09-09T10:39:19.468639Z",
+      "reviewed_head": "3eb62ef72c1e13412fa45d5b25d597d112d9ae7d",
       "result": "PASS_NO_NEW_P0_P1_P2",
+      "review_summary": "Completed for 3eb62ef",
+      "review_comment_id": 5609072309,
+      "review_comment": "Codex Review: Didn't find any major issues",
+      "provenance": "Observed external mutable GitHub PR #185 metadata; not author-generated audit evidence.",
       "p1": 0,
       "p2": 0,
-      "new_material_findings": [],
-      "historical_review_threads_resolved_after_readback": 15,
-      "gameauth_review_threads_resolved_after_readback": 2,
-      "account_character_batch_review": "PASS_NO_NEW_P0_P1_P2",
-      "marketplace_payments_wallet_batch_review": "PASS_NO_NEW_P0_P1_P2",
-      "marketplace_tests_batch_review": "PASS_NO_NEW_P0_P1_P2"
+      "new_material_findings": []
     },
-    "fresh_rereview_reason": "The two frozen Platform app/Audit recorder DIRECT paths and the ten frozen app/Announcements/** DIRECT paths are material additions after the clean 7f53b509 Marketplace-test re-review. Their canonical composition and exact-head post-adoption proof require fresh independent review; the committed evidence does not self-certify that outcome."
+    "fresh_rereview_reason": "SATISFIED_BY_EXTERNAL_PR_METADATA: fresh independent exact-head review completed cleanly on reviewed implementation 3eb62ef72c1e13412fa45d5b25d597d112d9ae7d (comment 5609072309). Later terminal cleanup head 12d6ee2f76f3ed23ee6a5d78131f2f64eaa2c97d removes only the two bounded proof workflows and records remaining_bounded_proof_workflows=[]; post-cleanup META CI run 34408192898/job 102656129082 succeeded and terminal read-only verifier comment 5609155461 reported 10/10 current-state tests PASS. These are external mutable lifecycle facts, not author evidence, whole-audit PASS, independent 10/10, or product readiness.",
+    "reviewed_implementation_head": "3eb62ef72c1e13412fa45d5b25d597d112d9ae7d",
+    "terminal_cleanup": {
+      "head": "12d6ee2f76f3ed23ee6a5d78131f2f64eaa2c97d",
+      "remaining_bounded_proof_workflows": [],
+      "meta_ci_run_id": 34408192898,
+      "meta_ci_job_id": 102656129082,
+      "meta_ci_result": "SUCCESS",
+      "terminal_verifier_comment_id": 5609155461,
+      "terminal_verifier_tests": "10/10 PASS",
+      "provenance": "Observed external mutable GitHub PR #185 metadata and read-only verifier output; not author-generated audit evidence."
+    }
   },
   "audit_completion": "NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial",
   "source_cut_policy": "Immutable original pinned generations are retained. Later lifecycle observations are separate evidence; this is not an all-repositories current-main acceptance snapshot.",

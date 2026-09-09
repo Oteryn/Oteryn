@@ -78,10 +78,6 @@ class AuditValidationTest(unittest.TestCase):
         p=self.base/'finding-register.tsv';p.write_text('id\tid\na\ta\n');self.reject()
     def test_missing_unknown_rejected(self):
         self.mutate(self.base/'unknowns.json',lambda d:d['items'].pop());self.reject()
-    def mutate_independent_review(self, func):
-        def mutate(data):
-            func(next(row for row in data['items'] if row['id']=='INDEPENDENT-REVIEW'))
-        self.mutate(self.base/'unknowns.json',mutate)
     def mutate_semantic_coverage(self, func):
         def mutate(data):
             func(next(row for row in data['items'] if row['id']=='SEMANTIC-COVERAGE'))
@@ -118,20 +114,30 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate_semantic_coverage(lambda row:row.update(
             missing={'unverified': 3979, 'classified': 346, 'total': 4325}))
         self.reject()
-    def test_stale_independent_review_phase_rejected(self):
-        self.mutate_independent_review(lambda row:row.update(
-            reason='The 49-path Marketplace/Payments/Wallet expansion is unreviewed.',
-            effect='No final acceptance is claimed for an older grouped revision.'))
+    def test_resolved_independent_review_row_reintroduction_rejected(self):
+        stale = {
+            'id': 'INDEPENDENT-REVIEW',
+            'missing': 'Independent review lifecycle/outcome for the adopted Platform audit-recorder and Announcements DIRECT slices',
+            'reason': 'Fresh independent review remains pending.',
+            'effect': 'Current exact-head review is not established.',
+            'owner_route': 'PR185 reviewer',
+            'closure_condition': 'Obtain review metadata.',
+        }
+        self.mutate(self.base/'unknowns.json',lambda data:data['items'].append(stale))
         self.reject()
-    def test_changed_current_review_gate_rejected(self):
-        self.mutate_independent_review(lambda row:row.update(
-            missing='Independent review lifecycle/outcome for the complete audit'))
+    def test_resolved_independent_review_row_reintroduction_rejected_even_if_count_is_adjusted(self):
+        stale = {'id':'INDEPENDENT-REVIEW','missing':'pending','reason':'pending','effect':'pending','owner_route':'PR185 reviewer','closure_condition':'pending'}
+        self.mutate(self.base/'unknowns.json',lambda data:data['items'].append(stale))
+        self.mutate(self.path,lambda data:data.update(unresolved_unknowns=15))
         self.reject()
-    def test_independent_review_extra_key_rejected(self):
-        self.mutate_independent_review(lambda row:row.update(review_passed=False))
+    def test_stale_report_pending_review_state_rejected(self):
+        self.mutate(self.path,lambda data:data['r3_review'].update(fresh_independent_rereview_required=True))
         self.reject()
-    def test_independent_review_type_drift_rejected(self):
-        self.mutate_independent_review(lambda row:row.update(owner_route=['PR185 reviewer']))
+    def test_reviewed_implementation_and_cleanup_heads_are_distinct_and_bound(self):
+        self.mutate(self.path,lambda data:data['r3_review']['terminal_cleanup'].update(head='3eb62ef72c1e13412fa45d5b25d597d112d9ae7d'))
+        self.reject()
+    def test_external_review_provenance_type_drift_rejected(self):
+        self.mutate(self.path,lambda data:data['r3_review']['latest_completed_rereview'].update(review_comment_id='5609072309'))
         self.reject()
     def test_workflow_count_inflation_rejected(self):
         self.mutate(self.path,lambda d:d['workflow_census'].update(total_workflows=78));self.reject()
