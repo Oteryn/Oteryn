@@ -31,6 +31,18 @@ DIRECT_ADDITIONS = 'coverage-review-canonical-additions.tsv'
 DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-canonical-additions.tsv'
 RECORDER_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
 ANNOUNCEMENTS_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-announcements-additions.tsv'
+EXPECTED_UNRESOLVED_IDS = {
+    'SEMANTIC-COVERAGE', 'HISTORY-REVALIDATION', 'ADMIN-STATE', 'INFRA-STATE', 'RECOVERY',
+    'COST-CI', 'COST-AGENTS', 'SUPPLY-CHAIN', 'NATIVE-G1', 'UI-343', 'PORTABILITY',
+    'LIVE-TELEMETRY', 'PRIVACY-RIGHTS', 'PLATFORM-H02',
+}
+EXPECTED_RESIDUAL_OBLIGATIONS_PARAGRAPH = (
+    'All 23 A–W domains have a criterion, method, evidence, opinion and limitation in `domain-matrix.tsv`. '
+    'FOURTEEN material residual obligations retain explicit owner routes and measurable closure conditions in '
+    '`unknowns.json`: `SEMANTIC-COVERAGE`, `HISTORY-REVALIDATION`, `ADMIN-STATE`, `INFRA-STATE`, `RECOVERY`, '
+    '`COST-CI`, `COST-AGENTS`, `SUPPLY-CHAIN`, `NATIVE-G1`, `UI-343`, `PORTABILITY`, `LIVE-TELEMETRY`, '
+    '`PRIVACY-RIGHTS`, and `PLATFORM-H02`.'
+)
 _LIBC = ctypes.CDLL(None, use_errno=True)
 _AT_EMPTY_PATH = 0x1000
 
@@ -115,6 +127,14 @@ def json_exact(left, right):
     if isinstance(left, list):
         return len(left) == len(right) and all(json_exact(a, b) for a, b in zip(left, right))
     return left == right
+
+
+def validate_residual_obligations_paragraph(report_path: Path) -> None:
+    companion = report_path.with_suffix('.md')
+    require(companion.is_file(), 'companion report missing')
+    paragraphs = [re.sub(r'\s+', ' ', part.strip()) for part in re.split(r'\n\s*\n', companion.read_text(encoding='utf-8')) if part.strip()]
+    expected = re.sub(r'\s+', ' ', EXPECTED_RESIDUAL_OBLIGATIONS_PARAGRAPH)
+    require(paragraphs.count(expected) == 1, 'residual-obligations paragraph drift')
 
 
 def read_json(path):
@@ -314,7 +334,10 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(len(domains)==doc['audit_domains_accounted'],'domain count')
     require(all(all(r[k].strip() for k in ['acceptance_criterion','method_and_evidence','opinion','remaining_limit','references']) for r in domains),'empty domain evidence')
     unknowns=read_json(base/'unknowns.json')['items'];unique(unknowns,lambda r:r['id'],'unknown id')
-    require(len(unknowns)==doc['unresolved_unknowns'],'unknown count')
+    require(type(doc.get('unresolved_unknowns')) is int and doc['unresolved_unknowns']==14,'report unresolved unknown count must be exactly 14')
+    require(len(unknowns)==14,'unresolved unknown count must be exactly 14')
+    require({row.get('id') for row in unknowns}==EXPECTED_UNRESOLVED_IDS,'unresolved unknown ID set drift')
+    validate_residual_obligations_paragraph(report_path)
     semantic_coverage=[row for row in unknowns if row.get('id')=='SEMANTIC-COVERAGE']
     require(len(semantic_coverage)==1,'semantic-coverage unknown missing')
     require(json_exact(semantic_coverage[0],SEMANTIC_COVERAGE_UNKNOWN),'semantic-coverage unknown drift')

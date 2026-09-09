@@ -1,6 +1,6 @@
 # Organization audit R3 evidence
 
-Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 15 residual obligations, 233 DIRECT scoped path reviews and 113 bounded GROUPED Platform paths out of 4325 immutable leaves. In total, 346 leaves are semantically classified and 3979 retain UNVERIFIED semantics. Full-file, control-field, translation-range and GROUPED carry-forward evidence are intentionally distinguished.
+Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 14 residual obligations, 233 DIRECT scoped path reviews and 113 bounded GROUPED Platform paths out of 4325 immutable leaves. In total, 346 leaves are semantically classified and 3979 retain UNVERIFIED semantics. Full-file, control-field, translation-range and GROUPED carry-forward evidence are intentionally distinguished.
 
 ## Local checks
 

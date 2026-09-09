@@ -110,7 +110,7 @@ The historical correction package, GameAuth, account/character, Marketplace/Paym
 
 ## 7. Remaining obligations and closure conditions
 
-All 23 A–W domains have a criterion, method, evidence, opinion and limitation in `domain-matrix.tsv`. Fifteen material residual obligations retain explicit owner routes and measurable closure conditions in `unknowns.json`: unadopted source semantics; unresolved historical outcomes; admin and production configuration; current data recovery; representative CI and actual agent costs; broader supply chain; native G1; initialized Atlas UI; OS/runtime portability; telemetry; rights/privacy; disclosed security disposition; independent semantic review.
+All 23 A–W domains have a criterion, method, evidence, opinion and limitation in `domain-matrix.tsv`. FOURTEEN material residual obligations retain explicit owner routes and measurable closure conditions in `unknowns.json`: `SEMANTIC-COVERAGE`, `HISTORY-REVALIDATION`, `ADMIN-STATE`, `INFRA-STATE`, `RECOVERY`, `COST-CI`, `COST-AGENTS`, `SUPPLY-CHAIN`, `NATIVE-G1`, `UI-343`, `PORTABILITY`, `LIVE-TELEMETRY`, `PRIVACY-RIGHTS`, and `PLATFORM-H02`.
 
 These are not all access failures. Source bytes and native hosted execution are available. Missing semantic review must be completed or validly imported, not labelled inaccessible. Maintenance does not turn suspended authored code into tested code. No host/deploy action is authorized merely because a tool exists.
 

@@ -34,6 +34,10 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         mutated = mutated.replace('3979 retain UNVERIFIED semantics', '3989 retain UNVERIFIED semantics', 1)
         self.reject(mutated)
 
+    def test_stale_residual_obligation_count_rejected(self):
+        mutated = self.current.replace('14 residual obligations', '15 residual obligations', 1)
+        self.reject(mutated)
+
     def test_historical_review_pending_wording_rejected(self):
         mutated = self.current.replace(
             'Those five corrections are applied and carried forward in the current audit lineage; they are not a pending review gate in this README.',

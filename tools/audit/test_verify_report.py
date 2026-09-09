@@ -20,6 +20,7 @@ class AuditValidationTest(unittest.TestCase):
         self.root=Path(self.tmp.name)
         self.path=self.root/REPORT
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
+        shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
         self.base=self.root/EVIDENCE;self.base.mkdir()
         for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
@@ -78,6 +79,27 @@ class AuditValidationTest(unittest.TestCase):
         p=self.base/'finding-register.tsv';p.write_text('id\tid\na\ta\n');self.reject()
     def test_missing_unknown_rejected(self):
         self.mutate(self.base/'unknowns.json',lambda d:d['items'].pop());self.reject()
+    def test_missing_history_with_coordinated_count_rejected(self):
+        self.mutate(self.base/'unknowns.json',lambda d:d.update(items=[row for row in d['items'] if row['id']!='HISTORY-REVALIDATION']))
+        self.mutate(self.path,lambda d:d.update(unresolved_unknowns=13))
+        self.reject()
+    def test_expected_unknown_replacement_rejected(self):
+        def replace(data):
+            row=next(row for row in data['items'] if row['id']=='HISTORY-REVALIDATION')
+            row['id']='UNEXPECTED-OPEN-OBLIGATION'
+        self.mutate(self.base/'unknowns.json',replace)
+        self.reject()
+    def test_report_unknown_count_not_fourteen_rejected(self):
+        self.mutate(self.path,lambda d:d.update(unresolved_unknowns=13))
+        self.reject()
+    def test_residual_obligations_paragraph_drift_rejected(self):
+        companion=self.path.with_suffix('.md')
+        companion.write_text(companion.read_text(encoding='utf-8').replace('FOURTEEN material residual obligations','Fifteen material residual obligations',1),encoding='utf-8')
+        self.reject()
+    def test_residual_obligation_id_drop_rejected(self):
+        companion=self.path.with_suffix('.md')
+        companion.write_text(companion.read_text(encoding='utf-8').replace(', `HISTORY-REVALIDATION`','',1),encoding='utf-8')
+        self.reject()
     def mutate_semantic_coverage(self, func):
         def mutate(data):
             func(next(row for row in data['items'] if row['id']=='SEMANTIC-COVERAGE'))
