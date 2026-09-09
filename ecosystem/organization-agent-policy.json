@@ -16,6 +16,8 @@
     "docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md",
     "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md",
     "docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md",
+    ".github/workflows/merge-queue-submission.yml",
+    "tools/governance/merge_queue_submission_executor.py",
     "tools/governance/merge_queue_submission_routing.py"
   ],
   "provider_binding_schema": {
