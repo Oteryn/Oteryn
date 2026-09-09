@@ -321,6 +321,18 @@
     "ledger_reproduction_artifact": 10079037530,
     "pre_adoption_ledger_sha256": "b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459",
     "projected_adopted_ledger_sha256": "742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406",
-    "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS"
+    "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS",
+    "post_adoption_head": "5ba21f04dde762a28fdcc04765bfbcfd929ba54a",
+    "post_adoption_run": 34285636501,
+    "post_adoption_job": 102260463521,
+    "post_adoption_verifier_unit_tests": 14,
+    "post_adoption_meta_ci_run": 34285636467,
+    "post_adoption_ledger_run": 34285636466,
+    "post_adoption_ledger_job": 102260463287,
+    "post_adoption_ledger_artifact": 10079336853,
+    "post_adoption_ledger_sha256": "742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406",
+    "post_adoption_grouped_paths": 107,
+    "post_adoption_unverified_paths": 3997,
+    "post_adoption_result": "MARKETPLACE_PAYMENTS_WALLET_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS"
   }
 }

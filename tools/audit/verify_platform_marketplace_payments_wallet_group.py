@@ -115,6 +115,7 @@ PRIMARY_QUALIFICATION = {
     'tracked_source_clean_after_execution': True,
     'outcome': 'QUALIFIED_PRIMARY_NOT_YET_ADOPTED',
 }
+POST_ADOPTION = {'audit_head': '5ba21f04dde762a28fdcc04765bfbcfd929ba54a', 'workflow_run': 34285636501, 'job': 102260463521, 'result': 'PASS', 'canonical_group_state': 'MARKETPLACE_PAYMENTS_WALLET_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS', 'verifier_unit_tests': 14, 'focused_current_tests': {'test_files': 13, 'junit_files': 5, 'cases': 45, 'assertions': 444, 'failures': 0, 'errors': 0, 'skipped': 0, 'junit': [{'file': 'marketplace-transfer-concurrency.xml', 'cases': 1, 'assertions': 54, 'failures': 0, 'errors': 0, 'skipped': 0}, {'file': 'marketplace-transfer.xml', 'cases': 2, 'assertions': 15, 'failures': 0, 'errors': 0, 'skipped': 0}, {'file': 'ordinary.xml', 'cases': 40, 'assertions': 327, 'failures': 0, 'errors': 0, 'skipped': 0}, {'file': 'payment-event-concurrency.xml', 'cases': 1, 'assertions': 23, 'failures': 0, 'errors': 0, 'skipped': 0}, {'file': 'payment-refund-concurrency.xml', 'cases': 1, 'assertions': 25, 'failures': 0, 'errors': 0, 'skipped': 0}]}, 'php': '8.5.10', 'mariadb': '11.8.9', 'meta_ci_run': 34285636467, 'meta_ci_result': 'SUCCESS', 'ledger_reproduction_run': 34285636466, 'ledger_reproduction_job': 102260463287, 'ledger_reproduction_artifact': 10079336853, 'ledger_sha256': '742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406', 'ledger_counts': {'source_rows': 4325, 'direct_paths': 221, 'grouped_paths': 107, 'unverified_paths': 3997}}
 GROUP_SCOPE = (
     'Historical direct-read evidence for the documented 49-file Marketplace/Payments/Wallet production batch '
     'is carried forward only for this exact byte-identical family. Adoption is bounded by exact family '
@@ -280,7 +281,7 @@ def validate_candidate_shape(candidate) -> bool:
     require(isinstance(qualification, dict), 'qualified candidate missing primary qualification')
     require(json_exact(qualification, PRIMARY_QUALIFICATION), 'candidate qualification must equal exact bound run/result')
     if adopted:
-        require('post_adoption_revalidation' not in candidate, 'post-adoption evidence must be bound only after adopted-state requalification')
+        require(json_exact(candidate.get('post_adoption_revalidation'), POST_ADOPTION), 'post-adoption evidence must be bound only after adopted-state requalification')
     else:
         require('post_adoption_revalidation' not in candidate, 'pending adoption candidate cannot carry post-adoption revalidation')
     return adopted
@@ -348,7 +349,7 @@ def verify(audit_root: Path, platform_root: Path, evidence_root: Path):
 
     if adopted:
         result = 'MARKETPLACE_PAYMENTS_WALLET_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS'
-        next_gate = 'run exact-head adopted-state hosted requalification and bind post-adoption evidence before cleanup'
+        next_gate = 'fresh independent exact-head review; retain temporary qualification and ledger evidence until review completes'
     else:
         result = 'MARKETPLACE_PAYMENTS_WALLET_PRIMARY_QUALIFIED_NOT_ADOPTED'
         next_gate = 'reproduce projected ledger digest and atomically adopt three exact GROUPED records or leave all 49 UNVERIFIED'

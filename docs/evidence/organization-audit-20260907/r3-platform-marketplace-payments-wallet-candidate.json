@@ -154,5 +154,78 @@
     "composer_validate": "PASS",
     "tracked_source_clean_after_execution": true,
     "outcome": "QUALIFIED_PRIMARY_NOT_YET_ADOPTED"
+  },
+  "post_adoption_revalidation": {
+    "audit_head": "5ba21f04dde762a28fdcc04765bfbcfd929ba54a",
+    "workflow_run": 34285636501,
+    "job": 102260463521,
+    "result": "PASS",
+    "canonical_group_state": "MARKETPLACE_PAYMENTS_WALLET_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS",
+    "verifier_unit_tests": 14,
+    "focused_current_tests": {
+      "test_files": 13,
+      "junit_files": 5,
+      "cases": 45,
+      "assertions": 444,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "junit": [
+        {
+          "file": "marketplace-transfer-concurrency.xml",
+          "cases": 1,
+          "assertions": 54,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "file": "marketplace-transfer.xml",
+          "cases": 2,
+          "assertions": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "file": "ordinary.xml",
+          "cases": 40,
+          "assertions": 327,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "file": "payment-event-concurrency.xml",
+          "cases": 1,
+          "assertions": 23,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "file": "payment-refund-concurrency.xml",
+          "cases": 1,
+          "assertions": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "php": "8.5.10",
+    "mariadb": "11.8.9",
+    "meta_ci_run": 34285636467,
+    "meta_ci_result": "SUCCESS",
+    "ledger_reproduction_run": 34285636466,
+    "ledger_reproduction_job": 102260463287,
+    "ledger_reproduction_artifact": 10079336853,
+    "ledger_sha256": "742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406",
+    "ledger_counts": {
+      "source_rows": 4325,
+      "direct_paths": 221,
+      "grouped_paths": 107,
+      "unverified_paths": 3997
+    }
   }
 }
