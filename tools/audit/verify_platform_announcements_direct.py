@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Fail-closed pre-adoption verifier for frozen Platform app/Announcements/**.
 
-This proves exact candidate/source identity and primary-execution prerequisites.
-It cannot promote coverage: all ten paths remain UNVERIFIED until a separate
-projection, adoption, post-adoption proof and independent review complete.
+This proves exact candidate/source identity and binds the completed primary
+qualification. It cannot promote coverage: all ten paths remain UNVERIFIED
+until a separate projection, adoption, post-adoption proof and independent
+review complete.
 """
 from __future__ import annotations
 
@@ -15,7 +16,7 @@ import re
 import subprocess
 
 CANDIDATE_REL = Path('docs/evidence/organization-audit-20260907/r3-platform-announcements-direct-candidate.json')
-CANDIDATE_BLOB = 'eabe7e5cc7edee8c1fb40d51e67f8b15def5380c'
+CANDIDATE_BLOB = '378b80656470c445a0cae9163d2246615dd039c5'
 SOURCE_COMMIT = 'de917b3477a1de0667531380de3660e8b2ab59aa'
 SOURCE_TREE = 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e'
 BASE_LEDGER_SHA = '2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f'
@@ -57,10 +58,15 @@ EXPECTED_BASELINE = {
     'platform_unverified_paths': 1894, 'ledger_sha256': BASE_LEDGER_SHA,
 }
 EXPECTED_QUALIFICATION = {
-    'status': 'PENDING_PRIMARY_EXECUTION', 'mariadb_image': 'mariadb:11.8.9',
+    'status': 'PRIMARY_QUALIFICATION_SUCCESS', 'mariadb_image': 'mariadb:11.8.9',
     'db_connection': 'mysql', 'db_port': 3306, 'test_files': 1,
-    'expected_cases': 4, 'exact_assertions': 'TO_BE_BOUND_FROM_PRIMARY_RUN',
+    'expected_cases': 4, 'exact_assertions': 20,
     'required_failures': 0, 'required_errors': 0, 'required_skips': 0,
+    'primary_audit_head': '0e132f9dc453e5d6784ae5c4c80f2d0330573409',
+    'primary_run_id': 34380399141,
+    'primary_job_id': 102563546379,
+    'primary_artifact_id': 10115614293,
+    'primary_artifact_sha256': 'eb577820be531bfbb5451cf8d964ffeb6a78eeb47d06c36c872ab2e04637141f',
 }
 
 
@@ -112,7 +118,7 @@ def validate_candidate_shape(candidate: dict) -> None:
         'role': 'FOCUSED_EXECUTION_DEPENDENCY_NOT_PROMOTED_BY_THIS_CANDIDATE',
     }], 'candidate focused test binding drift')
     require(candidate['baseline_accounting'] == EXPECTED_BASELINE, 'candidate baseline accounting drift')
-    require(candidate['qualification'] == EXPECTED_QUALIFICATION, 'candidate qualification state drift')
+    require(candidate['qualification'] == EXPECTED_QUALIFICATION, 'candidate qualification state/provenance drift')
     require(candidate['projection']['status'] == 'NOT_RUN_NO_CANONICAL_CHANGE', 'candidate projection status drift')
     require(candidate['projection']['adopted_paths'] == 0, 'candidate projection must not adopt paths')
     require(candidate['projection']['candidate_paths'] == 10, 'candidate projection path count drift')
@@ -182,16 +188,21 @@ def main() -> int:
     require(git(args.audit_root, 'rev-parse', 'HEAD:' + str(CANDIDATE_REL)) == CANDIDATE_BLOB, 'tracked candidate blob drift')
     validate_source(candidate, args.platform_root)
     print(json.dumps({
-        'result': 'ANNOUNCEMENTS_DIRECT_CANDIDATE_QUALIFIED_FOR_PRIMARY_EXECUTION_NOT_ADOPTED',
+        'result': 'ANNOUNCEMENTS_PRIMARY_QUALIFICATION_BOUND_NOT_ADOPTED',
         'source_commit': SOURCE_COMMIT,
         'candidate_paths': 10,
         'coverage_adopted': False,
+        'primary_cases': 4,
+        'primary_assertions': 20,
+        'primary_run_id': 34380399141,
+        'primary_job_id': 102563546379,
+        'primary_artifact_id': 10115614293,
         'canonical_direct_paths': 223,
         'canonical_grouped_paths': 113,
         'canonical_unverified_paths': 3989,
         'canonical_semantically_classified_paths': 336,
         'canonical_ledger_sha256': BASE_LEDGER_SHA,
-        'next_gate': 'real MariaDB primary qualification; canonical coverage must remain unchanged',
+        'next_gate': 'mechanical projection only; canonical coverage must remain unchanged until explicit adoption',
         'product_readiness_claimed': False,
         'audit_completion_claimed': False,
     }, sort_keys=True))
