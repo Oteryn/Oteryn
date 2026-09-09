@@ -211,16 +211,21 @@
     "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f"
   },
   "qualification": {
-    "status": "PENDING_PRIMARY_EXECUTION",
+    "status": "PRIMARY_QUALIFICATION_SUCCESS",
     "mariadb_image": "mariadb:11.8.9",
     "db_connection": "mysql",
     "db_port": 3306,
     "test_files": 1,
     "expected_cases": 4,
-    "exact_assertions": "TO_BE_BOUND_FROM_PRIMARY_RUN",
+    "exact_assertions": 20,
     "required_failures": 0,
     "required_errors": 0,
-    "required_skips": 0
+    "required_skips": 0,
+    "primary_audit_head": "0e132f9dc453e5d6784ae5c4c80f2d0330573409",
+    "primary_run_id": 34380399141,
+    "primary_job_id": 102563546379,
+    "primary_artifact_id": 10115614293,
+    "primary_artifact_sha256": "eb577820be531bfbb5451cf8d964ffeb6a78eeb47d06c36c872ab2e04637141f"
   },
   "projection": {
     "status": "NOT_RUN_NO_CANONICAL_CHANGE",
