@@ -108,6 +108,9 @@ def enqueue_receipt(**overrides):
         "base_ref": BASE_REF,
         "expected_head_sha": PR_HEAD,
         "merge_queue_entry_id": "MQE_queueentry0001",
+        "merge_queue_id": "MQ_platform_main_001",
+        "merge_queue_resource_path": f"/{REPOSITORY}/queue/main",
+        "merge_queue_url": f"https://github.com/{REPOSITORY}/queue/main",
         "observed_at_epoch_seconds": NOW,
     }
     values.update(overrides)
@@ -270,10 +273,18 @@ def test_async_receipt_time_is_current_and_post_attempt_start() -> None:
     assert verify_async(async_receipt(observed_at_epoch_seconds=NOW), started_at=NOW - 1, now=stale_now) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
 
 
-def test_graphql_enqueue_receipt_still_binds_exact_target_and_queue_entry() -> None:
+def test_graphql_enqueue_receipt_binds_exact_target_and_exact_main_queue_identity() -> None:
     assert verify_enqueue() == routing.ENQUEUED
-    assert verify_enqueue(enqueue_receipt(expected_head_sha=OTHER_HEAD)) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
-    assert verify_enqueue(enqueue_receipt(merge_queue_entry_id="wrong")) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
+    for changes in (
+        {"expected_head_sha": OTHER_HEAD},
+        {"merge_queue_entry_id": "wrong"},
+        {"merge_queue_id": ""},
+        {"merge_queue_resource_path": f"/{REPOSITORY}/queue/release"},
+        {"merge_queue_resource_path": "/Oteryn/Oteryn-Game/queue/main"},
+        {"merge_queue_url": f"https://github.com/{REPOSITORY}/queue/release"},
+        {"merge_queue_url": "https://github.com/Oteryn/Oteryn-Game/queue/main"},
+    ):
+        assert verify_enqueue(enqueue_receipt(**changes)) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN, changes
     executor_receipt = enqueue_receipt(route=routing.PROTECTED_EXECUTOR_ENQUEUE)
     assert verify_enqueue(executor_receipt, current_route=routing.PROTECTED_EXECUTOR_ENQUEUE) == routing.ENQUEUED
     assert verify_enqueue(executor_receipt, current_route=routing.EXPLICIT_ENQUEUE) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
