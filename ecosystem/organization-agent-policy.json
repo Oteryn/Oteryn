@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "OTERYN_ORGANIZATION_AGENT_POLICY",
-  "policy_version": "3.0.0",
+  "policy_version": "3.1.0",
   "authority_repository": "Oteryn/Oteryn",
   "canonical_human_surfaces": {
     "organization_policy": "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md",
