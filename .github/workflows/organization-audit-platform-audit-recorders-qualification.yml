@@ -11,6 +11,8 @@ on:
       - docs/evidence/organization-audit-20260907/collection-plan.json
       - docs/evidence/organization-audit-20260907/coverage-review.tsv
       - docs/evidence/organization-audit-20260907/coverage-review-additions.tsv
+      - docs/evidence/organization-audit-20260907/coverage-review-announcements-additions.tsv
+      - docs/evidence/organization-audit-20260907/coverage-review-canonical-additions.tsv
       - docs/evidence/organization-audit-20260907/coverage-groups.json
       - docs/evidence/organization-audit-20260907/coverage-summary.json
       - docs/evidence/organization-audit-20260907/unknowns.json
@@ -107,7 +109,7 @@ jobs:
           python3 audit/tools/audit/organization_audit.py \
             --plan audit/docs/evidence/organization-audit-20260907/collection-plan.json \
             --output "$RUNNER_TEMP/audit-inventory"
-      - name: Reproduce exact adopted canonical ledger
+      - name: Reproduce exact current canonical ledger preserving recorder membership
         shell: bash
         run: |
           set -euo pipefail
@@ -119,13 +121,13 @@ jobs:
           import csv,hashlib,json,sys
           from collections import Counter
           raw=open(sys.argv[1],'rb').read(); rows=list(csv.DictReader(raw.decode('utf-8').splitlines())); counts=Counter(r['disposition'] for r in rows); digest=hashlib.sha256(raw).hexdigest()
-          expected={'DIRECT':223,'GROUPED':113,'UNVERIFIED':3989}
-          if len(rows)!=4325 or dict(counts)!=expected: raise SystemExit(f'adopted ledger count drift: rows={len(rows)} counts={dict(counts)}')
-          if digest!='2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f': raise SystemExit('adopted ledger digest drift: '+digest)
+          expected={'DIRECT':233,'GROUPED':113,'UNVERIFIED':3979}
+          if len(rows)!=4325 or dict(counts)!=expected: raise SystemExit(f'current canonical ledger count drift: rows={len(rows)} counts={dict(counts)}')
+          if digest!='73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9': raise SystemExit('current canonical ledger digest drift: '+digest)
           required={'app/Audit/AdminAuditRecorder.php','app/Audit/SecurityEventRecorder.php'}
           direct={r['path'] for r in rows if r['repository_id']=='platform' and r['disposition']=='DIRECT'}
-          if not required.issubset(direct): raise SystemExit('adopted recorder DIRECT rows absent from ledger')
-          proof={'audit_head':'${{ github.event.pull_request.head.sha }}','source_rows':4325,'direct_paths':223,'grouped_paths':113,'unverified_paths':3989,'semantically_classified_paths':336,'ledger_sha256':digest,'recorder_direct_paths':sorted(required)}
+          if not required.issubset(direct): raise SystemExit('adopted recorder DIRECT rows absent from current ledger')
+          proof={'audit_head':'${{ github.event.pull_request.head.sha }}','source_rows':4325,'direct_paths':233,'grouped_paths':113,'unverified_paths':3979,'semantically_classified_paths':346,'ledger_sha256':digest,'recorder_direct_paths':sorted(required),'independent_review_required':True,'product_readiness_claimed':False,'audit_completion_claimed':False}
           open(sys.argv[2],'w',encoding='utf-8').write(json.dumps(proof,indent=2,sort_keys=True)+'\n'); print(json.dumps(proof,sort_keys=True))
           PY
       - name: Setup PHP 8.5.10
