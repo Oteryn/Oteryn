@@ -12,6 +12,7 @@ on:
       - docs/evidence/organization-audit-20260907/coverage-review-additions.tsv
       - docs/evidence/organization-audit-20260907/coverage-groups.json
       - docs/evidence/organization-audit-20260907/coverage-summary.json
+      - docs/evidence/organization-audit-20260907/unknowns.json
       - docs/evidence/organization-audit-20260907/r3-platform-audit-recorders-direct-candidate.json
       - docs/evidence/organization-audit-20260907/r3-platform-marketplace-tests-candidate.json
       - docs/evidence/organization-audit-20260907/verification-index.json
