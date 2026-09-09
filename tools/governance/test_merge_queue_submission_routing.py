@@ -296,8 +296,13 @@ def test_preflight_freshness_freeze_authority_and_capability_fail_closed() -> No
 def test_preflight_queue_identity_is_exact_and_reusable_for_admission() -> None:
     identity = routing.queue_identity_from_preflight(branch_observation())
     assert identity == queue_identity()
+    release_path = f"/{REPOSITORY}/queue/release"
+    release_url = f"https://github.com{release_path}"
+    release = branch_observation(base_ref="release", resource_path=release_path, url=release_url)
+    release_identity = routing.queue_identity_from_preflight(release)
+    assert release_identity == queue_identity(base_ref="release", resource_path=release_path, url=release_url)
+    assert verify([queue_entry()], identity=release_identity) == routing.BLOCKED_QUEUE_ADMISSION_UNPROVEN
     for changed in (
-        branch_observation(base_ref="release", resource_path=f"/{REPOSITORY}/queue/release", url=f"https://github.com/{REPOSITORY}/queue/release"),
         branch_observation(queue_id="wrong"),
         branch_observation(resource_path=f"/{REPOSITORY}/queue/release"),
         branch_observation(url=f"https://github.com/{REPOSITORY}/queue/release"),
