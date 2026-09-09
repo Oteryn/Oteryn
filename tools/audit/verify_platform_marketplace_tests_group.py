@@ -34,10 +34,40 @@ MARKETPLACE_CLOSEOUT = (
     'were removed on cleanup head `fbe839699782ad1d6df7a5841162d4a467d60c10`, whose META CI `34341624468` succeeded.'
 )
 MARKETPLACE_CLOSEOUT_PREDECESSOR = (
-    '`DIRECT` is a bounded review with the stated scope, not full approval of the entire file or every dependency.'
+    '`DIRECT` is a bounded review with the stated scope, not full approval of the entire file or every dependency. '
+    'R2 had 65 scoped entries; the current revision adds 158 DIRECT paths and extends some existing scopes. It reads '
+    'all 50 Platform migration files, control fields of all 77 workflow files and all 19 files in the frozen Platform '
+    'routes tree. The prior Platform audit statement that there were 21 route files was rejected fail-closed; the frozen '
+    'tree contains 19 and all 19 were read directly here. Exactly 113 Platform leaves are additionally GROUPED. GameAuth '
+    'contributes 27 paths after exact historical/source identity, 23 dependent bindings and 61 focused cases / 565 '
+    'assertions. Four account/Canary/profile/character families contribute 31 paths after exact 23 dependent bindings '
+    'and an ordered 15-file qualification producing 86 cases / 586 assertions. Three Marketplace/Payments/Wallet '
+    'families contribute 49 paths — `app/Marketplace/**` (21), `app/Payments/**` (24), `app/Wallet/**` (4) — after exact '
+    'historical direct-read evidence, byte-identical family trees, exact 23 dependent bindings and an ordered 13-file '
+    'PHP 8.5.10/MariaDB 11.8.9 qualification producing 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips, '
+    'including four real-MariaDB integration/concurrency files. The exact six-file `tests/Feature/Marketplace/**` '
+    'directory contributes a further 6 GROUPED paths after immutable historical evidence explicitly names every file, '
+    'exact byte identity, a bound 17-case / 179-assertion all-green qualification including both real-MariaDB tests, '
+    'and projected-ledger reproduction proving only those six rows transition from UNVERIFIED to GROUPED. GROUPED is '
+    'bounded semantic carry-forward, not product/security readiness. The rejected Atlas 508-path candidate remains '
+    'UNVERIFIED. Full CSV is reproducible from immutable inventories, the base `coverage-review.tsv`, the exact two-row '
+    '`coverage-review-additions.tsv` overlay, `coverage-groups.json` and ledger SHA-256 '
+    '`2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f`.'
 )
 MARKETPLACE_CLOSEOUT_SUCCESSOR = (
-    'Two additional frozen Platform leaves are now adopted as DIRECT bounded full-file reviews:'
+    'Two additional frozen Platform leaves are now adopted as DIRECT bounded full-file reviews: '
+    '`app/Audit/AdminAuditRecorder.php` and `app/Audit/SecurityEventRecorder.php`. Their exact blobs, two persistence '
+    'migrations, three representative consumer tests and the SecurityEventRecorder 31-constant oracle are bound in '
+    '`r3-platform-audit-recorders-direct-candidate.json`. Primary qualification on '
+    '`e68726c9590f0ea611871abfbf1bd3238b635c6c`, run `34347577287`, job `102452733285`, produced exactly 25 cases / '
+    '89 assertions / 0 failures / 0 errors / 0 skips on MariaDB 11.8.9. Exact-head pre-adoption proof on '
+    '`14b18e00936cbf09884e51bfc4c8eaf121edd715` reproduced the target ledger; post-adoption proof on '
+    '`8d2c412955a283de54c40bec2995a961d2322d9d`, run `34355682587`, job `102479632543`, artifact `10105627207`, again '
+    'reproduced 4,325 rows as 223 DIRECT / 113 GROUPED / 3,989 UNVERIFIED with digest '
+    '`2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f` and repeated the exact 25/89 MariaDB result; '
+    'META CI `34355682545` succeeded. This is bounded audit evidence, not product readiness, exhaustive '
+    'caller/security-workflow validation or later-current-main Platform acceptance. Fresh independent review of the '
+    'stable recorder-adoption audit head remains required before this two-path slice is closed.'
 )
 STALE_MARKETPLACE_GATES = (
     'Post-adoption exact-head proof and fresh independent review are still required.',
@@ -245,9 +275,9 @@ def validate_companion_report_text(text: str) -> None:
     require(closeout_paragraphs == [MARKETPLACE_CLOSEOUT],
             'Marketplace-test companion Markdown complete closeout paragraph missing/duplicated/drifted')
     predecessor_indexes = [i for i, paragraph in enumerate(paragraphs)
-                           if paragraph.startswith(MARKETPLACE_CLOSEOUT_PREDECESSOR)]
+                           if paragraph == MARKETPLACE_CLOSEOUT_PREDECESSOR]
     successor_indexes = [i for i, paragraph in enumerate(paragraphs)
-                         if paragraph.startswith(MARKETPLACE_CLOSEOUT_SUCCESSOR)]
+                         if paragraph == MARKETPLACE_CLOSEOUT_SUCCESSOR]
     closeout_index = paragraphs.index(MARKETPLACE_CLOSEOUT)
     require(predecessor_indexes == [closeout_index - 1] and successor_indexes == [closeout_index + 1],
             'Marketplace-test companion Markdown bounded closeout slot has inserted/missing/drifted paragraphs')

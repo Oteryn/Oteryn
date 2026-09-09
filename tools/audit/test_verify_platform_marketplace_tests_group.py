@@ -127,6 +127,18 @@ class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
             ))
         for stale in verifier.STALE_MARKETPLACE_GATES:
             mutations.append(text + '\n\n' + stale + '\n')
+        contradictory_claims = (
+            'This Marketplace batch establishes full product readiness.',
+            'This Marketplace batch is still awaiting independent review.',
+        )
+        neighbor_mutations = []
+        for neighbor in (verifier.MARKETPLACE_CLOSEOUT_PREDECESSOR,
+                         verifier.MARKETPLACE_CLOSEOUT_SUCCESSOR):
+            neighbor_mutations.extend((neighbor, neighbor + ' ' + claim) for claim in contradictory_claims)
+            neighbor_mutations.extend((neighbor, claim) for claim in contradictory_claims)
+            neighbor_mutations.extend(((neighbor, neighbor[:-1]), (neighbor, '')))
+        mutations.extend(text.replace(original, replacement, 1)
+                         for original, replacement in neighbor_mutations)
         for mutated in mutations:
             with self.assertRaisesRegex(ValueError, 'companion Markdown'): verifier.validate_companion_report_text(mutated)
 
