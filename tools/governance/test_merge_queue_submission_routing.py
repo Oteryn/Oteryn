@@ -236,7 +236,7 @@ def test_policy_documents_authenticated_attempt_bound_route() -> None:
         "`Oteryn/Oteryn#189`",
         "currently has `write`, `maintain` or `admin` permission",
         "GitHub-authored proof comment",
-        "successful `issue_comment` workflow run",
+        "`issue_comment` workflow run on META `main` completed successfully",
         "fresh connector live-head read",
         "strictly after the connector mutation returns",
         "Historical `added_to_merge_queue` timeline events alone are not terminal admission proof",
