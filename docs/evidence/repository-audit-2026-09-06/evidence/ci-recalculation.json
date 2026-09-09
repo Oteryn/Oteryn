@@ -1,0 +1,48 @@
+{
+  "evidence_kind": "recomputed historical export; not a new GitHub API capture",
+  "historical_full_export_sha256": "24775c60ffbb0944e9170896483badcf773f07ac519950c3a63dd1dd6073029a",
+  "run_index_sha256": "d9d5672f9facd90bca765c88d060b7532f80ca68834d1a06b462696e2e327553",
+  "recovered_part_sha256": [
+    "8f9b8987f5a593c0e4c138fc0988dcfff0ad50fd0d0646c7ab4e5f7398cedcc6",
+    "e64362f3b7fc7fe8861e6c742397f46a31491414c3fb0d1990d003ec8a21cd57",
+    "c5384d789dc551f5b8523dc7d392b776218f81d25ddfc10b798218bf40c1fdfe"
+  ],
+  "rows_all": 268,
+  "rows_meta": 165,
+  "all_conclusions": {
+    "success": 183,
+    "failure": 68,
+    "cancelled": 12,
+    "skipped": 5
+  },
+  "meta_conclusions": {
+    "success": 112,
+    "failure": 45,
+    "cancelled": 8
+  },
+  "meta_by_event": {
+    "merge_group": {
+      "success": 12
+    },
+    "pull_request": {
+      "success": 87,
+      "failure": 45,
+      "cancelled": 8
+    },
+    "push": {
+      "success": 13
+    }
+  },
+  "latency_proxy_seconds": {
+    "definition": "updated_at minus created_at; not test-only time, CPU, billed time or forecast",
+    "median": 12.0,
+    "p95_nearest_rank": 27.0,
+    "max": 37.0
+  },
+  "meta_same_workflow_event_head_success_and_failure": [],
+  "limits": [
+    "Timing and same-head conclusion claims are limited to 165 META CI records.",
+    "No blanket claim that every failing PR was intended RED or that every historical workflow is flake-free.",
+    "The 268-row index is preserved unchanged; head/time projection is joined by exact ID."
+  ]
+}

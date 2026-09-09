@@ -1,0 +1,29 @@
+{
+  "kind": "independent inventory/coverage reconciliation, not another semantic review",
+  "audited_commit": "0c493896040072badeff1f333eb83d7114a993ff",
+  "tree_expected": "77c33f4c2d3bffcd5983e35928d870d618cb5f68",
+  "tree_reconstructed": "77c33f4c2d3bffcd5983e35928d870d618cb5f68",
+  "tracked": 78,
+  "bytes": 844834,
+  "coverage_counts": {
+    "DIRECT": 78
+  },
+  "path_duplicates": [],
+  "missing_ledger_paths": [],
+  "mode_100755": [
+    "tools/governance/test_verify_ai_review_evidence_compat_v1.py",
+    "tools/governance/verify_ai_review_evidence_compat_v1.py"
+  ],
+  "original_prompt_sha256": "c51a6d60dddb1d2bd13fe3329723703f651b09d690522b757402988b0c569c1d",
+  "retained_clone_final_readback": {
+    "head": "0c493896040072badeff1f333eb83d7114a993ff",
+    "tree": "77c33f4c2d3bffcd5983e35928d870d618cb5f68",
+    "porcelain": "",
+    "diff_exit": 0,
+    "source": "read-only tool result, process 32792"
+  },
+  "limits": [
+    "Hash and mode matching prove identity/inventory, not detection of every defect.",
+    "Semantic review dispositions are cumulative from recorded source reads."
+  ]
+}

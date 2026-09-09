@@ -1,0 +1,26 @@
+test_actual_material_change_resumes_work (__main__.NarrowBoundedExecutionTests.test_actual_material_change_resumes_work) ... ok
+test_cli_emits_deterministic_json (__main__.NarrowBoundedExecutionTests.test_cli_emits_deterministic_json) ... ok
+test_done_requires_verified_fact_and_is_terminal (__main__.NarrowBoundedExecutionTests.test_done_requires_verified_fact_and_is_terminal) ... ok
+test_external_and_owner_dependencies_release (__main__.NarrowBoundedExecutionTests.test_external_and_owner_dependencies_release) ... ok
+test_fingerprints_are_deterministic_and_material (__main__.NarrowBoundedExecutionTests.test_fingerprints_are_deterministic_and_material) ... ok
+test_frozen_mutate_and_retrigger_fail_without_real_reason (__main__.NarrowBoundedExecutionTests.test_frozen_mutate_and_retrigger_fail_without_real_reason) ... ok
+test_heavy_validation_exhaustion_stalls (__main__.NarrowBoundedExecutionTests.test_heavy_validation_exhaustion_stalls) ... ok
+test_main_only_change_is_not_a_snapshot_coordinate (__main__.NarrowBoundedExecutionTests.test_main_only_change_is_not_a_snapshot_coordinate) ... ok
+test_narration_and_timestamp_are_not_progress (__main__.NarrowBoundedExecutionTests.test_narration_and_timestamp_are_not_progress) ... ok
+test_observe_remains_allowed_in_released_states (__main__.NarrowBoundedExecutionTests.test_observe_remains_allowed_in_released_states) ... ok
+test_operational_actions_require_a_durable_predecessor (__main__.NarrowBoundedExecutionTests.test_operational_actions_require_a_durable_predecessor) ... ok
+test_policy_has_closed_narrow_schema (__main__.NarrowBoundedExecutionTests.test_policy_has_closed_narrow_schema) ... ok
+test_previous_freeze_remains_authoritative_for_same_head (__main__.NarrowBoundedExecutionTests.test_previous_freeze_remains_authoritative_for_same_head) ... ok
+test_previous_must_match_stable_task_identity (__main__.NarrowBoundedExecutionTests.test_previous_must_match_stable_task_identity) ... ok
+test_retry_and_validation_increment_their_bounded_counters (__main__.NarrowBoundedExecutionTests.test_retry_and_validation_increment_their_bounded_counters) ... ok
+test_retry_counters_cannot_regress_within_their_scope (__main__.NarrowBoundedExecutionTests.test_retry_counters_cannot_regress_within_their_scope) ... ok
+test_unchanged_released_task_cannot_resume_operational_work (__main__.NarrowBoundedExecutionTests.test_unchanged_released_task_cannot_resume_operational_work) ... ok
+test_unchanged_retry_exhaustion_stalls_and_releases (__main__.NarrowBoundedExecutionTests.test_unchanged_retry_exhaustion_stalls_and_releases) ... ok
+test_unfrozen_noop_mutation_and_retrigger_are_denied (__main__.NarrowBoundedExecutionTests.test_unfrozen_noop_mutation_and_retrigger_are_denied) ... ok
+test_unsupported_dependency_kind_fails_closed (__main__.NarrowBoundedExecutionTests.test_unsupported_dependency_kind_fails_closed) ... ok
+test_zero_retry_denies_after_initial_failure (__main__.NarrowBoundedExecutionTests.test_zero_retry_denies_after_initial_failure) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.634s
+
+OK

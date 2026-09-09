@@ -1,0 +1,173 @@
+{
+  "evidence_id": "E04",
+  "provenance_note": "Structured transcription of directly returned tool results, not a raw API export. Process IDs identify Remote_Desktop_Commander calls on the authorized Windows audit host in this conversation.",
+  "sha": "0c493896040072badeff1f333eb83d7114a993ff",
+  "host": "the authorized Windows audit host",
+  "host_versions": {
+    "python": "3.12.0",
+    "git": "2.53.0.windows.1",
+    "gh": "2.96.0 (2026-07-02)"
+  },
+  "suites": [
+    {
+      "path": "tools/governance/test_agent_execution_routing.py",
+      "command": "python -B %TEMP%\\<isolated-audit>\\repo\\tools\\governance\\test_agent_execution_routing.py",
+      "static_test_definitions": 60,
+      "result": "PASS",
+      "exit_code": 0,
+      "process_id": 30996,
+      "is_active_ci_suite": true
+    },
+    {
+      "path": "tools/governance/test_remote_desktop_action_gate.py",
+      "command": "python -B %TEMP%\\<isolated-audit>\\repo\\tools\\governance\\test_remote_desktop_action_gate.py",
+      "static_test_definitions": 25,
+      "result": "PASS",
+      "exit_code": 0,
+      "process_id": 28880,
+      "is_active_ci_suite": true
+    },
+    {
+      "path": "tools/governance/test_merge_queue_workflow_contract.py",
+      "command": "python -B %TEMP%\\<isolated-audit>\\repo\\tools\\governance\\test_merge_queue_workflow_contract.py",
+      "static_test_definitions": 13,
+      "result": "PASS",
+      "exit_code": 0,
+      "process_id": 33888,
+      "is_active_ci_suite": true
+    },
+    {
+      "path": "tools/governance/test_agent_continuation_policy.py",
+      "command": "python -B %TEMP%\\<isolated-audit>\\repo\\tools\\governance\\test_agent_continuation_policy.py",
+      "static_test_definitions": 26,
+      "result": "PASS",
+      "exit_code": 0,
+      "process_id": 33868,
+      "is_active_ci_suite": true
+    },
+    {
+      "path": "tools/governance/test_agent_continuation_review_repairs.py",
+      "command": "python -B %TEMP%\\<isolated-audit>\\repo\\tools\\governance\\test_agent_continuation_review_repairs.py",
+      "static_test_definitions": 4,
+      "result": "PASS",
+      "exit_code": 0,
+      "process_id": 26800,
+      "is_active_ci_suite": true
+    },
+    {
+      "path": "tools/governance/test_bounded_execution_guard.py",
+      "command": "python -B %TEMP%\\<isolated-audit>\\repo\\tools\\governance\\test_bounded_execution_guard.py",
+      "static_test_definitions": 21,
+      "result": "ERROR",
+      "exit_code": 1,
+      "process_id": 26800,
+      "is_active_ci_suite": true,
+      "tests_run": 21,
+      "tests_passed": 20,
+      "errors": 1,
+      "failure_kind": "test-harness / local interpreter resolution",
+      "failure": "subprocess invokes python3 and returns 9009 on native Windows while python resolves to Python 3.12.0",
+      "location": "tools/governance/test_bounded_execution_guard.py:217-219"
+    },
+    {
+      "path": "tools/governance/test_verify_ai_review_evidence_compat_v1.py",
+      "command": "python -B %TEMP%\\<isolated-audit>\\repo\\tools\\governance\\test_verify_ai_review_evidence_compat_v1.py",
+      "static_test_definitions": 22,
+      "result": "IMPORT_ERROR",
+      "exit_code": 1,
+      "process_id": 9424,
+      "is_active_ci_suite": false,
+      "tests_executed": 0,
+      "failure_kind": "obsolete source/import dependency",
+      "failure": "ModuleNotFoundError: No module named 'test_verify_ai_review_evidence_core'",
+      "location": "tools/governance/test_verify_ai_review_evidence_compat_v1.py:10"
+    }
+  ],
+  "linux_bounded_repeat": {
+    "command": "python -B tools/governance/test_bounded_execution_guard.py -v",
+    "tests_run": 21,
+    "result": "PASS",
+    "exit_code": 0,
+    "reported_seconds": 0.634,
+    "log": "evidence/prior-linux-bounded.log",
+    "scope": "Three exact original files, not a full Linux checkout or execution of all six Linux suites.",
+    "historical_cwd": "prior isolated three-file native-bounded workspace",
+    "reproduction": "Obtain the three original files from the audited Git commit; see REPRODUCE.md."
+  },
+  "other_checks": [
+    {
+      "name": "Exact Git blob comparison",
+      "process_id": 31924,
+      "tracked_files": 78,
+      "mismatches": 0,
+      "result": "PASS"
+    },
+    {
+      "name": "Python AST syntax",
+      "process_id": 31924,
+      "files": 14,
+      "result": "PASS"
+    },
+    {
+      "name": "JSON parse",
+      "process_id": 31924,
+      "files": 7,
+      "result": "PASS"
+    },
+    {
+      "name": "YAML parse with BaseLoader",
+      "process_id": 6928,
+      "files": 3,
+      "result": "PASS",
+      "limit": "Syntax only, not all GitHub Actions semantic validation."
+    },
+    {
+      "name": "Unmodified native CI inline block: Validate META repository contract",
+      "process_id": 6928,
+      "result": "PASS",
+      "output": "Validated 7 JSON files, 4 repository entries and 0 release manifests."
+    },
+    {
+      "name": "Unmodified native CI inline block: Validate simplified governance desired state",
+      "process_id": 6928,
+      "result": "PASS"
+    },
+    {
+      "name": "jsonschema.Draft202012Validator.check_schema",
+      "process_id": 6928,
+      "result": "PASS",
+      "limit": "Schema validity, no release instances present; does not fix absent full instance validation in native CI."
+    },
+    {
+      "name": "Auxiliary fatal-error lint",
+      "command": "python -B -m ruff check --no-cache --select E9,F63,F7,F82 %TEMP%\\<isolated-audit>\\repo\\tools\\governance",
+      "process_id": 6928,
+      "result": "PASS",
+      "exit_code": 0,
+      "limit": "Auxiliary preinstalled tool; not a repository-required security scan or all lint rules."
+    },
+    {
+      "name": "git fsck --full --no-reflogs",
+      "process_id": 14280,
+      "result": "PASS",
+      "exit_code": 0
+    },
+    {
+      "name": "git diff --check",
+      "process_id": 31924,
+      "result": "PASS",
+      "exit_code": 0
+    },
+    {
+      "name": "Final git diff --exit-code and status --porcelain=v1",
+      "process_id": 14280,
+      "result": "PASS",
+      "exit_code": 0,
+      "status_stdout": ""
+    }
+  ],
+  "new_tests_created": false,
+  "tracked_source_modified": false,
+  "packages_installed": false,
+  "windows_alias_or_config_modified": false
+}

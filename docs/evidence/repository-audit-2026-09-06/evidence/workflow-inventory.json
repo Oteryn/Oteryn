@@ -1,0 +1,147 @@
+{
+  "evidence_id": "E02",
+  "provenance_note": "Structured transcription of directly returned tool results, not a raw API export. Process IDs identify Remote_Desktop_Commander calls on the authorized Windows audit host in this conversation.",
+  "mechanism": "gh api --method GET repos/Oteryn/Oteryn/actions/workflows?per_page=100, then last run per non-main/dynamic workflow",
+  "source_process_ids": [
+    18116,
+    19320
+  ],
+  "main_yaml_count": 2,
+  "server_record_count": 6,
+  "workflows": [
+    {
+      "id": 336924336,
+      "name": "META CI",
+      "path": ".github/workflows/ci.yml",
+      "api_state": "active",
+      "disposition": "CURRENT_MAIN_SOURCE"
+    },
+    {
+      "id": 340277073,
+      "name": "Terminal Branch Lifecycle",
+      "path": ".github/workflows/terminal-branch-lifecycle.yml",
+      "api_state": "active",
+      "disposition": "CURRENT_MAIN_SOURCE"
+    },
+    {
+      "id": 342180573,
+      "name": "META bounded AI review recheck",
+      "path": ".github/workflows/governance-ai-review-recheck.yml",
+      "api_state": "active",
+      "disposition": "ABSENT_FROM_MAIN_HISTORICAL_RECORD",
+      "last_run": {
+        "id": 33330051537,
+        "created_at": "2026-08-30T19:08:53Z",
+        "event": "pull_request_review",
+        "conclusion": "skipped"
+      },
+      "historical_run_count": 77
+    },
+    {
+      "id": 339796201,
+      "name": "Probe Atlas Runner Group Deny",
+      "path": ".github/workflows/probe-atlas-runner-group-deny.yml",
+      "api_state": "active",
+      "disposition": "ABSENT_FROM_MAIN_HISTORICAL_RECORD",
+      "last_run": {
+        "id": 32546160959,
+        "created_at": "2026-08-22T02:24:29Z",
+        "event": "pull_request",
+        "conclusion": "cancelled"
+      },
+      "historical_run_count": 2
+    },
+    {
+      "id": 340241436,
+      "name": "Terminal Branch Lifecycle CI",
+      "path": ".github/workflows/terminal-branch-lifecycle-ci.yml",
+      "api_state": "active",
+      "disposition": "ABSENT_FROM_MAIN_HISTORICAL_RECORD",
+      "last_run": {
+        "id": 32602321647,
+        "created_at": "2026-08-22T22:24:00Z",
+        "event": "pull_request",
+        "conclusion": "success"
+      },
+      "historical_run_count": 8
+    },
+    {
+      "id": 340123219,
+      "name": "Dependabot Updates",
+      "path": "dynamic/dependabot/dependabot-updates",
+      "api_state": "active",
+      "disposition": "GITHUB_DYNAMIC",
+      "last_run": {
+        "id": 33614943693,
+        "created_at": "2026-09-02T09:35:27Z",
+        "event": "dynamic",
+        "conclusion": "success"
+      },
+      "historical_run_count": 3
+    }
+  ],
+  "interpretation": "An API active record whose source is absent on main is not proof of present main-branch execution or a loop. Historical window and current registry are different populations.",
+  "reusable_dependencies": {
+    "repository": "Oteryn/Oteryn-Platform",
+    "commit": "e145f7c03bd0b15f0b0fecc0f6fae7884fe3e0db",
+    "purpose": "Exact external implementation called by META terminal-branch-lifecycle workflow; read-only inspection, no execution",
+    "files": [
+      {
+        "path": ".github/workflows/terminal-branch-lifecycle-read-reusable.yml",
+        "blob_sha": "e61700e57b3ec21349ec9fd25e707a546a65f692",
+        "coverage": "DIRECT",
+        "method": "Full source; downstream calls, permissions and destructive-operation guards; no native execution",
+        "evidence": "/response/turn71",
+        "source_url": "https://github.com/Oteryn/Oteryn-Platform/blob/e145f7c03bd0b15f0b0fecc0f6fae7884fe3e0db/.github/workflows/terminal-branch-lifecycle-read-reusable.yml"
+      },
+      {
+        "path": ".github/workflows/terminal-branch-lifecycle-reusable.yml",
+        "blob_sha": "7252d6cb0dfe435d429d6b0ecf9b406323355546",
+        "coverage": "DIRECT",
+        "method": "Full source; downstream calls, permissions and destructive-operation guards; no native execution",
+        "evidence": "/response/turn72",
+        "source_url": "https://github.com/Oteryn/Oteryn-Platform/blob/e145f7c03bd0b15f0b0fecc0f6fae7884fe3e0db/.github/workflows/terminal-branch-lifecycle-reusable.yml"
+      },
+      {
+        "path": "tools/agents/terminal_branch_cleanup.py",
+        "blob_sha": "d884b3ad31866515d27d3154be4ce28f6d96570d",
+        "coverage": "DIRECT",
+        "method": "Full source; downstream calls, permissions and destructive-operation guards; no native execution",
+        "evidence": "/response/turn73",
+        "source_url": "https://github.com/Oteryn/Oteryn-Platform/blob/e145f7c03bd0b15f0b0fecc0f6fae7884fe3e0db/tools/agents/terminal_branch_cleanup.py"
+      },
+      {
+        "path": "tools/agents/terminal_branch_cleanup_legacy.py",
+        "blob_sha": "9042f24bd7067b6eba11f5a8f85370862e33e81b",
+        "coverage": "DIRECT",
+        "method": "Full source; downstream calls, permissions and destructive-operation guards; no native execution",
+        "evidence": "/response/turn74,/response/turn75",
+        "source_url": "https://github.com/Oteryn/Oteryn-Platform/blob/e145f7c03bd0b15f0b0fecc0f6fae7884fe3e0db/tools/agents/terminal_branch_cleanup_legacy.py"
+      },
+      {
+        "path": "tools/agents/branch_lifecycle.py",
+        "blob_sha": "ba626f418924b1cb346aabf8d70f90a7bf0ee2f5",
+        "coverage": "DIRECT",
+        "method": "Full source; downstream calls, permissions and destructive-operation guards; no native execution",
+        "evidence": "/response/turn76",
+        "source_url": "https://github.com/Oteryn/Oteryn-Platform/blob/e145f7c03bd0b15f0b0fecc0f6fae7884fe3e0db/tools/agents/branch_lifecycle.py"
+      },
+      {
+        "path": "tools/agents/branch_lifecycle_legacy.py",
+        "blob_sha": "1472bd4e7d0b05f2b4076ef3665b977e50d22356",
+        "coverage": "DIRECT",
+        "method": "Full source; downstream calls, permissions and destructive-operation guards; no native execution",
+        "evidence": "/response/turn77,/response/turn78,/response/turn79,/response/turn80",
+        "source_url": "https://github.com/Oteryn/Oteryn-Platform/blob/e145f7c03bd0b15f0b0fecc0f6fae7884fe3e0db/tools/agents/branch_lifecycle_legacy.py"
+      },
+      {
+        "path": "tools/agents/terminal_branch_approval.py",
+        "blob_sha": "74222d77a31280aece5e09e3f7f4f9a4817f3b79",
+        "coverage": "DIRECT",
+        "method": "Full source; downstream calls, permissions and destructive-operation guards; no native execution",
+        "evidence": "/response/turn81",
+        "source_url": "https://github.com/Oteryn/Oteryn-Platform/blob/e145f7c03bd0b15f0b0fecc0f6fae7884fe3e0db/tools/agents/terminal_branch_approval.py"
+      }
+    ]
+  }
+}

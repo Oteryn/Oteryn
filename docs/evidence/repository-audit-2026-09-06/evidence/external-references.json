@@ -1,0 +1,25 @@
+{
+  "note": "Official documentation consulted for technical semantics; repository values come from live tools, not these pages.",
+  "sources": [
+    {
+      "title": "GitHub: Managing a merge queue",
+      "url": "https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue",
+      "used_for": "Merge-group triggers; build concurrency distinct from merge limits; no inference of single-PR build from merge maximum."
+    },
+    {
+      "title": "OpenAI: Sandbox",
+      "url": "https://learn.chatgpt.com/docs/sandboxing",
+      "used_for": "Sandbox boundary differs from approvals; danger-full-access plus never is full-access profile, not proof of active runtime settings."
+    },
+    {
+      "title": "OpenAI: Configuration reference",
+      "url": "https://learn.chatgpt.com/docs/config-file/config-reference",
+      "used_for": "Configuration keys and scope."
+    },
+    {
+      "title": "GitHub: Configuring default setup for code scanning",
+      "url": "https://docs.github.com/en/code-security/code-scanning/enabling-code-scanning/configuring-default-setup-for-code-scanning",
+      "used_for": "Code-scanning setup is a separate configured activity; was not activated by this audit."
+    }
+  ]
+}
