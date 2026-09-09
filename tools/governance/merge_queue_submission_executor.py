@@ -2,9 +2,10 @@
 """Protected-default-branch executor for exact-head GitHub Merge Queue submission.
 
 The executor is intentionally narrow: it accepts one versioned command, authenticates
-its caller against the META repository, re-reads one allowed target PR and its exact
-aggregate gate, and performs only GraphQL enqueuePullRequest(expectedHeadOid=...).
-It has no direct-merge or generic auto-merge path.
+its caller against META and the exact target repository, re-reads one allowed target
+PR and its exact aggregate gate, and performs only GraphQL
+`enqueuePullRequest(expectedHeadOid=...)`. It has no direct-merge or generic
+auto-merge path.
 """
 
 from __future__ import annotations
@@ -152,15 +153,42 @@ def parse_command(command: object) -> SubmissionRequest:
     expected_head_sha = expected_head_sha.lower()
     if not SHA_RE.fullmatch(expected_head_sha):
         raise SubmissionError("expected head must be a full 40-character lowercase hexadecimal SHA")
-    repository_name = repository.split("/", 1)[1]
     return SubmissionRequest(
         attempt_id=attempt_id,
         repository=repository,
-        repository_name=repository_name,
+        repository_name=repository.split("/", 1)[1],
         pr_number=pr_number,
         expected_head_sha=expected_head_sha,
         required_gate=required_gate,
     )
+
+
+def _validated_actor(actor: object) -> str:
+    if not isinstance(actor, str) or not actor or "/" in actor:
+        raise SubmissionError("invalid comment actor")
+    return actor
+
+
+def _require_repository_permission(
+    client: Client,
+    *,
+    repository: str,
+    actor: object,
+    purpose: str,
+) -> str:
+    actor_name = _validated_actor(actor)
+    owner, name = repository.split("/", 1)
+    encoded_actor = urllib.parse.quote(actor_name, safe="")
+    response = client.rest(
+        "GET",
+        f"/repos/{owner}/{name}/collaborators/{encoded_actor}/permission",
+    )
+    permission = response.get("permission")
+    if permission not in ALLOWED_CONTROL_PERMISSIONS:
+        raise SubmissionError(
+            f"comment actor lacks current write/maintain/admin permission on {purpose}"
+        )
+    return str(permission)
 
 
 def authorize_actor(
@@ -172,17 +200,27 @@ def authorize_actor(
 ) -> str:
     if actual_control_repository != CONTROL_REPOSITORY or actual_control_issue != CONTROL_ISSUE:
         raise SubmissionError("submission command did not originate from the canonical control endpoint")
-    if not isinstance(actor, str) or not actor or "/" in actor:
-        raise SubmissionError("invalid comment actor")
-    encoded_actor = urllib.parse.quote(actor, safe="")
-    response = client.rest(
-        "GET",
-        f"/repos/Oteryn/Oteryn/collaborators/{encoded_actor}/permission",
+    return _require_repository_permission(
+        client,
+        repository=CONTROL_REPOSITORY,
+        actor=actor,
+        purpose="META",
     )
-    permission = response.get("permission")
-    if permission not in ALLOWED_CONTROL_PERMISSIONS:
-        raise SubmissionError("comment actor lacks current write/maintain/admin permission on META")
-    return str(permission)
+
+
+def authorize_target_actor(
+    client: Client,
+    request: SubmissionRequest,
+    *,
+    actor: object,
+) -> str:
+    """Require current target-repository write authority before using the App token."""
+    return _require_repository_permission(
+        client,
+        repository=request.repository,
+        actor=actor,
+        purpose=f"target repository {request.repository}",
+    )
 
 
 def qualify_pull_request(client: Client, request: SubmissionRequest) -> QualifiedPullRequest:
@@ -449,6 +487,7 @@ def parse_args() -> argparse.Namespace:
 
     execute = subparsers.add_parser("execute")
     execute.add_argument("--command", required=True)
+    execute.add_argument("--actor", required=True)
     execute.add_argument("--receipt-path", required=True)
 
     return parser.parse_args()
@@ -477,13 +516,19 @@ def main() -> int:
         request = parse_command(args.command)
         target_token = os.environ.get("MQ_GITHUB_TOKEN", "")
         client = GitHubClient(target_token, os.environ.get("GITHUB_API_URL", "https://api.github.com"))
+        target_permission = authorize_target_actor(client, request, actor=args.actor)
         pull = qualify_pull_request(client, request)
         status, entry = enqueue_pull_request(client, request, pull)
         result = receipt(request, status=status, entry=entry)
         with open(args.receipt_path, "w", encoding="utf-8") as handle:
             json.dump(result, handle, sort_keys=True)
             handle.write("\n")
-        print(json.dumps(result, sort_keys=True))
+        print(
+            json.dumps(
+                {**result, "target_actor_permission": target_permission},
+                sort_keys=True,
+            )
+        )
         return 0
     except (SubmissionError, OSError, ValueError) as exc:
         print(f"Merge Queue submission rejected: {exc}", file=sys.stderr)
