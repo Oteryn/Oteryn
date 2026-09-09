@@ -103,7 +103,7 @@
     "platform_direct_paths": 158,
     "platform_grouped_paths": 113,
     "platform_unverified_paths": 1894,
-    "ledger_sha256": "PENDING_FINAL_EVIDENCE_REPRODUCTION"
+    "ledger_sha256": "2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f"
   },
   "qualification": {
     "status": "PRIMARY_QUALIFICATION_SUCCESS",
