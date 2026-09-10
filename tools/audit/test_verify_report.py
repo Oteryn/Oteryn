@@ -121,6 +121,36 @@ class AuditValidationTest(unittest.TestCase):
         snapshot=audit.EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT
         self.mutate_companion(snapshot,snapshot[:len(snapshot)//2])
         self.reject()
+    def test_section_1_rejects_review_repro_paragraph_after_snapshot(self):
+        claim='The present canonical state is 258 DIRECT / 113 GROUPED / 3954 UNVERIFIED and is product ready.'
+        self.mutate_companion(audit.EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT,
+                              audit.EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT+'\n\n'+claim)
+        self.reject()
+    def test_section_1_rejects_status_paragraph_later_before_section_2(self):
+        claim='The present canonical state is 258 DIRECT and is product ready.'
+        self.mutate_companion(audit.SECTION_2_HEADING,claim+'\n\n'+audit.SECTION_2_HEADING)
+        self.reject()
+    def test_section_1_rejects_arbitrary_non_status_paragraph(self):
+        self.mutate_companion(audit.SECTION_2_HEADING,
+                              'Arbitrary additional historical prose.\n\n'+audit.SECTION_2_HEADING)
+        self.reject()
+    def test_section_1_rejects_later_historical_paragraph_removal_or_reorder(self):
+        companion=self.path.with_suffix('.md')
+        original=companion.read_text(encoding='utf-8')
+        start=original.index(audit.SECTION_1_HEADING)
+        end=original.index(audit.SECTION_2_HEADING)
+        parts=original[start:end].split('\n\n')
+        self.assertGreaterEqual(len(parts),9)
+        for changed in (parts[:6]+parts[7:], parts[:6]+[parts[7],parts[6]]+parts[8:]):
+            with self.subTest(parts=len(changed)):
+                companion.write_text(original[:start]+'\n\n'.join(changed)+original[end:],encoding='utf-8')
+                self.reject()
+    def test_section_1_rejects_duplicate_boundary_headings(self):
+        for heading in (audit.SECTION_1_HEADING,audit.SECTION_2_HEADING):
+            with self.subTest(heading=heading):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
+                self.mutate_companion(heading,heading+'\n\n'+heading)
+                self.reject()
     def test_boolean_schema_rejected(self):
         self.mutate(self.path,lambda d:d.update(schema_version=True));self.reject()
     def test_production_claim_rejected(self):

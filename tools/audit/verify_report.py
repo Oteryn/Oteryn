@@ -68,6 +68,7 @@ EXPECTED_SECTION_7_PARAGRAPHS = (
 )
 SECTION_1_HEADING = '## 1. Source identity and actual coverage'
 SECTION_2_HEADING = '## 2. Native evidence actually acquired and rechecked'
+EXPECTED_SECTION_1_SHA256 = 'c1a89e79d2d2a3159e887790c0da3572094c0805b4496dd9752d2a2413c48d90'
 CURRENT_COVERAGE_TABLE_HEADER = '| Source | Tracked leaves | DIRECT scoped | GROUPED revalidated | UNVERIFIED semantics |'
 CURRENT_R5_ADOPTION_PARAGRAPH = (
     'Exactly 25 META source files under `docs/agents/evals/r5-instruction-efficiency/**` are now separately '
@@ -485,6 +486,22 @@ def validate_current_coverage_section(report_path: Path) -> None:
             'current history annotation missing or duplicated')
 
 
+def validate_complete_source_identity_section(report_path: Path) -> None:
+    """Bind every UTF-8 byte in §1, including prose after the readable status slot."""
+    companion = report_path.with_suffix('.md')
+    require(companion.is_file(), 'companion report missing')
+    raw = companion.read_bytes()
+    section_1 = SECTION_1_HEADING.encode('utf-8')
+    section_2 = SECTION_2_HEADING.encode('utf-8')
+    require(raw.count(section_1) == 1, 'section 1 heading missing/duplicated')
+    require(raw.count(section_2) == 1, 'section 2 heading missing/duplicated')
+    start = raw.index(section_1)
+    end = raw.index(section_2)
+    require(start < end, 'report section 1 boundary ordering drift')
+    digest = hashlib.sha256(raw[start:end]).hexdigest()
+    require(digest == EXPECTED_SECTION_1_SHA256, 'complete report section 1 byte contract drift')
+
+
 def read_json(path):
     def pairs(items):
         result={}
@@ -705,6 +722,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(len(unknowns)==14,'unresolved unknown count must be exactly 14')
     require({row.get('id') for row in unknowns}==EXPECTED_UNRESOLVED_IDS,'unresolved unknown ID set drift')
     require(json_exact(unknowns,EXPECTED_UNKNOWNS),'unresolved unknown register drift')
+    validate_complete_source_identity_section(report_path)
     validate_current_coverage_section(report_path)
     validate_residual_obligations_paragraph(report_path)
     semantic_coverage=[row for row in unknowns if row.get('id')=='SEMANTIC-COVERAGE']
