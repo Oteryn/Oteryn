@@ -54,6 +54,30 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         )
         self.reject(mutated)
 
+    def test_html_comment_split_obligation_claim_rejected(self):
+        mutated = self.current.replace(
+            'Full 4325-row CSV',
+            'There are 15 obliga<!-- -->tions left.\n\nFull 4325-row CSV',
+            1,
+        )
+        self.reject(mutated)
+
+    def test_markdown_split_obligation_claim_rejected(self):
+        mutated = self.current.replace(
+            'Full 4325-row CSV',
+            'There are 15 obliga**tions** left.\n\nFull 4325-row CSV',
+            1,
+        )
+        self.reject(mutated)
+
+    def test_unrelated_insertion_rejected(self):
+        mutated = self.current.replace(
+            'Full 4325-row CSV',
+            'Unrelated inserted content.\n\nFull 4325-row CSV',
+            1,
+        )
+        self.reject(mutated)
+
     def test_duplicate_canonical_obligation_claim_rejected(self):
         mutated = self.current.replace(
             'Full 4325-row CSV',

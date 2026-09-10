@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -10,6 +11,7 @@ import re
 EXPECTED_TITLE = '# Organization audit R3 evidence'
 EXPECTED_LOCAL_HEADING = '## Local checks'
 EXPECTED_EVIDENCE_HEADING = '## Evidence map and durability'
+EXPECTED_README_SHA256 = 'f577bd31eacea2988213f4a14c84b41c5225bd7bd70100e3d4fe27bde90367de'
 EXPECTED_INTRO = (
     'Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; '
     'this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 14 residual '
@@ -70,6 +72,10 @@ def paragraphs(text: str) -> list[str]:
 
 
 def validate_text(text: str) -> dict[str, object]:
+    require(
+        hashlib.sha256(text.encode('utf-8')).hexdigest() == EXPECTED_README_SHA256,
+        'README full-document SHA-256 drift',
+    )
     items = paragraphs(text)
     require(len(items) >= 4, 'README paragraph structure incomplete')
     require(items[0] == EXPECTED_TITLE, 'README title drift')
@@ -112,7 +118,12 @@ def main() -> int:
     parser.add_argument('--readme', type=Path, default=Path('docs/evidence/organization-audit-20260907/README.md'))
     args = parser.parse_args()
     require(args.readme.is_file(), 'README missing')
-    result = validate_text(args.readme.read_text(encoding='utf-8'))
+    readme_bytes = args.readme.read_bytes()
+    try:
+        readme_text = readme_bytes.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('README is not valid UTF-8') from exc
+    result = validate_text(readme_text)
     print(json.dumps(result, sort_keys=True))
     return 0
 
