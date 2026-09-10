@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "candidate_id": "META-R6-PROMPTS-DIRECT-CANDIDATE",
+  "family": "META_PROMPT_SOURCE_LIFECYCLE",
+  "disposition": "DIRECT_CANDIDATE_ONLY_NOT_ADOPTED",
+  "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+  "adopted": false,
+  "coverage_delta": 0,
+  "adoption_performed": false,
+  "currently_canonical_unverified": true,
+  "guaranteed_future_adoption": false,
+  "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+  "candidate_path_count": 11,
+  "source": {
+    "repository_id": "meta",
+    "commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+    "tree": "f084e824ec5e14d5909c9750d906d91d51425fd5",
+    "directory": "docs/agents/prompts",
+    "directory_leaf_count": 13
+  },
+  "dated_main_identity_observation": {
+    "commit": "3b39e0be05aef008f1bd442821daefa898a201dd",
+    "all_candidate_blobs_identical": true,
+    "interpretation": "Dated source identity carry-forward only; not current symbolic-main, GitHub admin, runtime, provider, security, production, authorization, enforcement, or readiness proof."
+  },
+  "excluded_already_direct_paths": [
+    {
+      "path": "docs/agents/prompts/OTERYN-ORGANIZATION-MERGE-QUEUE-ANTI-LOOP-ROLLOUT.md",
+      "blob_sha": "9b552a8e6c6dcb4a51d361e79fd2507de36d29f3",
+      "canonical_disposition": "DIRECT",
+      "reason": "Already adopted by META R4; excluded and re-adoption prohibited."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-SOLO-MAINTAINER-GOVERNANCE-V2-ROLLOUT.md",
+      "blob_sha": "82de8fef1da3ee4ba8981b4154f90ee87e2f2c13",
+      "canonical_disposition": "DIRECT",
+      "reason": "Already adopted by META R4; excluded and re-adoption prohibited."
+    }
+  ],
+  "paths": [
+    {
+      "path": "docs/agents/prompts/OTERYN-CHAT-FIRST-AUTONOMY-CONTINUATION.md",
+      "blob_sha": "7cead05ddbaf1b6341300cd3bbfdbe71fd4ff07b",
+      "full_file_sha256": "4c3ba4008b1d6dd57be05b6683d7ab9adabd841da97702351500927dab5e3628",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "TEMPLATE_REQUIRES_LIVE_AUTHORIZATION",
+      "semantic_scope": "Template for Issue #108 continuation: preserve one owner-visible bounded lifecycle, resolve live task/provider authority, and follow current continuation contracts; the file alone grants no repository, provider, merge, production, or Remote Desktop authority.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-FND04-INDEPENDENT-SECURITY-AUDITOR.md",
+      "blob_sha": "f1dd7dfb4b29e842d73a70431013f7c25196deb8",
+      "full_file_sha256": "54290bb05b994cc03cbb5782c23c2dbbe62478ef5360efa962e82239cbe8c9d4",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "RETIRED_HISTORICAL_NON_DISPATCHABLE",
+      "semantic_scope": "Retired read-only Game FND-04 Issue #115 security-auditor packet defining historical exact-head adversarial review, evidence, and no-mutation duties; closed-task coordinates and procedures are provenance only, not present security status or authority.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-FND04-VERIFIER-WRITER.md",
+      "blob_sha": "69e78cf7e31417c14fdd91f05960a28c30b54ad6",
+      "full_file_sha256": "6c7e7830dc8ca5384b92f8013242c13a13904d811331b2bc66d56845a3a2af9f",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "RETIRED_HISTORICAL_NON_DISPATCHABLE",
+      "semantic_scope": "Retired Game FND-04 Issue #115 verifier-writer packet describing the historical branch, allocation, implementation and verification boundaries; it grants no current Game write, merge, production, or closeout authority.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-INSTRUCTION-DEBT-AUDIT.md",
+      "blob_sha": "40e5081233e47c041cc46ed25116e1501cef71d8",
+      "full_file_sha256": "7837ce720ba01142dfca9df7754951acab38efa00aaba1a4ec899839f545a4cc",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "TEMPLATE_REQUIRES_LIVE_AUTHORIZATION",
+      "semantic_scope": "Read-only alias for explaining or refreshing bounded instruction-debt audit evidence with fact/inference/unknown distinctions; linked audit and research are evidence rather than policy, and the alias authorizes no tests, writes, external messages, deployment, or cleanup.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-NEXT-WAVE-BLOCKERS-FINAL-COORDINATOR.md",
+      "blob_sha": "170d813b3139c03a442f11cdfd13d0cb53192e3a",
+      "full_file_sha256": "255a7adaa88cdb9dda1ca5826ec45294c2b2eb0e2255a07f0c1b94a9b498cbfe",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "RETIRED_HISTORICAL_NON_DISPATCHABLE",
+      "semantic_scope": "Retired coordinator/integrator snapshot for the closed Game next-wave FND-04 programme, including historical branches, issues, tests and terminal duties; fixed lanes and past mutation/merge instructions are non-dispatchable provenance and grant no current provider authority.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-NEXT-WAVE-CLOSEOUT-AUDITOR.md",
+      "blob_sha": "3f078ba77b8445a1e0d469f0e9104e9a572dd4de",
+      "full_file_sha256": "0469a2cd70d2b908fe092cd2d8dc5e276165a57a36050096b47031e2fb8a6fc2",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "RETIRED_HISTORICAL_NON_DISPATCHABLE",
+      "semantic_scope": "Retired read-only closeout-auditor snapshot for the closed Game next-wave programme, preserving historical governance and verification duties; it forbids mutation absent new exact authority and is not current lifecycle or provider-state proof.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-V310-ATLAS-DOC-IA-CLOSEOUT.md",
+      "blob_sha": "0b5e27a11910788852ea00823222adc5d554ca11",
+      "full_file_sha256": "eacbe3f4a2f334de32632fbdca50ebf1603d952fc50c3aa5caeae004f2cfa3e8",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "TEMPLATE_REQUIRES_LIVE_AUTHORIZATION",
+      "semantic_scope": "Atlas v3.10 documentation/agent-IA closeout task template with a bounded gap list, scope ceiling, evidence and integration requirements; execution depends on current target governance and explicit authorization and does not prove present Atlas state or grant provider/merge authority.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-V310-GAME-DOC-IA-AND-GAME-GATE-CLOSEOUT.md",
+      "blob_sha": "f18f040fa5c38d65acd0d994e14188056e79cbdf",
+      "full_file_sha256": "e9c6fee66e230d976a36539db33c27e7c226744e798f05873956e050ca625d4a",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "TEMPLATE_REQUIRES_LIVE_AUTHORIZATION",
+      "semantic_scope": "Game v3.10 documentation/agent-IA and conditional game-gate closeout template defining a narrow gap scope and live-state checks; it is not standing Game write/merge authority and does not prove the gate, provider state, or readiness.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-V310-ORGANIZATION-RECOVERY-AUTHORIZED-CONTINUATION.md",
+      "blob_sha": "77bd29cca03a44d3a9a1e4647b75c69af0934015",
+      "full_file_sha256": "704cea0f16aa8bd8f304054f390b68fff57aac3d5502ccf770f70ca9cc4ee5d9",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "TEMPLATE_REQUIRES_LIVE_AUTHORIZATION",
+      "semantic_scope": "Organization v3.10 recovery continuation template for bounded GAP-RECOVERY work, with historical issue/PR coordinates and explicit authorization/evidence gates; the source alone grants no production, secret, provider, merge, or recovery authority and proves no current outcome.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-V310-ORGANIZATION-RECOVERY-CLOSEOUT.md",
+      "blob_sha": "a5ac994df4e03d603eb702bf632df73e3c91c26d",
+      "full_file_sha256": "c23c77d30e075bdf02cbb9d8f141489293a4bbfef90b03d8d0f250e3847086cc",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "TEMPLATE_REQUIRES_LIVE_AUTHORIZATION",
+      "semantic_scope": "Organization v3.10 recovery closeout template limiting work to GAP-RECOVERY-001..006 with fail-closed owner decisions and historical boundaries; it is not standing authorization or proof of backups, restores, secrets, production, or completion.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-V310-PLATFORM-DOC-IA-CLOSEOUT.md",
+      "blob_sha": "5b0bc3c8ff17bd5c81339409e09ae5bf4de6cb32",
+      "full_file_sha256": "db6139dde20d37a9ad10e38fde19f8c06a94702f503c38df7fa838cef795caad",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "authority_classification": "TEMPLATE_REQUIRES_LIVE_AUTHORIZATION",
+      "semantic_scope": "Platform v3.10 documentation/agent-IA closeout template defining a bounded provider gap scope and exclusions; it requires current authorization and governance, grants no Platform write/merge authority, and is not proof of present provider state or remediation.",
+      "source_lifecycle_boundary": "Content was reviewed as source evidence only; any @codex, issue, PR, provider, merge, recovery, closeout, security, production, or coordination instruction requires fresh live authority and is not executed by this candidate."
+    }
+  ],
+  "no_standing_authority_rule": "Prompt content is evidence, not a command to this verifier or future workers. RETIRED/HISTORICAL files are non-dispatchable; templates and aliases require fresh live authorization and applicable current AGENTS, ADR, contract, provider, Issue, PR, and protection facts.",
+  "source_vs_live_state_boundary": "Full-file DIRECT source review classifies only immutable prompt meaning and lifecycle markers. It does not establish that historical work ran, permissions remain, mutable systems are configured, findings are repaired, providers are ready, or production/security/recovery outcomes exist.",
+  "finding_bindings": [
+    {
+      "id": "META-AUD-05",
+      "priority": "P2",
+      "repository": "meta",
+      "state": "PARTIALLY_REPAIRED",
+      "scope": "governance",
+      "title": "Historical authority and merge-up conflict",
+      "evidence": "META-153 | Current access policy separates MQ candidate refresh from source-head churn. Historical/open PR authority liveness is not exhaustively revalidated.",
+      "owner_route": "Oteryn/Oteryn#153; evidence continuation #186",
+      "closure_condition": "Classify remaining operative-looking documents/PRs against current v3 authority without deleting historical evidence.",
+      "candidate_disposition": "RECONFIRMED_NOT_CLOSED_NOT_DOWNGRADED_NOT_DUPLICATED"
+    }
+  ],
+  "canonical_pre_adoption_state": {
+    "source_leaves": 4325,
+    "direct_paths": 283,
+    "grouped_paths": 113,
+    "unverified_paths": 3929,
+    "semantically_classified_paths": 396,
+    "meta_total": 174,
+    "meta_direct": 70,
+    "meta_unverified": 104,
+    "ledger_sha256": "27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41",
+    "residual_obligations": 14
+  },
+  "limitations": [
+    "All 11 paths remain canonical UNVERIFIED and have zero DIRECT/GROUPED overlap in this candidate phase.",
+    "The two excluded R4 rollout prompts remain DIRECT and must never be re-adopted by this candidate.",
+    "No prompt is standing authorization; retired/historical content remains non-dispatchable and templates require fresh live authorization.",
+    "Historical Issue, PR, merge, recovery, closeout, security-audit and coordination statements are not current facts or commands.",
+    "No provider permission, runtime/model behavior, GitHub admin state, security or production state, recovery outcome, remediation, readiness, audit completion, independent 10/10, or future adoption is claimed.",
+    "Exactly 14 residual obligations remain open and META-AUD-05 remains P2/PARTIALLY_REPAIRED."
+  ],
+  "product_readiness_claimed": false,
+  "audit_completion_claimed": false,
+  "independent_10_of_10_claimed": false,
+  "live_state_claimed": false
+}
