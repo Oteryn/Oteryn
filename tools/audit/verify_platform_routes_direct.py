@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 from pathlib import Path
 import subprocess
+
+import verify_report
 
 ROOT = Path(__file__).resolve().parents[2]
 CANDIDATE_REL = Path("docs/evidence/organization-audit-20260907/r3-platform-routes-direct-candidate.json")
@@ -15,6 +18,8 @@ GROUPS_REL = Path("docs/evidence/organization-audit-20260907/coverage-groups.jso
 SOURCE_COMMIT = "de917b3477a1de0667531380de3660e8b2ab59aa"
 ROUTES_TREE = "424f8bae6f7b9de1726f7c62c606b3b0baa15b23"
 LEDGER_SHA = "73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9"
+ORIGINAL_REVIEW_SHA256 = "15d5982db9ff2c4bce7103ffb44f10bd9a5f0320145f94919d9593b1f07ff0dd"
+REPORT_REL = Path("docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json")
 
 PATH_BLOBS = {
     "routes/api.php": "ba7916913c581d88a23cb19a70060d857606f644",
@@ -44,6 +49,17 @@ INCLUDED = ["route methods", "route URIs", "route names", "route middleware",
             "console schedule declarations"]
 EXCLUDED = ["controller and service internals", "framework-global middleware behavior",
             "production reachability", "data authorization internals", "UI and product readiness"]
+ROUTE_SCOPE = ("Frozen Platform de917b3 route declaration and middleware-composition review; "
+               "all 19 files in the exact routes tree were read. This does not approve "
+               "controller/model-binding authorization, framework CSRF implementation, "
+               "production configuration or runtime behavior.")
+ROUTE_EXECUTION_EVIDENCE = "SOURCE_REVIEW_ONLY; r3-continuation-checkpoint-20260908.json"
+EXPECTED_ROUTE_ROWS = {
+    path: {"repository": "platform", "path": path, "blob_sha": blob,
+           "depth": "SCOPED_SEMANTIC_REVIEW", "scope": ROUTE_SCOPE,
+           "line_ranges": "[]", "execution_evidence": ROUTE_EXECUTION_EVIDENCE}
+    for path, blob in PATH_BLOBS.items()
+}
 
 
 def require(condition: bool, message: str) -> None:
@@ -77,9 +93,10 @@ def read_json(path: Path):
 
 def expected_candidate():
     return {
-        "schema_version": 1, "id": "platform-routes-direct-candidate-20260910",
-        "repository": "platform", "disposition": "DIRECT_CANDIDATE_ONLY_NOT_ADOPTED",
-        "coverage_adopted": False, "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+        "schema_version": 1, "id": "platform-routes-direct-existing-revalidation-20260910",
+        "repository": "platform", "disposition": "DIRECT_EXISTING_REVALIDATION_ONLY",
+        "coverage_delta": 0, "already_canonical_direct": True,
+        "re_adoption_permitted": False, "review_method": "FRESH_FULL_FILE_DIRECT_READ",
         "source": {"repository": "Oteryn/Oteryn-Platform", "commit_sha": SOURCE_COMMIT,
                    "routes_tree_sha": ROUTES_TREE, "regular_file_count": 19,
                    "top_level_file_count": 5, "module_file_count": 14},
@@ -88,7 +105,7 @@ def expected_candidate():
         "rejected_history": {"claim": "The old Platform audit prose claimed 21 route files.",
                              "claimed_count": 21, "actual_count": 19,
                              "status": "REJECTED_COUNT_MISMATCH",
-                             "accepted_as_evidence": False, "used_for_candidate": False},
+                             "accepted_as_evidence": False, "used_for_revalidation": False},
         "review_result": {"material_new_findings": [],
                           "finding_severities_reviewed": ["P0", "P1", "P2"],
                           "statement": "The fresh direct review of all 19 immutable route files found no new material P0, P1, or P2 within the bounded route-declaration scope.",
@@ -98,9 +115,9 @@ def expected_candidate():
                                            "semantically_classified_paths": 346,
                                            "ledger_sha256": LEDGER_SHA},
         "limitations": [
-            "This candidate is proof-phase evidence only and is not an adoption, coverage promotion, readiness, completion, or provider-remediation claim.",
+            "This revalidation hardens existing DIRECT evidence only; it is not an adoption, coverage promotion, readiness, completion, or provider-remediation claim.",
+            "These 19 paths are already canonical DIRECT rows, coverage_delta is zero, re-adoption is prohibited, and no separate adoption phase exists for them.",
             "Existing provider findings remain open and are not closed by an absence of new findings in this bounded declaration review.",
-            "Canonical accounting and path dispositions remain unchanged until a separately authorized adoption phase.",
         ],
     }
 
@@ -143,13 +160,34 @@ def grouped_prefixes(groups):
 
 
 def validate_current_accounting(audit_root: Path) -> None:
-    with (audit_root / REVIEW_REL).open(encoding="utf-8", newline="") as handle:
-        direct_rows = [row for row in csv.DictReader(handle, delimiter="\t")
-                       if row["repository"] == "platform" and row["path"] in PATH_BLOBS]
+    review_path = audit_root / REVIEW_REL
+    require(hashlib.sha256(review_path.read_bytes()).hexdigest() == ORIGINAL_REVIEW_SHA256,
+            "original canonical DIRECT review ledger drift")
+    with review_path.open(encoding="utf-8", newline="") as handle:
+        original_rows = list(csv.DictReader(handle, delimiter="\t"))
+    require(len(original_rows) == 221, "original canonical DIRECT row count drift")
+    direct_rows = [row for row in original_rows
+                   if row["repository"] == "platform" and row["path"] in PATH_BLOBS]
     require(len(direct_rows) == 19, "canonical DIRECT route row count drift")
-    require({row["path"]: row["blob_sha"] for row in direct_rows} == PATH_BLOBS,
-            "canonical DIRECT route binding drift")
-    prefixes = grouped_prefixes(read_json(audit_root / GROUPS_REL))
+    indexed_route_rows = {row["path"]: row for row in direct_rows}
+    require(set(indexed_route_rows) == set(PATH_BLOBS), "canonical DIRECT route path set drift")
+    observed_route_rows = {path: indexed_route_rows[path] for path in PATH_BLOBS}
+    json_exact(observed_route_rows, EXPECTED_ROUTE_ROWS, "canonical_route_rows")
+
+    report_result = verify_report.validate(audit_root / REPORT_REL)
+    expected_result = {
+        "source_leaves": 4325, "scoped_review_paths": 233,
+        "grouped_revalidated_paths": 113, "semantically_classified_paths": 346,
+        "unverified_semantics": 3979,
+    }
+    for key, expected in expected_result.items():
+        require(type(report_result.get(key)) is int and report_result[key] == expected,
+                f"canonical accounting drift: {key}")
+    coverage = read_json(audit_root / "docs/evidence/organization-audit-20260907/coverage-summary.json")
+    require(coverage.get("ledger_sha256") == LEDGER_SHA, "canonical ledger SHA-256 drift")
+
+    groups = read_json(audit_root / GROUPS_REL)
+    prefixes = grouped_prefixes(groups)
     overlap = {path for path in PATH_BLOBS if any(path.startswith(prefix) for prefix in prefixes)}
     require(not overlap, "current DIRECT/GROUPED overlap: " + ", ".join(sorted(overlap)))
 
@@ -163,9 +201,10 @@ def main() -> int:
     validate_candidate(candidate)
     validate_source(args.platform_root)
     validate_current_accounting(args.audit_root)
-    print(json.dumps({"result": "PLATFORM_ROUTES_DIRECT_CANDIDATE_VALID_NOT_ADOPTED",
+    print(json.dumps({"result": "PLATFORM_ROUTES_DIRECT_EXISTING_REVALIDATION_VALID",
                       "review_method": "FRESH_FULL_FILE_DIRECT_READ", "route_files": 19,
-                      "coverage_adopted": False, "canonical_direct_paths": 233,
+                      "coverage_delta": 0, "already_canonical_direct": True,
+                      "re_adoption_permitted": False, "canonical_direct_paths": 233,
                       "canonical_grouped_paths": 113, "canonical_unverified_paths": 3979,
                       "canonical_semantically_classified_paths": 346,
                       "canonical_ledger_sha256": LEDGER_SHA,
