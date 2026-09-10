@@ -6,6 +6,7 @@ import csv
 import io
 import json
 from pathlib import Path
+import tempfile
 from unittest import mock
 import unittest
 
@@ -21,6 +22,53 @@ class AuditRecorderDirectVerifierTests(unittest.TestCase):
 
     def test_canonical_candidate_shape_passes(self):
         v.validate_candidate_shape(copy.deepcopy(self.candidate))
+
+    def test_authenticated_current_candidate_passes(self):
+        self.assertEqual(v.expected_candidate(ROOT), self.candidate)
+
+    def test_authenticated_candidate_rejects_material_worktree_drift(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / v.CANDIDATE_REL
+            path.parent.mkdir(parents=True)
+            changed = copy.deepcopy(self.candidate)
+            changed['limitations'][0] = 'This altered limitation establishes product readiness.'
+            path.write_text(json.dumps(changed), encoding='utf-8')
+            with mock.patch.object(v, 'git', return_value=v.CANDIDATE_BLOB), \
+                 self.assertRaisesRegex(ValueError, 'working-tree blob drift'):
+                v.expected_candidate(root)
+
+    def test_authenticated_candidate_uses_single_captured_read_during_replacement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / v.CANDIDATE_REL
+            path.parent.mkdir(parents=True)
+            canonical = (ROOT / v.CANDIDATE_REL).read_bytes()
+            path.write_bytes(canonical)
+            changed = copy.deepcopy(self.candidate)
+            changed['limitations'][0] = 'Replacement claims product readiness.'
+            replacement = json.dumps(changed).encode('utf-8')
+            original_read_bytes = Path.read_bytes
+            candidate_reads = 0
+
+            def replacing_read_bytes(current):
+                nonlocal candidate_reads
+                raw = original_read_bytes(current)
+                if current == path:
+                    candidate_reads += 1
+                    path.write_bytes(replacement)
+                return raw
+
+            with mock.patch.object(Path, 'read_bytes', replacing_read_bytes), \
+                 mock.patch.object(v, 'git', return_value=v.CANDIDATE_BLOB):
+                loaded = v.expected_candidate(root)
+            self.assertEqual(loaded, self.candidate)
+            self.assertEqual(candidate_reads, 1)
+
+    def test_strict_byte_parser_rejects_duplicate_keys_and_invalid_utf8(self):
+        for raw, message in ((b'{"key":1,"key":2}', 'duplicate JSON key'), (b'{"key":"\xff"}', 'invalid UTF-8')):
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                v.parse_json_bytes(raw)
 
     def test_committed_adopted_docs_pass(self):
         v.validate_adopted_docs(copy.deepcopy(self.candidate), ROOT)

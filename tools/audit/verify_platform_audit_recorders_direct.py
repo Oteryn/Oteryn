@@ -19,6 +19,7 @@ import verify_report as vr
 
 CANDIDATE_REL = Path('docs/evidence/organization-audit-20260907/r3-platform-audit-recorders-direct-candidate.json')
 CANDIDATE_BLOB = 'ca73bad56417157136b4284e8b31fe7f29829d07'
+CANDIDATE_SEMANTIC_SHA256 = '16ef44948f3490d1fcd05065fed89fbdba3d9334c28cd73c741a0d41f280d0f6'
 OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/coverage-review-additions.tsv')
 OVERLAY_BLOB = '9b5c1afc0d1ac39641077510fb4d6c20222e04d5'
 CANONICAL_OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/coverage-review-canonical-additions.tsv')
@@ -38,21 +39,37 @@ def blob_sha(raw: bytes) -> str:
     return hashlib.sha1(b'blob ' + str(len(raw)).encode('ascii') + b'\0' + raw).hexdigest()
 
 
-def read_json(path: Path) -> dict:
+def parse_json_bytes(raw: bytes) -> dict:
     def pairs(items):
         out={}
         for key,value in items:
             require(key not in out,'duplicate JSON key')
             out[key]=value
         return out
-    value=json.loads(path.read_text(encoding='utf-8'),object_pairs_hook=pairs)
-    require(isinstance(value,dict),'candidate root')
+    try:
+        text=raw.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('invalid UTF-8 JSON') from exc
+    value=json.loads(text,object_pairs_hook=pairs)
+    require(isinstance(value,dict),'JSON root must be an object')
     return value
 
 
+def read_json(path: Path) -> dict:
+    return parse_json_bytes(path.read_bytes())
+
+
+def expected_candidate(root: Path) -> dict:
+    """Load the candidate once and bind the parsed semantics to its Git blob."""
+    raw=(root/CANDIDATE_REL).read_bytes()
+    require(blob_sha(raw)==CANDIDATE_BLOB,'audit-recorder candidate working-tree blob drift')
+    require(git(root,'rev-parse','HEAD:'+str(CANDIDATE_REL))==CANDIDATE_BLOB,'tracked audit-recorder candidate blob drift')
+    return parse_json_bytes(raw)
+
+
 def validate_candidate_shape(candidate: dict) -> None:
-    reference=read_json(Path(__file__).resolve().parents[2]/CANDIDATE_REL)
-    require(vr.json_exact(candidate,reference),'complete audit-recorder candidate content drift')
+    semantic_bytes=json.dumps(candidate,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode('utf-8')
+    require(hashlib.sha256(semantic_bytes).hexdigest()==CANDIDATE_SEMANTIC_SHA256,'complete audit-recorder candidate content drift')
     require(candidate.get('coverage_adopted') is True,'complete audit-recorder candidate adoption drift')
     require(candidate.get('source')=={'repository':'Oteryn/Oteryn-Platform','commit_sha':SOURCE_COMMIT,'tree_sha':SOURCE_TREE},'complete audit-recorder candidate source drift')
     require(candidate.get('adoption',{}).get('direct_overlay_path')==str(OVERLAY_REL),'complete audit-recorder candidate overlay path drift')
@@ -137,9 +154,7 @@ def main() -> int:
     parser.add_argument('--audit-root',type=Path,default=Path('.'))
     parser.add_argument('--platform-root',type=Path,required=True)
     args=parser.parse_args()
-    candidate=read_json(args.audit_root/CANDIDATE_REL)
-    require(git(args.audit_root,'rev-parse','HEAD:'+str(CANDIDATE_REL))==CANDIDATE_BLOB,'tracked audit-recorder candidate blob drift')
-    validate_candidate_shape(candidate)
+    candidate=expected_candidate(args.audit_root)
     validate_adopted_docs(candidate,args.audit_root)
     validate_source(candidate,args.platform_root)
     print(json.dumps({
