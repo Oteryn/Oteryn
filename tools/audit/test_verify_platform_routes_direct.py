@@ -15,6 +15,13 @@ class PlatformRoutesCandidateTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.candidate = verifier.read_json(verifier.ROOT / verifier.CANDIDATE_REL)
+        cls.inventory_tmp = tempfile.TemporaryDirectory(prefix="routes-ledger-inventory-")
+        cls.inventory_dir = verifier.collect_canonical_inventories(
+            verifier.ROOT, Path(cls.inventory_tmp.name) / "audit")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.inventory_tmp.cleanup()
 
     def reject(self, mutate):
         candidate = deepcopy(self.candidate)
@@ -24,7 +31,7 @@ class PlatformRoutesCandidateTest(unittest.TestCase):
 
     def test_committed_revalidation_passes(self):
         verifier.validate_candidate(deepcopy(self.candidate))
-        verifier.validate_current_accounting(verifier.ROOT)
+        verifier.validate_current_accounting(verifier.ROOT, self.inventory_dir)
 
     def mutate_accounting(self, mutation):
         with tempfile.TemporaryDirectory() as temporary:
@@ -32,7 +39,7 @@ class PlatformRoutesCandidateTest(unittest.TestCase):
             shutil.copytree(verifier.ROOT / "docs/evidence", root / "docs/evidence")
             mutation(root)
             with self.assertRaises(ValueError):
-                verifier.validate_current_accounting(root)
+                verifier.validate_current_accounting(root, self.inventory_dir)
 
     def test_direct_grouped_overlap_detection_is_exact(self):
         groups = {"groups": [{"repository": "platform", "disposition": "GROUPED",
@@ -113,6 +120,28 @@ class PlatformRoutesCandidateTest(unittest.TestCase):
             data["ledger_sha256"] = "0" * 64
             path.write_text(json.dumps(data), encoding="utf-8")
         self.mutate_accounting(digest)
+
+    def test_non_route_canonical_addition_scope_drift_fails(self):
+        def mutation(root):
+            path = root / "docs/evidence/organization-audit-20260907/coverage-review-canonical-additions.tsv"
+            with path.open(encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle, delimiter="\t")
+                fieldnames, rows = reader.fieldnames, list(reader)
+            row = next(row for row in rows if not row["path"].startswith("routes/"))
+            row["scope"] = "Contradictory non-route canonical scope."
+            with path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames, delimiter="\t", lineterminator="\n")
+                writer.writeheader(); writer.writerows(rows)
+        self.mutate_accounting(mutation)
+
+    def test_accepted_grouped_scope_drift_fails(self):
+        def mutation(root):
+            path = root / verifier.GROUPS_REL
+            data = json.loads(path.read_text(encoding="utf-8"))
+            accepted = next(row for row in data["groups"] if row["disposition"] == "GROUPED")
+            accepted["scope"] = "Contradictory accepted GROUPED accounting scope."
+            path.write_text(json.dumps(data), encoding="utf-8")
+        self.mutate_accounting(mutation)
 
     def test_type_and_extra_key_drift_fail(self):
         self.reject(lambda c: c.update(schema_version=True))

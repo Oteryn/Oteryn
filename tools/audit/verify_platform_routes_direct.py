@@ -8,7 +8,9 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import tempfile
 
+import organization_audit
 import verify_report
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,6 +22,8 @@ ROUTES_TREE = "424f8bae6f7b9de1726f7c62c606b3b0baa15b23"
 LEDGER_SHA = "73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9"
 ORIGINAL_REVIEW_SHA256 = "15d5982db9ff2c4bce7103ffb44f10bd9a5f0320145f94919d9593b1f07ff0dd"
 REPORT_REL = Path("docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json")
+COLLECTION_PLAN_REL = Path("docs/evidence/organization-audit-20260907/collection-plan.json")
+INVENTORY_IDS = {"meta", "game", "platform", "atlas", "migration_archive"}
 
 PATH_BLOBS = {
     "routes/api.php": "ba7916913c581d88a23cb19a70060d857606f644",
@@ -159,7 +163,17 @@ def grouped_prefixes(groups):
     return prefixes
 
 
-def validate_current_accounting(audit_root: Path) -> None:
+def collect_canonical_inventories(audit_root: Path, output: Path) -> Path:
+    """Recreate the immutable inventories consumed by the authoritative ledger builder."""
+    plan = read_json(audit_root / COLLECTION_PLAN_REL)
+    plan["snapshots"] = [row for row in plan["snapshots"] if row["id"] in INVENTORY_IDS]
+    require({row["id"] for row in plan["snapshots"]} == INVENTORY_IDS,
+            "canonical inventory snapshot set drift")
+    organization_audit.collect(plan, output)
+    return output / "inventories"
+
+
+def validate_current_accounting(audit_root: Path, inventory_dir: Path | None = None) -> None:
     review_path = audit_root / REVIEW_REL
     require(hashlib.sha256(review_path.read_bytes()).hexdigest() == ORIGINAL_REVIEW_SHA256,
             "original canonical DIRECT review ledger drift")
@@ -174,7 +188,23 @@ def validate_current_accounting(audit_root: Path) -> None:
     observed_route_rows = {path: indexed_route_rows[path] for path in PATH_BLOBS}
     json_exact(observed_route_rows, EXPECTED_ROUTE_ROWS, "canonical_route_rows")
 
-    report_result = verify_report.validate(audit_root / REPORT_REL)
+    temporary = None
+    if inventory_dir is None:
+        temporary = tempfile.TemporaryDirectory(prefix="oteryn-routes-inventory-")
+        inventory_dir = collect_canonical_inventories(audit_root, Path(temporary.name) / "audit")
+    try:
+        report_result = verify_report.validate(audit_root / REPORT_REL, inventory_dir=inventory_dir)
+        ledger_bytes, grouped_counts = verify_report.rebuild_ledger(
+            audit_root / REPORT_REL, inventory_dir)
+    finally:
+        if temporary is not None:
+            temporary.cleanup()
+    require(report_result.get("tree_and_ledger_verified") is True,
+            "canonical inventory/ledger reproduction was not performed")
+    require(hashlib.sha256(ledger_bytes).hexdigest() == LEDGER_SHA,
+            "recomputed canonical ledger SHA-256 drift")
+    require(ledger_bytes.count(b"\n") - 1 == 4325, "recomputed canonical ledger row count drift")
+    require(sum(grouped_counts.values()) == 113, "recomputed canonical GROUPED count drift")
     expected_result = {
         "source_leaves": 4325, "scoped_review_paths": 233,
         "grouped_revalidated_paths": 113, "semantically_classified_paths": 346,
