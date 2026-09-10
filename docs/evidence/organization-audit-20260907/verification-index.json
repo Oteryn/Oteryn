@@ -433,5 +433,37 @@
     "product_readiness_claimed": false,
     "audit_completion_claimed": false,
     "runtime_attested": false
+  },
+  "r3_meta_r6_prompts_direct_adoption": {
+    "candidate_path": "r3-meta-r6-prompts-direct-candidate.json",
+    "candidate_sha256": "62b7f49af1434667f9ed293c896bc7f9b285cb8652883f00915607f0ce65381a",
+    "adoption_overlay": "coverage-review-meta-r6-prompts-direct-additions.tsv",
+    "adoption_overlay_sha256": "b51111c2e6eeb8d88f392d63007688b3be44128a7756512f8f295eaf7c9aeb8e",
+    "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+    "source_tree": "f084e824ec5e14d5909c9750d906d91d51425fd5",
+    "prompt_subtree_tree": "0b825e18cde3cd928dfe569acf9ce6c0dc71cfe5",
+    "live_main_identity_commit": "3b39e0be05aef008f1bd442821daefa898a201dd",
+    "path_count": 11,
+    "depth": "SCOPED_SEMANTIC_REVIEW",
+    "line_ranges": [],
+    "canonical_ledger_sha256": "ff5c6621a78c14fc17802ecf01b4ef815867ccab95acce90c490973946d6279b",
+    "canonical_counts": {
+      "source_rows": 4325,
+      "direct_paths": 294,
+      "grouped_paths": 113,
+      "unverified_paths": 3918,
+      "semantically_classified_paths": 407
+    },
+    "meta_counts": {
+      "direct_paths": 81,
+      "unverified_paths": 93,
+      "source_rows": 174
+    },
+    "excluded_r4_paths_readopted": false,
+    "meta_aud_05_status": "PARTIALLY_REPAIRED",
+    "product_readiness_claimed": false,
+    "audit_completion_claimed": false,
+    "live_state_claimed": false,
+    "standing_authority_claimed": false
   }
 }

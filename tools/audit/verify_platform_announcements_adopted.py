@@ -15,7 +15,7 @@ ANNOUNCEMENTS_OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/cove
 ANNOUNCEMENTS_OVERLAY_BLOB = '7822ad14cb7c9311267fd7bbf52490ca320762e9'
 ANNOUNCEMENTS_OVERLAY_SHA256 = '5e9b4832b886cf9049f49be00fa32b76abab5b896e63a1711688c47fb5addcb2'
 ANNOUNCEMENTS_LEDGER_SHA = '73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9'
-CANONICAL_LEDGER_SHA = '27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41'
+CANONICAL_LEDGER_SHA = 'ff5c6621a78c14fc17802ecf01b4ef815867ccab95acce90c490973946d6279b'
 LIFECYCLE_RESULT = 'ANNOUNCEMENTS_DIRECT_CANONICAL_ADOPTION_VALID_REVIEW_OBSERVED_IN_EXTERNAL_PR_METADATA'
 REVIEW_PROVENANCE = 'External mutable PR #185 metadata: reviewed implementation 3eb62ef72c1e13412fa45d5b25d597d112d9ae7d; review comment 5609072309. Not self-certified evidence.'
 EXPECTED_LINE_RANGES = {
@@ -88,20 +88,20 @@ def validate_adopted_docs(candidate: dict, audit_root: Path) -> None:
 
     report_path=audit_root/'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'
     report=vr.read_json(report_path)
-    require(report.get('revision')=='R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-283','report revision drift')
+    require(report.get('revision')=='R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-294','report revision drift')
     require(report.get('coverage_review_additions')==vr.DIRECT_ADDITIONS_BINDING,'canonical additions binding drift')
     require(report.get('coverage_review_announcements_additions')==vr.ANNOUNCEMENTS_ADDITIONS_BINDING,'Announcements evidence binding drift')
     require(report.get('r3_platform_announcements_direct_candidate')=='organization-audit-20260907/r3-platform-announcements-direct-candidate.json','Announcements candidate binding drift')
-    require(report.get('scoped_review_paths')==283 and report.get('grouped_revalidated_paths')==113 and report.get('semantically_classified_paths')==396,'report accounting drift')
+    require(report.get('scoped_review_paths')==294 and report.get('grouped_revalidated_paths')==113 and report.get('semantically_classified_paths')==407,'report accounting drift')
 
     summary=vr.read_json(audit_root/'docs/evidence/organization-audit-20260907/coverage-summary.json')
     require(summary.get('ledger_sha256')==CANONICAL_LEDGER_SHA,'canonical ledger digest drift')
-    require(summary.get('scoped_review_paths')==283 and summary.get('grouped_revalidated_paths')==113 and summary.get('unverified_semantics_total')==3929 and summary.get('semantically_classified_paths')==396,'summary accounting drift')
+    require(summary.get('scoped_review_paths')==294 and summary.get('grouped_revalidated_paths')==113 and summary.get('unverified_semantics_total')==3918 and summary.get('semantically_classified_paths')==407,'summary accounting drift')
     require(summary['per_repository']['platform']=={'leaves':2165,'direct_scoped':168,'unverified_semantics':1884,'grouped':113,'not_applicable':0},'Platform summary drift')
 
     base=report_path.parent/report['evidence_directory']
     review=vr.load_review(base,report)
-    require(len(review)==283,'canonical DIRECT count drift')
+    require(len(review)==294,'canonical DIRECT count drift')
     canonical={(row['repository'],row['path']):row for row in review}
     for row in ann_rows:
         current=canonical.get(('platform',row['path']))
@@ -125,10 +125,10 @@ def main() -> int:
         'result':LIFECYCLE_RESULT,
         'source_commit':pre.SOURCE_COMMIT,
         'adopted_paths':10,
-        'direct_paths':283,
+        'direct_paths':294,
         'grouped_paths':113,
-        'unverified_paths':3929,
-        'semantically_classified_paths':396,
+        'unverified_paths':3918,
+        'semantically_classified_paths':407,
         'ledger_sha256':CANONICAL_LEDGER_SHA,
         'primary_cases':4,
         'primary_assertions':20,

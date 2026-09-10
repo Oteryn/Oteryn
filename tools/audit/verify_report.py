@@ -30,12 +30,15 @@ DEFAULT_REASON = 'Identity enumerated; this continuation does not assert a compl
 DIRECT_ADDITIONS = 'coverage-review-canonical-additions.tsv'
 META_R4_DIRECT_ADDITIONS = 'coverage-review-meta-r4-direct-additions.tsv'
 META_R5_DIRECT_ADDITIONS = 'coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv'
+META_R6_DIRECT_ADDITIONS = 'coverage-review-meta-r6-prompts-direct-additions.tsv'
 DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-canonical-additions.tsv'
 RECORDER_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
 ANNOUNCEMENTS_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-announcements-additions.tsv'
 META_R4_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-meta-r4-direct-additions.tsv'
 META_R5_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv'
 META_R5_CANDIDATE_BINDING = 'organization-audit-20260907/r3-meta-r5-instruction-efficiency-direct-candidate.json'
+META_R6_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-meta-r6-prompts-direct-additions.tsv'
+META_R6_CANDIDATE_BINDING = 'organization-audit-20260907/r3-meta-r6-prompts-direct-candidate.json'
 EXPECTED_UNRESOLVED_IDS = {
     'SEMANTIC-COVERAGE', 'HISTORY-REVALIDATION', 'ADMIN-STATE', 'INFRA-STATE', 'RECOVERY',
     'COST-CI', 'COST-AGENTS', 'SUPPLY-CHAIN', 'NATIVE-G1', 'UI-343', 'PORTABILITY',
@@ -68,8 +71,8 @@ EXPECTED_SECTION_7_PARAGRAPHS = (
 )
 SECTION_1_HEADING = '## 1. Source identity and actual coverage'
 SECTION_2_HEADING = '## 2. Native evidence actually acquired and rechecked'
-EXPECTED_SECTION_1_SHA256 = 'c1a89e79d2d2a3159e887790c0da3572094c0805b4496dd9752d2a2413c48d90'
-EXPECTED_REPORT_MARKDOWN_SHA256 = '3ec3095327fae570585dd41f1e0dad21fce6af3536adce578baf8c32ce59c6d4'
+EXPECTED_SECTION_1_SHA256 = '03adf3b772c3d4555859e3c487e47fe8effe9359b1af91bcacba606f7b75b86b'
+EXPECTED_REPORT_MARKDOWN_SHA256 = '10c0d5fef8e3681831f1bc85d85e0ea002ac029fbcf939322508469394d22d56'
 CURRENT_COVERAGE_TABLE_HEADER = '| Source | Tracked leaves | DIRECT scoped | GROUPED revalidated | UNVERIFIED semantics |'
 CURRENT_R5_ADOPTION_PARAGRAPH = (
     'Exactly 25 META source files under `docs/agents/evals/r5-instruction-efficiency/**` are now separately '
@@ -82,14 +85,26 @@ CURRENT_R5_ADOPTION_PARAGRAPH = (
     'correctness or safety, A/B superiority, provider permission, measured cost, live state, or product '
     'readiness. The dated protected-main identity `3b39e0be05aef008f1bd442821daefa898a201dd` is source '
     'identity carry-forward only. `META-AUD-05` remains P2 / `PARTIALLY_REPAIRED`, and all 14 residual '
-    'obligations remain open. The current canonical ledger is '
+    'obligations remain open. The R5 adoption ledger was '
     '`27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41`.'
+)
+CURRENT_R6_ADOPTION_PARAGRAPH = (
+    'Exactly 11 META prompt files under `docs/agents/prompts/**` are now separately adopted as DIRECT '
+    '`SCOPED_SEMANTIC_REVIEW` rows through `coverage-review-meta-r6-prompts-direct-additions.tsv`, from '
+    'immutable reviewed candidate `r3-meta-r6-prompts-direct-candidate.json` (SHA-256 '
+    '`62b7f49af1434667f9ed293c896bc7f9b285cb8652883f00915607f0ce65381a`). The two rollout prompts '
+    'already counted by R4 are excluded and not re-adopted. Prompt text is source evidence, not standing '
+    'authority; retired/history packets remain non-dispatchable and templates require fresh live authorization. '
+    'No provider/runtime/admin/security/production/recovery/readiness/completion result is attested. The dated '
+    'protected-main identity `3b39e0be05aef008f1bd442821daefa898a201dd` is source identity carry-forward '
+    'only. `META-AUD-05` remains P2 / `PARTIALLY_REPAIRED`, all 14 residual obligations remain open, and the '
+    'current canonical ledger is `ff5c6621a78c14fc17802ecf01b4ef815867ccab95acce90c490973946d6279b`.'
 )
 CURRENT_HISTORY_ANNOTATION = (
     'The following paragraph is retained verbatim as the bounded **pre-Announcements Marketplace closeout '
     'snapshot** required by the Marketplace durability contract. Within that paragraph, “the current revision” '
     'and its 223-path ledger refer to that historical pre-Announcements audit state, not to the present canonical '
-    '283-path state shown above and bound below.'
+    '294-path state shown above and bound below.'
 )
 EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT = (
     '`DIRECT` is a bounded review with the stated scope, not full approval of the entire file or every '
@@ -144,22 +159,22 @@ def write_new_file_no_symlinks(path: Path, raw: bytes) -> None:
         except OSError as exc: raise ValueError('refusing ledger overwrite or symlink') from exc
     finally: os.close(descriptor)
 SEMANTIC_COVERAGE_UNKNOWN = {'id': 'SEMANTIC-COVERAGE',
- 'missing': '3929 source leaves retain UNVERIFIED semantics; 396 of 4325 leaves are semantically '
+ 'missing': '3918 source leaves retain UNVERIFIED semantics; 407 of 4325 leaves are semantically '
             'classified',
- 'reason': 'Source bytes are available; 283 DIRECT scoped path reviews are bound (the prior 233 '
-           '(221 original plus two app/Audit recorder paths plus ten app/Announcements/** paths) '
-           'plus exactly 25 META paths from the immutable reviewed R4 candidate plus exactly 25 '
-           'META R5 instruction-efficiency source paths from its separately reviewed candidate), '
+ 'reason': 'Source bytes are available; 294 DIRECT scoped path reviews are bound (the prior 283 '
+           'plus exactly 11 META prompt-family source paths from the immutable reviewed R6 '
+           'candidate; the two already-DIRECT R4 rollout prompts are excluded and not re-adopted), '
            'and 113 bounded GROUPED Platform paths remain bound (27 GameAuth + 31 '
            'Accounts/CanaryIntegration/CharacterProfiles/Characters + 49 '
-           'Marketplace/Payments/Wallet + 6 Marketplace tests). The META adoption is bounded '
-           'source-semantic evidence only, uses no fabricated line ranges, and does not establish '
-           'live admin/runtime/provider state or readiness. The ten Announcements DIRECT paths '
-           'retain their explicit execution limits. This is bounded semantic accounting, not full '
-           'behavior, product, or audit approval; 3929 paths retain UNVERIFIED. The rejected Atlas '
-           '508-path candidate remains UNVERIFIED, and no automatic import from maintenance N/A or '
-           'unproven summaries is allowed.',
- 'effect': 'Original exhaustive completeness cannot be claimed from 396 semantically classified '
+           'Marketplace/Payments/Wallet + 6 Marketplace tests). The R6 adoption is bounded '
+           'source-semantic evidence only: prompt text is not standing authority, retired/history '
+           'packets remain non-dispatchable, templates require fresh live authorization, and no '
+           'provider/runtime/admin/security/production/recovery/readiness/completion result is '
+           'attested. This is bounded semantic accounting, not full behavior, product, or audit '
+           'approval; 3918 paths retain UNVERIFIED. The rejected Atlas 508-path candidate remains '
+           'UNVERIFIED, and no automatic import from maintenance N/A or unproven summaries is '
+           'allowed.',
+ 'effect': 'Original exhaustive completeness cannot be claimed from 407 semantically classified '
            'leaves out of 4325.',
  'owner_route': 'META186 plus provider audit owners',
  'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review '
@@ -170,8 +185,8 @@ EXPECTED_COVERAGE_SUMMARY = {'schema_version': 1,
  'source_leaf_total': 4325,
  'active_repository_leaf_total': 4324,
  'per_repository': {'meta': {'leaves': 174,
-                             'direct_scoped': 70,
-                             'unverified_semantics': 104,
+                             'direct_scoped': 81,
+                             'unverified_semantics': 93,
                              'grouped': 0,
                              'not_applicable': 0},
                     'game': {'leaves': 830,
@@ -194,7 +209,7 @@ EXPECTED_COVERAGE_SUMMARY = {'schema_version': 1,
                                           'unverified_semantics': 0,
                                           'grouped': 0,
                                           'not_applicable': 0}},
- 'ledger_sha256': '27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41',
+ 'ledger_sha256': 'ff5c6621a78c14fc17802ecf01b4ef815867ccab95acce90c490973946d6279b',
  'identity_coverage': 'COMPLETE_FOR_PINNED_FIVE_REPOSITORIES',
  'semantic_coverage': 'PARTIAL_EXPLICIT',
  'unclassified_paths': 0,
@@ -222,39 +237,43 @@ EXPECTED_COVERAGE_SUMMARY = {'schema_version': 1,
                'coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv; the '
                'source-row evidence does not attest runtime model/effort, isolation, answer '
                'quality/safety, A/B superiority, provider permission, cost, or readiness, and the '
-               'already-DIRECT R5Q Results row remains separate.',
- 'new_scoped_paths_since_r2': 218,
- 'scoped_review_paths': 283,
+               'already-DIRECT R5Q Results row remains separate. The immutable reviewed 11-path '
+               'META R6 prompt-family candidate is separately adopted exactly once through '
+               'coverage-review-meta-r6-prompts-direct-additions.tsv; prompt text remains source '
+               'evidence rather than standing authority, retired/history packets remain '
+               'non-dispatchable, templates require fresh live authorization, and no '
+               'provider/runtime/admin/security/production/recovery/readiness/completion result is '
+               'attested.',
+ 'new_scoped_paths_since_r2': 229,
+ 'scoped_review_paths': 294,
  'grouped_revalidated_paths': 113,
- 'semantically_classified_paths': 396,
- 'unverified_semantics_total': 3929,
- 'coverage_dimension_note': 'DIRECT records bounded source review, not universal approval. The 283 '
-                            'DIRECT paths are the prior 258 plus exactly 25 META R5 '
-                            'instruction-efficiency source paths adopted from the immutable '
-                            'reviewed candidate through a separate overlay; the already-DIRECT R5Q '
-                            'Results evidence is not re-adopted. Platform contributes 113 GROUPED '
-                            'paths: GameAuth 27, account/Canary/profile/character 31, '
-                            'Marketplace/Payments/Wallet production code 49, and the exact '
-                            'six-file Marketplace test directory 6. The Atlas 508-path candidate '
-                            'remains rejected.',
+ 'semantically_classified_paths': 407,
+ 'unverified_semantics_total': 3918,
+ 'coverage_dimension_note': 'DIRECT records bounded source review, not universal approval. The 294 '
+                            'DIRECT paths are the prior 283 plus exactly 11 META prompt-family '
+                            'source paths adopted from the immutable reviewed R6 candidate through '
+                            'a separate overlay; the two already-DIRECT R4 rollout prompts are '
+                            'excluded and not re-adopted. Platform contributes 168 DIRECT and 113 '
+                            'GROUPED paths; the other provider counts are unchanged. Identity-only '
+                            'and rejected Atlas paths remain UNVERIFIED.',
  'rejected_group_candidates': 1}
 EXPECTED_UNKNOWNS = [{'id': 'SEMANTIC-COVERAGE',
-  'missing': '3929 source leaves retain UNVERIFIED semantics; 396 of 4325 leaves are semantically '
+  'missing': '3918 source leaves retain UNVERIFIED semantics; 407 of 4325 leaves are semantically '
              'classified',
-  'reason': 'Source bytes are available; 283 DIRECT scoped path reviews are bound (the prior 233 '
-            '(221 original plus two app/Audit recorder paths plus ten app/Announcements/** paths) '
-            'plus exactly 25 META paths from the immutable reviewed R4 candidate plus exactly 25 '
-            'META R5 instruction-efficiency source paths from its separately reviewed candidate), '
-            'and 113 bounded GROUPED Platform paths remain bound (27 GameAuth + 31 '
+  'reason': 'Source bytes are available; 294 DIRECT scoped path reviews are bound (the prior 283 '
+            'plus exactly 11 META prompt-family source paths from the immutable reviewed R6 '
+            'candidate; the two already-DIRECT R4 rollout prompts are excluded and not '
+            're-adopted), and 113 bounded GROUPED Platform paths remain bound (27 GameAuth + 31 '
             'Accounts/CanaryIntegration/CharacterProfiles/Characters + 49 '
-            'Marketplace/Payments/Wallet + 6 Marketplace tests). The META adoption is bounded '
-            'source-semantic evidence only, uses no fabricated line ranges, and does not establish '
-            'live admin/runtime/provider state or readiness. The ten Announcements DIRECT paths '
-            'retain their explicit execution limits. This is bounded semantic accounting, not full '
-            'behavior, product, or audit approval; 3929 paths retain UNVERIFIED. The rejected '
-            'Atlas 508-path candidate remains UNVERIFIED, and no automatic import from maintenance '
-            'N/A or unproven summaries is allowed.',
-  'effect': 'Original exhaustive completeness cannot be claimed from 396 semantically classified '
+            'Marketplace/Payments/Wallet + 6 Marketplace tests). The R6 adoption is bounded '
+            'source-semantic evidence only: prompt text is not standing authority, retired/history '
+            'packets remain non-dispatchable, templates require fresh live authorization, and no '
+            'provider/runtime/admin/security/production/recovery/readiness/completion result is '
+            'attested. This is bounded semantic accounting, not full behavior, product, or audit '
+            'approval; 3918 paths retain UNVERIFIED. The rejected Atlas 508-path candidate remains '
+            'UNVERIFIED, and no automatic import from maintenance N/A or unproven summaries is '
+            'allowed.',
+  'effect': 'Original exhaustive completeness cannot be claimed from 407 semantically classified '
             'leaves out of 4325.',
   'owner_route': 'META186 plus provider audit owners',
   'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review '
@@ -470,15 +489,18 @@ def validate_current_coverage_section(text: str) -> None:
     remainder = '\n'.join(lines[start + len(table):]).strip()
     paragraphs = tuple(re.sub(r'\s+', ' ', part.strip())
                        for part in re.split(r'\n\s*\n', remainder) if part.strip())
-    require(len(paragraphs) >= 3, 'current coverage status slot incomplete')
+    require(len(paragraphs) >= 4, 'current coverage status slot incomplete')
     require(paragraphs[0] == CURRENT_R5_ADOPTION_PARAGRAPH, 'current R5 adoption paragraph drift')
-    require(paragraphs[1] == CURRENT_HISTORY_ANNOTATION, 'current history annotation drift')
-    require(paragraphs[2] == EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT,
+    require(paragraphs[1] == CURRENT_R6_ADOPTION_PARAGRAPH, 'current R6 adoption paragraph drift')
+    require(paragraphs[2] == CURRENT_HISTORY_ANNOTATION, 'current history annotation drift')
+    require(paragraphs[3] == EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT,
             'historical snapshot is missing, reordered, or drifted')
     require(section.count(CURRENT_R5_ADOPTION_PARAGRAPH) == 1,
             'current R5 adoption paragraph missing or duplicated')
     require(section.count(CURRENT_HISTORY_ANNOTATION) == 1,
             'current history annotation missing or duplicated')
+    require(section.count(CURRENT_R6_ADOPTION_PARAGRAPH) == 1,
+            'current R6 adoption paragraph missing or duplicated')
 
 
 def validate_complete_source_identity_section(text: str) -> None:
@@ -551,6 +573,12 @@ def load_review(base: Path, doc: dict):
         r5_additions=read_tsv(base/META_R5_DIRECT_ADDITIONS)
         require(len(r5_additions)==25,'META R5 direct additions must contain exactly 25 rows')
         review=review+r5_additions
+    r6_binding=doc.get('coverage_review_meta_r6_prompts_direct_additions')
+    if r6_binding is not None:
+        require(r6_binding==META_R6_DIRECT_ADDITIONS_BINDING,'META R6 direct additions binding drift')
+        r6_additions=read_tsv(base/META_R6_DIRECT_ADDITIONS)
+        require(len(r6_additions)==11,'META R6 direct additions must contain exactly 11 rows')
+        review=review+r6_additions
     unique(review,lambda r:(r['repository'],r['path']),'review path')
     return review
 
@@ -706,6 +734,9 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(doc.get('coverage_review_meta_r5_instruction_efficiency_direct_additions')==META_R5_DIRECT_ADDITIONS_BINDING,'META R5 additions evidence binding drift')
     require(doc.get('r3_meta_r5_instruction_efficiency_direct_candidate')==META_R5_CANDIDATE_BINDING,'META R5 candidate provenance binding drift')
     require(doc.get('r3_meta_r5_instruction_efficiency_direct_adoption_overlay')==META_R5_DIRECT_ADDITIONS_BINDING,'META R5 adoption overlay provenance binding drift')
+    require(doc.get('coverage_review_meta_r6_prompts_direct_additions')==META_R6_DIRECT_ADDITIONS_BINDING,'META R6 additions evidence binding drift')
+    require(doc.get('r3_meta_r6_prompts_direct_candidate')==META_R6_CANDIDATE_BINDING,'META R6 candidate provenance binding drift')
+    require(doc.get('r3_meta_r6_prompts_direct_adoption_overlay')==META_R6_DIRECT_ADDITIONS_BINDING,'META R6 adoption overlay provenance binding drift')
     require(json_exact(doc.get('r3_review'),R3_REVIEW),'R3 review lifecycle drift')
     base=report_path.parent/doc['evidence_directory']
     findings=read_tsv(base/'finding-register.tsv');unique(findings,lambda r:r['id'],'finding id')

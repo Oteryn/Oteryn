@@ -21,17 +21,17 @@ class ReadmeCurrentStateTest(unittest.TestCase):
     def test_current_readme_passes(self):
         result = readme_contract.validate_text(self.current)
         self.assertEqual(result['result'], 'README_CURRENT_STATE_VALIDATED_NOT_PRODUCT_PASS')
-        self.assertEqual(result['direct_paths'], 283)
+        self.assertEqual(result['direct_paths'], 294)
         self.assertEqual(result['grouped_paths'], 113)
-        self.assertEqual(result['unverified_paths'], 3929)
-        self.assertEqual(result['semantically_classified_paths'], 396)
+        self.assertEqual(result['unverified_paths'], 3918)
+        self.assertEqual(result['semantically_classified_paths'], 407)
         self.assertEqual(result['remaining_bounded_proof_workflows'], [])
         self.assertFalse(result['product_readiness_claimed'])
         self.assertFalse(result['audit_completion_claimed'])
 
     def test_old_accounting_transition_rejected(self):
-        mutated = self.current.replace('283 DIRECT scoped path reviews', '258 DIRECT scoped path reviews', 1)
-        mutated = mutated.replace('3929 retain UNVERIFIED semantics', '3954 retain UNVERIFIED semantics', 1)
+        mutated = self.current.replace('294 DIRECT scoped path reviews', '258 DIRECT scoped path reviews', 1)
+        mutated = mutated.replace('3918 retain UNVERIFIED semantics', '3954 retain UNVERIFIED semantics', 1)
         self.reject(mutated)
 
     def test_stale_residual_obligation_count_rejected(self):
@@ -149,7 +149,7 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         self.reject(mutated)
 
     def test_truncated_current_accounting_paragraph_rejected(self):
-        mutated = self.current.replace(' and 3929 retain UNVERIFIED semantics.', '.', 1)
+        mutated = self.current.replace(' and 3918 retain UNVERIFIED semantics.', '.', 1)
         self.reject(mutated)
 
 

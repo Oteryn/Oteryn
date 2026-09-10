@@ -22,7 +22,7 @@ class AuditValidationTest(unittest.TestCase):
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
     def mutate(self,path,func):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
@@ -47,14 +47,14 @@ class AuditValidationTest(unittest.TestCase):
         self.assertEqual(result['unverified_semantics'],summary['source_leaf_total']-direct-grouped)
         self.assertFalse(result['tree_and_ledger_verified'])
     def test_current_coverage_table_meta_drift_rejected(self):
-        self.mutate_companion('| meta | 174 | 70 | 0 | 104 |','| meta | 174 | 45 | 0 | 129 |')
+        self.mutate_companion('| meta | 174 | 81 | 0 | 93 |','| meta | 174 | 45 | 0 | 129 |')
         self.reject()
     def test_current_coverage_table_total_drift_rejected(self):
-        self.mutate_companion('| **Total** | **4325** | **283** | **113** | **3929** |',
+        self.mutate_companion('| **Total** | **4325** | **294** | **113** | **3918** |',
                               '| **Total** | **4325** | **258** | **113** | **3954** |')
         self.reject()
     def test_current_history_annotation_present_count_drift_rejected(self):
-        self.mutate_companion('present canonical 283-path state','present canonical 258-path state')
+        self.mutate_companion('present canonical 294-path state','present canonical 258-path state')
         self.reject()
     def test_current_r5_paragraph_deletion_or_mutation_rejected(self):
         for replacement in ('', audit.CURRENT_R5_ADOPTION_PARAGRAPH.replace('all 14','all 13')):
@@ -390,8 +390,8 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.base/'unknowns.json',mutate)
     def test_stale_semantic_coverage_transition_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('283 DIRECT', '258 DIRECT')
-                                .replace('3929 paths', '3954 paths')))
+            reason=row['reason'].replace('294 DIRECT', '258 DIRECT')
+                                .replace('3918 paths', '3954 paths')))
         self.reject()
     def test_changed_semantic_coverage_total_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
@@ -407,11 +407,11 @@ class AuditValidationTest(unittest.TestCase):
         self.reject()
     def test_missing_recorder_provenance_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace(' plus two app/Audit recorder paths', '')))
+            reason=row['reason'].replace('the prior 283 plus exactly 11 META prompt-family source paths', 'exactly 11 META prompt-family source paths')))
         self.reject()
     def test_missing_announcements_provenance_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace(' plus ten app/Announcements/** paths', '')))
+            reason=row['reason'].replace('the prior 283 plus exactly 11 META prompt-family source paths', 'the prior 273 plus exactly 11 META prompt-family source paths')))
         self.reject()
     def test_semantic_coverage_extra_key_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(semantic_pass=False))

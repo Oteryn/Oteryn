@@ -5,8 +5,8 @@
   "per_repository": {
     "meta": {
       "leaves": 174,
-      "direct_scoped": 70,
-      "unverified_semantics": 104,
+      "direct_scoped": 81,
+      "unverified_semantics": 93,
       "grouped": 0,
       "not_applicable": 0
     },
@@ -39,17 +39,17 @@
       "not_applicable": 0
     }
   },
-  "ledger_sha256": "27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41",
+  "ledger_sha256": "ff5c6621a78c14fc17802ecf01b4ef815867ccab95acce90c490973946d6279b",
   "identity_coverage": "COMPLETE_FOR_PINNED_FIVE_REPOSITORIES",
   "semantic_coverage": "PARTIAL_EXPLICIT",
   "unclassified_paths": 0,
   "semantic_completion_claimed": false,
-  "durability": "Full CSV accompanies the audit delivery. Committed DIRECT review rows plus the fail-closed coverage-review-canonical-additions.tsv composition overlay, immutable Git trees, explicit accepted/rejected GROUPED records and verify_report.py reproduce every disposition. The canonical additions overlay composes the separately preserved two-row audit-recorder overlay and the exact ten-row Announcements overlay. Platform GameAuth contributes 27 GROUPED paths; Accounts/CanaryIntegration/CharacterProfiles/Characters contribute 31; Marketplace/Payments/Wallet production code contributes 49; the exact six-file Marketplace test directory contributes 6. Two frozen Platform app/Audit recorder implementations and ten frozen app/Announcements implementations are adopted as bounded DIRECT review rows. The Announcements slice is qualified by real MariaDB 11.8.9 with 4 cases / 20 assertions and a mechanical projection proving exactly ten UNVERIFIED-to-DIRECT transitions; the Polish editorial_translations join branch and a dedicated simultaneous-writer race remain explicit execution limits. The rejected 508-file Atlas candidate remains UNVERIFIED. The immutable reviewed 25-path META R4 candidate is adopted exactly once through coverage-review-meta-r4-direct-additions.tsv; its source-specific overlay preserves exact path/blob/scope evidence and does not imply runtime, admin, provider, or readiness proof. The immutable reviewed 25-path META R5 instruction-efficiency candidate is separately adopted exactly once through coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv; the source-row evidence does not attest runtime model/effort, isolation, answer quality/safety, A/B superiority, provider permission, cost, or readiness, and the already-DIRECT R5Q Results row remains separate.",
-  "new_scoped_paths_since_r2": 218,
-  "scoped_review_paths": 283,
+  "durability": "Full CSV accompanies the audit delivery. Committed DIRECT review rows plus the fail-closed coverage-review-canonical-additions.tsv composition overlay, immutable Git trees, explicit accepted/rejected GROUPED records and verify_report.py reproduce every disposition. The canonical additions overlay composes the separately preserved two-row audit-recorder overlay and the exact ten-row Announcements overlay. Platform GameAuth contributes 27 GROUPED paths; Accounts/CanaryIntegration/CharacterProfiles/Characters contribute 31; Marketplace/Payments/Wallet production code contributes 49; the exact six-file Marketplace test directory contributes 6. Two frozen Platform app/Audit recorder implementations and ten frozen app/Announcements implementations are adopted as bounded DIRECT review rows. The Announcements slice is qualified by real MariaDB 11.8.9 with 4 cases / 20 assertions and a mechanical projection proving exactly ten UNVERIFIED-to-DIRECT transitions; the Polish editorial_translations join branch and a dedicated simultaneous-writer race remain explicit execution limits. The rejected 508-file Atlas candidate remains UNVERIFIED. The immutable reviewed 25-path META R4 candidate is adopted exactly once through coverage-review-meta-r4-direct-additions.tsv; its source-specific overlay preserves exact path/blob/scope evidence and does not imply runtime, admin, provider, or readiness proof. The immutable reviewed 25-path META R5 instruction-efficiency candidate is separately adopted exactly once through coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv; the source-row evidence does not attest runtime model/effort, isolation, answer quality/safety, A/B superiority, provider permission, cost, or readiness, and the already-DIRECT R5Q Results row remains separate. The immutable reviewed 11-path META R6 prompt-family candidate is separately adopted exactly once through coverage-review-meta-r6-prompts-direct-additions.tsv; prompt text remains source evidence rather than standing authority, retired/history packets remain non-dispatchable, templates require fresh live authorization, and no provider/runtime/admin/security/production/recovery/readiness/completion result is attested.",
+  "new_scoped_paths_since_r2": 229,
+  "scoped_review_paths": 294,
   "grouped_revalidated_paths": 113,
-  "semantically_classified_paths": 396,
-  "unverified_semantics_total": 3929,
-  "coverage_dimension_note": "DIRECT records bounded source review, not universal approval. The 283 DIRECT paths are the prior 258 plus exactly 25 META R5 instruction-efficiency source paths adopted from the immutable reviewed candidate through a separate overlay; the already-DIRECT R5Q Results evidence is not re-adopted. Platform contributes 113 GROUPED paths: GameAuth 27, account/Canary/profile/character 31, Marketplace/Payments/Wallet production code 49, and the exact six-file Marketplace test directory 6. The Atlas 508-path candidate remains rejected.",
+  "semantically_classified_paths": 407,
+  "unverified_semantics_total": 3918,
+  "coverage_dimension_note": "DIRECT records bounded source review, not universal approval. The 294 DIRECT paths are the prior 283 plus exactly 11 META prompt-family source paths adopted from the immutable reviewed R6 candidate through a separate overlay; the two already-DIRECT R4 rollout prompts are excluded and not re-adopted. Platform contributes 168 DIRECT and 113 GROUPED paths; the other provider counts are unchanged. Identity-only and rejected Atlas paths remain UNVERIFIED.",
   "rejected_group_candidates": 1
 }

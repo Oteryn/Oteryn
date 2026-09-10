@@ -12,6 +12,7 @@ CANDIDATE_SHA256 = '62b7f49af1434667f9ed293c896bc7f9b285cb8652883f00915607f0ce65
 REPORT_REL = Path('docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json')
 INDEX_REL = Path('docs/evidence/organization-audit-20260907/verification-index.json')
 R6_ADOPTION_OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/coverage-review-meta-r6-prompts-direct-additions.tsv')
+OVERLAY_SHA256 = 'b51111c2e6eeb8d88f392d63007688b3be44128a7756512f8f295eaf7c9aeb8e'
 PLAN_REL = Path('docs/evidence/organization-audit-20260907/collection-plan.json')
 FINDINGS_REL = Path('docs/evidence/organization-audit-20260907/finding-register.tsv')
 SOURCE = '1a01c5b3e08666a82245b1cac78da3736c65e785'
@@ -19,7 +20,7 @@ SOURCE_TREE = 'f084e824ec5e14d5909c9750d906d91d51425fd5'
 SUBTREE = 'docs/agents/prompts'
 SUBTREE_TREE = '0b825e18cde3cd928dfe569acf9ce6c0dc71cfe5'
 DATED_MAIN = '3b39e0be05aef008f1bd442821daefa898a201dd'
-LEDGER_SHA = '27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41'
+LEDGER_SHA = 'ff5c6621a78c14fc17802ecf01b4ef815867ccab95acce90c490973946d6279b'
 INVENTORY_IDS = {'meta', 'game', 'platform', 'atlas', 'migration_archive'}
 EXPECTED_META_AUD_05 = {'id':'META-AUD-05','priority':'P2','repository':'meta','state':'PARTIALLY_REPAIRED','scope':'governance','title':'Historical authority and merge-up conflict','evidence':'META-153 | Current access policy separates MQ candidate refresh from source-head churn. Historical/open PR authority liveness is not exhaustively revalidated.','owner_route':'Oteryn/Oteryn#153; evidence continuation #186','closure_condition':'Classify remaining operative-looking documents/PRs against current v3 authority without deleting historical evidence.'}
 
@@ -86,20 +87,32 @@ def validate_finding(root, candidate):
     expected_binding = dict(EXPECTED_META_AUD_05, candidate_disposition='RECONFIRMED_NOT_CLOSED_NOT_DOWNGRADED_NOT_DUPLICATED')
     json_exact(candidate['finding_bindings'], [expected_binding], 'candidate finding bindings')
 
-def _is_r6_prompt_adoption_key(key):
-    normalized = key.lower().replace('-', '_')
-    return 'r6' in normalized and 'prompt' in normalized and (
-        'adoption' in normalized or 'adopted' in normalized or
-        ('coverage_review' in normalized and 'additions' in normalized)
-    )
+def expected_overlay(candidate):
+    evidence = ('Immutable source file received full-file semantic review and was separately adopted only after clean exact-head candidate review. Prompt text is source evidence, not standing authority; retired/history packets remain non-dispatchable; templates require fresh live authorization. No provider/runtime/admin/security/production/recovery/readiness/completion result is attested.')
+    return [{'repository':'meta','path':row['path'],'blob_sha':row['blob_sha'],
+             'depth':'SCOPED_SEMANTIC_REVIEW','scope':row['semantic_scope'],
+             'line_ranges':'[]','execution_evidence':evidence} for row in candidate['paths']]
 
-def validate_candidate_only_state(root):
-    overlay = root / R6_ADOPTION_OVERLAY_REL
-    require(not overlay.exists() and not overlay.is_symlink(), 'R6 prompt adoption overlay exists')
-    index = read_json(root / INDEX_REL)
-    require(not any(_is_r6_prompt_adoption_key(key) for key in index), 'R6 prompt adoption index record exists')
-    report = read_json(root / REPORT_REL)
-    require(not any(_is_r6_prompt_adoption_key(key) for key in report), 'R6 prompt adoption report pointer exists')
+def validate_adoption(root, candidate):
+    raw=(root/R6_ADOPTION_OVERLAY_REL).read_bytes()
+    require(hashlib.sha256(raw).hexdigest()==OVERLAY_SHA256, 'R6 overlay SHA drift')
+    rows=list(csv.DictReader(io.StringIO(raw.decode('utf-8')),delimiter='\t'))
+    json_exact(rows,expected_overlay(candidate),'R6 overlay')
+    require(len(rows)==11 and len({(r['repository'],r['path']) for r in rows})==11,'R6 overlay path count/duplicate drift')
+    require(all(r['line_ranges']=='[]' for r in rows),'fabricated line ranges forbidden')
+    expected={'candidate_path':CANDIDATE_REL.name,'candidate_sha256':CANDIDATE_SHA256,
+      'adoption_overlay':R6_ADOPTION_OVERLAY_REL.name,'adoption_overlay_sha256':OVERLAY_SHA256,
+      'source_commit':SOURCE,'source_tree':SOURCE_TREE,'prompt_subtree_tree':SUBTREE_TREE,
+      'live_main_identity_commit':DATED_MAIN,'path_count':11,'depth':'SCOPED_SEMANTIC_REVIEW',
+      'line_ranges':[],'canonical_ledger_sha256':LEDGER_SHA,
+      'canonical_counts':{'source_rows':4325,'direct_paths':294,'grouped_paths':113,'unverified_paths':3918,'semantically_classified_paths':407},
+      'meta_counts':{'direct_paths':81,'unverified_paths':93,'source_rows':174},
+      'excluded_r4_paths_readopted':False,'meta_aud_05_status':'PARTIALLY_REPAIRED',
+      'product_readiness_claimed':False,'audit_completion_claimed':False,
+      'live_state_claimed':False,'standing_authority_claimed':False}
+    index=read_json(root/INDEX_REL)
+    require(list(index).count('r3_meta_r6_prompts_direct_adoption')==1,'R6 adoption index missing/duplicated')
+    json_exact(index['r3_meta_r6_prompts_direct_adoption'],expected,'R6 adoption index')
 
 def collect_inventories(root, output):
     plan = read_json(root / PLAN_REL)
@@ -120,28 +133,29 @@ def validate_accounting(root, candidate, inventory_dir=None):
         if temp: temp.cleanup()
     require(result.get('tree_and_ledger_verified') is True, 'authoritative ledger not rebuilt')
     require(hashlib.sha256(ledger).hexdigest() == LEDGER_SHA, 'canonical ledger SHA drift')
-    expected = {'source_leaves':4325,'scoped_review_paths':283,'grouped_revalidated_paths':113,'unverified_semantics':3929,'semantically_classified_paths':396}
+    expected = {'source_leaves':4325,'scoped_review_paths':294,'grouped_revalidated_paths':113,'unverified_semantics':3918,'semantically_classified_paths':407}
     for key, value in expected.items(): require(type(result.get(key)) is int and result[key] == value, 'canonical accounting drift: ' + key)
     rows = list(csv.DictReader(io.StringIO(ledger.decode())))
     wanted = {row['path']: row['blob_sha'] for row in candidate['paths']}
     selected = [row for row in rows if row['repository_id'] == 'meta' and row['path'] in wanted]
     require(len(selected) == 11 and {row['path'] for row in selected} == set(wanted), 'candidate ledger path set drift')
     require(all(row['object_sha'] == wanted[row['path']] for row in selected), 'candidate ledger blob drift')
-    require(all(row['disposition'] == 'UNVERIFIED' and row['depth'] == 'IDENTITY_ONLY' for row in selected), 'candidate path is already classified')
-    require(not any(row['disposition'] in {'DIRECT','GROUPED'} for row in selected), 'candidate overlaps classified coverage')
+    require(all(row['disposition'] == 'DIRECT' and row['depth'] == 'SCOPED_SEMANTIC_REVIEW' for row in selected), 'candidate path is already classified')
+    require(all(row['scope'] == next(item['semantic_scope'] for item in candidate['paths'] if item['path'] == row['path']) for row in selected), 'candidate adopted scope drift')
+    require(not any(row['disposition'] == 'GROUPED' for row in selected), 'candidate overlaps GROUPED coverage')
     excluded = {row['path']: row['blob_sha'] for row in candidate['excluded_already_direct_paths']}
     excluded_rows = [row for row in rows if row['repository_id'] == 'meta' and row['path'] in excluded]
     require(len(excluded_rows) == 2 and all(row['object_sha'] == excluded[row['path']] and row['disposition'] == 'DIRECT' for row in excluded_rows), 'R4 exclusions are not exact already-DIRECT rows')
     meta_rows = [row for row in rows if row['repository_id'] == 'meta']
-    require(len(meta_rows) == 174 and sum(row['disposition'] == 'DIRECT' for row in meta_rows) == 70 and sum(row['disposition'] == 'UNVERIFIED' for row in meta_rows) == 104, 'META accounting drift')
+    require(len(meta_rows) == 174 and sum(row['disposition'] == 'DIRECT' for row in meta_rows) == 81 and sum(row['disposition'] == 'UNVERIFIED' for row in meta_rows) == 93, 'META accounting drift')
     require(sum(grouped.values()) == 113, 'GROUPED accounting drift')
     return result
 
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--audit-root', type=Path, default=ROOT); args = parser.parse_args()
     candidate = expected_candidate(args.audit_root)
-    validate_candidate(candidate, candidate); validate_source(args.audit_root, candidate); validate_finding(args.audit_root, candidate); validate_accounting(args.audit_root, candidate); validate_candidate_only_state(args.audit_root)
-    print(json.dumps({'result':'META_R6_PROMPTS_DIRECT_CANDIDATE_VALID_NOT_ADOPTED','family':candidate['family'],'candidate_paths':11,'candidate_sha256':CANDIDATE_SHA256,'coverage_delta':0,'coverage_adopted':False,'adoption_performed':False,'current_disposition':'UNVERIFIED','direct_paths':283,'grouped_paths':113,'unverified_paths':3929,'semantically_classified_paths':396,'ledger_sha256':LEDGER_SHA,'meta_aud_05_status':'PARTIALLY_REPAIRED','residual_obligations':14,'product_readiness_claimed':False,'audit_completion_claimed':False,'live_state_claimed':False}, sort_keys=True))
+    validate_candidate(candidate, candidate); validate_source(args.audit_root, candidate); validate_finding(args.audit_root, candidate); validate_adoption(args.audit_root, candidate); validate_accounting(args.audit_root, candidate)
+    print(json.dumps({'result':'META_R6_PROMPTS_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS','family':candidate['family'],'candidate_paths':11,'candidate_sha256':CANDIDATE_SHA256,'coverage_delta':11,'coverage_adopted':True,'adoption_performed':True,'current_disposition':'DIRECT','direct_paths':294,'grouped_paths':113,'unverified_paths':3918,'semantically_classified_paths':407,'ledger_sha256':LEDGER_SHA,'meta_direct_paths':81,'meta_unverified_paths':93,'excluded_r4_paths_readopted':False,'meta_aud_05_status':'PARTIALLY_REPAIRED','residual_obligations':14,'product_readiness_claimed':False,'audit_completion_claimed':False,'live_state_claimed':False,'standing_authority_claimed':False}, sort_keys=True))
     return 0
 
 if __name__ == '__main__': raise SystemExit(main())
