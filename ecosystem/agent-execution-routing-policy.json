@@ -26,6 +26,28 @@
   "preflight_freshness": {
     "max_age_seconds": 900
   },
+  "integration_capability_routing": {
+    "schema_version": 1,
+    "contract_path": "docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md",
+    "require_preflight_before_worker_release": true,
+    "states": [
+      "NOT_REQUIRED",
+      "DIRECT_CAPABLE",
+      "DELEGATED_CAPABLE",
+      "BLOCKED_CAPABILITY_UNAVAILABLE"
+    ],
+    "direct_operation": "github.merge_async.put_exact_head",
+    "delegated_route": "meta.governed_merge_queue_executor.v1",
+    "delegated_request_operation": "github.issue_comment.create",
+    "control_repository": "Oteryn/Oteryn",
+    "control_issue": 196,
+    "allowed_target_repositories": {
+      "Oteryn/Oteryn": "meta-gate",
+      "Oteryn/Oteryn-Game": "game-gate",
+      "Oteryn/Oteryn-Platform": "platform-gate",
+      "Oteryn/Oteryn-Atlas": "atlas-gate"
+    }
+  },
   "remote_desktop_reasons": [
     "host_only_service",
     "lan_or_hardware",
