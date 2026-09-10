@@ -1,6 +1,6 @@
 # Organization audit checkpoint — R6 continuation
 
-Purpose: durable continuation pointer for META #186 / PR #185 after the R6 bounded cycle. This checkpoint does **not** create a new policy, approval programme, gate, hardening lane, scope guard, or source of authority. GitHub LIVE state remains authoritative for lifecycle, and the committed audit report/JSON plus `docs/evidence/organization-audit-20260907/` remain authoritative for audit evidence and accounting.
+Purpose: durable continuation pointer for META #186 / PR #185 after the R6 bounded cycle. This file records the current audited state only and does not alter audit authority or create an additional gate. GitHub LIVE state remains authoritative for lifecycle, and the committed audit report/JSON plus `docs/evidence/organization-audit-20260907/` remain authoritative for audit evidence and accounting.
 
 ## Bound R6 state
 
