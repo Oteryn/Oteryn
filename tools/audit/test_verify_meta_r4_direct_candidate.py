@@ -20,6 +20,15 @@ class MetaR4DirectCandidateTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             root=Path(t); shutil.copytree(verifier.ROOT/'docs/evidence',root/'docs/evidence'); mutation(root)
             with self.assertRaises(ValueError): verifier.validate_accounting(root,self.candidate,self.inventory)
+    def mutate_finding(self,mutation):
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t); path=root/verifier.FINDINGS_REL; path.parent.mkdir(parents=True)
+            with (verifier.ROOT/verifier.FINDINGS_REL).open(encoding='utf-8',newline='') as f:
+                reader=csv.DictReader(f,delimiter='\t'); fields=reader.fieldnames; rows=list(reader)
+            mutation(rows)
+            with path.open('w',encoding='utf-8',newline='') as f:
+                writer=csv.DictWriter(f,fieldnames=fields,delimiter='\t',lineterminator='\n'); writer.writeheader(); writer.writerows(rows)
+            with self.assertRaises(ValueError): verifier.validate_finding(root,self.candidate)
     def test_committed_candidate_and_rebuilt_ledger_pass(self):
         verifier.validate_candidate(deepcopy(self.candidate)); verifier.validate_source(verifier.ROOT,self.candidate)
         verifier.validate_finding(verifier.ROOT,self.candidate); verifier.validate_accounting(verifier.ROOT,self.candidate,self.inventory)
@@ -41,6 +50,20 @@ class MetaR4DirectCandidateTest(unittest.TestCase):
         self.reject(lambda c:c['reconfirmed_finding'].update(severity='P3'))
         self.reject(lambda c:c['reconfirmed_finding'].update(id='META-AUD-NEW'))
         self.reject(lambda c:c['reconfirmed_finding'].update(duplicate_id='META-AUD-05'))
+        self.mutate_finding(lambda rows:rows.append(deepcopy(next(r for r in rows if r['id']=='META-AUD-05'))))
+    def test_meta_aud_05_complete_canonical_row_is_bound(self):
+        mutations={
+            'repository':'game',
+            'scope':'resolved; no further action required',
+            'evidence':'resolved; no further action required',
+            'owner_route':'Oteryn/Oteryn-Game#1',
+            'closure_condition':'resolved; no further action required',
+        }
+        for field,value in mutations.items():
+            with self.subTest(field=field):
+                def mutate(rows,field=field,value=value):
+                    next(r for r in rows if r['id']=='META-AUD-05')[field]=value
+                self.mutate_finding(mutate)
     def test_adoption_readiness_completion_and_live_claims_fail(self):
         self.reject(lambda c:c.update(coverage_adopted=True))
         self.reject(lambda c:c.update(disposition='DIRECT'))

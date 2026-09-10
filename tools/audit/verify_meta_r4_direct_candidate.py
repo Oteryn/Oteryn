@@ -15,6 +15,17 @@ FINDINGS_REL=Path('docs/evidence/organization-audit-20260907/finding-register.ts
 SOURCE='1a01c5b3e08666a82245b1cac78da3736c65e785'; SOURCE_TREE='f084e824ec5e14d5909c9750d906d91d51425fd5'
 LEDGER_SHA='73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9'
 INVENTORY_IDS={'meta','game','platform','atlas','migration_archive'}
+EXPECTED_META_AUD_05={
+    'id':'META-AUD-05',
+    'priority':'P2',
+    'repository':'meta',
+    'state':'PARTIALLY_REPAIRED',
+    'scope':'governance',
+    'title':'Historical authority and merge-up conflict',
+    'evidence':'META-153 | Current access policy separates MQ candidate refresh from source-head churn. Historical/open PR authority liveness is not exhaustively revalidated.',
+    'owner_route':'Oteryn/Oteryn#153; evidence continuation #186',
+    'closure_condition':'Classify remaining operative-looking documents/PRs against current v3 authority without deleting historical evidence.',
+}
 
 
 def require(value,message):
@@ -72,7 +83,9 @@ def validate_finding(root,candidate):
     found=[r for r in rows if r['id']=='META-AUD-05']
     require(len(found)==1,'META-AUD-05 missing or duplicated')
     row=found[0]; c=candidate['reconfirmed_finding']
-    require((row['priority'],row['state'],row['title'])==(c['severity'],c['status'],c['title']),'META-AUD-05 canonical state drift')
+    require(list(row)==list(EXPECTED_META_AUD_05),'META-AUD-05 canonical key set/order drift')
+    require(row==EXPECTED_META_AUD_05,'META-AUD-05 complete canonical row drift')
+    require((row['priority'],row['state'],row['title'])==(c['severity'],c['status'],c['title']),'META-AUD-05 candidate summary drift')
 
 def validate_accounting(root,candidate,inventory_dir=None):
     temporary=None
