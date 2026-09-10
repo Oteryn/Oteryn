@@ -458,7 +458,7 @@ def submit_merge_queue(
     principal = _response_body(mutation_client.rest("GET", "/user")).get("login")
     if principal != target.request_actor:
         raise ExecutorError("mutation principal must match the live control-request actor")
-    permission = _response_body(read_client.rest(
+    permission = _response_body(mutation_client.rest(
         "GET", f"/repos/{owner}/{name}/collaborators/{urllib.parse.quote(target.request_actor, safe='')}/permission"
     )).get("permission")
     if permission not in INTEGRATION_PERMISSIONS:

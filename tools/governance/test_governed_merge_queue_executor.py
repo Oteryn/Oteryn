@@ -40,6 +40,10 @@ class FakeClient:
         response = self.responses.get((method, path))
         if response is None and (method, path) == ("GET", "/user"):
             response = executor.Response(200, {"login": ACTOR})
+        if response is None and method == "GET" and path.endswith(
+            f"/collaborators/{ACTOR}/permission"
+        ):
+            response = executor.Response(200, {"permission": "maintain"})
         if response is None:
             raise AssertionError(f"unexpected request: {method} {path}")
         if response.status not in allowed_statuses:
@@ -120,9 +124,6 @@ def read_responses() -> dict[tuple[str, str], executor.Response]:
             "head_sha": HEAD, "check_suite_id": 77, "pull_requests": [{"number": PR}],
             "status": "completed", "conclusion": "success",
         }]}),
-        (
-            "GET", f"/repos/Oteryn/Oteryn-Game/collaborators/{ACTOR}/permission",
-        ): executor.Response(200, {"permission": "maintain"}),
     }
 
 
@@ -425,12 +426,13 @@ def test_403_and_404_are_precise_capability_blockers() -> None:
 
 def test_put_requires_same_authenticated_actor_with_target_integration_permission() -> None:
     for principal, permission in (("different-user", "maintain"), (ACTOR, "write")):
-        responses = read_responses()
         permission_key = ("GET", f"/repos/Oteryn/Oteryn-Game/collaborators/{ACTOR}/permission")
-        responses[permission_key] = executor.Response(200, {"permission": permission})
-        read_client = FakeClient(responses)
+        read_client = FakeClient(read_responses())
         target = qualified(read_client)
-        mutation_client = FakeClient({("GET", "/user"): executor.Response(200, {"login": principal})})
+        mutation_client = FakeClient({
+            ("GET", "/user"): executor.Response(200, {"login": principal}),
+            permission_key: executor.Response(200, {"permission": permission}),
+        })
         try:
             executor.submit_merge_queue(read_client, mutation_client, target)
         except executor.ExecutorError:
@@ -438,6 +440,24 @@ def test_put_requires_same_authenticated_actor_with_target_integration_permissio
         else:
             raise AssertionError("unauthorized mutation principal reached merge-async")
         assert not any(call[0] == "PUT" for call in mutation_client.calls)
+
+
+def test_target_permission_read_uses_the_authenticated_pat_client() -> None:
+    read_client = FakeClient(read_responses())
+    target = qualified(read_client)
+    mutation_client = FakeClient({
+        ("GET", "/user"): executor.Response(200, {"login": ACTOR}),
+        ("GET", f"/repos/Oteryn/Oteryn-Game/collaborators/{ACTOR}/permission"):
+            executor.Response(200, {"permission": "write"}),
+    })
+    try:
+        executor.submit_merge_queue(read_client, mutation_client, target)
+    except executor.ExecutorError as exc:
+        assert "lacks current target" in str(exc)
+    else:
+        raise AssertionError("PAT-bound permission denial was ignored")
+    assert any("/collaborators/" in call[1] for call in mutation_client.calls)
+    assert not any("/collaborators/" in call[1] for call in read_client.calls)
 
 
 def test_invalid_inputs_fail_before_any_target_mutation() -> None:
