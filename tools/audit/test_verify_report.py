@@ -28,6 +28,11 @@ class AuditValidationTest(unittest.TestCase):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
     def reject(self):
         with self.assertRaises(ValueError):audit.validate(self.path)
+    def mutate_companion(self, old, new, count=1):
+        companion=self.path.with_suffix('.md')
+        text=companion.read_text(encoding='utf-8')
+        self.assertIn(old,text)
+        companion.write_text(text.replace(old,new,count),encoding='utf-8')
     def test_current_report_validates_as_accounting_only(self):
         result=audit.validate(self.path)
         report=audit.read_json(self.path)
@@ -41,6 +46,54 @@ class AuditValidationTest(unittest.TestCase):
         self.assertEqual(result['semantically_classified_paths'],direct+grouped)
         self.assertEqual(result['unverified_semantics'],summary['source_leaf_total']-direct-grouped)
         self.assertFalse(result['tree_and_ledger_verified'])
+    def test_current_coverage_table_meta_drift_rejected(self):
+        self.mutate_companion('| meta | 174 | 70 | 0 | 104 |','| meta | 174 | 45 | 0 | 129 |')
+        self.reject()
+    def test_current_coverage_table_total_drift_rejected(self):
+        self.mutate_companion('| **Total** | **4325** | **283** | **113** | **3929** |',
+                              '| **Total** | **4325** | **258** | **113** | **3954** |')
+        self.reject()
+    def test_current_history_annotation_present_count_drift_rejected(self):
+        self.mutate_companion('present canonical 283-path state','present canonical 258-path state')
+        self.reject()
+    def test_current_r5_paragraph_deletion_or_mutation_rejected(self):
+        for replacement in ('', audit.CURRENT_R5_ADOPTION_PARAGRAPH.replace('all 14','all 13')):
+            with self.subTest(replacement=bool(replacement)):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
+                self.mutate_companion(audit.CURRENT_R5_ADOPTION_PARAGRAPH,replacement)
+                self.reject()
+    def test_current_r5_readiness_append_or_replacement_rejected(self):
+        for replacement in (
+            audit.CURRENT_R5_ADOPTION_PARAGRAPH+' This establishes product and production readiness.',
+            'This R5 adoption establishes product readiness and organization-wide audit completion.',
+        ):
+            with self.subTest(replacement=replacement[:20]):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
+                self.mutate_companion(audit.CURRENT_R5_ADOPTION_PARAGRAPH,replacement)
+                self.reject()
+    def test_current_table_or_r5_paragraph_duplicate_rejected(self):
+        table='\n'.join(audit._current_coverage_table())
+        for original, duplicate in ((table,table+'\n\n'+table),
+                                    (audit.CURRENT_R5_ADOPTION_PARAGRAPH,
+                                     audit.CURRENT_R5_ADOPTION_PARAGRAPH+'\n\n'+audit.CURRENT_R5_ADOPTION_PARAGRAPH)):
+            with self.subTest(original=original[:20]):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
+                self.mutate_companion(original,duplicate)
+                self.reject()
+    def test_current_history_annotation_move_or_remove_rejected(self):
+        for replacement in ('', audit.CURRENT_HISTORY_ANNOTATION+'\n\nUnrelated current status.'):
+            with self.subTest(replacement=bool(replacement)):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
+                self.mutate_companion(audit.CURRENT_HISTORY_ANNOTATION,replacement)
+                self.reject()
+    def test_current_ledger_digest_drift_rejected(self):
+        self.mutate_companion('27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41','0'*64)
+        self.reject()
+    def test_historical_223_snapshot_remains_accepted(self):
+        text=self.path.with_suffix('.md').read_text(encoding='utf-8')
+        self.assertIn('223 DIRECT / 113 GROUPED / 3,989 UNVERIFIED',text)
+        self.assertIn('2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f',text)
+        self.assertEqual(audit.validate(self.path)['result'],'ACCOUNTING_VALID_NOT_SEMANTIC_PASS')
     def test_boolean_schema_rejected(self):
         self.mutate(self.path,lambda d:d.update(schema_version=True));self.reject()
     def test_production_claim_rejected(self):

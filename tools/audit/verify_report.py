@@ -66,6 +66,30 @@ EXPECTED_SECTION_7_PARAGRAPHS = (
         'because its remediation has an owner.'
     ),
 )
+SECTION_1_HEADING = '## 1. Source identity and actual coverage'
+SECTION_2_HEADING = '## 2. Native evidence actually acquired and rechecked'
+CURRENT_COVERAGE_TABLE_HEADER = '| Source | Tracked leaves | DIRECT scoped | GROUPED revalidated | UNVERIFIED semantics |'
+CURRENT_R5_ADOPTION_PARAGRAPH = (
+    'Exactly 25 META source files under `docs/agents/evals/r5-instruction-efficiency/**` are now separately '
+    'adopted as DIRECT `SCOPED_SEMANTIC_REVIEW` rows through '
+    '`coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv`, from immutable reviewed candidate '
+    '`r3-meta-r5-instruction-efficiency-direct-candidate.json` (SHA-256 '
+    '`a6ff7425e1a1d338bd02c769cc930109bf28c03db39b896c2ceb90233234eef3`). Each row records bounded '
+    'full-file source semantics with empty line ranges. This adoption does not re-adopt the already-DIRECT '
+    '`OTERYN-R5Q-RESULTS.md` evidence and does not attest runtime model/effort, fresh isolation, answer '
+    'correctness or safety, A/B superiority, provider permission, measured cost, live state, or product '
+    'readiness. The dated protected-main identity `3b39e0be05aef008f1bd442821daefa898a201dd` is source '
+    'identity carry-forward only. `META-AUD-05` remains P2 / `PARTIALLY_REPAIRED`, and all 14 residual '
+    'obligations remain open. The current canonical ledger is '
+    '`27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41`.'
+)
+CURRENT_HISTORY_ANNOTATION = (
+    'The following paragraph is retained verbatim as the bounded **pre-Announcements Marketplace closeout '
+    'snapshot** required by the Marketplace durability contract. Within that paragraph, “the current revision” '
+    'and its 223-path ledger refer to that historical pre-Announcements audit state, not to the present canonical '
+    '283-path state shown above and bound below.'
+)
+HISTORICAL_SNAPSHOT_PREFIX = '`DIRECT` is a bounded review with the stated scope,'
 _LIBC = ctypes.CDLL(None, use_errno=True)
 _AT_EMPTY_PATH = 0x1000
 
@@ -396,6 +420,49 @@ def validate_residual_obligations_paragraph(report_path: Path) -> None:
     require(paragraphs == expected, 'section 7 paragraph sequence drift')
 
 
+def _current_coverage_table() -> tuple[str, ...]:
+    per_repository = EXPECTED_COVERAGE_SUMMARY['per_repository']
+    rows = [CURRENT_COVERAGE_TABLE_HEADER, '|---|---:|---:|---:|---:|']
+    for repository in ('meta', 'game', 'platform', 'atlas', 'migration_archive'):
+        values = per_repository[repository]
+        rows.append(f"| {repository} | {values['leaves']} | {values['direct_scoped']} | {values['grouped']} | {values['unverified_semantics']} |")
+    rows.append(
+        f"| **Total** | **{EXPECTED_COVERAGE_SUMMARY['source_leaf_total']}** | "
+        f"**{EXPECTED_COVERAGE_SUMMARY['scoped_review_paths']}** | "
+        f"**{EXPECTED_COVERAGE_SUMMARY['grouped_revalidated_paths']}** | "
+        f"**{EXPECTED_COVERAGE_SUMMARY['unverified_semantics_total']}** |"
+    )
+    return tuple(rows)
+
+
+def validate_current_coverage_section(report_path: Path) -> None:
+    """Bind the current §1 table/adoption/history slot while leaving scoped history intact."""
+    companion = report_path.with_suffix('.md')
+    require(companion.is_file(), 'companion report missing')
+    text = companion.read_text(encoding='utf-8')
+    require(text.count(SECTION_1_HEADING) == 1 and text.count(SECTION_2_HEADING) == 1,
+            'report section 1 boundary drift')
+    section = text.split(SECTION_1_HEADING, 1)[1].split(SECTION_2_HEADING, 1)[0]
+    lines = section.splitlines()
+    require(lines.count(CURRENT_COVERAGE_TABLE_HEADER) == 1,
+            'current coverage table missing or duplicated')
+    start = lines.index(CURRENT_COVERAGE_TABLE_HEADER)
+    table = _current_coverage_table()
+    require(tuple(lines[start:start + len(table)]) == table, 'current coverage table drift')
+    remainder = '\n'.join(lines[start + len(table):]).strip()
+    paragraphs = tuple(re.sub(r'\s+', ' ', part.strip())
+                       for part in re.split(r'\n\s*\n', remainder) if part.strip())
+    require(len(paragraphs) >= 3, 'current coverage status slot incomplete')
+    require(paragraphs[0] == CURRENT_R5_ADOPTION_PARAGRAPH, 'current R5 adoption paragraph drift')
+    require(paragraphs[1] == CURRENT_HISTORY_ANNOTATION, 'current history annotation drift')
+    require(paragraphs[2].startswith(HISTORICAL_SNAPSHOT_PREFIX),
+            'historical snapshot is missing or reordered')
+    require(section.count(CURRENT_R5_ADOPTION_PARAGRAPH) == 1,
+            'current R5 adoption paragraph missing or duplicated')
+    require(section.count(CURRENT_HISTORY_ANNOTATION) == 1,
+            'current history annotation missing or duplicated')
+
+
 def read_json(path):
     def pairs(items):
         result={}
@@ -616,6 +683,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(len(unknowns)==14,'unresolved unknown count must be exactly 14')
     require({row.get('id') for row in unknowns}==EXPECTED_UNRESOLVED_IDS,'unresolved unknown ID set drift')
     require(json_exact(unknowns,EXPECTED_UNKNOWNS),'unresolved unknown register drift')
+    validate_current_coverage_section(report_path)
     validate_residual_obligations_paragraph(report_path)
     semantic_coverage=[row for row in unknowns if row.get('id')=='SEMANTIC-COVERAGE']
     require(len(semantic_coverage)==1,'semantic-coverage unknown missing')
