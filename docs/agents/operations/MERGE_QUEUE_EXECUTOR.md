@@ -81,8 +81,12 @@ merge_action=merge_queue
 ```
 
 HTTP 202 produces a non-terminal receipt. The executor binds the returned server
-UUID to sequence 1, performs UUID-addressed status readback and fresh target
-identity readback, and requires a strictly later executor sequence.
+UUID to sequence 1 and, before any fallible status or target readback, flushes a
+machine-readable non-secret `REQUEST_ACCEPTED_NON_TERMINAL` record to stdout and
+durably appends it to `GITHUB_STEP_SUMMARY`. The record carries the request comment
+ID, repository, PR, base, exact head, merge action, UUID and receipt sequence. Only
+then does it perform UUID-addressed status readback and fresh target identity
+readback, requiring a strictly later executor sequence.
 
 HTTP 200/409 is reconciliation only. HTTP 400/422 is rejection. HTTP 403/404 is a
 precise native capability/credential blocker. There is no direct merge, generic
@@ -106,6 +110,12 @@ Only then may normal task/lease/Issue closeout proceed.
 Do not repeat an identical request when an async UUID already exists or a
 previous request is awaiting reconciliation. Preserve the candidate and inspect
 the exact workflow result.
+
+A failure after HTTP 202 does not invalidate or erase the accepted receipt. The
+operator/coordinator must recover the persisted UUID, reconcile that exact async
+request and must not repeat the PUT. If receipt persistence itself fails, the
+executor stops with a UUID-bearing `RECONCILIATION_REQUIRED` blocker and never
+issues another PUT as fallback.
 
 If the credential is absent/denied, the executor is not operational. Continue
 safe path-disjoint work; do not weaken protections or resurrect a provider-local

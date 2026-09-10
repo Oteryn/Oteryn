@@ -75,8 +75,10 @@ cannot submit the PR to Merge Queue.
   emitted by the GitHub Actions app.
 - Positive mutation is only REST `merge-async` with exact `sha` and explicit
   `merge_action=merge_queue`.
-- HTTP 202 requires server UUID and strictly-later UUID-bound status/target
-  readback.
+- HTTP 202 requires immediate durable emission of a non-secret UUID-bound
+  `REQUEST_ACCEPTED_NON_TERMINAL` receipt before any status/target readback, then
+  strictly-later UUID-bound readback. Later failure requires reconciliation by
+  that UUID and never repetition of the request.
 - HTTP 200/409 is reconciliation only.
 - Direct merge, generic auto-merge, GraphQL enqueue, bypass, force, default
   merge action, no-op/retrigger commits and ambiguous dequeue remain forbidden.

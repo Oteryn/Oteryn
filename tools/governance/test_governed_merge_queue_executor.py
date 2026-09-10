@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
+import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -21,6 +25,21 @@ REQUEST_COMMENT = 5617345429
 SERVER_UUID = "f0a3d092-6c9f-4edd-9d3f-cb9d8865a935"
 ACTOR = "maintainer-user"
 HEAD_BRANCH = "fix/provider-change"
+
+
+@contextlib.contextmanager
+def step_summary():
+    previous = os.environ.get("GITHUB_STEP_SUMMARY")
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "step-summary.md"
+        os.environ["GITHUB_STEP_SUMMARY"] = str(path)
+        try:
+            yield path
+        finally:
+            if previous is None:
+                os.environ.pop("GITHUB_STEP_SUMMARY", None)
+            else:
+                os.environ["GITHUB_STEP_SUMMARY"] = previous
 
 
 class FakeClient:
@@ -343,7 +362,9 @@ def test_202_uses_only_exact_merge_async_request_and_causal_uuid_readback() -> N
         }
     )
 
-    result = executor.submit_merge_queue(read_client, mutation_client, target)
+    with step_summary() as summary_path:
+        result = executor.submit_merge_queue(read_client, mutation_client, target)
+        persisted = summary_path.read_text(encoding="utf-8")
 
     assert result["result"] == "REQUEST_ACCEPTED_NON_TERMINAL"
     assert result["request_comment_id"] == REQUEST_COMMENT
@@ -351,6 +372,8 @@ def test_202_uses_only_exact_merge_async_request_and_causal_uuid_readback() -> N
     assert result["receipt"]["executor_sequence"] == 1
     assert result["readback"]["server_uuid"] == SERVER_UUID
     assert result["readback"]["executor_sequence"] == 2
+    assert "REQUEST_ACCEPTED_NON_TERMINAL" in persisted
+    assert SERVER_UUID in persisted
     put_calls = [call for call in mutation_client.calls if call[0] == "PUT"]
     assert put_calls == [
         (
@@ -359,6 +382,69 @@ def test_202_uses_only_exact_merge_async_request_and_causal_uuid_readback() -> N
             {"sha": HEAD, "merge_action": "merge_queue"},
         )
     ]
+
+
+def test_202_persists_uuid_receipt_before_failed_readback() -> None:
+    read_client = FakeClient(read_responses())
+    target = qualified(read_client)
+    mutation_client = FakeClient({
+        ("PUT", f"/repos/Oteryn/Oteryn-Game/pulls/{PR}/merge-async"):
+            executor.Response(202, {"status": "accepted", "details": {
+                "uuid": SERVER_UUID, "merge_action": "merge_queue",
+                "expected_head_sha": HEAD,
+            }}),
+        ("GET", f"/repos/Oteryn/Oteryn-Game/pulls/{PR}/merge-async/{SERVER_UUID}"):
+            executor.Response(500, {"message": "transient failure"}),
+    })
+    output = io.StringIO()
+    with step_summary() as summary_path, contextlib.redirect_stdout(output):
+        try:
+            executor.submit_merge_queue(read_client, mutation_client, target)
+        except AssertionError as exc:
+            assert "fixture status 500" in str(exc)
+        else:
+            raise AssertionError("post-202 readback failure was suppressed")
+
+        stdout_record = output.getvalue()
+        summary_record = summary_path.read_text(encoding="utf-8")
+
+    for persisted in (stdout_record, summary_record):
+        assert "REQUEST_ACCEPTED_NON_TERMINAL" in persisted
+        assert f'"server_uuid":"{SERVER_UUID}"' in persisted
+        assert f'"request_comment_id":{REQUEST_COMMENT}' in persisted
+        assert f'"repository":"{REPO}"' in persisted
+        assert f'"expected_head_sha":"{HEAD}"' in persisted
+    assert [call[0] for call in mutation_client.calls].count("PUT") == 1
+
+
+def test_202_receipt_persistence_failure_requires_uuid_reconciliation() -> None:
+    read_client = FakeClient(read_responses())
+    target = qualified(read_client)
+    mutation_client = FakeClient({
+        ("PUT", f"/repos/Oteryn/Oteryn-Game/pulls/{PR}/merge-async"):
+            executor.Response(202, {"status": "accepted", "details": {
+                "uuid": SERVER_UUID, "merge_action": "merge_queue",
+                "expected_head_sha": HEAD,
+            }}),
+    })
+    previous = os.environ.pop("GITHUB_STEP_SUMMARY", None)
+    output = io.StringIO()
+    try:
+        with contextlib.redirect_stdout(output):
+            try:
+                executor.submit_merge_queue(read_client, mutation_client, target)
+            except executor.ExecutorError as exc:
+                assert "RECONCILIATION_REQUIRED" in str(exc)
+                assert SERVER_UUID in str(exc)
+                assert "do not repeat" in str(exc)
+            else:
+                raise AssertionError("missing receipt persistence did not fail closed")
+    finally:
+        if previous is not None:
+            os.environ["GITHUB_STEP_SUMMARY"] = previous
+    assert SERVER_UUID in output.getvalue()
+    assert [call[0] for call in mutation_client.calls].count("PUT") == 1
+    assert not any("merge-async/" in call[1] for call in mutation_client.calls)
 
 
 def test_202_rejects_wrong_uuid_bound_head_or_action() -> None:

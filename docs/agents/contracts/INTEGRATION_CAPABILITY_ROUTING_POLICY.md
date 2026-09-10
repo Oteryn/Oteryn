@@ -122,8 +122,13 @@ The protected META executor:
   evidence and consumes the canonical authorization/freeze/attempt route objects;
 - performs only native `merge-async` with exact `sha` and
   `merge_action="merge_queue"`;
-- treats HTTP 202 as acceptance only and requires its server UUID plus a
-  strictly later UUID-bound status/target readback;
+- treats HTTP 202 as acceptance only, creates the UUID-bound receipt immediately,
+  and durably emits its non-secret machine record to stdout and
+  `GITHUB_STEP_SUMMARY` before any fallible readback;
+- requires a strictly later UUID-bound status/target readback; readback failure
+  preserves the accepted receipt and requires UUID reconciliation without a
+  repeated PUT, while persistence failure is a UUID-bearing
+  `RECONCILIATION_REQUIRED` blocker;
 - treats HTTP 200/409 as reconciliation, never a fabricated new acceptance;
 - treats denied/unavailable native mutation as
   `BLOCKED_CAPABILITY_UNAVAILABLE`;

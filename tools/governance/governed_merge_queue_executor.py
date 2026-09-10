@@ -440,6 +440,32 @@ def _readback(
     )
 
 
+def _persist_accepted_receipt(record: Mapping[str, Any]) -> None:
+    """Persist a non-secret 202 receipt before any fallible causal readback."""
+    receipt = record["receipt"]
+    server_uuid = str(receipt["server_uuid"])
+    serialized = json.dumps(record, sort_keys=True, separators=(",", ":"))
+    try:
+        sys.stdout.write(serialized + "\n")
+        sys.stdout.flush()
+
+        summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "").strip()
+        if not summary_path:
+            raise OSError("GITHUB_STEP_SUMMARY is unavailable")
+        with open(summary_path, "a", encoding="utf-8") as summary:
+            summary.write("\n### Governed Merge Queue accepted request receipt\n\n")
+            summary.write("```json\n" + serialized + "\n```\n")
+            summary.flush()
+            os.fsync(summary.fileno())
+    except (OSError, ValueError) as exc:
+        # A real 202 has already happened. Preserve the causal handle in the
+        # blocker and never retry the PUT as a persistence fallback.
+        raise ExecutorError(
+            "RECONCILIATION_REQUIRED: accepted merge-async receipt persistence "
+            f"failed for server UUID {server_uuid}; do not repeat the request: {exc}"
+        ) from exc
+
+
 def submit_merge_queue(
     read_client: Client,
     mutation_client: Client,
@@ -520,6 +546,12 @@ def submit_merge_queue(
             server_uuid,
             receipt_sequence,
         )
+        accepted_result = {
+            "result": "REQUEST_ACCEPTED_NON_TERMINAL",
+            "request_comment_id": target.request_comment_id,
+            "receipt": asdict(receipt),
+        }
+        _persist_accepted_receipt(accepted_result)
         readback = _readback(
             read_client,
             mutation_client,
@@ -528,12 +560,7 @@ def submit_merge_queue(
             sequence=sequence,
             prior_sequence=receipt_sequence,
         )
-        return {
-            "result": "REQUEST_ACCEPTED_NON_TERMINAL",
-            "request_comment_id": target.request_comment_id,
-            "receipt": asdict(receipt),
-            "readback": asdict(readback),
-        }
+        return {**accepted_result, "readback": asdict(readback)}
 
     # HTTP 200/409 is reconciliation only: it never fabricates a new acceptance receipt.
     details = response.body.get("details")
