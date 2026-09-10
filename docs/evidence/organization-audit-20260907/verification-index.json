@@ -380,5 +380,27 @@
     "post_adoption_grouped_paths": 113,
     "post_adoption_unverified_paths": 3991,
     "post_adoption_result": "MARKETPLACE_TESTS_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS"
+  },
+  "r3_meta_r4_direct_adoption": {
+    "candidate_path": "r3-meta-r4-direct-candidate.json",
+    "candidate_sha256": "aeb3eaf325aef8c989209d1c9104c8d7a890b25eef2b3bb1ea014ffd079aab39",
+    "adoption_overlay": "coverage-review-meta-r4-direct-additions.tsv",
+    "adoption_overlay_sha256": "70e5f14056e539f59a0be0783acb83c8e38c7cde5ff9e6cfde01672bfcf35598",
+    "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+    "live_main_identity_commit": "3b39e0be05aef008f1bd442821daefa898a201dd",
+    "path_count": 25,
+    "depth": "SCOPED_SEMANTIC_REVIEW",
+    "line_ranges": [],
+    "canonical_ledger_sha256": "71f41a16273b3eb16afc0a786f2ff4d2e83b737fac0e869d9e2cf97d43483d11",
+    "canonical_counts": {
+      "source_rows": 4325,
+      "direct_paths": 258,
+      "grouped_paths": 113,
+      "unverified_paths": 3954,
+      "semantically_classified_paths": 371
+    },
+    "meta_aud_05_status": "PARTIALLY_REPAIRED",
+    "product_readiness_claimed": false,
+    "audit_completion_claimed": false
   }
 }

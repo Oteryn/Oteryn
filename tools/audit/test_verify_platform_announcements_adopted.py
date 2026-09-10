@@ -27,7 +27,7 @@ class AnnouncementsAdoptedVerifierTest(unittest.TestCase):
     def test_historical_candidate_remains_pre_adoption(self):
         self.assertFalse(self.candidate['coverage_adopted'])
         self.assertEqual(self.candidate['projection']['status'],'PROJECTION_SUCCESS_NOT_ADOPTED')
-        self.assertEqual(self.candidate['projection']['projected_ledger_sha256'],adopted.CANONICAL_LEDGER_SHA)
+        self.assertEqual(self.candidate['projection']['projected_ledger_sha256'],adopted.ANNOUNCEMENTS_LEDGER_SHA)
 
     def test_announcements_overlay_blob_is_exact(self):
         raw=(ROOT/adopted.ANNOUNCEMENTS_OVERLAY_REL).read_bytes()

@@ -12,14 +12,14 @@ The source set remains META@`1a01c5b3e08666a82245b1cac78da3736c65e785`, Game@`4d
 
 | Source | Tracked leaves | DIRECT scoped | GROUPED revalidated | UNVERIFIED semantics |
 |---|---:|---:|---:|---:|
-| meta | 174 | 20 | 0 | 154 |
+| meta | 174 | 45 | 0 | 129 |
 | game | 830 | 34 | 0 | 796 |
 | platform | 2165 | 168 | 113 | 1884 |
 | atlas | 1155 | 10 | 0 | 1145 |
 | migration_archive | 1 | 1 | 0 | 0 |
-| **Total** | **4325** | **233** | **113** | **3979** |
+| **Total** | **4325** | **258** | **113** | **3954** |
 
-The following paragraph is retained verbatim as the bounded **pre-Announcements Marketplace closeout snapshot** required by the Marketplace durability contract. Within that paragraph, “the current revision” and its 223-path ledger refer to that historical pre-Announcements audit state, not to the present canonical 233-path state shown above and bound below.
+The following paragraph is retained verbatim as the bounded **pre-Announcements Marketplace closeout snapshot** required by the Marketplace durability contract. Within that paragraph, “the current revision” and its 223-path ledger refer to that historical pre-Announcements audit state, not to the present canonical 258-path state shown above and bound below.
 
 `DIRECT` is a bounded review with the stated scope, not full approval of the entire file or every dependency. R2 had 65 scoped entries; the current revision adds 158 DIRECT paths and extends some existing scopes. It reads all 50 Platform migration files, control fields of all 77 workflow files and all 19 files in the frozen Platform routes tree. The prior Platform audit statement that there were 21 route files was rejected fail-closed; the frozen tree contains 19 and all 19 were read directly here. Exactly 113 Platform leaves are additionally GROUPED. GameAuth contributes 27 paths after exact historical/source identity, 23 dependent bindings and 61 focused cases / 565 assertions. Four account/Canary/profile/character families contribute 31 paths after exact 23 dependent bindings and an ordered 15-file qualification producing 86 cases / 586 assertions. Three Marketplace/Payments/Wallet families contribute 49 paths — `app/Marketplace/**` (21), `app/Payments/**` (24), `app/Wallet/**` (4) — after exact historical direct-read evidence, byte-identical family trees, exact 23 dependent bindings and an ordered 13-file PHP 8.5.10/MariaDB 11.8.9 qualification producing 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips, including four real-MariaDB integration/concurrency files. The exact six-file `tests/Feature/Marketplace/**` directory contributes a further 6 GROUPED paths after immutable historical evidence explicitly names every file, exact byte identity, a bound 17-case / 179-assertion all-green qualification including both real-MariaDB tests, and projected-ledger reproduction proving only those six rows transition from UNVERIFIED to GROUPED. GROUPED is bounded semantic carry-forward, not product/security readiness. The rejected Atlas 508-path candidate remains UNVERIFIED. Full CSV is reproducible from immutable inventories, the base `coverage-review.tsv`, the exact two-row `coverage-review-additions.tsv` overlay, `coverage-groups.json` and ledger SHA-256 `2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f`.
 

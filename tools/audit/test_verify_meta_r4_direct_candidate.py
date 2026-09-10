@@ -1,91 +1,91 @@
 #!/usr/bin/env python3
-"""Adversarial tests for the 25-path META R4-correlated DIRECT candidate."""
+"""Adversarial tests for immutable candidate and exact 25-row META adoption."""
 from copy import deepcopy
 from pathlib import Path
 import csv, json, shutil, tempfile, unittest
 import verify_meta_r4_direct_candidate as verifier
 
-class MetaR4DirectCandidateTest(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.candidate=verifier.expected_candidate()
-        cls.tmp=tempfile.TemporaryDirectory(prefix='meta-r4-ledger-')
-        cls.inventory=verifier.collect_inventories(verifier.ROOT,Path(cls.tmp.name)/'audit')
-    @classmethod
-    def tearDownClass(cls): cls.tmp.cleanup()
-    def reject(self,mutation):
-        value=deepcopy(self.candidate); mutation(value)
-        with self.assertRaises(ValueError): verifier.validate_candidate(value)
-    def mutate_accounting(self,mutation):
-        with tempfile.TemporaryDirectory() as t:
-            root=Path(t); shutil.copytree(verifier.ROOT/'docs/evidence',root/'docs/evidence'); mutation(root)
-            with self.assertRaises(ValueError): verifier.validate_accounting(root,self.candidate,self.inventory)
-    def mutate_finding(self,mutation):
-        with tempfile.TemporaryDirectory() as t:
-            root=Path(t); path=root/verifier.FINDINGS_REL; path.parent.mkdir(parents=True)
-            with (verifier.ROOT/verifier.FINDINGS_REL).open(encoding='utf-8',newline='') as f:
-                reader=csv.DictReader(f,delimiter='\t'); fields=reader.fieldnames; rows=list(reader)
-            mutation(rows)
-            with path.open('w',encoding='utf-8',newline='') as f:
-                writer=csv.DictWriter(f,fieldnames=fields,delimiter='\t',lineterminator='\n'); writer.writeheader(); writer.writerows(rows)
-            with self.assertRaises(ValueError): verifier.validate_finding(root,self.candidate)
-    def test_committed_candidate_and_rebuilt_ledger_pass(self):
-        verifier.validate_candidate(deepcopy(self.candidate)); verifier.validate_source(verifier.ROOT,self.candidate)
-        verifier.validate_finding(verifier.ROOT,self.candidate); verifier.validate_accounting(verifier.ROOT,self.candidate,self.inventory)
-    def test_missing_duplicate_extra_and_blob_drift_fail(self):
-        self.reject(lambda c:c['paths'].pop())
-        self.reject(lambda c:c['paths'].append(deepcopy(c['paths'][0])))
-        self.reject(lambda c:c['paths'].append({'path':'extra','blob_sha':'0'*40,'semantic_note':'x'}))
-        self.reject(lambda c:c['paths'][6].update(blob_sha='0'*40))
-    def test_source_tree_and_historical_coordinates_fail_closed(self):
-        self.reject(lambda c:c['source'].update(tree_sha='0'*40))
-        self.reject(lambda c:c['historical_r4_provenance'].update(audited_source_commit='0'*40))
-        self.reject(lambda c:c['historical_r4_provenance'].update(coverage_ledger_publication_blob='0'*40))
-    def test_temporal_authority_cannot_be_promoted(self):
-        for key in ('retired_prompts_dispatchable','superpowers_material_dispatchable','historical_closeouts_are_current_live_proof','recovery_contract_is_current_live_qualification','desired_state_is_live_enforcement_proof','mutable_github_admin_provider_runtime_state_reviewed'):
-            self.reject(lambda c,key=key:c['temporal_authority'].update({key:True}))
-    def test_meta_aud_05_cannot_be_dropped_closed_downgraded_or_duplicated(self):
-        self.reject(lambda c:c.pop('reconfirmed_finding'))
-        self.reject(lambda c:c['reconfirmed_finding'].update(status='CLOSED'))
-        self.reject(lambda c:c['reconfirmed_finding'].update(severity='P3'))
-        self.reject(lambda c:c['reconfirmed_finding'].update(id='META-AUD-NEW'))
-        self.reject(lambda c:c['reconfirmed_finding'].update(duplicate_id='META-AUD-05'))
-        self.mutate_finding(lambda rows:rows.append(deepcopy(next(r for r in rows if r['id']=='META-AUD-05'))))
-    def test_meta_aud_05_complete_canonical_row_is_bound(self):
-        mutations={
-            'repository':'game',
-            'scope':'resolved; no further action required',
-            'evidence':'resolved; no further action required',
-            'owner_route':'Oteryn/Oteryn-Game#1',
-            'closure_condition':'resolved; no further action required',
-        }
-        for field,value in mutations.items():
-            with self.subTest(field=field):
-                def mutate(rows,field=field,value=value):
-                    next(r for r in rows if r['id']=='META-AUD-05')[field]=value
-                self.mutate_finding(mutate)
-    def test_adoption_readiness_completion_and_live_claims_fail(self):
-        self.reject(lambda c:c.update(coverage_adopted=True))
-        self.reject(lambda c:c.update(disposition='DIRECT'))
-        self.reject(lambda c:c['limitations'].append('Adoption is guaranteed next.'))
-        self.reject(lambda c:c['limitations'].append('This establishes product readiness and independent 10/10.'))
-        self.reject(lambda c:c.update(live_enforcement=True))
-    def test_types_keys_notes_and_accounting_are_exact(self):
-        self.reject(lambda c:c.update(schema_version=True))
-        self.reject(lambda c:c['paths'][0].update(semantic_note='Readiness proven.'))
-        self.reject(lambda c:c['canonical_accounting_unchanged'].update(direct_paths=258))
-        self.reject(lambda c:c['source'].update(extra=False))
-    def test_candidate_paths_must_remain_unverified(self):
-        def mutation(root):
-            # Introducing this source path as canonical DIRECT must alter the authoritative ledger.
-            path=root/'docs/evidence/organization-audit-20260907/coverage-review-canonical-additions.tsv'
-            with path.open(encoding='utf-8',newline='') as f: reader=csv.DictReader(f,delimiter='\t'); fields=reader.fieldnames; rows=list(reader)
-            rows.append({'repository':'meta','path':self.candidate['paths'][0]['path'],'blob_sha':self.candidate['paths'][0]['blob_sha'],'depth':'FULL_FILE','scope':'bad promotion','line_ranges':'[]','execution_evidence':'none'})
-            with path.open('w',encoding='utf-8',newline='') as f: w=csv.DictWriter(f,fieldnames=fields,delimiter='\t',lineterminator='\n');w.writeheader();w.writerows(rows)
-        self.mutate_accounting(mutation)
-    def test_non_candidate_accounting_drift_fails(self):
-        def mutation(root):
-            path=root/'docs/evidence/organization-audit-20260907/coverage-groups.json'; data=json.loads(path.read_text()); data['groups'][0]['scope']='drift'; path.write_text(json.dumps(data))
-        self.mutate_accounting(mutation)
+class MetaR4DirectAdoptionTest(unittest.TestCase):
+ @classmethod
+ def setUpClass(cls):
+  cls.candidate=verifier.expected_candidate(); cls.tmp=tempfile.TemporaryDirectory(prefix='meta-r4-ledger-')
+  cls.inventory=verifier.collect_inventories(verifier.ROOT,Path(cls.tmp.name)/'audit')
+ @classmethod
+ def tearDownClass(cls): cls.tmp.cleanup()
+ def reject_candidate(self,fn):
+  v=deepcopy(self.candidate);fn(v)
+  with self.assertRaises(ValueError):verifier.validate_candidate(v)
+ def copied_root(self):
+  t=tempfile.TemporaryDirectory(); root=Path(t.name); shutil.copytree(verifier.ROOT/'docs/evidence',root/'docs/evidence'); return t,root
+ def mutate_overlay(self,fn):
+  t,root=self.copied_root()
+  try:
+   p=root/verifier.OVERLAY_REL
+   with p.open(newline='',encoding='utf-8') as f:r=csv.DictReader(f,delimiter='\t'); fields=r.fieldnames;rows=list(r)
+   fn(rows)
+   with p.open('w',newline='',encoding='utf-8') as f:w=csv.DictWriter(f,fields,delimiter='\t',lineterminator='\n');w.writeheader();w.writerows(rows)
+   with self.assertRaises(ValueError):verifier.validate_adoption(root,self.candidate)
+  finally:t.cleanup()
+ def test_committed_adoption_and_rebuilt_ledger_pass(self):
+  verifier.validate_candidate(deepcopy(self.candidate));verifier.validate_source(verifier.ROOT,self.candidate)
+  verifier.validate_finding(verifier.ROOT,self.candidate);verifier.validate_adoption(verifier.ROOT,self.candidate)
+  verifier.validate_accounting(verifier.ROOT,self.candidate,self.inventory)
+ def test_candidate_bytes_are_immutable(self):
+  raw=(verifier.ROOT/verifier.CANDIDATE_REL).read_bytes();self.assertEqual(verifier.hashlib.sha256(raw).hexdigest(),verifier.CANDIDATE_SHA256)
+  self.reject_candidate(lambda c:c['paths'][0].update(semantic_note='mutated'))
+ def test_missing_duplicate_and_extra_candidate_path_fail(self):
+  self.reject_candidate(lambda c:c['paths'].pop())
+  self.reject_candidate(lambda c:c['paths'].append(deepcopy(c['paths'][0])))
+  self.reject_candidate(lambda c:c['paths'].append({'path':'extra','blob_sha':'0'*40,'semantic_note':'x'}))
+ def test_wrong_candidate_blob_and_temporal_claim_fail(self):
+  self.reject_candidate(lambda c:c['paths'][0].update(blob_sha='0'*40))
+  self.reject_candidate(lambda c:c['temporal_authority'].update(retired_prompts_dispatchable=True))
+  self.reject_candidate(lambda c:c['limitations'].append('product readiness and audit completion established'))
+ def test_missing_duplicate_wrong_blob_depth_scope_evidence_and_ranges_fail(self):
+  mutations=[lambda r:r.pop(),lambda r:r.append(deepcopy(r[0])),lambda r:r[0].update(blob_sha='0'*40),
+   lambda r:r[0].update(depth='FULL_FILE'),lambda r:r[0].update(scope='weakened'),
+   lambda r:r[0].update(execution_evidence='product readiness established'),lambda r:r[0].update(line_ranges='[[1,1]]')]
+  for fn in mutations:
+   with self.subTest(fn=fn):self.mutate_overlay(fn)
+ def test_re_adoption_or_unrelated_disposition_mutation_fails(self):
+  t,root=self.copied_root()
+  try:
+   p=root/'docs/evidence/organization-audit-20260907/coverage-review-canonical-additions.tsv'
+   with p.open(newline='',encoding='utf-8') as f:r=csv.DictReader(f,delimiter='\t');fields=r.fieldnames;rows=list(r)
+   rows.append(verifier.expected_overlay(self.candidate)[0])
+   with p.open('w',newline='',encoding='utf-8') as f:w=csv.DictWriter(f,fields,delimiter='\t',lineterminator='\n');w.writeheader();w.writerows(rows)
+   with self.assertRaises(ValueError):verifier.validate_accounting(root,self.candidate,self.inventory)
+  finally:t.cleanup()
+  t,root=self.copied_root()
+  try:
+   p=root/'docs/evidence/organization-audit-20260907/coverage-review.tsv'; lines=p.read_text().splitlines();p.write_text('\n'.join(lines[:-1])+'\n')
+   with self.assertRaises(ValueError):verifier.validate_accounting(root,self.candidate,self.inventory)
+  finally:t.cleanup()
+ def test_grouped_overlap_and_stale_counts_digest_fail(self):
+  t,root=self.copied_root()
+  try:
+   p=root/'docs/evidence/organization-audit-20260907/coverage-groups.json';d=json.loads(p.read_text());d['groups'][0]['path_prefix']='.github/';d['groups'][0]['repository']='meta';p.write_text(json.dumps(d))
+   with self.assertRaises(ValueError):verifier.validate_accounting(root,self.candidate,self.inventory)
+  finally:t.cleanup()
+  t,root=self.copied_root()
+  try:
+   p=root/'docs/evidence/organization-audit-20260907/coverage-summary.json';d=json.loads(p.read_text());d['ledger_sha256']='73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9';p.write_text(json.dumps(d))
+   with self.assertRaises(ValueError):verifier.validate_accounting(root,self.candidate,self.inventory)
+  finally:t.cleanup()
+ def test_complete_meta_aud_05_row_and_false_closure_fail(self):
+  t,root=self.copied_root()
+  try:
+   p=root/verifier.FINDINGS_REL
+   with p.open(newline='',encoding='utf-8') as f:r=csv.DictReader(f,delimiter='\t');fields=r.fieldnames;rows=list(r)
+   next(x for x in rows if x['id']=='META-AUD-05')['closure_condition']='CLOSED'
+   with p.open('w',newline='',encoding='utf-8') as f:w=csv.DictWriter(f,fields,delimiter='\t',lineterminator='\n');w.writeheader();w.writerows(rows)
+   with self.assertRaises(ValueError):verifier.validate_finding(root,self.candidate)
+  finally:t.cleanup()
+ def test_index_readiness_and_digest_claims_fail(self):
+  t,root=self.copied_root()
+  try:
+   p=root/verifier.INDEX_REL;d=json.loads(p.read_text());d['r3_meta_r4_direct_adoption']['product_readiness_claimed']=True;p.write_text(json.dumps(d))
+   with self.assertRaises(ValueError):verifier.validate_adoption(root,self.candidate)
+  finally:t.cleanup()
 
-if __name__=='__main__': unittest.main()
+if __name__=='__main__':unittest.main()

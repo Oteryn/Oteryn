@@ -22,7 +22,7 @@ class AuditValidationTest(unittest.TestCase):
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
     def mutate(self,path,func):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
@@ -139,12 +139,12 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.base/'unknowns.json',mutate)
     def test_stale_semantic_coverage_transition_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('233 DIRECT', '223 DIRECT')
-                                .replace('3979 paths', '3989 paths')))
+            reason=row['reason'].replace('258 DIRECT', '233 DIRECT')
+                                .replace('3954 paths', '3979 paths')))
         self.reject()
     def test_changed_semantic_coverage_total_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            missing='3979 source leaves retain UNVERIFIED semantics; 346 of 4324 leaves are semantically classified'))
+            missing='3954 source leaves retain UNVERIFIED semantics; 371 of 4324 leaves are semantically classified'))
         self.reject()
     def test_changed_semantic_classified_count_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
@@ -167,7 +167,7 @@ class AuditValidationTest(unittest.TestCase):
         self.reject()
     def test_semantic_coverage_nested_type_drift_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            missing={'unverified': 3979, 'classified': 346, 'total': 4325}))
+            missing={'unverified': 3954, 'classified': 371, 'total': 4325}))
         self.reject()
     def test_resolved_independent_review_row_reintroduction_rejected(self):
         stale = {

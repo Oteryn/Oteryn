@@ -1,19 +1,52 @@
 {
   "schema_version": 2,
   "report_id": "OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907",
-  "revision": "R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-233",
+  "revision": "R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-258",
   "status": "QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE",
   "governing_issue": "Oteryn/Oteryn#186",
   "pull_request": "Oteryn/Oteryn#185",
   "source_collection_time_utc": "2026-09-07T22:06:16.642480Z",
   "repositories": {
-    "meta": {"repository": "Oteryn/Oteryn", "commit_sha": "1a01c5b3e08666a82245b1cac78da3736c65e785", "tree_sha": "f084e824ec5e14d5909c9750d906d91d51425fd5", "leaf_count": 174},
-    "game": {"repository": "Oteryn/Oteryn-Game", "commit_sha": "4d6139083179b8fd8c5d0497b2abf8c2545de599", "tree_sha": "49cabfccf7d4876e5bc9276fc5963caa33dab8a5", "leaf_count": 830},
-    "platform": {"repository": "Oteryn/Oteryn-Platform", "commit_sha": "de917b3477a1de0667531380de3660e8b2ab59aa", "tree_sha": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e", "leaf_count": 2165},
-    "atlas": {"repository": "Oteryn/Oteryn-Atlas", "commit_sha": "f00815858bb5b031c502ad19fb96a05ff66b4d84", "tree_sha": "a1009378f8d3950a5ee62fb3ee65041f7d53a1e0", "leaf_count": 1155},
-    "migration_archive": {"repository": "Oteryn/Oteryn-Platform-Migration-Backup-20260818", "commit_sha": "6da4f83ef6a35afbab3332f90d7c7f171d23d235", "tree_sha": "dbf8349a21e432df47d1475b8431939bbe94d6e1", "leaf_count": 1}
+    "meta": {
+      "repository": "Oteryn/Oteryn",
+      "commit_sha": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "tree_sha": "f084e824ec5e14d5909c9750d906d91d51425fd5",
+      "leaf_count": 174
+    },
+    "game": {
+      "repository": "Oteryn/Oteryn-Game",
+      "commit_sha": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "tree_sha": "49cabfccf7d4876e5bc9276fc5963caa33dab8a5",
+      "leaf_count": 830
+    },
+    "platform": {
+      "repository": "Oteryn/Oteryn-Platform",
+      "commit_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "tree_sha": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+      "leaf_count": 2165
+    },
+    "atlas": {
+      "repository": "Oteryn/Oteryn-Atlas",
+      "commit_sha": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+      "tree_sha": "a1009378f8d3950a5ee62fb3ee65041f7d53a1e0",
+      "leaf_count": 1155
+    },
+    "migration_archive": {
+      "repository": "Oteryn/Oteryn-Platform-Migration-Backup-20260818",
+      "commit_sha": "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+      "tree_sha": "dbf8349a21e432df47d1475b8431939bbe94d6e1",
+      "leaf_count": 1
+    }
   },
-  "source_identity_validation": {"active_repositories": 4, "archive_repositories": 1, "active_leaf_count": 4324, "including_archive_leaf_count": 4325, "historical_supporting_snapshots": 3, "all_collected_root_trees_verified": 8, "unique_blobs_verified": 4641},
+  "source_identity_validation": {
+    "active_repositories": 4,
+    "archive_repositories": 1,
+    "active_leaf_count": 4324,
+    "including_archive_leaf_count": 4325,
+    "historical_supporting_snapshots": 3,
+    "all_collected_root_trees_verified": 8,
+    "unique_blobs_verified": 4641
+  },
   "semantic_coverage": "PARTIAL_EXPLICIT_NOT_ALL_LINE",
   "production_readiness_claimed": false,
   "independent_score": null,
@@ -26,10 +59,26 @@
   "audit_domains_accounted": 23,
   "audit_domains_all_pass": false,
   "workflow_census": {
-    "meta": {"workflows": 2, "jobs": 4, "merge_group_workflows": 1},
-    "game": {"workflows": 17, "jobs": 41, "merge_group_workflows": 1},
-    "platform": {"workflows": 55, "jobs": 100, "merge_group_workflows": 1},
-    "atlas": {"workflows": 3, "jobs": 5, "merge_group_workflows": 2},
+    "meta": {
+      "workflows": 2,
+      "jobs": 4,
+      "merge_group_workflows": 1
+    },
+    "game": {
+      "workflows": 17,
+      "jobs": 41,
+      "merge_group_workflows": 1
+    },
+    "platform": {
+      "workflows": 55,
+      "jobs": 100,
+      "merge_group_workflows": 1
+    },
+    "atlas": {
+      "workflows": 3,
+      "jobs": 5,
+      "merge_group_workflows": 2
+    },
     "total_workflows": 77,
     "total_declared_jobs": 150,
     "matrix_expanded": false,
@@ -38,7 +87,11 @@
   "corrected_coordinate": {
     "repository": "Oteryn/Oteryn-Game",
     "original_unresolvable_sha": "3327db49c0c3e2d90afe6a74954c579a36aba2a5",
-    "observations": ["Git fetch exit128 in run34165374247", "Native GitHub Git-commit GET returned404", "Replacement main ref, commit and all root-tree/blob identities verified"],
+    "observations": [
+      "Git fetch exit128 in run34165374247",
+      "Native GitHub Git-commit GET returned404",
+      "Replacement main ref, commit and all root-tree/blob identities verified"
+    ],
     "replacement_sha": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
     "original_cause": "UNKNOWN; no fabrication motive or simple upstream drift inferred"
   },
@@ -50,6 +103,7 @@
   "coverage_review_additions": "organization-audit-20260907/coverage-review-canonical-additions.tsv",
   "coverage_review_recorder_additions": "organization-audit-20260907/coverage-review-additions.tsv",
   "coverage_review_announcements_additions": "organization-audit-20260907/coverage-review-announcements-additions.tsv",
+  "coverage_review_meta_r4_direct_additions": "organization-audit-20260907/coverage-review-meta-r4-direct-additions.tsv",
   "coverage_groups": "organization-audit-20260907/coverage-groups.json",
   "coverage_summary": "organization-audit-20260907/coverage-summary.json",
   "domain_matrix": "organization-audit-20260907/domain-matrix.tsv",
@@ -57,12 +111,19 @@
   "verification": "organization-audit-20260907/verification-index.json",
   "unknown_register": "organization-audit-20260907/unknowns.json",
   "authority_note": "Provider implementation and live lifecycle authority remain in their repositories. Evidence is source-pinned; later source/config/consumer/Issue/PR changes can invalidate it. No provider writes, production actions, protection changes, new required gates or restored Atlas workflows are authorized by this report.",
-  "known_source_snapshot_p1_ids": ["GAME-F20", "PLATFORM-F01", "PLATFORM-F02", "PLATFORM-F16"],
+  "known_source_snapshot_p1_ids": [
+    "GAME-F20",
+    "PLATFORM-F01",
+    "PLATFORM-F02",
+    "PLATFORM-F16"
+  ],
   "known_source_snapshot_p1_count": 4,
-  "historical_candidate_p1_ids_not_counted_as_source_snapshot": ["GAME-CANDIDATE-361"],
-  "scoped_review_paths": 233,
+  "historical_candidate_p1_ids_not_counted_as_source_snapshot": [
+    "GAME-CANDIDATE-361"
+  ],
+  "scoped_review_paths": 258,
   "grouped_revalidated_paths": 113,
-  "semantically_classified_paths": 346,
+  "semantically_classified_paths": 371,
   "r3_native_results": "organization-audit-20260907/r3-native-results.json",
   "r3_source_review": "organization-audit-20260907/r3-source-review.md",
   "r3_visual_review": "organization-audit-20260907/r3-visual-review.json",
@@ -110,5 +171,7 @@
   "r3_platform_marketplace_payments_wallet_candidate": "organization-audit-20260907/r3-platform-marketplace-payments-wallet-candidate.json",
   "r3_platform_marketplace_tests_candidate": "organization-audit-20260907/r3-platform-marketplace-tests-candidate.json",
   "r3_platform_audit_recorders_direct_candidate": "organization-audit-20260907/r3-platform-audit-recorders-direct-candidate.json",
-  "r3_platform_announcements_direct_candidate": "organization-audit-20260907/r3-platform-announcements-direct-candidate.json"
+  "r3_platform_announcements_direct_candidate": "organization-audit-20260907/r3-platform-announcements-direct-candidate.json",
+  "r3_meta_r4_direct_candidate": "organization-audit-20260907/r3-meta-r4-direct-candidate.json",
+  "r3_meta_r4_direct_adoption_overlay": "organization-audit-20260907/coverage-review-meta-r4-direct-additions.tsv"
 }

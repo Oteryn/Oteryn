@@ -28,9 +28,11 @@ STATES = {'SOURCE_REPAIRED_TESTED','PARTIALLY_REPAIRED','RETIRED_SOURCE','SOURCE
           'REPORTED_OPEN','OWNER_DECISION_PENDING','HISTORICAL_TERMINAL','REPORTED_OPEN_CANDIDATE'}
 DEFAULT_REASON = 'Identity enumerated; this continuation does not assert a complete semantic review of this leaf. Historical/source oracles may provide narrower evidence in the finding register.'
 DIRECT_ADDITIONS = 'coverage-review-canonical-additions.tsv'
+META_R4_DIRECT_ADDITIONS = 'coverage-review-meta-r4-direct-additions.tsv'
 DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-canonical-additions.tsv'
 RECORDER_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
 ANNOUNCEMENTS_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-announcements-additions.tsv'
+META_R4_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-meta-r4-direct-additions.tsv'
 EXPECTED_UNRESOLVED_IDS = {
     'SEMANTIC-COVERAGE', 'HISTORY-REVALIDATION', 'ADMIN-STATE', 'INFRA-STATE', 'RECOVERY',
     'COST-CI', 'COST-AGENTS', 'SUPPLY-CHAIN', 'NATIVE-G1', 'UI-343', 'PORTABILITY',
@@ -92,9 +94,9 @@ def write_new_file_no_symlinks(path: Path, raw: bytes) -> None:
     finally: os.close(descriptor)
 SEMANTIC_COVERAGE_UNKNOWN = {
     'id': 'SEMANTIC-COVERAGE',
-    'missing': '3979 source leaves retain UNVERIFIED semantics; 346 of 4325 leaves are semantically classified',
-    'reason': 'Source bytes are available; 233 DIRECT scoped path reviews are bound (the prior 221 plus two app/Audit recorder paths plus ten app/Announcements/** paths), and 113 bounded GROUPED Platform paths are bound (27 GameAuth + 31 Accounts/CanaryIntegration/CharacterProfiles/Characters + 49 Marketplace/Payments/Wallet + 6 Marketplace tests). The ten Announcements DIRECT paths are frozen-source bounded reviews qualified by real MariaDB 11.8.9 with 4 cases / 20 assertions and a mechanical projection proving exactly those ten rows transition UNVERIFIED to DIRECT; the Polish editorial_translations join branch and a dedicated simultaneous-writer race remain explicit execution limits. This is bounded semantic accounting, not full behavior, product, or audit approval; 3979 paths retain UNVERIFIED. The rejected Atlas 508-path candidate remains UNVERIFIED, and no automatic import from maintenance N/A or unproven summaries is allowed.',
-    'effect': 'Original exhaustive completeness cannot be claimed from 346 semantically classified leaves out of 4325.',
+    'missing': '3954 source leaves retain UNVERIFIED semantics; 371 of 4325 leaves are semantically classified',
+    'reason': 'Source bytes are available; 258 DIRECT scoped path reviews are bound (the prior 233 (221 original plus two app/Audit recorder paths plus ten app/Announcements/** paths) plus exactly 25 META paths from the immutable reviewed R4 candidate), and 113 bounded GROUPED Platform paths remain bound (27 GameAuth + 31 Accounts/CanaryIntegration/CharacterProfiles/Characters + 49 Marketplace/Payments/Wallet + 6 Marketplace tests). The META adoption is bounded source-semantic evidence only, uses no fabricated line ranges, and does not establish live admin/runtime/provider state or readiness. The ten Announcements DIRECT paths retain their explicit execution limits. This is bounded semantic accounting, not full behavior, product, or audit approval; 3954 paths retain UNVERIFIED. The rejected Atlas 508-path candidate remains UNVERIFIED, and no automatic import from maintenance N/A or unproven summaries is allowed.',
+    'effect': 'Original exhaustive completeness cannot be claimed from 371 semantically classified leaves out of 4325.',
     'owner_route': 'META186 plus provider audit owners',
     'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review changed/uncovered authored families, and retain justified grouping/N/A.',
 }
@@ -198,6 +200,12 @@ def load_review(base: Path, doc: dict):
         additions=read_tsv(base/DIRECT_ADDITIONS)
         require(additions,'coverage review additions empty')
         review=review+additions
+    meta_binding=doc.get('coverage_review_meta_r4_direct_additions')
+    if meta_binding is not None:
+        require(meta_binding==META_R4_DIRECT_ADDITIONS_BINDING,'META R4 direct additions binding drift')
+        meta_additions=read_tsv(base/META_R4_DIRECT_ADDITIONS)
+        require(len(meta_additions)==25,'META R4 direct additions must contain exactly 25 rows')
+        review=review+meta_additions
     unique(review,lambda r:(r['repository'],r['path']),'review path')
     return review
 
@@ -346,6 +354,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(doc.get('coverage_review_additions')==DIRECT_ADDITIONS_BINDING,'canonical direct additions binding drift')
     require(doc.get('coverage_review_recorder_additions')==RECORDER_ADDITIONS_BINDING,'recorder additions evidence binding drift')
     require(doc.get('coverage_review_announcements_additions')==ANNOUNCEMENTS_ADDITIONS_BINDING,'Announcements additions evidence binding drift')
+    require(doc.get('coverage_review_meta_r4_direct_additions')==META_R4_DIRECT_ADDITIONS_BINDING,'META R4 additions evidence binding drift')
     require(json_exact(doc.get('r3_review'),R3_REVIEW),'R3 review lifecycle drift')
     base=report_path.parent/doc['evidence_directory']
     findings=read_tsv(base/'finding-register.tsv');unique(findings,lambda r:r['id'],'finding id')
