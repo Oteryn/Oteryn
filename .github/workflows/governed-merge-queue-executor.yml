@@ -73,6 +73,7 @@ jobs:
       - name: Execute governed native merge-async request
         if: ${{ steps.parse.outputs.allowed == 'true' }}
         env:
+          OTERYN_MQ_READ_TOKEN: ${{ github.token }}
           OTERYN_MQ_FINE_GRAINED_PAT: ${{ secrets.OTERYN_MQ_FINE_GRAINED_PAT }}
           TARGET_REPOSITORY: ${{ steps.parse.outputs.repository }}
           TARGET_PR: ${{ steps.parse.outputs.pr_number }}

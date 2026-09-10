@@ -28,6 +28,7 @@
   },
   "integration_capability_routing": {
     "schema_version": 1,
+    "snapshot_max_age_seconds": 300,
     "contract_path": "docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md",
     "require_preflight_before_worker_release": true,
     "states": [
@@ -41,11 +42,32 @@
     "delegated_request_operation": "github.issue_comment.create",
     "control_repository": "Oteryn/Oteryn",
     "control_issue": 196,
+    "protected_executor": {
+      "repository": "Oteryn/Oteryn",
+      "ref": "refs/heads/main",
+      "workflow_path": ".github/workflows/governed-merge-queue-executor.yml",
+      "workflow_blob_sha": "1e6aa15cb557386c67b09ca332f69d5cfd75f6b7"
+    },
     "allowed_target_repositories": {
-      "Oteryn/Oteryn": "meta-gate",
-      "Oteryn/Oteryn-Game": "game-gate",
-      "Oteryn/Oteryn-Platform": "platform-gate",
-      "Oteryn/Oteryn-Atlas": "atlas-gate"
+      "Oteryn/Oteryn": {
+        "gate": "meta-gate",
+        "source_workflows": [{"path": ".github/workflows/ci.yml", "event": "pull_request", "workflow_id": 336924336}]
+      },
+      "Oteryn/Oteryn-Game": {
+        "gate": "game-gate",
+        "source_workflows": [{"path": ".github/workflows/merge-gate.yml", "event": "pull_request", "workflow_id": 336912904}]
+      },
+      "Oteryn/Oteryn-Platform": {
+        "gate": "platform-gate",
+        "source_workflows": [{"path": ".github/workflows/ci.yml", "event": "pull_request", "workflow_id": 315878887}]
+      },
+      "Oteryn/Oteryn-Atlas": {
+        "gate": null,
+        "source_workflows": [
+          {"path": ".github/workflows/merge-authority-audit.yml", "event": "pull_request_target", "workflow_id": 351151514},
+          {"path": ".github/workflows/verification-shadow.yml", "event": "pull_request_target", "workflow_id": 353763418}
+        ]
+      }
     }
   },
   "remote_desktop_reasons": [

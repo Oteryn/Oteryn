@@ -12,14 +12,27 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from pathlib import Path
 import re
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping, Protocol
+
+from merge_queue_submission_routing import (
+    ASYNC_MERGE_QUEUE,
+    AUTH_FINE_GRAINED_PAT,
+    AUTHORIZATION_SOURCE,
+    CandidateFreeze,
+    SubmissionAttempt,
+    SubmissionAuthorization,
+    build_merge_async_request,
+    choose_submission_route,
+)
 
 API_URL = "https://api.github.com"
 API_VERSION = "2026-03-10"
@@ -34,12 +47,16 @@ CONTROL_COMMAND_RE = re.compile(
     r"([1-9][0-9]*) ([0-9a-f]{40})$"
 )
 TRUSTED_ASSOCIATIONS = frozenset({"OWNER", "MEMBER"})
-TARGET_GATES = {
-    "Oteryn/Oteryn": "meta-gate",
-    "Oteryn/Oteryn-Game": "game-gate",
-    "Oteryn/Oteryn-Platform": "platform-gate",
-    "Oteryn/Oteryn-Atlas": "atlas-gate",
+POLICY_PATH = Path(__file__).resolve().parents[2] / "ecosystem/agent-execution-routing-policy.json"
+_ROUTING_POLICY = json.loads(POLICY_PATH.read_text(encoding="utf-8"))
+_TARGET_POLICY = _ROUTING_POLICY["integration_capability_routing"]["allowed_target_repositories"]
+TARGET_GATES = {repository: config["gate"] for repository, config in _TARGET_POLICY.items()}
+SOURCE_WORKFLOWS = {
+    repository: tuple((item["path"], item["event"], item["workflow_id"])
+                      for item in config["source_workflows"])
+    for repository, config in _TARGET_POLICY.items()
 }
+INTEGRATION_PERMISSIONS = frozenset({"admin", "maintain"})
 
 
 class ExecutorError(RuntimeError):
@@ -127,8 +144,10 @@ class QualifiedTarget:
     pr_number: int
     base: str
     head_sha: str
-    required_gate: str
+    required_gate: str | None
     request_comment_id: int
+    request_actor: str
+    head_branch: str
 
 
 @dataclass(frozen=True)
@@ -188,7 +207,7 @@ def verify_control_request(
     pr_number: int,
     expected_head_sha: str,
     request_comment_id: int,
-) -> None:
+) -> str:
     comment = _response_body(
         read_client.rest(
             "GET",
@@ -213,6 +232,11 @@ def verify_control_request(
         or requested_head != expected_head_sha
     ):
         raise ValueError("live control request does not match workflow-bound target coordinates")
+    actor = comment.get("user")
+    login = actor.get("login") if isinstance(actor, dict) else None
+    if not isinstance(login, str) or not login:
+        raise ValueError("control request actor login is missing")
+    return login
 
 
 def _validate_target_identity(
@@ -251,7 +275,7 @@ def qualify_target(
     repository, pr_number, expected_head_sha, request_comment_id = normalize_inputs(
         repository, pr_number, expected_head_sha, request_comment_id
     )
-    verify_control_request(
+    request_actor = verify_control_request(
         read_client,
         repository=repository,
         pr_number=pr_number,
@@ -269,36 +293,63 @@ def qualify_target(
         expected_head_sha=expected_head_sha,
         require_open_ready=True,
     )
+    head = pull["head"]
+    head_branch = head.get("ref") if isinstance(head, dict) else None
+    if not isinstance(head_branch, str) or not head_branch:
+        raise ValueError("pull request head branch is missing")
 
     required_gate = TARGET_GATES[repository]
-    query = urllib.parse.urlencode(
-        {"check_name": required_gate, "filter": "latest", "per_page": "100"}
-    )
-    checks = _response_body(
-        read_client.rest(
-            "GET",
-            f"/repos/{owner}/{name}/commits/{expected_head_sha}/check-runs?{query}",
+    gate_suite_id: int | None = None
+    if repository != "Oteryn/Oteryn-Atlas":
+        query = urllib.parse.urlencode(
+            {"check_name": required_gate, "filter": "latest", "per_page": "100"}
         )
-    )
-    runs = checks.get("check_runs")
-    if not isinstance(runs, list) or not runs:
-        raise ValueError(f"no exact-head {required_gate} check run was found")
-    matching = [
-        run
-        for run in runs
-        if isinstance(run, dict)
-        and run.get("name") == required_gate
-        and str(run.get("head_sha") or "").lower() == expected_head_sha
-        and isinstance(run.get("app"), dict)
-        and run["app"].get("slug") == "github-actions"
-    ]
-    if not matching:
-        raise ValueError(
-            f"no GitHub-Actions {required_gate} check run matches the exact target head"
-        )
-    latest = max(matching, key=lambda run: int(run.get("id") or 0))
-    if latest.get("status") != "completed" or latest.get("conclusion") != "success":
-        raise ValueError(f"latest exact-head {required_gate} must be completed/success")
+        checks = _response_body(read_client.rest(
+            "GET", f"/repos/{owner}/{name}/commits/{expected_head_sha}/check-runs?{query}"
+        ))
+        runs = checks.get("check_runs")
+        matching = [
+            run for run in runs if isinstance(runs, list) and isinstance(run, dict)
+            and run.get("name") == required_gate
+            and str(run.get("head_sha") or "").lower() == expected_head_sha
+            and isinstance(run.get("app"), dict) and run["app"].get("slug") == "github-actions"
+            and isinstance(run.get("check_suite"), dict)
+            and isinstance(run["check_suite"].get("id"), int)
+        ] if isinstance(runs, list) else []
+        if not matching:
+            raise ValueError(f"no canonical-source candidate for exact-head {required_gate} was found")
+        latest = max(matching, key=lambda run: int(run.get("id") or 0))
+        if latest.get("status") != "completed" or latest.get("conclusion") != "success":
+            raise ValueError(f"latest exact-head {required_gate} must be completed/success")
+        gate_suite_id = latest["check_suite"]["id"]
+
+    for workflow_path, event, workflow_id in SOURCE_WORKFLOWS[repository]:
+        query = urllib.parse.urlencode({"head_sha": expected_head_sha, "event": event, "per_page": "100"})
+        payload = _response_body(read_client.rest(
+            "GET", f"/repos/{owner}/{name}/actions/runs?{query}"
+        ))
+        workflow_runs = payload.get("workflow_runs")
+        canonical = [run for run in workflow_runs if isinstance(workflow_runs, list)
+            and isinstance(run, dict)
+            and run.get("workflow_id") == workflow_id
+            and run.get("path") == workflow_path
+            and run.get("event") == event
+            and isinstance(run.get("head_repository"), dict)
+            and run["head_repository"].get("full_name") == repository
+            and run.get("head_branch") == head_branch
+            and str(run.get("head_sha") or "").lower() == expected_head_sha
+            and (gate_suite_id is None or run.get("check_suite_id") == gate_suite_id)
+        ] if isinstance(workflow_runs, list) else []
+        if not canonical:
+            raise ValueError(f"canonical source workflow did not run: {workflow_path}")
+        latest_workflow = max(canonical, key=lambda run: int(run.get("id") or 0))
+        relations = latest_workflow.get("pull_requests")
+        if not isinstance(relations, list):
+            raise ValueError("canonical workflow pull-request relation is malformed")
+        if relations and not any(item.get("number") == pr_number for item in relations if isinstance(item, dict)):
+            raise ValueError("canonical workflow does not relate to the target pull request")
+        if latest_workflow.get("status") != "completed" or latest_workflow.get("conclusion") != "success":
+            raise ValueError(f"canonical source workflow must be completed/success: {workflow_path}")
     return QualifiedTarget(
         repository,
         pr_number,
@@ -306,6 +357,8 @@ def qualify_target(
         expected_head_sha,
         required_gate,
         request_comment_id,
+        request_actor,
+        head_branch,
     )
 
 
@@ -392,12 +445,52 @@ def submit_merge_queue(
     mutation_client: Client,
     target: QualifiedTarget,
 ) -> Mapping[str, Any]:
+    # The earlier qualification is only workflow setup. Re-read every mutable fact
+    # and bind the mutation credential's human principal immediately before PUT.
+    target = qualify_target(
+        read_client,
+        repository=target.repository,
+        pr_number=target.pr_number,
+        expected_head_sha=target.head_sha,
+        request_comment_id=target.request_comment_id,
+    )
     owner, name = target.repository.split("/", 1)
+    principal = _response_body(mutation_client.rest("GET", "/user")).get("login")
+    if principal != target.request_actor:
+        raise ExecutorError("mutation principal must match the live control-request actor")
+    permission = _response_body(read_client.rest(
+        "GET", f"/repos/{owner}/{name}/collaborators/{urllib.parse.quote(target.request_actor, safe='')}/permission"
+    )).get("permission")
+    if permission not in INTEGRATION_PERMISSIONS:
+        raise ExecutorError("control-request actor lacks current target admin or maintain permission")
+
+    now = int(time.time())
+    attempt = SubmissionAttempt(
+        f"mq-executor:{target.request_comment_id}:{now}", target.repository,
+        target.pr_number, target.base, target.head_sha,
+    )
+    freeze = CandidateFreeze(target.repository, target.pr_number, target.head_sha)
+    authorization = SubmissionAuthorization(
+        AUTHORIZATION_SOURCE, target.repository, target.pr_number, target.base,
+        target.head_sha, True, True, now,
+    )
+    route = choose_submission_route(
+        attempt, freeze, authorization,
+        execution_auth=AUTH_FINE_GRAINED_PAT, now_epoch_seconds=now,
+    )
+    if route != ASYNC_MERGE_QUEUE:
+        raise ExecutorError(f"canonical submission route rejected fresh authorization: {route}")
+    request = build_merge_async_request(
+        attempt, freeze, authorization,
+        execution_auth=AUTH_FINE_GRAINED_PAT, now_epoch_seconds=now,
+    )
+    if request is None:
+        raise ExecutorError("canonical merge-async request construction failed")
     sequence = ExecutorSequence()
     response = mutation_client.rest(
-        "PUT",
-        f"/repos/{owner}/{name}/pulls/{target.pr_number}/merge-async",
-        body={"sha": target.head_sha, "merge_action": MERGE_ACTION},
+        request.method,
+        request.endpoint,
+        body={"sha": request.sha, "merge_action": request.merge_action},
         allowed_statuses=(200, 202, 400, 403, 404, 409, 422),
     )
 
@@ -494,7 +587,7 @@ def main() -> int:
         return 2
 
     try:
-        read_client = GitHubClient()
+        read_client = GitHubClient(token=os.environ.get("OTERYN_MQ_READ_TOKEN"))
         mutation_client = GitHubClient(token=mutation_token)
         target = qualify_target(
             read_client,

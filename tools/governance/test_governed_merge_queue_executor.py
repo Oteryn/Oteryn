@@ -19,6 +19,8 @@ PR = 528
 HEAD = "97fcf72a2f29a8fc134c97dd3cdaf9237be7c6d3"
 REQUEST_COMMENT = 5617345429
 SERVER_UUID = "f0a3d092-6c9f-4edd-9d3f-cb9d8865a935"
+ACTOR = "maintainer-user"
+HEAD_BRANCH = "fix/provider-change"
 
 
 class FakeClient:
@@ -36,6 +38,8 @@ class FakeClient:
     ) -> executor.Response:
         self.calls.append((method, path, body))
         response = self.responses.get((method, path))
+        if response is None and (method, path) == ("GET", "/user"):
+            response = executor.Response(200, {"login": ACTOR})
         if response is None:
             raise AssertionError(f"unexpected request: {method} {path}")
         if response.status not in allowed_statuses:
@@ -64,7 +68,7 @@ def pull(
         "merged": state == "closed",
         "draft": draft,
         "base": {"ref": base},
-        "head": {"sha": head, "repo": {"full_name": head_repository}},
+        "head": {"sha": head, "ref": HEAD_BRANCH, "repo": {"full_name": head_repository}},
     }
 
 
@@ -80,6 +84,7 @@ def read_responses() -> dict[tuple[str, str], executor.Response]:
                 "author_association": "MEMBER",
                 "issue_url": "https://api.github.com/repos/Oteryn/Oteryn/issues/196",
                 "body": control_body(),
+                "user": {"login": ACTOR},
             },
         ),
         (
@@ -100,10 +105,24 @@ def read_responses() -> dict[tuple[str, str], executor.Response]:
                         "status": "completed",
                         "conclusion": "success",
                         "app": {"slug": "github-actions"},
+                        "check_suite": {"id": 77},
                     }
                 ]
             },
         ),
+        (
+            "GET",
+            f"/repos/Oteryn/Oteryn-Game/actions/runs?head_sha={HEAD}&event=pull_request&per_page=100",
+        ): executor.Response(200, {"workflow_runs": [{
+            "id": 90, "workflow_id": 336912904,
+            "path": ".github/workflows/merge-gate.yml", "event": "pull_request",
+            "head_repository": {"full_name": REPO}, "head_branch": HEAD_BRANCH,
+            "head_sha": HEAD, "check_suite_id": 77, "pull_requests": [{"number": PR}],
+            "status": "completed", "conclusion": "success",
+        }]}),
+        (
+            "GET", f"/repos/Oteryn/Oteryn-Game/collaborators/{ACTOR}/permission",
+        ): executor.Response(200, {"permission": "maintain"}),
     }
 
 
@@ -122,8 +141,12 @@ def test_allowlist_binds_every_permanent_repository_to_its_gate() -> None:
         "Oteryn/Oteryn": "meta-gate",
         "Oteryn/Oteryn-Game": "game-gate",
         "Oteryn/Oteryn-Platform": "platform-gate",
-        "Oteryn/Oteryn-Atlas": "atlas-gate",
+        "Oteryn/Oteryn-Atlas": None,
     }
+    assert executor.SOURCE_WORKFLOWS["Oteryn/Oteryn-Atlas"] == (
+        (".github/workflows/merge-authority-audit.yml", "pull_request_target", 351151514),
+        (".github/workflows/verification-shadow.yml", "pull_request_target", 353763418),
+    )
 
 
 def test_control_request_is_one_live_exact_transport_record() -> None:
@@ -133,6 +156,7 @@ def test_control_request_is_one_live_exact_transport_record() -> None:
     assert target.pr_number == PR
     assert target.head_sha == HEAD
     assert target.request_comment_id == REQUEST_COMMENT
+    assert target.request_actor == ACTOR
 
 
 def test_control_request_wrong_issue_body_actor_or_coordinates_fail_closed() -> None:
@@ -192,6 +216,7 @@ def test_latest_exact_head_provider_gate_must_be_success() -> None:
                     "status": "completed",
                     "conclusion": "failure",
                     "app": {"slug": "github-actions"},
+                    "check_suite": {"id": 77},
                 }
             ]
         },
@@ -214,9 +239,71 @@ def test_exact_head_gate_must_come_from_github_actions() -> None:
     try:
         qualified(FakeClient(responses))
     except ValueError as exc:
-        assert "GitHub-Actions" in str(exc)
+        assert "canonical-source candidate" in str(exc)
     else:
         raise AssertionError("spoofed non-GitHub-Actions gate was accepted")
+
+
+def test_gate_must_bind_canonical_workflow_identity_and_pr_relation() -> None:
+    key = ("GET", f"/repos/Oteryn/Oteryn-Game/actions/runs?head_sha={HEAD}&event=pull_request&per_page=100")
+    for field, value in (
+        ("workflow_id", 1), ("path", ".github/workflows/spoof.yml"),
+        ("event", "push"), ("head_branch", "other"), ("head_sha", "a" * 40),
+        ("check_suite_id", 999), ("pull_requests", [{"number": PR + 1}]),
+    ):
+        responses = read_responses()
+        run = dict(responses[key].body["workflow_runs"][0])
+        run[field] = value
+        responses[key] = executor.Response(200, {"workflow_runs": [run]})
+        try:
+            qualified(FakeClient(responses))
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"noncanonical workflow field {field} was accepted")
+
+
+def test_atlas_requires_both_source_workflows_but_allows_empty_relations() -> None:
+    repository = "Oteryn/Oteryn-Atlas"
+    responses = read_responses()
+    comment_key = ("GET", f"/repos/Oteryn/Oteryn/issues/comments/{REQUEST_COMMENT}")
+    comment = dict(responses[comment_key].body)
+    comment["body"] = control_body(repository=repository)
+    responses[comment_key] = executor.Response(200, comment)
+    responses[("GET", f"/repos/{repository}/pulls/{PR}")] = executor.Response(
+        200, pull(head_repository=repository)
+    )
+    workflow_runs = []
+    for index, (path, event, workflow_id) in enumerate(executor.SOURCE_WORKFLOWS[repository]):
+        workflow_runs.append({
+                "id": 100 + index, "workflow_id": workflow_id, "path": path,
+                "event": event, "head_repository": {"full_name": repository},
+                "head_branch": HEAD_BRANCH, "head_sha": HEAD, "pull_requests": [],
+                "status": "completed", "conclusion": "success",
+        })
+    query = f"head_sha={HEAD}&event=pull_request_target&per_page=100"
+    responses[("GET", f"/repos/{repository}/actions/runs?{query}")] = executor.Response(
+        200, {"workflow_runs": workflow_runs}
+    )
+    target = executor.qualify_target(
+        FakeClient(responses), repository=repository, pr_number=PR,
+        expected_head_sha=HEAD, request_comment_id=REQUEST_COMMENT,
+    )
+    assert target.required_gate is None
+
+    first_path, first_event, _ = executor.SOURCE_WORKFLOWS[repository][0]
+    responses[("GET", f"/repos/{repository}/actions/runs?head_sha={HEAD}&event={first_event}&per_page=100")] = executor.Response(
+        200, {"workflow_runs": workflow_runs[1:]}
+    )
+    try:
+        executor.qualify_target(
+            FakeClient(responses), repository=repository, pr_number=PR,
+            expected_head_sha=HEAD, request_comment_id=REQUEST_COMMENT,
+        )
+    except ValueError as exc:
+        assert first_path in str(exc)
+    else:
+        raise AssertionError("Atlas qualification accepted missing canonical source workflow")
 
 
 def test_202_uses_only_exact_merge_async_request_and_causal_uuid_readback() -> None:
@@ -336,6 +423,23 @@ def test_403_and_404_are_precise_capability_blockers() -> None:
             raise AssertionError(f"HTTP {status} was not classified as capability blocker")
 
 
+def test_put_requires_same_authenticated_actor_with_target_integration_permission() -> None:
+    for principal, permission in (("different-user", "maintain"), (ACTOR, "write")):
+        responses = read_responses()
+        permission_key = ("GET", f"/repos/Oteryn/Oteryn-Game/collaborators/{ACTOR}/permission")
+        responses[permission_key] = executor.Response(200, {"permission": permission})
+        read_client = FakeClient(responses)
+        target = qualified(read_client)
+        mutation_client = FakeClient({("GET", "/user"): executor.Response(200, {"login": principal})})
+        try:
+            executor.submit_merge_queue(read_client, mutation_client, target)
+        except executor.ExecutorError:
+            pass
+        else:
+            raise AssertionError("unauthorized mutation principal reached merge-async")
+        assert not any(call[0] == "PUT" for call in mutation_client.calls)
+
+
 def test_invalid_inputs_fail_before_any_target_mutation() -> None:
     for values in (
         ("Other/Repo", PR, HEAD, REQUEST_COMMENT),
@@ -364,7 +468,7 @@ def test_workflow_is_narrow_read_only_and_has_no_forbidden_merge_fallback() -> N
     assert "merge_pull_request" not in workflow
     assert "enablePullRequestAutoMerge" not in workflow
     assert "enqueuePullRequest" not in workflow
-    assert "GITHUB_TOKEN" not in workflow
+    assert "OTERYN_MQ_READ_TOKEN: ${{ github.token }}" in workflow
     assert "contents: read" in workflow
     assert "issues: read" in workflow
     assert "pull-requests: read" in workflow

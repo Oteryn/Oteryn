@@ -28,6 +28,13 @@ tool/action discovery plus protected executor operational readback; a task,
 prompt, caller boolean, comment, or previous-session assertion is not capability
 evidence.
 
+Every capable snapshot carries an observation timestamp and is valid only for
+the finite freshness interval in the machine policy. Future, stale, malformed
+or self-asserted observations fail closed. `DELEGATED_CAPABLE` additionally
+requires a fresh protected-META `refs/heads/main` readback bound to the canonical
+executor workflow path and exact blob, credential-operational proof and retained
+terminal canary evidence for that same identity.
+
 ## States
 
 The only states are:
@@ -89,12 +96,20 @@ second authorization proof or attestation system.
 
 The protected META executor:
 
-- accepts only the four permanent Oteryn repositories and their canonical source
-  gates (`meta-gate`, `game-gate`, `platform-gate`, `atlas-gate`);
+- accepts only the four permanent Oteryn repositories and their immutable
+  source-workflow identities in the organization routing policy;
 - requires target PR `open`, unmerged, non-Draft, `base=main`, same-repository
   head, exact requested SHA;
-- requires the latest matching exact-head provider gate from the
-  `github-actions` App to be `completed/success`;
+- binds source qualification to exact repository, workflow path, event, stable
+  workflow ID, PR head branch and SHA, plus target PR relation whenever GitHub
+  supplies a non-empty relation. META, Game and Platform also bind the named gate
+  check suite to that run. Atlas requires both canonical `pull_request_target`
+  source workflows; empty relations are permitted there and terminal
+  `atlas-gate` remains merge-group proof;
+- authenticates the fine-grained PAT human principal, requires it to equal the
+  control-comment actor and requires current target `admin` or `maintain`;
+- immediately before mutation, re-reads comment, PR, eligibility and workflow
+  evidence and consumes the canonical authorization/freeze/attempt route objects;
 - performs only native `merge-async` with exact `sha` and
   `merge_action="merge_queue"`;
 - treats HTTP 202 as acceptance only and requires its server UUID plus a

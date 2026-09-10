@@ -36,6 +36,11 @@ Before `meta.governed_merge_queue_executor.v1` may be advertised as operational:
 The workflow's normal repository permissions are read-only. It never uses the
 built-in workflow token as the queue mutation credential.
 
+The mutation credential authenticates a human principal. The executor requires
+that principal to equal the live control-comment actor and to have current
+`admin` or `maintain` permission in the target repository. META organization
+membership alone is transport eligibility, never cross-repository authority.
+
 ## Control request
 
 The active provider coordinator must first perform the normal fresh
@@ -55,11 +60,17 @@ OWNER/MEMBER META actor association. The executor re-fetches the same comment
 live and verifies that it is still on Issue #196 and still binds the same
 repository, PR and exact head before it reads the target PR.
 
+Immediately before the PUT it repeats that read and all target/source-workflow
+qualification. Workflow proof binds exact repository, path, event, stable ID,
+PR head branch/SHA and any non-empty PR relation. Atlas's two canonical
+`pull_request_target` workflows may have empty relations; both identities must
+still pass, and terminal `atlas-gate` is not source qualification.
+
 ## Native mutation
 
 The executor independently requires target PR `open`, unmerged, non-Draft,
-`base=main`, same-repository head, exact requested SHA and latest exact-head
-canonical provider gate from GitHub Actions in `completed/success`.
+`base=main`, same-repository head, exact requested SHA and the immutable canonical
+source-workflow evidence in `completed/success`.
 
 The only positive mutation is:
 
