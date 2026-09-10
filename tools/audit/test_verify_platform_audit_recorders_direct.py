@@ -4,7 +4,9 @@ from __future__ import annotations
 import copy
 import csv
 import io
+import json
 from pathlib import Path
+from unittest import mock
 import unittest
 
 import verify_platform_audit_recorders_direct as v
@@ -26,6 +28,21 @@ class AuditRecorderDirectVerifierTests(unittest.TestCase):
     def test_current_lifecycle_is_external_review_metadata_not_pending(self):
         self.assertIn('3eb62ef72c1e13412fa45d5b25d597d112d9ae7d', v.REVIEW_PROVENANCE)
         self.assertIn('Not self-certified evidence', v.REVIEW_PROVENANCE)
+
+    def test_main_emits_current_r6_global_accounting(self):
+        output = io.StringIO()
+        with mock.patch('sys.argv', ['verify', '--platform-root', '/tmp/platform']), \
+             mock.patch.object(v, 'git', return_value=v.CANDIDATE_BLOB), \
+             mock.patch.object(v, 'validate_candidate_shape'), \
+             mock.patch.object(v, 'validate_adopted_docs'), \
+             mock.patch.object(v, 'validate_source'), \
+             mock.patch('sys.stdout', output):
+            self.assertEqual(v.main(), 0)
+        result = json.loads(output.getvalue())
+        self.assertEqual(
+            {key: result[key] for key in ('current_direct_paths', 'current_grouped_paths', 'current_unverified_paths', 'current_semantically_classified_paths')},
+            {'current_direct_paths': 294, 'current_grouped_paths': 113, 'current_unverified_paths': 3918, 'current_semantically_classified_paths': 407},
+        )
 
     def test_source_coordinate_drift_fails_closed(self):
         c = copy.deepcopy(self.candidate); c['source']['commit_sha'] = '0' * 40

@@ -2,6 +2,7 @@
 """Adversarial tests for the immutable META R5 candidate."""
 from copy import deepcopy
 from pathlib import Path
+from unittest import mock
 import csv,json,shutil,tempfile,unittest
 import verify_meta_r5_instruction_efficiency_direct_candidate as v
 
@@ -18,6 +19,39 @@ class MetaR5CandidateTest(unittest.TestCase):
   t=tempfile.TemporaryDirectory(); root=Path(t.name); shutil.copytree(v.ROOT/'docs/evidence',root/'docs/evidence'); return t,root
  def test_committed_candidate_source_finding_and_accounting_pass(self):
   v.validate_candidate(deepcopy(self.c)); v.validate_source(v.ROOT,self.c); v.validate_finding(v.ROOT); v.validate_adoption(v.ROOT,self.c); v.validate_accounting(v.ROOT,self.c,self.inventory)
+ def test_authenticated_candidate_bytes_survive_path_replacement(self):
+  t,root=self.copied()
+  try:
+   path=root/v.CANDIDATE_REL; canonical=path.read_bytes(); altered=deepcopy(self.c)
+   altered['product_readiness_claimed']=True
+   original=Path.read_bytes; reads=0
+   def replace_after_read(subject):
+    nonlocal reads
+    raw=original(subject)
+    if subject==path:
+     reads+=1; path.write_text(json.dumps(altered),encoding='utf-8')
+    return raw
+   with mock.patch.object(Path,'read_bytes',replace_after_read): observed=v.expected_candidate(root)
+   self.assertEqual(observed,self.c); self.assertEqual(reads,1)
+  finally:t.cleanup()
+ def test_main_consumes_authenticated_candidate_object(self):
+  t,root=self.copied()
+  try:
+   path=root/v.CANDIDATE_REL; altered=deepcopy(self.c); altered['audit_completion_claimed']=True
+   original=Path.read_bytes; reads=0
+   def replace_after_read(subject):
+    nonlocal reads
+    raw=original(subject)
+    if subject==path:
+     reads+=1; path.write_text(json.dumps(altered),encoding='utf-8')
+    return raw
+   with mock.patch.object(Path,'read_bytes',replace_after_read), mock.patch.object(v,'validate_source'), \
+        mock.patch.object(v,'validate_finding'), mock.patch.object(v,'validate_adoption'), \
+        mock.patch.object(v,'validate_accounting'), mock.patch('sys.argv',['verify','--audit-root',str(root)]), \
+        mock.patch('sys.stdout',new_callable=v.io.StringIO) as output:
+    self.assertEqual(v.main(),0)
+   self.assertEqual(json.loads(output.getvalue())['result'],'META_R5_INSTRUCTION_EFFICIENCY_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS'); self.assertEqual(reads,1)
+  finally:t.cleanup()
  def test_missing_extra_duplicate_wrong_blob_tree_and_ref_fail(self):
   for fn in [lambda c:c['paths'].pop(),lambda c:c['paths'].append(deepcopy(c['paths'][0])),lambda c:c['paths'].append({'x':'y'}),lambda c:c['paths'][0].update(blob_sha='0'*40),lambda c:c['source'].update(subtree_tree='0'*40),lambda c:c['source'].update(commit='0'*40)]:
    with self.subTest(fn=fn): self.reject(fn)

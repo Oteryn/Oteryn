@@ -145,10 +145,10 @@ def main() -> int:
     print(json.dumps({
         'result':'AUDIT_RECORDERS_DIRECT_EVIDENCE_PRESERVED_IN_CURRENT_CANONICAL_COMPOSITION',
         'recorder_paths':2,
-        'current_direct_paths':283,
+        'current_direct_paths':294,
         'current_grouped_paths':113,
-        'current_unverified_paths':3929,
-        'current_semantically_classified_paths':396,
+        'current_unverified_paths':3918,
+        'current_semantically_classified_paths':407,
         'current_ledger_sha256':CURRENT_LEDGER_SHA,
         'independent_review_required':False,
         'review_provenance':REVIEW_PROVENANCE,

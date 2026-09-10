@@ -2,6 +2,7 @@
 """Adversarial tests for immutable candidate and exact 25-row META adoption."""
 from copy import deepcopy
 from pathlib import Path
+from unittest import mock
 import csv, json, shutil, tempfile, unittest
 import verify_meta_r4_direct_candidate as verifier
 
@@ -33,6 +34,40 @@ class MetaR4DirectAdoptionTest(unittest.TestCase):
  def test_candidate_bytes_are_immutable(self):
   raw=(verifier.ROOT/verifier.CANDIDATE_REL).read_bytes();self.assertEqual(verifier.hashlib.sha256(raw).hexdigest(),verifier.CANDIDATE_SHA256)
   self.reject_candidate(lambda c:c['paths'][0].update(semantic_note='mutated'))
+ def test_authenticated_candidate_bytes_survive_path_replacement(self):
+  t,root=self.copied_root()
+  try:
+   path=root/verifier.CANDIDATE_REL; canonical=path.read_bytes(); altered=deepcopy(self.candidate)
+   altered['product_readiness_claimed']=True
+   original=Path.read_bytes; reads=0
+   def replace_after_read(subject):
+    nonlocal reads
+    raw=original(subject)
+    if subject==path:
+     reads+=1; path.write_text(json.dumps(altered),encoding='utf-8')
+    return raw
+   with mock.patch.object(Path,'read_bytes',replace_after_read):
+    observed=verifier.expected_candidate(root)
+   self.assertEqual(observed,self.candidate); self.assertEqual(reads,1)
+  finally:t.cleanup()
+ def test_main_consumes_authenticated_candidate_object(self):
+  t,root=self.copied_root()
+  try:
+   path=root/verifier.CANDIDATE_REL; altered=deepcopy(self.candidate); altered['audit_completion_claimed']=True
+   original=Path.read_bytes; reads=0
+   def replace_after_read(subject):
+    nonlocal reads
+    raw=original(subject)
+    if subject==path:
+     reads+=1; path.write_text(json.dumps(altered),encoding='utf-8')
+    return raw
+   with mock.patch.object(Path,'read_bytes',replace_after_read), mock.patch.object(verifier,'validate_source'), \
+        mock.patch.object(verifier,'validate_finding'), mock.patch.object(verifier,'validate_adoption'), \
+        mock.patch.object(verifier,'validate_accounting'), mock.patch('sys.argv',['verify','--audit-root',str(root)]), \
+        mock.patch('sys.stdout',new_callable=verifier.io.StringIO) as output:
+    self.assertEqual(verifier.main(),0)
+   self.assertEqual(json.loads(output.getvalue())['result'],'META_R4_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS'); self.assertEqual(reads,1)
+  finally:t.cleanup()
  def test_missing_duplicate_and_extra_candidate_path_fail(self):
   self.reject_candidate(lambda c:c['paths'].pop())
   self.reject_candidate(lambda c:c['paths'].append(deepcopy(c['paths'][0])))

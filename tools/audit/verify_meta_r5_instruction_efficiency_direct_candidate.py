@@ -37,14 +37,17 @@ def json_exact(a,e,p='root'):
   require(len(a)==len(e),p+' list length drift')
   for i,(x,y) in enumerate(zip(a,e)): json_exact(x,y,f'{p}[{i}]')
  else: require(a==e,p+' value drift')
-def read_json(path):
+def parse_json_bytes(raw):
  def pairs(items):
   d={}
   for k,v in items: require(k not in d,'duplicate JSON key: '+k); d[k]=v
   return d
- return json.loads(path.read_text(encoding='utf-8'),object_pairs_hook=pairs)
+ try: text=raw.decode('utf-8')
+ except UnicodeDecodeError as exc: raise ValueError('invalid JSON UTF-8') from exc
+ return json.loads(text,object_pairs_hook=pairs)
+def read_json(path): return parse_json_bytes(path.read_bytes())
 def expected_candidate(root=ROOT):
- raw=(root/CANDIDATE_REL).read_bytes(); require(hashlib.sha256(raw).hexdigest()==CANDIDATE_SHA256,'candidate complete-file SHA drift'); return read_json(root/CANDIDATE_REL)
+ raw=(root/CANDIDATE_REL).read_bytes(); require(hashlib.sha256(raw).hexdigest()==CANDIDATE_SHA256,'candidate complete-file SHA drift'); return parse_json_bytes(raw)
 def validate_candidate(candidate,expected=None): json_exact(candidate,expected or expected_candidate())
 def git(root,*args): return subprocess.run(['git','-c','core.hooksPath=/dev/null',*args],cwd=root,check=True,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=60).stdout.strip()
 def validate_source(root,c):

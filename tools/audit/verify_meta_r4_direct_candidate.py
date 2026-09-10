@@ -45,16 +45,22 @@ def json_exact(actual,expected,path='root'):
         for i,(a,e) in enumerate(zip(actual,expected)): json_exact(a,e,f'{path}[{i}]')
     else: require(actual==expected,f'{path} value drift')
 
-def read_json(path):
+def parse_json_bytes(raw):
     def pairs(items):
         out={}
         for k,v in items: require(k not in out,'duplicate JSON key: '+k); out[k]=v
         return out
-    return json.loads(path.read_text(encoding='utf-8'),object_pairs_hook=pairs)
+    try:
+        text=raw.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('invalid JSON UTF-8') from exc
+    return json.loads(text,object_pairs_hook=pairs)
 
-def expected_candidate():
-    raw=(ROOT/CANDIDATE_REL).read_bytes(); require(hashlib.sha256(raw).hexdigest()==CANDIDATE_SHA256,'candidate complete-file SHA drift')
-    return read_json(ROOT/CANDIDATE_REL)
+def read_json(path): return parse_json_bytes(path.read_bytes())
+
+def expected_candidate(root=ROOT):
+    raw=(root/CANDIDATE_REL).read_bytes(); require(hashlib.sha256(raw).hexdigest()==CANDIDATE_SHA256,'candidate complete-file SHA drift')
+    return parse_json_bytes(raw)
 
 def validate_candidate(candidate, expected=None): json_exact(candidate,expected or expected_candidate())
 
@@ -143,6 +149,6 @@ def validate_accounting(root,candidate,inventory_dir=None):
 
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--audit-root',type=Path,default=ROOT); a=p.parse_args()
-    raw=(a.audit_root/CANDIDATE_REL).read_bytes(); require(hashlib.sha256(raw).hexdigest()==CANDIDATE_SHA256,'candidate complete-file SHA drift'); candidate=read_json(a.audit_root/CANDIDATE_REL); validate_candidate(candidate); validate_source(a.audit_root,candidate); validate_finding(a.audit_root,candidate); validate_adoption(a.audit_root,candidate); validate_accounting(a.audit_root,candidate)
+    candidate=expected_candidate(a.audit_root); validate_candidate(candidate,candidate); validate_source(a.audit_root,candidate); validate_finding(a.audit_root,candidate); validate_adoption(a.audit_root,candidate); validate_accounting(a.audit_root,candidate)
     print(json.dumps({'result':'META_R4_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS','candidate_paths':25,'coverage_adopted':True,'current_disposition':'DIRECT','source_rows':4325,'direct_paths':294,'grouped_paths':113,'unverified_paths':3918,'semantically_classified_paths':407,'ledger_sha256':LEDGER_SHA,'meta_aud_05_status':'PARTIALLY_REPAIRED','product_readiness_claimed':False,'audit_completion_claimed':False,'live_state_claimed':False},sort_keys=True)); return 0
 if __name__=='__main__': raise SystemExit(main())
