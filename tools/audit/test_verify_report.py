@@ -51,6 +51,14 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.path,lambda d:d.update(severity_counts_exhaustive=True));self.reject()
     def test_unqualified_completion_rejected(self):
         self.mutate(self.path,lambda d:d.update(status='COMPLETE'));self.reject()
+    def test_audit_completion_complete_rejected(self):
+        self.mutate(self.path,lambda d:d.update(audit_completion='COMPLETE'));self.reject()
+    def test_audit_completion_equivalent_false_claim_rejected(self):
+        self.mutate(self.path,lambda d:d.update(audit_completion='PRODUCT_READY_AND_AUDIT_COMPLETE'));self.reject()
+    def test_meta_r4_candidate_pointer_drift_rejected(self):
+        self.mutate(self.path,lambda d:d.update(r3_meta_r4_direct_candidate='organization-audit-20260907/wrong.json'));self.reject()
+    def test_meta_r4_overlay_pointer_drift_rejected(self):
+        self.mutate(self.path,lambda d:d.update(r3_meta_r4_direct_adoption_overlay='organization-audit-20260907/wrong.tsv'));self.reject()
     def test_duplicate_finding_rejected(self):
         p=self.base/'finding-register.tsv';lines=p.read_text().splitlines();p.write_text('\n'.join(lines+[lines[1]])+'\n');self.reject()
     def test_missing_domain_rejected(self):
@@ -59,6 +67,20 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.path,lambda d:d['known_source_snapshot_p1_ids'].append('GAME-CANDIDATE-361'));self.reject()
     def test_hidden_unverified_paths_rejected(self):
         self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['platform'].update(unverified_semantics=0));self.reject()
+    def test_summary_semantic_coverage_complete_rejected(self):
+        self.mutate(self.base/'coverage-summary.json',lambda d:d.update(semantic_coverage='COMPLETE'));self.reject()
+    def test_summary_semantic_completion_true_rejected(self):
+        self.mutate(self.base/'coverage-summary.json',lambda d:d.update(semantic_completion_claimed=True));self.reject()
+    def test_summary_durability_readiness_append_rejected(self):
+        self.mutate(self.base/'coverage-summary.json',lambda d:d.update(durability=d['durability']+' This establishes product and production readiness.'));self.reject()
+    def test_summary_dimension_note_readiness_replacement_rejected(self):
+        self.mutate(self.base/'coverage-summary.json',lambda d:d.update(coverage_dimension_note='Audit completion and production readiness are established.'));self.reject()
+    def test_summary_key_removal_rejected(self):
+        self.mutate(self.base/'coverage-summary.json',lambda d:d.pop('new_scoped_paths_since_r2'));self.reject()
+    def test_summary_extra_key_rejected(self):
+        self.mutate(self.base/'coverage-summary.json',lambda d:d.update(product_ready=True));self.reject()
+    def test_summary_type_drift_rejected(self):
+        self.mutate(self.base/'coverage-summary.json',lambda d:d.update(rejected_group_candidates='1'));self.reject()
     def test_rejected_group_is_not_promoted_by_summary(self):
         self.mutate(self.base/'coverage-summary.json',lambda d:d['per_repository']['atlas'].update(grouped=508,unverified_semantics=637));self.reject()
     def test_rejected_candidate_is_preserved_but_not_counted(self):
@@ -169,6 +191,30 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate_semantic_coverage(lambda row:row.update(
             missing={'unverified': 3954, 'classified': 371, 'total': 4325}))
         self.reject()
+    def test_each_retained_nonsemantic_unknown_substance_is_exact(self):
+        ids=audit.EXPECTED_UNRESOLVED_IDS-{'SEMANTIC-COVERAGE'}
+        for unknown_id in sorted(ids):
+            with self.subTest(unknown_id=unknown_id):
+                shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/'unknowns.json',self.base/'unknowns.json')
+                def alter(data):
+                    row=next(row for row in data['items'] if row['id']==unknown_id)
+                    row['closure_condition']='Closed; waived; no further action required.'
+                self.mutate(self.base/'unknowns.json',alter)
+                self.reject()
+    def test_history_revalidation_false_closure_rejected(self):
+        def alter(data):
+            row=next(row for row in data['items'] if row['id']=='HISTORY-REVALIDATION')
+            row.update(missing='Nothing remains',reason='Complete',effect='Product ready',
+                       owner_route='Nobody',closure_condition='Closed; no further action required.')
+        self.mutate(self.base/'unknowns.json',alter);self.reject()
+    def test_nonsemantic_unknown_extra_key_rejected(self):
+        def alter(data):
+            next(row for row in data['items'] if row['id']=='ADMIN-STATE')['state']='OPEN'
+        self.mutate(self.base/'unknowns.json',alter);self.reject()
+    def test_nonsemantic_unknown_type_drift_rejected(self):
+        def alter(data):
+            next(row for row in data['items'] if row['id']=='INFRA-STATE')['reason']=['No host access']
+        self.mutate(self.base/'unknowns.json',alter);self.reject()
     def test_resolved_independent_review_row_reintroduction_rejected(self):
         stale = {
             'id': 'INDEPENDENT-REVIEW',

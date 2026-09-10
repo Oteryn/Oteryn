@@ -100,6 +100,194 @@ SEMANTIC_COVERAGE_UNKNOWN = {
     'owner_route': 'META186 plus provider audit owners',
     'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review changed/uncovered authored families, and retain justified grouping/N/A.',
 }
+EXPECTED_AUDIT_COMPLETION = 'NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial'
+META_R4_CANDIDATE_BINDING = 'organization-audit-20260907/r3-meta-r4-direct-candidate.json'
+EXPECTED_COVERAGE_SUMMARY = {'schema_version': 1,
+ 'source_leaf_total': 4325,
+ 'active_repository_leaf_total': 4324,
+ 'per_repository': {'meta': {'leaves': 174,
+                             'direct_scoped': 45,
+                             'unverified_semantics': 129,
+                             'grouped': 0,
+                             'not_applicable': 0},
+                    'game': {'leaves': 830,
+                             'direct_scoped': 34,
+                             'unverified_semantics': 796,
+                             'grouped': 0,
+                             'not_applicable': 0},
+                    'platform': {'leaves': 2165,
+                                 'direct_scoped': 168,
+                                 'unverified_semantics': 1884,
+                                 'grouped': 113,
+                                 'not_applicable': 0},
+                    'atlas': {'leaves': 1155,
+                              'direct_scoped': 10,
+                              'unverified_semantics': 1145,
+                              'grouped': 0,
+                              'not_applicable': 0},
+                    'migration_archive': {'leaves': 1,
+                                          'direct_scoped': 1,
+                                          'unverified_semantics': 0,
+                                          'grouped': 0,
+                                          'not_applicable': 0}},
+ 'ledger_sha256': '71f41a16273b3eb16afc0a786f2ff4d2e83b737fac0e869d9e2cf97d43483d11',
+ 'identity_coverage': 'COMPLETE_FOR_PINNED_FIVE_REPOSITORIES',
+ 'semantic_coverage': 'PARTIAL_EXPLICIT',
+ 'unclassified_paths': 0,
+ 'semantic_completion_claimed': False,
+ 'durability': 'Full CSV accompanies the audit delivery. Committed DIRECT review rows plus the fail-closed '
+               'coverage-review-canonical-additions.tsv composition overlay, immutable Git trees, explicit '
+               'accepted/rejected GROUPED records and verify_report.py reproduce every disposition. The '
+               'canonical additions overlay composes the separately preserved two-row audit-recorder overlay '
+               'and the exact ten-row Announcements overlay. Platform GameAuth contributes 27 GROUPED paths; '
+               'Accounts/CanaryIntegration/CharacterProfiles/Characters contribute 31; '
+               'Marketplace/Payments/Wallet production code contributes 49; the exact six-file Marketplace '
+               'test directory contributes 6. Two frozen Platform app/Audit recorder implementations and ten '
+               'frozen app/Announcements implementations are adopted as bounded DIRECT review rows. The '
+               'Announcements slice is qualified by real MariaDB 11.8.9 with 4 cases / 20 assertions and a '
+               'mechanical projection proving exactly ten UNVERIFIED-to-DIRECT transitions; the Polish '
+               'editorial_translations join branch and a dedicated simultaneous-writer race remain explicit '
+               'execution limits. The rejected 508-file Atlas candidate remains UNVERIFIED. The immutable '
+               'reviewed 25-path META R4 candidate is adopted exactly once through '
+               'coverage-review-meta-r4-direct-additions.tsv; its source-specific overlay preserves exact '
+               'path/blob/scope evidence and does not imply runtime, admin, provider, or readiness proof.',
+ 'new_scoped_paths_since_r2': 193,
+ 'scoped_review_paths': 258,
+ 'grouped_revalidated_paths': 113,
+ 'semantically_classified_paths': 371,
+ 'unverified_semantics_total': 3954,
+ 'coverage_dimension_note': 'DIRECT records bounded source review, not universal approval. The 258 DIRECT '
+                            'paths are the prior 233 plus exactly 25 META paths adopted from the immutable '
+                            'reviewed R4 candidate through coverage-review-meta-r4-direct-additions.tsv; no '
+                            'path is re-adopted or GROUPED. Platform contributes 113 GROUPED paths: GameAuth '
+                            '27, account/Canary/profile/character 31, Marketplace/Payments/Wallet production '
+                            'code 49, and the exact six-file Marketplace test directory 6. The Atlas '
+                            '508-path candidate remains rejected.',
+ 'rejected_group_candidates': 1}
+EXPECTED_UNKNOWNS = [{'id': 'SEMANTIC-COVERAGE',
+  'missing': '3954 source leaves retain UNVERIFIED semantics; 371 of 4325 leaves are semantically classified',
+  'reason': 'Source bytes are available; 258 DIRECT scoped path reviews are bound (the prior 233 (221 '
+            'original plus two app/Audit recorder paths plus ten app/Announcements/** paths) plus exactly 25 '
+            'META paths from the immutable reviewed R4 candidate), and 113 bounded GROUPED Platform paths '
+            'remain bound (27 GameAuth + 31 Accounts/CanaryIntegration/CharacterProfiles/Characters + 49 '
+            'Marketplace/Payments/Wallet + 6 Marketplace tests). The META adoption is bounded '
+            'source-semantic evidence only, uses no fabricated line ranges, and does not establish live '
+            'admin/runtime/provider state or readiness. The ten Announcements DIRECT paths retain their '
+            'explicit execution limits. This is bounded semantic accounting, not full behavior, product, or '
+            'audit approval; 3954 paths retain UNVERIFIED. The rejected Atlas 508-path candidate remains '
+            'UNVERIFIED, and no automatic import from maintenance N/A or unproven summaries is allowed.',
+  'effect': 'Original exhaustive completeness cannot be claimed from 371 semantically classified leaves out '
+            'of 4325.',
+  'owner_route': 'META186 plus provider audit owners',
+  'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review '
+                       'changed/uncovered authored families, and retain justified grouping/N/A.'},
+ {'id': 'HISTORY-REVALIDATION',
+  'missing': 'Current outcome of explicitly unverified historical findings',
+  'reason': 'Source changed, live PR/ref state not read or runtime condition unexecuted.',
+  'effect': '77 individual records are accounted, not77 proven current outcomes; later metadata '
+            'reconciliation is separate from source/regression qualification.',
+  'owner_route': 'META153/Game364/Platform451/Atlas315',
+  'closure_condition': 'Resolve each REQUIRES/UNKNOWN/OPEN_INHERITED row with exact source/runtime/live '
+                       'evidence.'},
+ {'id': 'ADMIN-STATE',
+  'missing': 'Current organization/admin security settings',
+  'reason': 'Managed integration does not expose all admin-only configuration.',
+  'effect': 'No current private reporting/scanning/member/privilege attestation.',
+  'owner_route': 'Organization owner via META186',
+  'closure_condition': 'Provide dated nonsecret exported settings and authorized verification; never secret '
+                       'values.'},
+ {'id': 'INFRA-STATE',
+  'missing': 'Private production runtime configuration',
+  'reason': 'No host exception or production access used.',
+  'effect': 'No infrastructure health or deployment readiness conclusion.',
+  'owner_route': 'Provider operations owners',
+  'closure_condition': 'Authorized read-only configuration/health snapshot with redaction and exact '
+                       'release.'},
+ {'id': 'RECOVERY',
+  'missing': 'Current release/data restore/rollback',
+  'reason': 'All50 Platform migration up paths ran on the synthetic SQLite UI fixture and up/down source was '
+            'read; current-data upgrade/down/restore and measured RPO/RTO remain unexecuted.',
+  'effect': 'RPO/RTO and live data recovery not qualified.',
+  'owner_route': 'META59/60 and provider operations',
+  'closure_condition': 'Isolated approved current-release/data restore with measured RPO/RTO, smoke, '
+                       'rollback and cleanup.'},
+ {'id': 'COST-CI',
+  'missing': 'Representative complete candidate cost/latency/cache/retry and billed-usage evidence',
+  'reason': 'R3 acquires84 completed runs/418 jobs across seven newest12-run strata;16 anomalous job times '
+            'remain unknown. No random/full candidate cohort or earlier-attempt/billing history.',
+  'effect': 'Measured observations exist, but no organization savings, flake rate or pure queue-time claim '
+            'follows.',
+  'owner_route': 'Provider CI programmes',
+  'closure_condition': 'Collect representative recent PR/MQ/push cohort, sample criteria and timestamps; '
+                       'measure queue/run/capacity/cache/retry/yield before changes.'},
+ {'id': 'COST-AGENTS',
+  'missing': 'Actual token/API/wall-clock cost',
+  'reason': 'R5Q explicitly labels these NOT_MEASURED.',
+  'effect': 'Fewer Markdown reads do not prove token/billing savings.',
+  'owner_route': 'META instruction optimization owner',
+  'closure_condition': 'Instrument supported execution telemetry, stratify task classes and compare '
+                       'cost/quality/safety without claiming an enforced model default.'},
+ {'id': 'SUPPLY-CHAIN',
+  'missing': 'Fresh CVE/SBOM/history/provenance assessment',
+  'reason': 'Locked Platform Composer audit at recorded execution returned0 advisories/0 abandoned; '
+            'remaining ecosystems, full SBOM/provenance/secret-history and freshness are not established.',
+  'effect': 'Lockfiles and Dependabot do not establish clean supply chain.',
+  'owner_route': 'Provider security owners',
+  'closure_condition': 'Authorized advisory/SBOM/provenance scans with source/lock/time/scope/exclusion and '
+                       'triage; keep sensitive findings private.'},
+ {'id': 'NATIVE-G1',
+  'missing': 'Game native durable user journey',
+  'reason': 'No actual native/durable G1 user journey was executed in this audit continuation; provider '
+            'programme state must be read separately rather than inferred from component CI.',
+  'effect': 'Component/source tests cannot establish actual gameplay composition.',
+  'owner_route': 'Game364/162',
+  'closure_condition': 'Real producer/native command -> logical owner -> durable effect -> visible '
+                       'projection through reconnect/restart with no duplicate effect/rollback.'},
+ {'id': 'UI-343',
+  'missing': 'Initialized Atlas product/UI acceptance',
+  'reason': 'Platform public fixture now has48 scoped cases/eight author-reviewed screenshots. This does not '
+            'supply initialized Atlas world/renderer or native Game acceptance; Atlas maintenance authority '
+            'remains separate.',
+  'effect': 'No full product UX, renderer synchronization or accessibility PASS.',
+  'owner_route': 'Atlas343/344; maintenance315',
+  'closure_condition': 'Qualified minimum-data browser environment, pinned Playwright, real '
+                       'journeys/screenshots/keyboard/accessibility checks and independent acceptance.'},
+ {'id': 'PORTABILITY',
+  'missing': 'Complete supported OS/runtime matrix',
+  'reason': 'R3 adds supported PHP8.5 and Go Gateway execution on isolated hosted Linux, plus prior '
+            'Python/Node. Complete Windows/GPU/native-Game and production-supported matrix not executed.',
+  'effect': 'No current Windows/GPU/full supported runtime qualification.',
+  'owner_route': 'Provider build owners',
+  'closure_condition': 'Execute bounded required native/OS matrix with exact source/toolchain identities.'},
+ {'id': 'LIVE-TELEMETRY',
+  'missing': 'Production SLO/alerts and failure yield',
+  'reason': 'No current telemetry queried.',
+  'effect': 'No measured availability, alert correctness or failure recovery conclusion.',
+  'owner_route': 'Provider operations',
+  'closure_condition': 'Read dated sanitized metrics, exercise approved isolated alert delivery and map '
+                       'critical journeys to observable conditions.'},
+ {'id': 'PRIVACY-RIGHTS',
+  'missing': 'Complete data/asset rights and privacy posture',
+  'reason': 'Root license inventory and repository statements are not complete rights/privacy assessments.',
+  'effect': 'No legal compliance or third-party-data clearance conclusion.',
+  'owner_route': 'Owner plus provider data/security owners',
+  'closure_condition': 'Document intended META/Atlas terms, asset provenance/usage terms, data '
+                       'inventory/retention/consent boundaries and appropriate expert review.'},
+ {'id': 'PLATFORM-H02',
+  'missing': 'Security maintainer disposition for the already-disclosed characterization and '
+             'current-generation regression/remediation',
+  'reason': 'Controlled source-pinned characterization exists. Independent review established that mechanism '
+            'details were present in public ancestor commits and public Actions artifacts, so that material '
+            'must be treated as disclosed. The current report intentionally does not repeat the mechanism. '
+            'Artifact deletion/expiry, current live reachability, private-advisory submission and '
+            'remediation are not established.',
+  'effect': 'Cannot claim confidentiality restoration, private advisory submission, current exploitability '
+            'status or completed security remediation.',
+  'owner_route': 'Platform451 via the private reporting process in Oteryn/Oteryn-Platform SECURITY.md',
+  'closure_condition': 'Platform security maintainer assesses severity/reachability on relevant current '
+                       'source through the private reporting route, binds a deterministic regression and '
+                       'disposition/remediation evidence, and separately verifies any artifact '
+                       'deletion/expiry before claiming historical material is no longer downloadable.'}]
 R3_REVIEW = {
     'reviewed_head': '9096edd135d42f31da4824f4c4fb50ee187de2c9',
     'result': 'CHANGES_REQUIRED',
@@ -345,6 +533,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(doc['independent_score'] is None,'independent score not established')
     require(doc['severity_counts_exhaustive'] is False,'exhaustive severity claim unsupported')
     require(doc['status']=='QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE','unsupported completion status')
+    require(doc.get('audit_completion') == EXPECTED_AUDIT_COMPLETION,'audit completion boundary drift')
     repo=doc['repositories']
     require(set(repo)=={'meta','game','platform','atlas','migration_archive'},'repository scope')
     for v in repo.values():
@@ -355,6 +544,8 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(doc.get('coverage_review_recorder_additions')==RECORDER_ADDITIONS_BINDING,'recorder additions evidence binding drift')
     require(doc.get('coverage_review_announcements_additions')==ANNOUNCEMENTS_ADDITIONS_BINDING,'Announcements additions evidence binding drift')
     require(doc.get('coverage_review_meta_r4_direct_additions')==META_R4_DIRECT_ADDITIONS_BINDING,'META R4 additions evidence binding drift')
+    require(doc.get('r3_meta_r4_direct_candidate')==META_R4_CANDIDATE_BINDING,'META R4 candidate provenance binding drift')
+    require(doc.get('r3_meta_r4_direct_adoption_overlay')==META_R4_DIRECT_ADDITIONS_BINDING,'META R4 adoption overlay provenance binding drift')
     require(json_exact(doc.get('r3_review'),R3_REVIEW),'R3 review lifecycle drift')
     base=report_path.parent/doc['evidence_directory']
     findings=read_tsv(base/'finding-register.tsv');unique(findings,lambda r:r['id'],'finding id')
@@ -374,6 +565,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(type(doc.get('unresolved_unknowns')) is int and doc['unresolved_unknowns']==14,'report unresolved unknown count must be exactly 14')
     require(len(unknowns)==14,'unresolved unknown count must be exactly 14')
     require({row.get('id') for row in unknowns}==EXPECTED_UNRESOLVED_IDS,'unresolved unknown ID set drift')
+    require(json_exact(unknowns,EXPECTED_UNKNOWNS),'unresolved unknown register drift')
     validate_residual_obligations_paragraph(report_path)
     semantic_coverage=[row for row in unknowns if row.get('id')=='SEMANTIC-COVERAGE']
     require(len(semantic_coverage)==1,'semantic-coverage unknown missing')
@@ -394,6 +586,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     for row in review:
         require(not any(row['repository']==g['repository'] and row['path'].startswith(g['path_prefix']) for g in groups),'DIRECT/GROUPED overlap')
     coverage=read_json(base/'coverage-summary.json')
+    require(json_exact(coverage,EXPECTED_COVERAGE_SUMMARY),'coverage summary contract drift')
     require(coverage['semantic_completion_claimed'] is False,'unsupported semantic completion')
     require(coverage['source_leaf_total']==sum(r['leaf_count'] for r in repo.values()),'leaf total mismatch')
     require(coverage.get('scoped_review_paths')==len(review),'coverage direct count mismatch')
