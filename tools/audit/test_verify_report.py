@@ -151,6 +151,47 @@ class AuditValidationTest(unittest.TestCase):
                 shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
                 self.mutate_companion(heading,heading+'\n\n'+heading)
                 self.reject()
+    def test_complete_report_rejects_fenced_heading_repro(self):
+        companion=self.path.with_suffix('.md')
+        text=companion.read_text(encoding='utf-8')
+        false_section='##  1. Source identity and actual coverage\n\nProduct readiness is established.\n\n```text\n'
+        text=false_section+text.replace(audit.SECTION_2_HEADING,
+                                        audit.SECTION_2_HEADING+'\n```',1)
+        companion.write_text(text,encoding='utf-8')
+        self.reject()
+    def test_complete_report_rejects_html_context_around_canonical_region(self):
+        for opener,closer in (('<!--\n','\n-->'),('<div>\n','\n</div>')):
+            with self.subTest(opener=opener):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
+                companion=self.path.with_suffix('.md')
+                text=companion.read_text(encoding='utf-8')
+                text=text.replace(audit.SECTION_1_HEADING,opener+audit.SECTION_1_HEADING,1)
+                text=text.replace(audit.SECTION_2_HEADING,audit.SECTION_2_HEADING+closer,1)
+                companion.write_text(text,encoding='utf-8')
+                self.reject()
+    def test_complete_report_rejects_bytes_before_or_after_section_region(self):
+        companion=self.path.with_suffix('.md')
+        original=companion.read_bytes()
+        section_1=original.index(audit.SECTION_1_HEADING.encode())
+        section_2=original.index(audit.SECTION_2_HEADING.encode())
+        after_section_2=section_2+len(audit.SECTION_2_HEADING.encode())
+        for changed in (original[:section_1]+b'X'+original[section_1:],
+                        original[:after_section_2]+b'X'+original[after_section_2:]):
+            with self.subTest(offset=len(changed)):
+                companion.write_bytes(changed)
+                self.reject()
+                companion.write_bytes(original)
+    def test_complete_report_rejects_crlf_conversion(self):
+        companion=self.path.with_suffix('.md')
+        companion.write_bytes(companion.read_bytes().replace(b'\n',b'\r\n'))
+        self.reject()
+    def test_complete_report_rejects_unrelated_one_byte_prose_edit(self):
+        companion=self.path.with_suffix('.md')
+        raw=companion.read_bytes()
+        marker=b'R3 preserves'
+        self.assertIn(marker,raw)
+        companion.write_bytes(raw.replace(marker,b'R3 Preserves',1))
+        self.reject()
     def test_boolean_schema_rejected(self):
         self.mutate(self.path,lambda d:d.update(schema_version=True));self.reject()
     def test_production_claim_rejected(self):

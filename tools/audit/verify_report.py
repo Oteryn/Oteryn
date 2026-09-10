@@ -69,6 +69,7 @@ EXPECTED_SECTION_7_PARAGRAPHS = (
 SECTION_1_HEADING = '## 1. Source identity and actual coverage'
 SECTION_2_HEADING = '## 2. Native evidence actually acquired and rechecked'
 EXPECTED_SECTION_1_SHA256 = 'c1a89e79d2d2a3159e887790c0da3572094c0805b4496dd9752d2a2413c48d90'
+EXPECTED_REPORT_MARKDOWN_SHA256 = '3ec3095327fae570585dd41f1e0dad21fce6af3536adce578baf8c32ce59c6d4'
 CURRENT_COVERAGE_TABLE_HEADER = '| Source | Tracked leaves | DIRECT scoped | GROUPED revalidated | UNVERIFIED semantics |'
 CURRENT_R5_ADOPTION_PARAGRAPH = (
     'Exactly 25 META source files under `docs/agents/evals/r5-instruction-efficiency/**` are now separately '
@@ -502,6 +503,19 @@ def validate_complete_source_identity_section(report_path: Path) -> None:
     require(digest == EXPECTED_SECTION_1_SHA256, 'complete report section 1 byte contract drift')
 
 
+def validate_complete_report_markdown(report_path: Path) -> None:
+    """Bind the companion report's complete, unnormalized raw UTF-8 byte sequence."""
+    companion = report_path.with_suffix('.md')
+    require(companion.is_file(), 'companion report missing')
+    raw = companion.read_bytes()
+    try:
+        raw.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('companion report must be valid UTF-8') from exc
+    require(hashlib.sha256(raw).hexdigest() == EXPECTED_REPORT_MARKDOWN_SHA256,
+            'complete companion report byte contract drift')
+
+
 def read_json(path):
     def pairs(items):
         result={}
@@ -722,6 +736,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(len(unknowns)==14,'unresolved unknown count must be exactly 14')
     require({row.get('id') for row in unknowns}==EXPECTED_UNRESOLVED_IDS,'unresolved unknown ID set drift')
     require(json_exact(unknowns,EXPECTED_UNKNOWNS),'unresolved unknown register drift')
+    validate_complete_report_markdown(report_path)
     validate_complete_source_identity_section(report_path)
     validate_current_coverage_section(report_path)
     validate_residual_obligations_paragraph(report_path)
