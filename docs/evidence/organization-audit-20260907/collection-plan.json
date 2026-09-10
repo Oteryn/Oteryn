@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "scope": "Verified immutable source snapshots. The original PR185 Game coordinate could not be resolved; its replacement is not silent evidence carry-forward. Prior audit publications are historical evidence, not current provider authority. No provider code is executed.",
+  "snapshots": [
+    {
+      "id": "meta",
+      "repository": "Oteryn/Oteryn",
+      "commit_sha": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "expected_tree_sha": "f084e824ec5e14d5909c9750d906d91d51425fd5",
+      "role": "audited_source"
+    },
+    {
+      "id": "game",
+      "repository": "Oteryn/Oteryn-Game",
+      "commit_sha": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "expected_tree_sha": "49cabfccf7d4876e5bc9276fc5963caa33dab8a5",
+      "role": "audited_source"
+    },
+    {
+      "id": "platform",
+      "repository": "Oteryn/Oteryn-Platform",
+      "commit_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "expected_tree_sha": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+      "role": "audited_source"
+    },
+    {
+      "id": "atlas",
+      "repository": "Oteryn/Oteryn-Atlas",
+      "commit_sha": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+      "expected_tree_sha": "a1009378f8d3950a5ee62fb3ee65041f7d53a1e0",
+      "role": "audited_source"
+    },
+    {
+      "id": "migration_archive",
+      "repository": "Oteryn/Oteryn-Platform-Migration-Backup-20260818",
+      "commit_sha": "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+      "expected_tree_sha": null,
+      "role": "archive"
+    },
+    {
+      "id": "meta_audit153",
+      "repository": "Oteryn/Oteryn",
+      "commit_sha": "eae38fa0963bd3b6ebb5e090f079944b5a1892db",
+      "expected_tree_sha": null,
+      "role": "historical_evidence"
+    },
+    {
+      "id": "game_audit360",
+      "repository": "Oteryn/Oteryn-Game",
+      "commit_sha": "d8a69a2fda51a8882c2e0d9bae61204f9cde163b",
+      "expected_tree_sha": null,
+      "role": "historical_evidence"
+    },
+    {
+      "id": "platform_audit1294",
+      "repository": "Oteryn/Oteryn-Platform",
+      "commit_sha": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+      "expected_tree_sha": null,
+      "role": "historical_evidence"
+    }
+  ],
+  "coordinate_corrections": [
+    {
+      "repository": "Oteryn/Oteryn-Game",
+      "original_report_sha": "3327db49c0c3e2d90afe6a74954c579a36aba2a5",
+      "observed_result": "Git fetch exit 128 in run 34165374247; native GitHub Git-commit GET returned 404. Current main ref and replacement commit/tree resolved successfully.",
+      "replacement_sha": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "semantic_carry_forward": "REQUIRES_RECONCILIATION"
+    }
+  ]
+}

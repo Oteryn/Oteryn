@@ -1,0 +1,344 @@
+{
+  "schema_version": 1,
+  "candidate_id": "R3-META-R5-INSTRUCTION-EFFICIENCY-DIRECT-CANDIDATE-20260910",
+  "candidate_path_count": 25,
+  "disposition": "DIRECT_CANDIDATE_ONLY_NOT_ADOPTED",
+  "coverage_delta": 0,
+  "coverage_adopted": false,
+  "adoption_performed": false,
+  "currently_canonical_unverified": true,
+  "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+  "source": {
+    "repository": "Oteryn/Oteryn",
+    "repository_id": "meta",
+    "commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+    "commit_tree": "f084e824ec5e14d5909c9750d906d91d51425fd5",
+    "subtree_path": "docs/agents/evals/r5-instruction-efficiency",
+    "subtree_tree": "58673e86047adc98c4612c3bedf78f6d47175139",
+    "path_count": 25,
+    "read_method": "FRESH_FULL_FILE_DIRECT_READ"
+  },
+  "paths": [
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/README.md",
+      "blob_sha": "0dd93bcbecd1a9595fba40c7bb1d992149e0904b",
+      "full_file_sha256": "a105a6e4fed5c818e29dc6a35f4f6e217af50a75c699de62cd1cb35edd99449d",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "On-demand R5 instruction-efficiency eval-pack lifecycle, isolated A/B execution order, aliases, repetition, and collection instructions. Source specification only; it is not provider authority and grants no repository, production, merge, Remote Desktop, or paid-service authority."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/REVIEWER.md",
+      "blob_sha": "766a94df34cda5dae852069e3eca584e7d02ded1",
+      "full_file_sha256": "1072efe3e72483d107138bdb33c1a7c6093264f9f8ff9fbd3709488dfe89fa9d",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "Independent/blind R5Q reviewer inputs, correctness/read-relevance rubric, derived metrics, verdicts, confounds, and output format. Source specification only; it is not proof that any review was independent, correct, or executed."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/TRIAL_PROTOCOL.md",
+      "blob_sha": "1a02b16b60dad93b0b671c049f76797e1c781df8",
+      "full_file_sha256": "624f01dfc2af6fff6351ee41567e16a0cb491d765e1cffc7043b8c1fca21e311",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "Read-only isolated single-arm trial controls and externally observable telemetry schema, including requested-only runtime identity and NOT_MEASURED cost/time rules. Source specification only; it is not proof that isolation, model/runtime attestation, or telemetry collection occurred."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/A1A.md",
+      "blob_sha": "b79ca465001e90b6862949c189898b94417adafa",
+      "full_file_sha256": "898a81ceb8f384e70917bb383ccf67648a3f9655b64c2a2d3b167ef62e5191a2",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q A1A trial-arm task specification for Oteryn/Oteryn-Atlas, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking whether a typo-only change in docs/evidence/ATLAS-COMPREHENSIVE-VERIFICATION-PLATFORM-CLOSEOUT.md is compatible with maintenance authority. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/A1B.md",
+      "blob_sha": "ff83774f63e2cb91afd49a8c599b6582adc1547f",
+      "full_file_sha256": "b6fee92e6e365917e9ac4e3a8e5d753b82fb08c06538f33085a1461f2853863e",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q A1B trial-arm task specification for Oteryn/Oteryn-Atlas, using a provider protected-main identity resolved and frozen on first read, asking whether a typo-only change in docs/evidence/ATLAS-COMPREHENSIVE-VERIFICATION-PLATFORM-CLOSEOUT.md is compatible with maintenance authority. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/A2A.md",
+      "blob_sha": "7c850c28dda5078f339d6a3327c4cefd179ac3f9",
+      "full_file_sha256": "c2294116f30d973c8fd4d02445e226e879e174745bfbc4fb981848e7d56601e0",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q A2A trial-arm task specification for Oteryn/Oteryn-Atlas, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking whether the closed historical ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md prompt is current authority and what minimum lifecycle evidence is needed. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/A2B.md",
+      "blob_sha": "939a7405a5205e840bce5ff1c1f3a6007e6f8bae",
+      "full_file_sha256": "cff8bc0a45a18045f49237fc1d58e759ad1bcf71a9db3b22df75d88cf8b2d302",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q A2B trial-arm task specification for Oteryn/Oteryn-Atlas, using a provider protected-main identity resolved and frozen on first read, asking whether the closed historical ATLAS-E2E-VERIFICATION-OPTIMIZATION-IMPLEMENTATION.md prompt is current authority and what minimum lifecycle evidence is needed. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/A3A.md",
+      "blob_sha": "d505f584824b0351c1c30a4346c7f93da844ae94",
+      "full_file_sha256": "ecbcf1c993caad2978f79325521aa0a9bf36a762a9d8c3918aefce3fffb0a7df",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q A3A trial-arm task specification for Oteryn/Oteryn-Atlas, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking whether maintenance authority permits renaming ATLAS-LEAN-PROMPT-CANARY.md and modifying .agents/profiles/**. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/A3B.md",
+      "blob_sha": "2cd0537490ae9e197fa083f8d325a0f984dd02a9",
+      "full_file_sha256": "ff901327450d67f33c60d90620a1c1d48522186bf68a9f085b3ab1d5f7198374",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q A3B trial-arm task specification for Oteryn/Oteryn-Atlas, using a provider protected-main identity resolved and frozen on first read, asking whether maintenance authority permits renaming ATLAS-LEAN-PROMPT-CANARY.md and modifying .agents/profiles/**. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/G1A.md",
+      "blob_sha": "d9ea039388ce77367ffb4121c87ed411e9ca3a76",
+      "full_file_sha256": "a6dcff9ea25b3b622a310b8871be6d1a38f9e4697efd093cb68bd8058f45ba40",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q G1A trial-arm task specification for Oteryn/Oteryn-Game, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking the smallest safe decision for a harmless typo in non-authority README.md. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/G1B.md",
+      "blob_sha": "838185a82d62ae799d7d9fa343148cf1e2222a74",
+      "full_file_sha256": "c4f0538f379d5f40ebcc1ceea5e99154d6328d69f71f826c47f5ec4fe4a65bf1",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q G1B trial-arm task specification for Oteryn/Oteryn-Game, using a provider protected-main identity resolved and frozen on first read, asking the smallest safe decision for a harmless typo in non-authority README.md. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/G2A.md",
+      "blob_sha": "3c3ce298d2fcf32cc7a93f8a656623ba2b89e83d",
+      "full_file_sha256": "3bf3785009cc875dc805143c8b66834048bc27838a0f5bb348b598a7a101c217",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q G2A trial-arm task specification for Oteryn/Oteryn-Game, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking whether task OTV2-20260907-doc-consumer-snapshot-refresh governed by Issue #375 remains active or becomes historical. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/G2B.md",
+      "blob_sha": "41163138c1a98b85c488f5288375b43fd807e9ef",
+      "full_file_sha256": "f0d55dd76f16655b499793a2b02cae416db1c5c6b9b9c48b42616a7acd96226d",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q G2B trial-arm task specification for Oteryn/Oteryn-Game, using a provider protected-main identity resolved and frozen on first read, asking whether task OTV2-20260907-doc-consumer-snapshot-refresh governed by Issue #375 remains active or becomes historical. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/G3A.md",
+      "blob_sha": "a2f3ae8105237f1b7662a093d73e875cd0eeb130",
+      "full_file_sha256": "f12fd2b9d02ad21562aa4495bcb0a58116a9233002bed5cf89f6d787a2cd1df5",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q G3A trial-arm task specification for Oteryn/Oteryn-Game, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking the minimum authoritative sources required before changing a WorldId/ChannelId and session-generation fencing rule. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/G3B.md",
+      "blob_sha": "a42642e3357e947217717c443d333c7a968db6aa",
+      "full_file_sha256": "d2d711bb2a33d155d561da44a273c0d3e5dbc9f18efbfcf7b99a765953ea1f9a",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q G3B trial-arm task specification for Oteryn/Oteryn-Game, using a provider protected-main identity resolved and frozen on first read, asking the minimum authoritative sources required before changing a WorldId/ChannelId and session-generation fencing rule. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/G4A.md",
+      "blob_sha": "8590bfcfab4adf0b3969758715abea431b197821",
+      "full_file_sha256": "8edaab2af023834044a511333c953637e41b9405a8d4873f1a4b0ea6064f39af",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q G4A trial-arm task specification for Oteryn/Oteryn-Game, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking whether a task document alone grants production, Remote Desktop, and paid external-review permissions. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/G4B.md",
+      "blob_sha": "d9329424c2437e573394b48d5b54b6ae47ffd4c8",
+      "full_file_sha256": "b28d99df5b8a65520554ad0d1cc41052f824e775a4338fa5e80e79d7885945c6",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q G4B trial-arm task specification for Oteryn/Oteryn-Game, using a provider protected-main identity resolved and frozen on first read, asking whether a task document alone grants production, Remote Desktop, and paid external-review permissions. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/P1A.md",
+      "blob_sha": "921dfc5f8120a74e3daac7b9e19a503cabc811b7",
+      "full_file_sha256": "1c2067932150eab866c88bd0a6211c38475bd99d81c99614f5aed5793377662e",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q P1A trial-arm task specification for Oteryn/Oteryn-Platform, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking the smallest safe decision for a harmless typo in non-authority README.md. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/P1B.md",
+      "blob_sha": "43729e1943a66ebdc19b1237cc3d2bf6dc49674e",
+      "full_file_sha256": "9da232b5fb10169372199cb17c82f0cc4445e3bc4947fb4c8076b5e89f75228c",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q P1B trial-arm task specification for Oteryn/Oteryn-Platform, using a provider protected-main identity resolved and frozen on first read, asking the smallest safe decision for a harmless typo in non-authority README.md. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/P2A.md",
+      "blob_sha": "3d28f721f890e2ed9998454ff819f88cd4ee16f6",
+      "full_file_sha256": "5963d4dc502fb035b58de73de093a4bf47967e115971211be74e1da9edfabade",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q P2A trial-arm task specification for Oteryn/Oteryn-Platform, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking whether task OTERYN-20260907-task-inventory-path-d26 governed by Issue #1299 remains active or becomes historical. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/P2B.md",
+      "blob_sha": "93564ee5af28f2e6180cea564fb1274335d885a8",
+      "full_file_sha256": "60be79beab420fc7fd4f24b1385ad8f6f5b9fc3f2f9b8e8145f646619b67a7bf",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q P2B trial-arm task specification for Oteryn/Oteryn-Platform, using a provider protected-main identity resolved and frozen on first read, asking whether task OTERYN-20260907-task-inventory-path-d26 governed by Issue #1299 remains active or becomes historical. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/P3A.md",
+      "blob_sha": "9e60d298fd1bd88fa985d3817be20598baf5d239",
+      "full_file_sha256": "c1b29c93ec22de2c6237c3c280c841eb8b3a5aada2154eb2871aad02e9683d69",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q P3A trial-arm task specification for Oteryn/Oteryn-Platform, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking the minimum authoritative sources required before an authenticated idempotent webhook write with transactions and reconciliation. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/P3B.md",
+      "blob_sha": "dfc51c039d64b0250a5dcf7a744c694302e2f812",
+      "full_file_sha256": "0cfa77aea620bed38d3ce40fb92fed49244e6c62eff4e507d5bf033e4879bde7",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q P3B trial-arm task specification for Oteryn/Oteryn-Platform, using a provider protected-main identity resolved and frozen on first read, asking the minimum authoritative sources required before an authenticated idempotent webhook write with transactions and reconciliation. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/P4A.md",
+      "blob_sha": "fda70c648364b3764ace60fdb99891672a56a39b",
+      "full_file_sha256": "fd037a9e96a8c02e1f93731c4630236978b2c3c53e7ce9b173c288eae855a3fe",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q P4A trial-arm task specification for Oteryn/Oteryn-Platform, using the historical provider commit/tree named by the arm, with ref-aware immutable reads, asking whether a local task packet alone authorizes another-repository and production modification. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    },
+    {
+      "repository": "meta",
+      "path": "docs/agents/evals/r5-instruction-efficiency/arms/P4B.md",
+      "blob_sha": "3a30e77652f54a8cf61f12866f52501e64443ffc",
+      "full_file_sha256": "8e013b7995e34c54dfb81d8fdb98e96469622e26bea9c94a43f942c80fb718df",
+      "object_type": "blob",
+      "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+      "eligible_adoption_depth": "SCOPED_SEMANTIC_REVIEW",
+      "currently_canonical_unverified": true,
+      "semantic_note": "R5Q P4B trial-arm task specification for Oteryn/Oteryn-Platform, using a provider protected-main identity resolved and frozen on first read, asking whether a local task packet alone authorizes another-repository and production modification. It specifies read-only constraints and the telemetry boundary; it is not proof of the arm answer, model identity, isolation, effectiveness, safety outcome, permissions, current runtime/admin state, or superiority of A/B."
+    }
+  ],
+  "current_main_identity_observation": {
+    "observed_on": "2026-09-10",
+    "main_commit": "3b39e0be05aef008f1bd442821daefa898a201dd",
+    "all_25_source_blobs_identical": true,
+    "scope": "Source identity carry-forward only; not live admin, runtime, provider, enforcement, or permission evidence."
+  },
+  "r5q_results_limitations": {
+    "exact_ab_task_text_not_reproduced": true,
+    "worker_configuration_discrepancy": "Execution configuration requests GPT-5.6 Terra/Medium while arm self-reports say GPT-5.6 Sol/Medium; unresolved.",
+    "runtime_model_effort_attestation": "REQUESTED_ONLY / RUNTIME_NOT_ATTESTED",
+    "isolation_attestation": "Fresh fork_turns=none isolation is asserted by execution configuration but not independently attested by arm telemetry.",
+    "tokens_api_wall_clock": "NOT_MEASURED",
+    "result_level_boundaries": "G3B under-specification and A3B under-loaded regression remain result evidence and do not automatically create source-file P2 findings.",
+    "inference_boundary": "No universal B superiority, readiness, or cost saving may be inferred."
+  },
+  "finding_disposition": {
+    "new_source_findings": [],
+    "result_findings_not_promoted_to_source_findings": [
+      "G3B_UNDER_SPECIFICATION",
+      "A3B_UNDER_LOADED_REGRESSION"
+    ]
+  },
+  "canonical_baseline": {
+    "source_rows": 4325,
+    "direct_paths": 258,
+    "grouped_paths": 113,
+    "unverified_paths": 3954,
+    "semantically_classified_paths": 371,
+    "meta_direct_paths": 45,
+    "meta_unverified_paths": 129,
+    "ledger_sha256": "71f41a16273b3eb16afc0a786f2ff4d2e83b737fac0e869d9e2cf97d43483d11",
+    "residual_obligations": 14,
+    "meta_aud_05_priority": "P2",
+    "meta_aud_05_state": "PARTIALLY_REPAIRED"
+  },
+  "limitations": [
+    "Candidate source semantics only; no path is adopted or reclassified and coverage_delta is zero.",
+    "The family specifies evaluation tasks and procedures; it does not attest execution, outcomes, permissions, live state, provider behavior, readiness, or completion.",
+    "A later adoption decision, if separately authorized, may use only SCOPED_SEMANTIC_REVIEW and must rebuild authoritative accounting.",
+    "HISTORY-REVALIDATION and COST-AGENTS remain open; this candidate closes neither.",
+    "META-AUD-05 remains P2 / PARTIALLY_REPAIRED with its complete canonical row."
+  ],
+  "product_readiness_claimed": false,
+  "audit_completion_claimed": false,
+  "runtime_attested": false,
+  "live_admin_state_claimed": false
+}

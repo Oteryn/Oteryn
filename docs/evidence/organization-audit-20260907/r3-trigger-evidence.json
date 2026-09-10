@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "finding": "PLATFORM-F17",
+  "source_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
+  "blobs": {
+    ".github/workflows/announcements-acceptance.yml": "399edcf4bbbbdf69d36f28d749cf32136848c4d7",
+    "lang/en/public.php": "7cca711447330670cda8aa1d9f312f3c2e701c5e",
+    "lang/pl/public.php": "7da6af62141283aad5669faf90379cb83bd98c6b",
+    "resources/views/announcements/components/ticker.blade.php": "b5ca83d179ac5dfeb90678f08f3487d242cae478",
+    "scripts/acceptance/playwright.announcements.config.mjs": "2c8b23f0893c169452ca5e8c90a9b8a9fa55a521",
+    "scripts/acceptance/tests/announcements-public-acceptance.spec.mjs": "b993c495d68a7f0edaa86212356b5a42c099d47a"
+  },
+  "cases": [
+    {
+      "event": "pull_request",
+      "changed_path": "lang/en/public.php",
+      "selected": false,
+      "role": "counterexample"
+    },
+    {
+      "event": "pull_request",
+      "changed_path": "lang/pl/public.php",
+      "selected": false,
+      "role": "counterexample"
+    },
+    {
+      "event": "pull_request",
+      "changed_path": "app/Announcements/Queries/Example.php",
+      "selected": true,
+      "role": "positive_control"
+    },
+    {
+      "event": "pull_request",
+      "changed_path": "scripts/acceptance/tests/announcements-public-acceptance.spec.mjs",
+      "selected": true,
+      "role": "positive_control"
+    },
+    {
+      "event": "push",
+      "changed_path": "lang/en/public.php",
+      "selected": false,
+      "role": "counterexample"
+    },
+    {
+      "event": "push",
+      "changed_path": "lang/pl/public.php",
+      "selected": false,
+      "role": "counterexample"
+    },
+    {
+      "event": "push",
+      "changed_path": "app/Announcements/Queries/Example.php",
+      "selected": true,
+      "role": "positive_control"
+    },
+    {
+      "event": "push",
+      "changed_path": "scripts/acceptance/tests/announcements-public-acceptance.spec.mjs",
+      "selected": true,
+      "role": "positive_control"
+    }
+  ],
+  "verdict": "STATIC_DEDICATED_WORKFLOW_FALSE_NEGATIVE",
+  "limitation": "Only Announcements auto-selection for a locale-only change. Other workflows may run. No live event, protected merge bypass or fresh Announcements lifecycle/browser acceptance is claimed."
+}

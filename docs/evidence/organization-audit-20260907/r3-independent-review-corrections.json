@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "reviewed_head": "9096edd135d42f31da4824f4c4fb50ee187de2c9",
+  "review_summary_comment": 5582123653,
+  "review_completed_at_utc": "2026-09-08T09:00:42Z",
+  "status": "AUTHOR_REMEDIATION_ACTIVE_AFTER_REREVIEW3",
+  "findings": [
+    {
+      "thread_id": "PRRT_kwDOT8KVrs6gKtn7",
+      "comment_id": 3956154649,
+      "priority": "P1",
+      "subject": "Security characterization disclosure state",
+      "correction": "Mechanism details present in public ancestor commits and public Actions artifacts are treated as disclosed. The current audit must not describe that material as owner-private or confidential merely because the final tree deletes the scripts. Current public audit text intentionally does not repeat exploit details. Provider handling remains routed through Oteryn-Platform SECURITY.md private vulnerability reporting.",
+      "artifact_deletion": "NOT_ESTABLISHED; treat any historical artifact as public while it remains downloadable or its deletion/expiry has not been independently verified",
+      "supersedes": [
+        "OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.md prior restricted/private wording for PLATFORM-H02",
+        "organization-audit-20260907/README.md prior restricted/private wording",
+        "organization-audit-20260907/r3-source-review.md prior private-characterization wording",
+        "organization-audit-20260907/unknowns.json prior owner-private reason text",
+        "organization-audit-20260907/finding-register.tsv PLATFORM-H02 prior restricted-characterization wording",
+        "organization-audit-20260907/verification-index.json prior owner-private wording"
+      ]
+    },
+    {
+      "thread_id": "PRRT_kwDOT8KVrs6gKtoA",
+      "comment_id": 3956154655,
+      "priority": "P1",
+      "subject": "Original browser failure recount",
+      "correction": "verify_r3_evidence.py parses the original browser result, requires the exact 48-case matrix, exactly eight stored http_ok failures for /support and /legal/privacy across four viewports, no hidden ninth failure, the exact 404/200 status split, clean browser observations and the recorded no-JavaScript login control. The Node replay is explicitly legacy/offline and not a new browser execution."
+    },
+    {
+      "thread_id": "PRRT_kwDOT8KVrs6gKtoE",
+      "comment_id": 3956154661,
+      "priority": "P1",
+      "subject": "Migration execution recount",
+      "correction": "verify_r3_evidence.py binds migrations.log to r3-migration-review.json, reconstructs the exact 50 database/migrations/*.php path/blob set from coverage-review.tsv, validates its committed digest, then requires exactly 50 unique DONE migration names equal to that source set. Down/current-data/production migration qualification remains unclaimed."
+    },
+    {
+      "thread_id": "PRRT_kwDOT8KVrs6gKtoF",
+      "comment_id": 3956154665,
+      "priority": "P1",
+      "subject": "Committed results drift",
+      "correction": "The raw-archive recount now loads r3-native-results.json and fails closed on any semantic difference from the recomputed summary."
+    },
+    {
+      "thread_id": "PRRT_kwDOT8KVrs6gKtoK",
+      "comment_id": 3956154671,
+      "priority": "P2",
+      "subject": "Collector diagnostic overwrite",
+      "correction": "collect_ci_cohort.py creates both normal output and collection-error.json with exclusive binary creation. Existing files and final-path symlinks are not overwritten/followed; dedicated negative tests preserve the original target bytes."
+    }
+  ],
+  "validation": {
+    "local_targeted_python_tests": 47,
+    "local_targeted_python_result": "PASS",
+    "hosted_qualified_head": "81b5c7c8986123774cd6a4169e934a197d640be2",
+    "hosted_run": 34212229245,
+    "hosted_job": 102015652696,
+    "hosted_python_tests": 92,
+    "hosted_python_result": "PASS",
+    "hosted_node_tests": 34,
+    "hosted_node_result": "PASS",
+    "real_six_archive_recount": "PASS_AND_SEMANTICALLY_EQUALS_COMMITTED_R3_NATIVE_RESULTS",
+    "hosted_meta_ci_run": 34212229295,
+    "hosted_meta_ci_result": "SUCCESS",
+    "temporary_workflow_retired_by": "62e9d88d3ae3ade414aab4814412a3268c2f8785",
+    "limits": "Author remediation remains non-independent. A fresh review is required after the exact corrected head is stable."
+  },
+  "latest_rereview": {
+    "reviewed_head": "e242a68a9df73304cbb6ba8bd3cfebbb36a2197b",
+    "completed_at_utc": "2026-09-08T10:54:10Z",
+    "result": "CHANGES_REQUIRED",
+    "findings": [
+      {
+        "thread_id": "PRRT_kwDOT8KVrs6gNOM7",
+        "priority": "P1",
+        "subject": "Canonical coverage ledger disclosure labels"
+      },
+      {
+        "thread_id": "PRRT_kwDOT8KVrs6gNONA",
+        "priority": "P2",
+        "subject": "Native result strict JSON types"
+      },
+      {
+        "thread_id": "PRRT_kwDOT8KVrs6gNOND",
+        "priority": "P2",
+        "subject": "Trigger evidence strict JSON types"
+      }
+    ]
+  }
+}

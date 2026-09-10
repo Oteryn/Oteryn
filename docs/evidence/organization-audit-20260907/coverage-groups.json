@@ -1,0 +1,1184 @@
+{
+  "schema_version": 1,
+  "groups": [
+    {
+      "id": "PLATFORM-GAMEAUTH-HISTORICAL-DIRECT-CARRYFORWARD",
+      "repository": "platform",
+      "disposition": "GROUPED",
+      "path_prefix": "app/GameAuth/",
+      "expected_count": 27,
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Every app/GameAuth/** leaf was directly read in the immutable historical Platform audit and is byte-identical at frozen de917b3. Carry-forward is bounded by exact path/blob identity, 23 frozen dependent config/route/test/toolchain blobs, 61 focused current test cases/565 assertions, and separate exact-source concurrency evidence. This is scoped semantic reuse, not product/security readiness.",
+      "limitations": "Adopted only as bounded GROUPED carry-forward. Exact byte identity and focused qualification do not establish production security, later-current-main status, provider remediation, full Identity/session correctness, real-world Gateway connectivity, or organization-wide audit completion.",
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Platform",
+        "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+        "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+        "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+        "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+        "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+        "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+        "exact_statement": "**FACT.** All 27 files in the inspected `app/GameAuth/**` batch were read directly.",
+        "pattern": "app/GameAuth/**",
+        "count": 27,
+        "basis": "historical direct read of every app/GameAuth leaf"
+      },
+      "current_revalidation": {
+        "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "current_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "gameauth_tree": "e115d2dfea7d6bcdf3fa13dbd81fec21f0f482ca",
+        "changed_paths_under_group_prefix": 0,
+        "historical_to_current_compare_status": "ahead",
+        "current_blobs": {
+          "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+          "config/game-auth.php": "a36d4c56e2c2bc9c715157948efc9421ff4cae24",
+          "config/auth.php": "38712b618171bb16fb3247fb797ae5e076fff0af",
+          "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7",
+          "routes/api.php": "ba7916913c581d88a23cb19a70060d857606f644",
+          "routes/internal.php": "5fa537392a6f7400f56f8c2b6f55571dad2ebe90",
+          "tests/Feature/GameAuth/EnsureGameWorldCommandTest.php": "7a6a4b88a271f8636a2bf5d3295161a70c162594",
+          "tests/Feature/GameAuth/GameAuthRevocationTest.php": "1f7b948056cbd6756fea101b29e1f7d777a0d984",
+          "tests/Feature/GameAuth/GameLoginContextApiTest.php": "dd8a9dc4988d6fe6d65206fa0d5c9031d048b913",
+          "tests/Feature/GameAuth/GameLoginTicketApiTest.php": "266a5f9d71202e8a3769ad339b9636550468100b",
+          "tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php": "1fdf519959d61086f2c32e2415761a4a53369ab4",
+          "tests/Feature/GameAuth/GameLoginTicketRedeemApiTest.php": "f991a70e8c62ffd713d9e7da08c3a746c61c9202",
+          "tests/Feature/GameAuth/NativeProtocolIdentityMigrationTest.php": "e06e7c7d2e38cf1a2b58ac489da1f76dad61623a",
+          "tests/Feature/GameAuth/OAuth/NativeOAuthClientManagerTest.php": "a8e169d2a451540c4ed84448fad6144142c3838d",
+          "tests/Feature/GameAuth/OAuth/NativeOAuthGrantPolicyTest.php": "1f8b493c33c279766ea3a913d886db0b2dc9f36e",
+          "tests/Feature/GameAuth/OAuth/NativeOAuthPkceTest.php": "2ed9100bc9d5a0a3c5a5efa470300f1b3a1cb610",
+          "tests/Feature/GameAuth/OAuth/NativeOAuthRevocationGenerationTest.php": "b79b3b60ab258c369ce36334d5093b018c41d0a2",
+          "tests/Feature/GameAuth/OAuth/PublicClientPkcePolicyTest.php": "781b9e82e69c8330bac3e1009648413b797bbed8",
+          "tests/Feature/GameAuth/WorldRegistryTest.php": "e57a5ab73aa74ef07ad3a6b280c6a7b14f5626fd",
+          "tests/Unit/Http/Middleware/PreventSensitiveGameAuthResponseCachingTest.php": "5409ea3c38d9151301732ce67e9e00afb9d5140b",
+          "composer.json": "6bfd2d8018fb40ce4df9aef11ab715b5210d508d",
+          "composer.lock": "9de0c6c04944b771ccd0072ea08f72dc90fff123",
+          "phpunit.xml": "5ee5e6c596a08b758922fdc30ba650f5301d7a34"
+        },
+        "required_checks": [
+          "historical audit publication commit/tree and evidence blob match exactly",
+          "historical evidence contains the exact all-27 direct-read statement exactly once",
+          "historical and frozen current app trees are byte-identical",
+          "historical and frozen current app/GameAuth trees contain exactly the same 27 regular-file leaves and blob identities",
+          "all named frozen-current dependent config/route/test/toolchain blobs match exactly",
+          "focused frozen-current GameAuth tests pass as a prerequisite to GROUPED adoption"
+        ],
+        "focused_test_files": [
+          "tests/Feature/GameAuth/EnsureGameWorldCommandTest.php",
+          "tests/Feature/GameAuth/GameAuthRevocationTest.php",
+          "tests/Feature/GameAuth/GameLoginContextApiTest.php",
+          "tests/Feature/GameAuth/GameLoginTicketApiTest.php",
+          "tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php",
+          "tests/Feature/GameAuth/GameLoginTicketRedeemApiTest.php",
+          "tests/Feature/GameAuth/NativeProtocolIdentityMigrationTest.php",
+          "tests/Feature/GameAuth/OAuth/NativeOAuthClientManagerTest.php",
+          "tests/Feature/GameAuth/OAuth/NativeOAuthGrantPolicyTest.php",
+          "tests/Feature/GameAuth/OAuth/NativeOAuthPkceTest.php",
+          "tests/Feature/GameAuth/OAuth/NativeOAuthRevocationGenerationTest.php",
+          "tests/Feature/GameAuth/OAuth/PublicClientPkcePolicyTest.php",
+          "tests/Feature/GameAuth/WorldRegistryTest.php",
+          "tests/Unit/Http/Middleware/PreventSensitiveGameAuthResponseCachingTest.php"
+        ],
+        "existing_concurrency_evidence": {
+          "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+          "r3_native_artifact_id": 10035749457,
+          "qualification": "separate exact-source MariaDB concurrency evidence; not replaced by the focused SQLite/default-environment test set"
+        }
+      },
+      "evaluation": {
+        "qualification_head": "261c3838cd4806ef29bd9e0e1808049be4bdf809",
+        "qualification_run": 34225490543,
+        "qualification_job": 102058467962,
+        "verifier_unit_tests": 5,
+        "focused_current_tests": {
+          "cases": 61,
+          "assertions": 565,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "existing_exact_source_concurrency_artifact": 10035749457,
+        "outcome": "ADOPTED_GROUPED_CARRY_FORWARD",
+        "post_adoption_revalidation": {
+          "audit_head": "34c037154d1861ab0f1995ce4dc3ee9a36ebbb65",
+          "workflow_run": 34227110039,
+          "job": 102063808556,
+          "result": "PASS",
+          "canonical_group_state": "GAMEAUTH_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS",
+          "focused_current_tests": {
+            "cases": 61,
+            "assertions": 565,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "meta_ci_run": 34227109946,
+          "meta_ci_result": "SUCCESS"
+        }
+      }
+    },
+    {
+      "id": "PLATFORM-ACCOUNTS-HISTORICAL-DIRECT-CARRYFORWARD",
+      "repository": "platform",
+      "disposition": "GROUPED",
+      "path_prefix": "app/Accounts/",
+      "expected_count": 7,
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Historical direct-read evidence for the documented 31-file account/Canary/profile/character batch is carried forward only for this exact byte-identical family. Adoption is bounded by exact family path/blob identity, the exact 23-path dependent binding set, and the exact 15-file frozen-current qualification result of 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips.",
+      "limitations": "Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, later-current-main status, provider remediation, full Platform security/correctness, or organization-wide audit completion.",
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Platform",
+        "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+        "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+        "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+        "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+        "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+        "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+        "pattern": "app/Accounts/**",
+        "count": 7,
+        "basis": "historical direct read of the documented 31-file account/Canary/profile/character batch, bounded to this exact family by immutable source enumeration"
+      },
+      "current_revalidation": {
+        "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "current_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "family_tree": "7505ff7d6836c667e0354622616ba2673e1ff9f2",
+        "changed_paths_under_group_prefix": 0,
+        "historical_to_current_compare_status": "ahead",
+        "current_blobs": {
+          "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+          "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7",
+          "config/marketplace.php": "0ed3d3d29827c801f2d72e8aee12b4b23ff0ef75",
+          "routes/web.php": "339e7573b2bc04c7bdd9183cd739c099448d8421",
+          "routes/modules/marketplace.php": "6ead81fecf5d99eb231413bea98d8bf097fa05b5",
+          "composer.json": "6bfd2d8018fb40ce4df9aef11ab715b5210d508d",
+          "composer.lock": "9de0c6c04944b771ccd0072ea08f72dc90fff123",
+          "phpunit.xml": "5ee5e6c596a08b758922fdc30ba650f5301d7a34",
+          "tests/Feature/Accounts/AccountOverviewTest.php": "e41d2eaa6672c8e12c5a3ea08371b3fcb0eb8925",
+          "tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php": "e0e453a15c154a1cb05b531a226b3d6dd35efe9d",
+          "tests/Feature/Accounts/ProvisionCanaryAccountTest.php": "81425a0d6aecaf01b329ca3f3e11ba9df1f86729",
+          "tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php": "007ec50001bb53273a66a2f85eb932e25dceea6c",
+          "tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php": "ba1be31b1dd7d10c39d28193e683e6cd4ad5d9a6",
+          "tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php": "fa11ef6c3721a266dfc43682ca20a50556194698",
+          "tests/Feature/Characters/CharacterCreationTest.php": "bae4a241f08f60dff6efd3bc25ff1b1f72572ea7",
+          "tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php": "9517868e1cc0a9996ca839ee6e14c2d96af1fbbe",
+          "tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php": "81c10eda199e600bde7f4fa867d20b12c46c30e8",
+          "tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php": "15a2d81bf44b5c2086154834e52270760e1390ff",
+          "tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php": "9d2eefc286d276d2a41ad5fbbf09b10fee12d1d1",
+          "tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php": "e0a339e1bc2a21b9e745035333b17dbf1504a236",
+          "tests/Unit/Characters/CharacterNamePolicyTest.php": "b17ed4f75fecd99e58fcb7049fe5be264d0b6bc4",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php": "f9b9a17d34003132acf877a9755b998d6cfa5403",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php": "14aa475be873476523eae72775b02acad956c8df"
+        },
+        "required_checks": [
+          "historical 31-file direct-read evidence is bound exactly and this family is its exact enumerated subset",
+          "historical and frozen current app trees are byte-identical",
+          "historical and frozen current app/Accounts/ trees contain exactly the same 7 regular-file leaves and blob identities",
+          "the dependent binding map is exactly the required 23 paths and contains all 15 focused test files",
+          "the exact frozen-current 15-file qualification passes with 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips"
+        ],
+        "focused_test_files": [
+          "tests/Feature/Accounts/AccountOverviewTest.php",
+          "tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php",
+          "tests/Feature/Accounts/ProvisionCanaryAccountTest.php",
+          "tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php",
+          "tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php",
+          "tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php",
+          "tests/Feature/Characters/CharacterCreationTest.php",
+          "tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php",
+          "tests/Unit/Characters/CharacterNamePolicyTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php"
+        ]
+      },
+      "evaluation": {
+        "qualification_head": "a55ed0c005b581dd91042a3da40678f8ff04acb6",
+        "qualification_run": 34230659158,
+        "qualification_job": 102075660945,
+        "verifier_unit_tests": 8,
+        "focused_current_tests": {
+          "cases": 86,
+          "assertions": 586,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
+      }
+    },
+    {
+      "id": "PLATFORM-CANARY-INTEGRATION-HISTORICAL-DIRECT-CARRYFORWARD",
+      "repository": "platform",
+      "disposition": "GROUPED",
+      "path_prefix": "app/CanaryIntegration/",
+      "expected_count": 8,
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Historical direct-read evidence for the documented 31-file account/Canary/profile/character batch is carried forward only for this exact byte-identical family. Adoption is bounded by exact family path/blob identity, the exact 23-path dependent binding set, and the exact 15-file frozen-current qualification result of 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips.",
+      "limitations": "Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, later-current-main status, provider remediation, full Platform security/correctness, or organization-wide audit completion.",
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Platform",
+        "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+        "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+        "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+        "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+        "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+        "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+        "pattern": "app/CanaryIntegration/**",
+        "count": 8,
+        "basis": "historical direct read of the documented 31-file account/Canary/profile/character batch, bounded to this exact family by immutable source enumeration"
+      },
+      "current_revalidation": {
+        "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "current_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "family_tree": "f37ac5641d49dbc7f419c69ffc0ae852af655baa",
+        "changed_paths_under_group_prefix": 0,
+        "historical_to_current_compare_status": "ahead",
+        "current_blobs": {
+          "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+          "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7",
+          "config/marketplace.php": "0ed3d3d29827c801f2d72e8aee12b4b23ff0ef75",
+          "routes/web.php": "339e7573b2bc04c7bdd9183cd739c099448d8421",
+          "routes/modules/marketplace.php": "6ead81fecf5d99eb231413bea98d8bf097fa05b5",
+          "composer.json": "6bfd2d8018fb40ce4df9aef11ab715b5210d508d",
+          "composer.lock": "9de0c6c04944b771ccd0072ea08f72dc90fff123",
+          "phpunit.xml": "5ee5e6c596a08b758922fdc30ba650f5301d7a34",
+          "tests/Feature/Accounts/AccountOverviewTest.php": "e41d2eaa6672c8e12c5a3ea08371b3fcb0eb8925",
+          "tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php": "e0e453a15c154a1cb05b531a226b3d6dd35efe9d",
+          "tests/Feature/Accounts/ProvisionCanaryAccountTest.php": "81425a0d6aecaf01b329ca3f3e11ba9df1f86729",
+          "tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php": "007ec50001bb53273a66a2f85eb932e25dceea6c",
+          "tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php": "ba1be31b1dd7d10c39d28193e683e6cd4ad5d9a6",
+          "tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php": "fa11ef6c3721a266dfc43682ca20a50556194698",
+          "tests/Feature/Characters/CharacterCreationTest.php": "bae4a241f08f60dff6efd3bc25ff1b1f72572ea7",
+          "tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php": "9517868e1cc0a9996ca839ee6e14c2d96af1fbbe",
+          "tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php": "81c10eda199e600bde7f4fa867d20b12c46c30e8",
+          "tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php": "15a2d81bf44b5c2086154834e52270760e1390ff",
+          "tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php": "9d2eefc286d276d2a41ad5fbbf09b10fee12d1d1",
+          "tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php": "e0a339e1bc2a21b9e745035333b17dbf1504a236",
+          "tests/Unit/Characters/CharacterNamePolicyTest.php": "b17ed4f75fecd99e58fcb7049fe5be264d0b6bc4",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php": "f9b9a17d34003132acf877a9755b998d6cfa5403",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php": "14aa475be873476523eae72775b02acad956c8df"
+        },
+        "required_checks": [
+          "historical 31-file direct-read evidence is bound exactly and this family is its exact enumerated subset",
+          "historical and frozen current app trees are byte-identical",
+          "historical and frozen current app/CanaryIntegration/ trees contain exactly the same 8 regular-file leaves and blob identities",
+          "the dependent binding map is exactly the required 23 paths and contains all 15 focused test files",
+          "the exact frozen-current 15-file qualification passes with 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips"
+        ],
+        "focused_test_files": [
+          "tests/Feature/Accounts/AccountOverviewTest.php",
+          "tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php",
+          "tests/Feature/Accounts/ProvisionCanaryAccountTest.php",
+          "tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php",
+          "tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php",
+          "tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php",
+          "tests/Feature/Characters/CharacterCreationTest.php",
+          "tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php",
+          "tests/Unit/Characters/CharacterNamePolicyTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php"
+        ]
+      },
+      "evaluation": {
+        "qualification_head": "a55ed0c005b581dd91042a3da40678f8ff04acb6",
+        "qualification_run": 34230659158,
+        "qualification_job": 102075660945,
+        "verifier_unit_tests": 8,
+        "focused_current_tests": {
+          "cases": 86,
+          "assertions": 586,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
+      }
+    },
+    {
+      "id": "PLATFORM-CHARACTER-PROFILES-HISTORICAL-DIRECT-CARRYFORWARD",
+      "repository": "platform",
+      "disposition": "GROUPED",
+      "path_prefix": "app/CharacterProfiles/",
+      "expected_count": 4,
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Historical direct-read evidence for the documented 31-file account/Canary/profile/character batch is carried forward only for this exact byte-identical family. Adoption is bounded by exact family path/blob identity, the exact 23-path dependent binding set, and the exact 15-file frozen-current qualification result of 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips.",
+      "limitations": "Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, later-current-main status, provider remediation, full Platform security/correctness, or organization-wide audit completion.",
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Platform",
+        "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+        "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+        "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+        "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+        "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+        "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+        "pattern": "app/CharacterProfiles/**",
+        "count": 4,
+        "basis": "historical direct read of the documented 31-file account/Canary/profile/character batch, bounded to this exact family by immutable source enumeration"
+      },
+      "current_revalidation": {
+        "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "current_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "family_tree": "677b67618fa5155c8e0e33b1baed097c8afce8e3",
+        "changed_paths_under_group_prefix": 0,
+        "historical_to_current_compare_status": "ahead",
+        "current_blobs": {
+          "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+          "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7",
+          "config/marketplace.php": "0ed3d3d29827c801f2d72e8aee12b4b23ff0ef75",
+          "routes/web.php": "339e7573b2bc04c7bdd9183cd739c099448d8421",
+          "routes/modules/marketplace.php": "6ead81fecf5d99eb231413bea98d8bf097fa05b5",
+          "composer.json": "6bfd2d8018fb40ce4df9aef11ab715b5210d508d",
+          "composer.lock": "9de0c6c04944b771ccd0072ea08f72dc90fff123",
+          "phpunit.xml": "5ee5e6c596a08b758922fdc30ba650f5301d7a34",
+          "tests/Feature/Accounts/AccountOverviewTest.php": "e41d2eaa6672c8e12c5a3ea08371b3fcb0eb8925",
+          "tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php": "e0e453a15c154a1cb05b531a226b3d6dd35efe9d",
+          "tests/Feature/Accounts/ProvisionCanaryAccountTest.php": "81425a0d6aecaf01b329ca3f3e11ba9df1f86729",
+          "tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php": "007ec50001bb53273a66a2f85eb932e25dceea6c",
+          "tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php": "ba1be31b1dd7d10c39d28193e683e6cd4ad5d9a6",
+          "tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php": "fa11ef6c3721a266dfc43682ca20a50556194698",
+          "tests/Feature/Characters/CharacterCreationTest.php": "bae4a241f08f60dff6efd3bc25ff1b1f72572ea7",
+          "tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php": "9517868e1cc0a9996ca839ee6e14c2d96af1fbbe",
+          "tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php": "81c10eda199e600bde7f4fa867d20b12c46c30e8",
+          "tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php": "15a2d81bf44b5c2086154834e52270760e1390ff",
+          "tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php": "9d2eefc286d276d2a41ad5fbbf09b10fee12d1d1",
+          "tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php": "e0a339e1bc2a21b9e745035333b17dbf1504a236",
+          "tests/Unit/Characters/CharacterNamePolicyTest.php": "b17ed4f75fecd99e58fcb7049fe5be264d0b6bc4",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php": "f9b9a17d34003132acf877a9755b998d6cfa5403",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php": "14aa475be873476523eae72775b02acad956c8df"
+        },
+        "required_checks": [
+          "historical 31-file direct-read evidence is bound exactly and this family is its exact enumerated subset",
+          "historical and frozen current app trees are byte-identical",
+          "historical and frozen current app/CharacterProfiles/ trees contain exactly the same 4 regular-file leaves and blob identities",
+          "the dependent binding map is exactly the required 23 paths and contains all 15 focused test files",
+          "the exact frozen-current 15-file qualification passes with 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips"
+        ],
+        "focused_test_files": [
+          "tests/Feature/Accounts/AccountOverviewTest.php",
+          "tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php",
+          "tests/Feature/Accounts/ProvisionCanaryAccountTest.php",
+          "tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php",
+          "tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php",
+          "tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php",
+          "tests/Feature/Characters/CharacterCreationTest.php",
+          "tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php",
+          "tests/Unit/Characters/CharacterNamePolicyTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php"
+        ]
+      },
+      "evaluation": {
+        "qualification_head": "a55ed0c005b581dd91042a3da40678f8ff04acb6",
+        "qualification_run": 34230659158,
+        "qualification_job": 102075660945,
+        "verifier_unit_tests": 8,
+        "focused_current_tests": {
+          "cases": 86,
+          "assertions": 586,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
+      }
+    },
+    {
+      "id": "PLATFORM-CHARACTERS-HISTORICAL-DIRECT-CARRYFORWARD",
+      "repository": "platform",
+      "disposition": "GROUPED",
+      "path_prefix": "app/Characters/",
+      "expected_count": 12,
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Historical direct-read evidence for the documented 31-file account/Canary/profile/character batch is carried forward only for this exact byte-identical family. Adoption is bounded by exact family path/blob identity, the exact 23-path dependent binding set, and the exact 15-file frozen-current qualification result of 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips.",
+      "limitations": "Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, later-current-main status, provider remediation, full Platform security/correctness, or organization-wide audit completion.",
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Platform",
+        "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+        "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+        "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+        "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+        "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+        "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+        "pattern": "app/Characters/**",
+        "count": 12,
+        "basis": "historical direct read of the documented 31-file account/Canary/profile/character batch, bounded to this exact family by immutable source enumeration"
+      },
+      "current_revalidation": {
+        "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "current_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "family_tree": "cee6097116aea56865cfa54406c0be150e1f3f97",
+        "changed_paths_under_group_prefix": 0,
+        "historical_to_current_compare_status": "ahead",
+        "current_blobs": {
+          "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+          "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7",
+          "config/marketplace.php": "0ed3d3d29827c801f2d72e8aee12b4b23ff0ef75",
+          "routes/web.php": "339e7573b2bc04c7bdd9183cd739c099448d8421",
+          "routes/modules/marketplace.php": "6ead81fecf5d99eb231413bea98d8bf097fa05b5",
+          "composer.json": "6bfd2d8018fb40ce4df9aef11ab715b5210d508d",
+          "composer.lock": "9de0c6c04944b771ccd0072ea08f72dc90fff123",
+          "phpunit.xml": "5ee5e6c596a08b758922fdc30ba650f5301d7a34",
+          "tests/Feature/Accounts/AccountOverviewTest.php": "e41d2eaa6672c8e12c5a3ea08371b3fcb0eb8925",
+          "tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php": "e0e453a15c154a1cb05b531a226b3d6dd35efe9d",
+          "tests/Feature/Accounts/ProvisionCanaryAccountTest.php": "81425a0d6aecaf01b329ca3f3e11ba9df1f86729",
+          "tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php": "007ec50001bb53273a66a2f85eb932e25dceea6c",
+          "tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php": "ba1be31b1dd7d10c39d28193e683e6cd4ad5d9a6",
+          "tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php": "fa11ef6c3721a266dfc43682ca20a50556194698",
+          "tests/Feature/Characters/CharacterCreationTest.php": "bae4a241f08f60dff6efd3bc25ff1b1f72572ea7",
+          "tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php": "9517868e1cc0a9996ca839ee6e14c2d96af1fbbe",
+          "tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php": "81c10eda199e600bde7f4fa867d20b12c46c30e8",
+          "tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php": "15a2d81bf44b5c2086154834e52270760e1390ff",
+          "tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php": "9d2eefc286d276d2a41ad5fbbf09b10fee12d1d1",
+          "tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php": "e0a339e1bc2a21b9e745035333b17dbf1504a236",
+          "tests/Unit/Characters/CharacterNamePolicyTest.php": "b17ed4f75fecd99e58fcb7049fe5be264d0b6bc4",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php": "f9b9a17d34003132acf877a9755b998d6cfa5403",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php": "14aa475be873476523eae72775b02acad956c8df"
+        },
+        "required_checks": [
+          "historical 31-file direct-read evidence is bound exactly and this family is its exact enumerated subset",
+          "historical and frozen current app trees are byte-identical",
+          "historical and frozen current app/Characters/ trees contain exactly the same 12 regular-file leaves and blob identities",
+          "the dependent binding map is exactly the required 23 paths and contains all 15 focused test files",
+          "the exact frozen-current 15-file qualification passes with 86 cases / 586 assertions / 0 failures / 0 errors / 0 skips"
+        ],
+        "focused_test_files": [
+          "tests/Feature/Accounts/AccountOverviewTest.php",
+          "tests/Feature/Accounts/CanaryProvisioningMariaDbIntegrationTest.php",
+          "tests/Feature/Accounts/ProvisionCanaryAccountTest.php",
+          "tests/Feature/CharacterProfiles/CharacterProfilePreferenceTest.php",
+          "tests/Feature/CharacterProfiles/Concurrency/CharacterProfilePreferenceConcurrencyTest.php",
+          "tests/Feature/Characters/CanaryCharacterCreateMariaDbIntegrationTest.php",
+          "tests/Feature/Characters/CharacterCreationTest.php",
+          "tests/Unit/CanaryIntegration/CanaryCharacterCreateDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryCharacterTransferDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryProvisioningDatabasePrivilegeVerifierTest.php",
+          "tests/Unit/CanaryIntegration/CanaryRuntimeRedisReaderTest.php",
+          "tests/Unit/Characters/CharacterNamePolicyTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php"
+        ]
+      },
+      "evaluation": {
+        "qualification_head": "a55ed0c005b581dd91042a3da40678f8ff04acb6",
+        "qualification_run": 34230659158,
+        "qualification_job": 102075660945,
+        "verifier_unit_tests": 8,
+        "focused_current_tests": {
+          "cases": 86,
+          "assertions": 586,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
+      }
+    },
+    {
+      "id": "PLATFORM-MARKETPLACE-HISTORICAL-DIRECT-CARRYFORWARD",
+      "repository": "platform",
+      "disposition": "GROUPED",
+      "path_prefix": "app/Marketplace/",
+      "expected_count": 21,
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Historical direct-read evidence for the documented 49-file Marketplace/Payments/Wallet production batch is carried forward only for this exact byte-identical family. Adoption is bounded by exact family path/blob identity, the exact 23-path dependent binding set, and the exact 13-file frozen-current qualification result of 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips.",
+      "limitations": "Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, later-current-main status, provider remediation, complete Platform payment/marketplace correctness/security, or organization-wide audit completion.",
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Platform",
+        "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+        "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+        "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+        "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+        "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+        "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+        "pattern": "app/Marketplace/**",
+        "count": 21,
+        "basis": "historical direct read of the documented 49-file Marketplace/Payments/Wallet production batch, bounded to this exact family by immutable source enumeration"
+      },
+      "current_revalidation": {
+        "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "current_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "family_tree": "bb18ad79196ac6e9d91e546662416a031cc0b6ad",
+        "changed_paths_under_group_prefix": 0,
+        "historical_to_current_compare_status": "ahead",
+        "current_blobs": {
+          "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+          "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7",
+          "config/marketplace.php": "0ed3d3d29827c801f2d72e8aee12b4b23ff0ef75",
+          "config/payments.php": "40a13b6d0ebf1cd2eeaeda088458754209ecd3ff",
+          "routes/web.php": "339e7573b2bc04c7bdd9183cd739c099448d8421",
+          "routes/modules/marketplace.php": "6ead81fecf5d99eb231413bea98d8bf097fa05b5",
+          "routes/modules/payments.php": "77690386865ea9095c427f96ee7a8e6b863f176a",
+          "composer.json": "6bfd2d8018fb40ce4df9aef11ab715b5210d508d",
+          "composer.lock": "9de0c6c04944b771ccd0072ea08f72dc90fff123",
+          "phpunit.xml": "5ee5e6c596a08b758922fdc30ba650f5301d7a34",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php": "f9b9a17d34003132acf877a9755b998d6cfa5403",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php": "14aa475be873476523eae72775b02acad956c8df",
+          "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php": "41df060eb0b14828e6331aa78e86e6f1a27b5334",
+          "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php": "a3e70ea8019ceaa636afd3c4030c84190c68e077",
+          "tests/Feature/Marketplace/MarketplaceModuleTest.php": "cd545576fba348f5f17e5e527882e8b4c142c6ad",
+          "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php": "e1a8bd57d63a9c86427f0d0140e23147147b6dd2",
+          "tests/Feature/Payments/PaymentAvailabilityTest.php": "98c166b7be061979bc721eafe305fbe508cc03f4",
+          "tests/Feature/Payments/PaymentEventConcurrencyMariaDbTest.php": "702ae8f13d736947aae28d49dbc351e1a655b61c",
+          "tests/Feature/Payments/PaymentEventCoreTest.php": "65aa479ee3ad57ba463d1ec80e0e9e166acd23e4",
+          "tests/Feature/Payments/PaymentFoundationSurfaceTest.php": "b9d81e83e517f068c467fcc4e97d4d0e190154ab",
+          "tests/Feature/Payments/PaymentPartialRefundConcurrencyMariaDbTest.php": "66583c63d4714f11d41b5ca25015356409e471cc",
+          "tests/Feature/Payments/PaymentPartialRefundIntegrityTest.php": "1dcff12df2d27d5e6d1a875f5e217fa047816bff",
+          "tests/Unit/Payments/PaymentOrderStateMachineTest.php": "8481f198ab1961062dda957e28660d76b27ee405"
+        },
+        "required_checks": [
+          "historical 49-file direct-read evidence is bound exactly and this family is its exact enumerated subset",
+          "historical and frozen current app trees are byte-identical",
+          "historical and frozen current app/Marketplace/ trees contain exactly the same 21 regular-file leaves and blob identities",
+          "the dependent binding map is exactly the required 23 paths and contains all 13 focused test files",
+          "the exact frozen-current 13-file qualification passes with 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips"
+        ],
+        "focused_test_files": [
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php",
+          "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php",
+          "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php",
+          "tests/Feature/Marketplace/MarketplaceModuleTest.php",
+          "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php",
+          "tests/Feature/Payments/PaymentAvailabilityTest.php",
+          "tests/Feature/Payments/PaymentEventConcurrencyMariaDbTest.php",
+          "tests/Feature/Payments/PaymentEventCoreTest.php",
+          "tests/Feature/Payments/PaymentFoundationSurfaceTest.php",
+          "tests/Feature/Payments/PaymentPartialRefundConcurrencyMariaDbTest.php",
+          "tests/Feature/Payments/PaymentPartialRefundIntegrityTest.php",
+          "tests/Unit/Payments/PaymentOrderStateMachineTest.php"
+        ]
+      },
+      "evaluation": {
+        "qualification_head": "13f6933c543db98848450e063e61f8c0dd2fa3d3",
+        "qualification_run": 34283717767,
+        "qualification_job": 102254287765,
+        "verifier_unit_tests": 10,
+        "focused_current_tests": {
+          "test_files": 13,
+          "junit_files": 5,
+          "cases": 45,
+          "assertions": 444,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "junit": [
+            {
+              "file": "marketplace-transfer-concurrency.xml",
+              "cases": 1,
+              "assertions": 54,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "marketplace-transfer.xml",
+              "cases": 2,
+              "assertions": 15,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "ordinary.xml",
+              "cases": 40,
+              "assertions": 327,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "payment-event-concurrency.xml",
+              "cases": 1,
+              "assertions": 23,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "payment-refund-concurrency.xml",
+              "cases": 1,
+              "assertions": 25,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            }
+          ]
+        },
+        "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
+      }
+    },
+    {
+      "id": "PLATFORM-PAYMENTS-HISTORICAL-DIRECT-CARRYFORWARD",
+      "repository": "platform",
+      "disposition": "GROUPED",
+      "path_prefix": "app/Payments/",
+      "expected_count": 24,
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Historical direct-read evidence for the documented 49-file Marketplace/Payments/Wallet production batch is carried forward only for this exact byte-identical family. Adoption is bounded by exact family path/blob identity, the exact 23-path dependent binding set, and the exact 13-file frozen-current qualification result of 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips.",
+      "limitations": "Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, later-current-main status, provider remediation, complete Platform payment/marketplace correctness/security, or organization-wide audit completion.",
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Platform",
+        "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+        "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+        "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+        "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+        "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+        "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+        "pattern": "app/Payments/**",
+        "count": 24,
+        "basis": "historical direct read of the documented 49-file Marketplace/Payments/Wallet production batch, bounded to this exact family by immutable source enumeration"
+      },
+      "current_revalidation": {
+        "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "current_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "family_tree": "903b912ae8e904b4eb52bb987bff670fcea0ed74",
+        "changed_paths_under_group_prefix": 0,
+        "historical_to_current_compare_status": "ahead",
+        "current_blobs": {
+          "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+          "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7",
+          "config/marketplace.php": "0ed3d3d29827c801f2d72e8aee12b4b23ff0ef75",
+          "config/payments.php": "40a13b6d0ebf1cd2eeaeda088458754209ecd3ff",
+          "routes/web.php": "339e7573b2bc04c7bdd9183cd739c099448d8421",
+          "routes/modules/marketplace.php": "6ead81fecf5d99eb231413bea98d8bf097fa05b5",
+          "routes/modules/payments.php": "77690386865ea9095c427f96ee7a8e6b863f176a",
+          "composer.json": "6bfd2d8018fb40ce4df9aef11ab715b5210d508d",
+          "composer.lock": "9de0c6c04944b771ccd0072ea08f72dc90fff123",
+          "phpunit.xml": "5ee5e6c596a08b758922fdc30ba650f5301d7a34",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php": "f9b9a17d34003132acf877a9755b998d6cfa5403",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php": "14aa475be873476523eae72775b02acad956c8df",
+          "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php": "41df060eb0b14828e6331aa78e86e6f1a27b5334",
+          "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php": "a3e70ea8019ceaa636afd3c4030c84190c68e077",
+          "tests/Feature/Marketplace/MarketplaceModuleTest.php": "cd545576fba348f5f17e5e527882e8b4c142c6ad",
+          "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php": "e1a8bd57d63a9c86427f0d0140e23147147b6dd2",
+          "tests/Feature/Payments/PaymentAvailabilityTest.php": "98c166b7be061979bc721eafe305fbe508cc03f4",
+          "tests/Feature/Payments/PaymentEventConcurrencyMariaDbTest.php": "702ae8f13d736947aae28d49dbc351e1a655b61c",
+          "tests/Feature/Payments/PaymentEventCoreTest.php": "65aa479ee3ad57ba463d1ec80e0e9e166acd23e4",
+          "tests/Feature/Payments/PaymentFoundationSurfaceTest.php": "b9d81e83e517f068c467fcc4e97d4d0e190154ab",
+          "tests/Feature/Payments/PaymentPartialRefundConcurrencyMariaDbTest.php": "66583c63d4714f11d41b5ca25015356409e471cc",
+          "tests/Feature/Payments/PaymentPartialRefundIntegrityTest.php": "1dcff12df2d27d5e6d1a875f5e217fa047816bff",
+          "tests/Unit/Payments/PaymentOrderStateMachineTest.php": "8481f198ab1961062dda957e28660d76b27ee405"
+        },
+        "required_checks": [
+          "historical 49-file direct-read evidence is bound exactly and this family is its exact enumerated subset",
+          "historical and frozen current app trees are byte-identical",
+          "historical and frozen current app/Payments/ trees contain exactly the same 24 regular-file leaves and blob identities",
+          "the dependent binding map is exactly the required 23 paths and contains all 13 focused test files",
+          "the exact frozen-current 13-file qualification passes with 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips"
+        ],
+        "focused_test_files": [
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php",
+          "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php",
+          "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php",
+          "tests/Feature/Marketplace/MarketplaceModuleTest.php",
+          "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php",
+          "tests/Feature/Payments/PaymentAvailabilityTest.php",
+          "tests/Feature/Payments/PaymentEventConcurrencyMariaDbTest.php",
+          "tests/Feature/Payments/PaymentEventCoreTest.php",
+          "tests/Feature/Payments/PaymentFoundationSurfaceTest.php",
+          "tests/Feature/Payments/PaymentPartialRefundConcurrencyMariaDbTest.php",
+          "tests/Feature/Payments/PaymentPartialRefundIntegrityTest.php",
+          "tests/Unit/Payments/PaymentOrderStateMachineTest.php"
+        ]
+      },
+      "evaluation": {
+        "qualification_head": "13f6933c543db98848450e063e61f8c0dd2fa3d3",
+        "qualification_run": 34283717767,
+        "qualification_job": 102254287765,
+        "verifier_unit_tests": 10,
+        "focused_current_tests": {
+          "test_files": 13,
+          "junit_files": 5,
+          "cases": 45,
+          "assertions": 444,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "junit": [
+            {
+              "file": "marketplace-transfer-concurrency.xml",
+              "cases": 1,
+              "assertions": 54,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "marketplace-transfer.xml",
+              "cases": 2,
+              "assertions": 15,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "ordinary.xml",
+              "cases": 40,
+              "assertions": 327,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "payment-event-concurrency.xml",
+              "cases": 1,
+              "assertions": 23,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "payment-refund-concurrency.xml",
+              "cases": 1,
+              "assertions": 25,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            }
+          ]
+        },
+        "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
+      }
+    },
+    {
+      "id": "PLATFORM-WALLET-HISTORICAL-DIRECT-CARRYFORWARD",
+      "repository": "platform",
+      "disposition": "GROUPED",
+      "path_prefix": "app/Wallet/",
+      "expected_count": 4,
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Historical direct-read evidence for the documented 49-file Marketplace/Payments/Wallet production batch is carried forward only for this exact byte-identical family. Adoption is bounded by exact family path/blob identity, the exact 23-path dependent binding set, and the exact 13-file frozen-current qualification result of 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips.",
+      "limitations": "Adopted only as bounded GROUPED carry-forward. This does not establish production readiness, later-current-main status, provider remediation, complete Platform payment/marketplace correctness/security, or organization-wide audit completion.",
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Platform",
+        "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+        "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+        "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+        "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+        "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+        "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+        "pattern": "app/Wallet/**",
+        "count": 4,
+        "basis": "historical direct read of the documented 49-file Marketplace/Payments/Wallet production batch, bounded to this exact family by immutable source enumeration"
+      },
+      "current_revalidation": {
+        "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "current_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+        "family_tree": "2221b703a2eda060a52d1ea448f791d44bc92d58",
+        "changed_paths_under_group_prefix": 0,
+        "historical_to_current_compare_status": "ahead",
+        "current_blobs": {
+          "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+          "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7",
+          "config/marketplace.php": "0ed3d3d29827c801f2d72e8aee12b4b23ff0ef75",
+          "config/payments.php": "40a13b6d0ebf1cd2eeaeda088458754209ecd3ff",
+          "routes/web.php": "339e7573b2bc04c7bdd9183cd739c099448d8421",
+          "routes/modules/marketplace.php": "6ead81fecf5d99eb231413bea98d8bf097fa05b5",
+          "routes/modules/payments.php": "77690386865ea9095c427f96ee7a8e6b863f176a",
+          "composer.json": "6bfd2d8018fb40ce4df9aef11ab715b5210d508d",
+          "composer.lock": "9de0c6c04944b771ccd0072ea08f72dc90fff123",
+          "phpunit.xml": "5ee5e6c596a08b758922fdc30ba650f5301d7a34",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php": "f9b9a17d34003132acf877a9755b998d6cfa5403",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php": "14aa475be873476523eae72775b02acad956c8df",
+          "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php": "41df060eb0b14828e6331aa78e86e6f1a27b5334",
+          "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php": "a3e70ea8019ceaa636afd3c4030c84190c68e077",
+          "tests/Feature/Marketplace/MarketplaceModuleTest.php": "cd545576fba348f5f17e5e527882e8b4c142c6ad",
+          "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php": "e1a8bd57d63a9c86427f0d0140e23147147b6dd2",
+          "tests/Feature/Payments/PaymentAvailabilityTest.php": "98c166b7be061979bc721eafe305fbe508cc03f4",
+          "tests/Feature/Payments/PaymentEventConcurrencyMariaDbTest.php": "702ae8f13d736947aae28d49dbc351e1a655b61c",
+          "tests/Feature/Payments/PaymentEventCoreTest.php": "65aa479ee3ad57ba463d1ec80e0e9e166acd23e4",
+          "tests/Feature/Payments/PaymentFoundationSurfaceTest.php": "b9d81e83e517f068c467fcc4e97d4d0e190154ab",
+          "tests/Feature/Payments/PaymentPartialRefundConcurrencyMariaDbTest.php": "66583c63d4714f11d41b5ca25015356409e471cc",
+          "tests/Feature/Payments/PaymentPartialRefundIntegrityTest.php": "1dcff12df2d27d5e6d1a875f5e217fa047816bff",
+          "tests/Unit/Payments/PaymentOrderStateMachineTest.php": "8481f198ab1961062dda957e28660d76b27ee405"
+        },
+        "required_checks": [
+          "historical 49-file direct-read evidence is bound exactly and this family is its exact enumerated subset",
+          "historical and frozen current app trees are byte-identical",
+          "historical and frozen current app/Wallet/ trees contain exactly the same 4 regular-file leaves and blob identities",
+          "the dependent binding map is exactly the required 23 paths and contains all 13 focused test files",
+          "the exact frozen-current 13-file qualification passes with 45 cases / 444 assertions / 0 failures / 0 errors / 0 skips"
+        ],
+        "focused_test_files": [
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php",
+          "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php",
+          "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php",
+          "tests/Feature/Marketplace/MarketplaceModuleTest.php",
+          "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php",
+          "tests/Feature/Payments/PaymentAvailabilityTest.php",
+          "tests/Feature/Payments/PaymentEventConcurrencyMariaDbTest.php",
+          "tests/Feature/Payments/PaymentEventCoreTest.php",
+          "tests/Feature/Payments/PaymentFoundationSurfaceTest.php",
+          "tests/Feature/Payments/PaymentPartialRefundConcurrencyMariaDbTest.php",
+          "tests/Feature/Payments/PaymentPartialRefundIntegrityTest.php",
+          "tests/Unit/Payments/PaymentOrderStateMachineTest.php"
+        ]
+      },
+      "evaluation": {
+        "qualification_head": "13f6933c543db98848450e063e61f8c0dd2fa3d3",
+        "qualification_run": 34283717767,
+        "qualification_job": 102254287765,
+        "verifier_unit_tests": 10,
+        "focused_current_tests": {
+          "test_files": 13,
+          "junit_files": 5,
+          "cases": 45,
+          "assertions": 444,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "junit": [
+            {
+              "file": "marketplace-transfer-concurrency.xml",
+              "cases": 1,
+              "assertions": 54,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "marketplace-transfer.xml",
+              "cases": 2,
+              "assertions": 15,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "ordinary.xml",
+              "cases": 40,
+              "assertions": 327,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "payment-event-concurrency.xml",
+              "cases": 1,
+              "assertions": 23,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "payment-refund-concurrency.xml",
+              "cases": 1,
+              "assertions": 25,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            }
+          ]
+        },
+        "outcome": "ADOPTED_GROUPED_CARRY_FORWARD"
+      }
+    },
+    {
+      "id": "PLATFORM-MARKETPLACE-TESTS-HISTORICAL-DIRECT-CARRYFORWARD",
+      "repository": "platform",
+      "disposition": "GROUPED",
+      "path_prefix": "tests/Feature/Marketplace/",
+      "expected_count": 6,
+      "depth": "GROUPED_REVALIDATED",
+      "scope": "Historical direct-read evidence explicitly names every file in the exact six-file Marketplace test directory; frozen-current carry-forward is bounded by exact tree/path/blob identity and the bound 17-case/179-assertion all-green qualification including both real-MariaDB tests.",
+      "limitations": "Adopted only as bounded GROUPED carry-forward. Fresh independent exact-head review completed at 7f53b509791aae6d56637522aee65891e449914c with no new P0/P1/P2; the temporary qualifier and ledger workflows were removed at cleanup head fbe839699782ad1d6df7a5841162d4a467d60c10. This does not establish production readiness, complete Marketplace/payment correctness, later-current-main status, provider remediation, or organization-wide audit completion.",
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Platform",
+        "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+        "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+        "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+        "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+        "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+        "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+        "exact_statement": "**FACT.** The following Marketplace tests were read directly during continuation:",
+        "pattern": "tests/Feature/Marketplace/**",
+        "count": 6,
+        "basis": "immutable historical evidence explicitly names every file in the six-file Marketplace test directory"
+      },
+      "current_revalidation": {
+        "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "family_tree": "03f7d3735dee4140bf75960f0e106c3ba3d3b37b",
+        "changed_paths_under_group_prefix": 0,
+        "historical_to_current_compare_status": "ahead",
+        "current_blobs": {
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php": "f9b9a17d34003132acf877a9755b998d6cfa5403",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php": "14aa475be873476523eae72775b02acad956c8df",
+          "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php": "41df060eb0b14828e6331aa78e86e6f1a27b5334",
+          "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php": "a3e70ea8019ceaa636afd3c4030c84190c68e077",
+          "tests/Feature/Marketplace/MarketplaceModuleTest.php": "cd545576fba348f5f17e5e527882e8b4c142c6ad",
+          "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php": "e1a8bd57d63a9c86427f0d0140e23147147b6dd2"
+        },
+        "required_checks": [
+          "historical audit publication commit/tree/evidence blob match exactly",
+          "historical evidence contains the direct-read statement and all six exact Marketplace test paths",
+          "historical and frozen-current Marketplace test directory tree SHAs are identical",
+          "both generations contain exactly the same six regular files and exact blob identities",
+          "the exact frozen-current six-file qualification is bound to its exact head/run/job and JUnit totals",
+          "fresh frozen-current execution repeats all six files with zero failures/errors/skips including both real-MariaDB tests"
+        ],
+        "focused_test_files": [
+          "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php",
+          "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php",
+          "tests/Feature/Marketplace/MarketplaceModuleTest.php",
+          "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php",
+          "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php"
+        ]
+      },
+      "evaluation": {
+        "qualification_head": "f54e5b0640945d7a5f0a7c471ac81105436214ae",
+        "qualification_run": 34323945126,
+        "qualification_job": 102376779500,
+        "verifier_unit_tests": 10,
+        "focused_current_tests": {
+          "test_files": 6,
+          "junit_files": 3,
+          "cases": 17,
+          "assertions": 179,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "junit": [
+            {
+              "file": "ordinary.xml",
+              "cases": 14,
+              "assertions": 110,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "transfer-concurrency.xml",
+              "cases": 1,
+              "assertions": 54,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            {
+              "file": "transfer.xml",
+              "cases": 2,
+              "assertions": 15,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            }
+          ]
+        },
+        "pre_adoption_revalidation": {
+          "audit_head": "1999409a1205b7bdb5663a809992b9c44efd8dbb",
+          "workflow_run": 34329669372,
+          "job": 102395040735,
+          "result": "PASS",
+          "verifier_unit_tests": 13,
+          "focused_current_tests": {
+            "test_files": 6,
+            "junit_files": 3,
+            "cases": 17,
+            "assertions": 179,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit": [
+              {
+                "file": "ordinary.xml",
+                "cases": 14,
+                "assertions": 110,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              },
+              {
+                "file": "transfer-concurrency.xml",
+                "cases": 1,
+                "assertions": 54,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              },
+              {
+                "file": "transfer.xml",
+                "cases": 2,
+                "assertions": 15,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              }
+            ]
+          },
+          "php": "8.5.10",
+          "mariadb": "11.8.9",
+          "meta_ci_run": 34329669391,
+          "meta_ci_result": "SUCCESS"
+        },
+        "projected_ledger": {
+          "projection_head": "1999409a1205b7bdb5663a809992b9c44efd8dbb",
+          "workflow_run": 34329669431,
+          "job": 102395041138,
+          "artifact": 10095210015,
+          "source_rows": 4325,
+          "direct_paths": 221,
+          "grouped_paths": 113,
+          "unverified_paths": 3991,
+          "new_grouped_paths": [
+            "tests/Feature/Marketplace/CanaryCharacterTransferConcurrencyMariaDbTest.php",
+            "tests/Feature/Marketplace/CanaryCharacterTransferMariaDbIntegrationTest.php",
+            "tests/Feature/Marketplace/MarketplaceAuctionTerminalRecoveryConcurrencyTest.php",
+            "tests/Feature/Marketplace/MarketplaceIdempotencyTest.php",
+            "tests/Feature/Marketplace/MarketplaceModuleTest.php",
+            "tests/Feature/Marketplace/MarketplaceSettlementRecoveryTest.php"
+          ],
+          "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
+          "outcome": "PROJECTED_LEDGER_PASS"
+        },
+        "outcome": "ADOPTED_GROUPED_CARRY_FORWARD",
+        "post_adoption_revalidation": {
+          "audit_head": "c67c1e9d7622612affdd431b2af9fae05d0d11ef",
+          "workflow_run": 34333058684,
+          "job": 102405922454,
+          "result": "PASS",
+          "canonical_group_state": "MARKETPLACE_TESTS_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS",
+          "verifier_unit_tests": 14,
+          "focused_current_tests": {
+            "test_files": 6,
+            "junit_files": 3,
+            "cases": 17,
+            "assertions": 179,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0,
+            "junit": [
+              {
+                "file": "ordinary.xml",
+                "cases": 14,
+                "assertions": 110,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              },
+              {
+                "file": "transfer-concurrency.xml",
+                "cases": 1,
+                "assertions": 54,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              },
+              {
+                "file": "transfer.xml",
+                "cases": 2,
+                "assertions": 15,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              }
+            ]
+          },
+          "php": "8.5.10",
+          "mariadb": "11.8.9",
+          "meta_ci_run": 34333058582,
+          "meta_ci_result": "SUCCESS",
+          "ledger_reproduction_run": 34333058620,
+          "ledger_reproduction_job": 102405921741,
+          "ledger_reproduction_artifact": 10096546256,
+          "ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
+          "ledger_counts": {
+            "source_rows": 4325,
+            "direct_paths": 221,
+            "grouped_paths": 113,
+            "unverified_paths": 3991
+          }
+        }
+      }
+    }
+  ],
+  "rejected_candidates": [
+    {
+      "id": "ATLAS-CREATURE-GAMEPLAY-SHARDS",
+      "repository": "atlas",
+      "disposition": "REVALIDATION_FAILED_NOT_ADOPTED",
+      "path_prefix": "web/creature-gameplay/shards/",
+      "expected_count": 508,
+      "historical_evidence": {
+        "repository": "Oteryn/Oteryn-Atlas",
+        "publication_commit": "0f62cba3fdbb56af0a01ae7c0b4587b66d1923fc",
+        "coverage_rules_path": "docs/evidence/repository-audit-2026-09-06/round-4/coverage-rules.json",
+        "coverage_rules_blob": "0c3b86dd143a1ffd4523b4472c4782a8f9a73e76",
+        "audited_main_sha": "5ea38a62fe1af8b8068adcb84350e9644905943c",
+        "audited_main_tree": "1024b0a7c32cab87e74655fba2a8cb7463cb3d44",
+        "pattern": "web/creature-gameplay/shards/**",
+        "count": 508,
+        "basis": "manifest+digest+bounded-schema+consumer+4 edge samples"
+      },
+      "current_revalidation": {
+        "source_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+        "source_tree": "a1009378f8d3950a5ee62fb3ee65041f7d53a1e0",
+        "historical_to_current_compare_status": "ahead",
+        "changed_paths_under_group_prefix": 0,
+        "current_blobs": {
+          "web/creature-gameplay/manifest.json": "9a338a50dd9cba5643c0b662170d796fa8689604",
+          "src/browser/creature-gameplay-profiles.mjs": "bfc19092d5393842cbb814f32882377eeedfe809",
+          "src/browser/loader.mjs": "2ef07afddf4102be6cc67d418180343ebecafcf1",
+          "tests/fullworld-runtime/creature-gameplay-runtime-safety.test.mjs": "cfe1cbc46502fd16cfbc190eee989ce8f8fd7eca",
+          "tests/verification/qualification-gameplay-contract.test.mjs": "993130738cb7834d63ed9a97b0944acdbe943c4c"
+        },
+        "required_checks": [
+          "historical coverage rule blob and count match exactly",
+          "git diff historical audited main to current source is empty under the grouped prefix and manifest",
+          "current grouped prefix contains exactly 508 regular-file leaves",
+          "current manifest, consumer, loader and focused test blobs match this record",
+          "focused current consumer/runtime tests pass on the exact current source"
+        ],
+        "qualification_status": "FAILED_CURRENT_CONSUMER_IMPACT_ROUTING_4_PASS_1_FAIL"
+      },
+      "depth": "GROUPED_REVALIDATION_CANDIDATE_REJECTED",
+      "scope": "Identity-only evidence for the rejected candidate: the exact 508 shard leaves and manifest are unchanged from the historical source, and the five named current dependent blobs are source-bound. Historical semantic GROUPED assurance is NOT carried forward because the required current consumer/impact-routing qualification failed 4/5. All 508 leaves remain UNVERIFIED.",
+      "limitations": "This rejected record is not semantic coverage. It does not make the 508 generated shards DIRECT or GROUPED reviews, restore Atlas verification, approve gameplay values, qualify a browser/fullworld run, or establish current product readiness.",
+      "evaluation": {
+        "qualification_run": 34218265762,
+        "qualification_job": 102035087439,
+        "audit_python_tests_passed": 103,
+        "audit_node_tests_passed": 37,
+        "identity_revalidation": "PASS_508_EXACT_SHARDS_MANIFEST_UNCHANGED_AND_5_DEPENDENT_BLOBS_BOUND",
+        "focused_current_consumer_tests": {
+          "passed": 4,
+          "failed": 1
+        },
+        "failing_test": "gameplay impact routing executes both functional fixture and bounded source-contract coverage",
+        "failure_location": "tests/verification/qualification-gameplay-contract.test.mjs:77",
+        "failure_reason": "gameplay runtime requires a dedicated impact rule",
+        "outcome": "REJECTED_NOT_COUNTED_AS_GROUPED"
+      }
+    }
+  ]
+}

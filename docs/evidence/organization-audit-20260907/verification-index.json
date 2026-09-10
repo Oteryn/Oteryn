@@ -1,0 +1,469 @@
+{
+  "schema_version": 1,
+  "results": [
+    {
+      "id": "atlas-focused-node",
+      "source_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+      "command": [
+        "node",
+        "--test",
+        "tests/fullworld-runtime/runtime-safety.test.mjs",
+        "tests/fullworld-runtime/cdp-session.test.mjs",
+        "tests/fullworld-publication/canonical-json-parity.test.mjs"
+      ],
+      "exit_code": 0,
+      "log_sha256": "86e88c911bc725aeec96626b52f7f996bdd979aa678050c76f0a1c4476d188f6"
+    },
+    {
+      "id": "atlas-output-safety",
+      "source_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tests/fullworld-publication/test_output_safety.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log_sha256": "c8e604e50efb36abcae18564d7fe4ef2e3101abefbae4a3ed15b436564532c15"
+    },
+    {
+      "id": "game-semantic-dispatch",
+      "source_commit": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tools/architecture/tests",
+        "-p",
+        "test_semantic_contract_audit_dispatch.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log_sha256": "8e1a2ea36767c2854d3885b3e979bdd088c63515aeea183fe80ba737eb567dee"
+    },
+    {
+      "id": "meta-central_agent_policy.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/central_agent_policy.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "c2c7048579f7cbddde925c74afecf8363144995d372c64d6071f73b8e6ee0612"
+    },
+    {
+      "id": "meta-test_agent_continuation_policy.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_agent_continuation_policy.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "56fe3aeb17809548e7a858e31837b0f851131d6b748ed871c16bbc9885bbdf70"
+    },
+    {
+      "id": "meta-test_agent_continuation_review_repairs.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_agent_continuation_review_repairs.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "feabb4add9e2ca3374e538560634d1ec97dc4f4ce89aab12f3d726e36ea9b2f6"
+    },
+    {
+      "id": "meta-test_agent_execution_routing.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_agent_execution_routing.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "36bb8c33048149e8afb1906835545c4ccb340329cc918d64625e07e6ce48c8a1"
+    },
+    {
+      "id": "meta-test_bounded_execution_guard.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_bounded_execution_guard.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "c13b84184b97654af7523809135695b895cd7aee6a6319bea2996128b2089f78"
+    },
+    {
+      "id": "meta-test_central_agent_policy.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_central_agent_policy.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "c411f8ea786595efa9ce2d659f22f562d33ea95e54825b0509eb2cf661d513ce"
+    },
+    {
+      "id": "meta-test_merge_queue_workflow_contract.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_merge_queue_workflow_contract.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "328f7b1f9d1ec28b78555e6c4ca42ecd1c53f78673c630d5c31f3131c5b2c438"
+    },
+    {
+      "id": "meta-test_remote_desktop_action_gate.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/test_remote_desktop_action_gate.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "df6250a8fe28bf01ee0d843f1f9873df9c091ad16e62a1e86de4ba381ca736be"
+    },
+    {
+      "id": "meta-validate_release_manifests.py",
+      "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tools/governance/validate_release_manifests.py"
+      ],
+      "exit_code": 0,
+      "log_sha256": "978b1b7bdb0d4a93744797e02461e49e420fda5ca4383f4f4f077393528ec5cb"
+    },
+    {
+      "id": "platform-test_classify_changes",
+      "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tests/ci/test_classify_changes.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log_sha256": "709e5336527501d9320c14134842c2f674df01bda8d542371acdecde6b620094"
+    },
+    {
+      "id": "platform-test_required_test_gate",
+      "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "command": [
+        "/opt/pyvenv/bin/python",
+        "tests/ci/test_required_test_gate.py",
+        "-v"
+      ],
+      "exit_code": 0,
+      "log_sha256": "71ce2af8ac9d3bdc3b31464cd5d73c2407cba696f1434b88e8cfc761ab71a82f"
+    }
+  ],
+  "collector_tests": 18,
+  "platform_existing_tests": 29,
+  "game_dispatcher_tests": 37,
+  "atlas_focused_tests": 33,
+  "routing_policy_fixtures": 28,
+  "real_git_cases": 8,
+  "routing_false_negatives": 2,
+  "reproduced_unsafe_skip_cases": [
+    "type_and_docs",
+    "rename_into_docs"
+  ],
+  "routing_product_verdict": "FAIL_FOR_TWO_CASES",
+  "acquisition": {
+    "failed_run": 34165374247,
+    "failed_job": 101875254866,
+    "failure": "Unresolvable original Game commit; 18 collector tests passed; acquisition did not pass",
+    "successful_run": 34165469839,
+    "artifact_id": 10033995995,
+    "artifact_sha256": "ac3a5682c5a36f1bf20066c726565761a3612864b62886f36d2af4e9a032a861",
+    "collector_head": "72dc835d9123fd59f67b0e1f2f4a4e3a1181c1bf",
+    "source_object_count": 4641,
+    "source_object_bytes": 55462229,
+    "independent_blob_and_tree_integrity": "PASS_8_ROOT_TREES_AND_ALL_OBJECTS"
+  },
+  "interpretation": "Test success is scoped to executed assertions. Two false-negative routing cases are reproduced product failures, not product PASS. Full source identities do not imply full review. Initial interrupted META batch was not counted; per-command reruns have durable results.",
+  "r3_native_manifest": "r3-native-manifest.json",
+  "r3_native_results": "r3-native-results.json",
+  "r3_trigger_evidence": "r3-trigger-evidence.json",
+  "r3_verification_boundary": "Immutable native archives are independently parsed offline; collector success is not product PASS. Post-review verification parses the original failed browser capture and the exact 50-migration log/source binding, requires semantic equality with committed r3-native-results.json and labels legacy replay as not a new browser execution. Audit-author checks are not independent semantic acceptance.",
+  "r3_sensitive_material": "Two characterization scripts are absent from the final effective diff; mechanism details present in public ancestor history/Actions artifacts are treated as disclosed. Current audit text does not repeat mechanism details; historical artifact deletion/expiry, private-advisory submission and remediation are not established.",
+  "r3_post_review_qualification": {
+    "qualified_head": "81b5c7c8986123774cd6a4169e934a197d640be2",
+    "temporary_workflow_run": 34212229245,
+    "job": 102015652696,
+    "python_tests": 92,
+    "python_result": "PASS",
+    "node_tests": 34,
+    "node_result": "PASS",
+    "six_public_archive_recount": "PASS_AND_EQUALS_COMMITTED_R3_NATIVE_RESULTS",
+    "meta_ci_run": 34212229295,
+    "meta_ci_result": "SUCCESS",
+    "post_qualification_delta": "Commit 62e9d88d3ae3ade414aab4814412a3268c2f8785 deletes only the temporary read-only qualification workflow; audit docs/evidence/tooling bytes qualified at 81b5c7c remain unchanged until subsequent evidence-metadata updates.",
+    "independent_rereview": "REQUIRED_ON_FINAL_STABLE_HEAD"
+  },
+  "r2_execution_environment": {
+    "python": "3.13.5",
+    "git": "2.47.3",
+    "node": "22.16.0",
+    "php": "8.4.23 (not Platform pinned 8.5)",
+    "rust": "NOT_AVAILABLE",
+    "internet": "sandbox DNS unavailable; approved GitHub-hosted read-only collection used"
+  },
+  "not_executed_in_r2": [
+    "Full Laravel/PHP8.5 runtime/migration suite",
+    "Native Rust build/test/Windows/G1",
+    "Actual Atlas product E2E, UI visual/accessibility qualification and restoration",
+    "Live SMTP failure injection",
+    "Actual production deploy/restore/rollback or live admin/security verification",
+    "Fresh complete dependency/CVE/SBOM/secret-history scan",
+    "Paid agent/token/cost benchmark"
+  ],
+  "results_provenance": "The results array, original test counts and acquisition fields preserve executed R2 source-pinned evidence. They are not presented as new R3 executions. R3 native execution identities/results are bound by r3-native-manifest.json and r3-native-results.json. The post-review qualification at 81b5c7c re-executed the current audit tests and recounted all six public archives against the committed map before the temporary workflow was deleted.",
+  "r3_not_executed": [
+    "One combined full Integration/native Game journey",
+    "Migration down/current-data upgrade, rollback data conservation and current production restore",
+    "Full supported OS/runtime/Windows/GPU matrix",
+    "Initialized Atlas product E2E and workflow restoration",
+    "Authenticated/admin/payment/multibrowser/Polish or complete accessibility UI qualification",
+    "Current live SMTP/admin/security/production configuration verification",
+    "Complete all-ecosystem CVE/SBOM/provenance/secret-history assessment",
+    "Actual billed usage and agent token/cost comparison",
+    "Independent semantic acceptance"
+  ],
+  "r3_platform_gameauth_qualification": {
+    "frozen_source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "historical_source_commit": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+    "qualification_head": "261c3838cd4806ef29bd9e0e1808049be4bdf809",
+    "run": 34225490543,
+    "job": 102058467962,
+    "verifier_unit_tests": 5,
+    "exact_gameauth_paths": 27,
+    "dependent_blob_bindings": 23,
+    "focused_test_files": 14,
+    "focused_cases": 61,
+    "focused_assertions": 565,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "tracked_source_clean_after_execution": true,
+    "separate_concurrency_artifact": 10035749457,
+    "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS"
+  },
+  "r3_platform_account_character_qualification": {
+    "frozen_source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "historical_source_commit": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+    "primary_qualification_head": "a55ed0c005b581dd91042a3da40678f8ff04acb6",
+    "primary_run": 34230659158,
+    "primary_job": 102075660945,
+    "verifier_unit_tests_at_primary": 8,
+    "exact_family_counts": [
+      7,
+      8,
+      4,
+      12
+    ],
+    "exact_total_paths": 31,
+    "dependent_blob_bindings": 23,
+    "focused_test_files": 15,
+    "focused_cases": 86,
+    "focused_assertions": 586,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "php": "8.5.10",
+    "mariadb": "11.8.9",
+    "tracked_source_clean_after_execution": true,
+    "hardening_head": "a109c61da6845be43c8d44b10cec04116f09e4fe",
+    "hardening_meta_ci_run": 34239058157,
+    "hardening_qualification_run": 34239058179,
+    "ledger_reproduction_head": "783673fbb5c849b035cc49976c6099e7655b39b0",
+    "ledger_reproduction_run": 34239677668,
+    "ledger_reproduction_artifact": 10061390705,
+    "pre_adoption_ledger_sha256": "db82a3bfa333521a4a21bf5e5e90ea816613186214ca92d59b6ce3394b0b7354",
+    "projected_adopted_ledger_sha256": "b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459",
+    "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS",
+    "post_adoption_head": "3b05f71a331da8c06fd0f5d6a0557590004ce5c5",
+    "post_adoption_run": 34281059173,
+    "post_adoption_job": 102245648440,
+    "post_adoption_verifier_unit_tests": 16,
+    "post_adoption_meta_ci_run": 34281059174,
+    "post_adoption_ledger_run": 34281059142,
+    "post_adoption_ledger_artifact": 10077605747,
+    "post_adoption_ledger_sha256": "b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459",
+    "post_adoption_result": "ACCOUNT_CHARACTER_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS"
+  },
+  "r3_platform_marketplace_payments_wallet_qualification": {
+    "frozen_source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "historical_source_commit": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+    "primary_qualification_head": "13f6933c543db98848450e063e61f8c0dd2fa3d3",
+    "primary_run": 34283717767,
+    "primary_job": 102254287765,
+    "primary_verifier_unit_tests": 10,
+    "exact_family_counts": [
+      21,
+      24,
+      4
+    ],
+    "exact_total_paths": 49,
+    "dependent_blob_bindings": 23,
+    "focused_test_files": 13,
+    "focused_cases": 45,
+    "focused_assertions": 444,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "php": "8.5.10",
+    "mariadb": "11.8.9",
+    "tracked_source_clean_after_execution": true,
+    "hardening_head": "53dc22290da5c952fc76aa4cb7222ad450be6974",
+    "hardening_meta_ci_run": 34284712709,
+    "hardening_qualification_run": 34284712575,
+    "ledger_reproduction_head": "adc884f64982e71609415ef946d97b445488c3e0",
+    "ledger_reproduction_run": 34284837901,
+    "ledger_reproduction_artifact": 10079037530,
+    "pre_adoption_ledger_sha256": "b61566ad825adf528b177a5ab4a2ee533680bd948e44a60df6289255c5747459",
+    "projected_adopted_ledger_sha256": "742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406",
+    "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS",
+    "post_adoption_head": "5ba21f04dde762a28fdcc04765bfbcfd929ba54a",
+    "post_adoption_run": 34285636501,
+    "post_adoption_job": 102260463521,
+    "post_adoption_verifier_unit_tests": 14,
+    "post_adoption_meta_ci_run": 34285636467,
+    "post_adoption_ledger_run": 34285636466,
+    "post_adoption_ledger_job": 102260463287,
+    "post_adoption_ledger_artifact": 10079336853,
+    "post_adoption_ledger_sha256": "742443fbcc7fba9a45e1c71bf4395e3b2fe4ced7ae527a38de6ef2c74cb49406",
+    "post_adoption_grouped_paths": 107,
+    "post_adoption_unverified_paths": 3997,
+    "post_adoption_result": "MARKETPLACE_PAYMENTS_WALLET_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS"
+  },
+  "r3_platform_marketplace_tests_qualification": {
+    "frozen_source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "historical_source_commit": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+    "family_tree": "03f7d3735dee4140bf75960f0e106c3ba3d3b37b",
+    "exact_total_paths": 6,
+    "path_blob_bindings": 6,
+    "focused_test_files": 6,
+    "primary_qualification_head": "f54e5b0640945d7a5f0a7c471ac81105436214ae",
+    "primary_run": 34323945126,
+    "primary_job": 102376779500,
+    "primary_verifier_unit_tests": 10,
+    "focused_cases": 17,
+    "focused_assertions": 179,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "php": "8.5.10",
+    "mariadb": "11.8.9",
+    "qualification_binding_head": "b8f7aba0ed08813203f64ae56cac5ef7f857af93",
+    "qualification_binding_run": 34329383462,
+    "qualification_binding_job": 102394131869,
+    "qualification_binding_verifier_unit_tests": 13,
+    "pre_adoption_head": "1999409a1205b7bdb5663a809992b9c44efd8dbb",
+    "pre_adoption_run": 34329669372,
+    "pre_adoption_job": 102395040735,
+    "pre_adoption_meta_ci_run": 34329669391,
+    "projected_ledger_run": 34329669431,
+    "projected_ledger_job": 102395041138,
+    "projected_ledger_artifact": 10095210015,
+    "projected_ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
+    "projected_grouped_paths": 113,
+    "projected_unverified_paths": 3991,
+    "qualification": "BOUNDED_GROUPED_CARRY_FORWARD_NOT_PRODUCT_PASS",
+    "post_adoption_head": "c67c1e9d7622612affdd431b2af9fae05d0d11ef",
+    "post_adoption_run": 34333058684,
+    "post_adoption_job": 102405922454,
+    "post_adoption_verifier_unit_tests": 14,
+    "post_adoption_meta_ci_run": 34333058582,
+    "post_adoption_ledger_run": 34333058620,
+    "post_adoption_ledger_job": 102405921741,
+    "post_adoption_ledger_artifact": 10096546256,
+    "post_adoption_ledger_sha256": "25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617",
+    "post_adoption_grouped_paths": 113,
+    "post_adoption_unverified_paths": 3991,
+    "post_adoption_result": "MARKETPLACE_TESTS_GROUPED_ADOPTION_PRIMARY_PROOF_REVALIDATED_NOT_PRODUCT_PASS"
+  },
+  "r3_meta_r4_direct_adoption": {
+    "candidate_path": "r3-meta-r4-direct-candidate.json",
+    "candidate_sha256": "aeb3eaf325aef8c989209d1c9104c8d7a890b25eef2b3bb1ea014ffd079aab39",
+    "adoption_overlay": "coverage-review-meta-r4-direct-additions.tsv",
+    "adoption_overlay_sha256": "70e5f14056e539f59a0be0783acb83c8e38c7cde5ff9e6cfde01672bfcf35598",
+    "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+    "live_main_identity_commit": "3b39e0be05aef008f1bd442821daefa898a201dd",
+    "path_count": 25,
+    "depth": "SCOPED_SEMANTIC_REVIEW",
+    "line_ranges": [],
+    "canonical_ledger_sha256": "71f41a16273b3eb16afc0a786f2ff4d2e83b737fac0e869d9e2cf97d43483d11",
+    "canonical_counts": {
+      "source_rows": 4325,
+      "direct_paths": 258,
+      "grouped_paths": 113,
+      "unverified_paths": 3954,
+      "semantically_classified_paths": 371
+    },
+    "meta_aud_05_status": "PARTIALLY_REPAIRED",
+    "product_readiness_claimed": false,
+    "audit_completion_claimed": false
+  },
+  "r3_meta_r5_instruction_efficiency_direct_adoption": {
+    "candidate_path": "r3-meta-r5-instruction-efficiency-direct-candidate.json",
+    "candidate_sha256": "a6ff7425e1a1d338bd02c769cc930109bf28c03db39b896c2ceb90233234eef3",
+    "adoption_overlay": "coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv",
+    "adoption_overlay_sha256": "929b2afdb37263181ea116a4c9616ce25f58e12c26f04d12dd8ed6dd2a60d4ad",
+    "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+    "source_tree": "f084e824ec5e14d5909c9750d906d91d51425fd5",
+    "subtree_tree": "58673e86047adc98c4612c3bedf78f6d47175139",
+    "live_main_identity_commit": "3b39e0be05aef008f1bd442821daefa898a201dd",
+    "path_count": 25,
+    "depth": "SCOPED_SEMANTIC_REVIEW",
+    "line_ranges": [],
+    "canonical_ledger_sha256": "27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41",
+    "canonical_counts": {
+      "source_rows": 4325,
+      "direct_paths": 283,
+      "grouped_paths": 113,
+      "unverified_paths": 3929,
+      "semantically_classified_paths": 396
+    },
+    "meta_counts": {
+      "direct_paths": 70,
+      "unverified_paths": 104,
+      "source_rows": 174
+    },
+    "results_row_readopted": false,
+    "meta_aud_05_status": "PARTIALLY_REPAIRED",
+    "product_readiness_claimed": false,
+    "audit_completion_claimed": false,
+    "runtime_attested": false
+  },
+  "r3_meta_r6_prompts_direct_adoption": {
+    "candidate_path": "r3-meta-r6-prompts-direct-candidate.json",
+    "candidate_sha256": "62b7f49af1434667f9ed293c896bc7f9b285cb8652883f00915607f0ce65381a",
+    "adoption_overlay": "coverage-review-meta-r6-prompts-direct-additions.tsv",
+    "adoption_overlay_sha256": "b51111c2e6eeb8d88f392d63007688b3be44128a7756512f8f295eaf7c9aeb8e",
+    "source_commit": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+    "source_tree": "f084e824ec5e14d5909c9750d906d91d51425fd5",
+    "prompt_subtree_tree": "0b825e18cde3cd928dfe569acf9ce6c0dc71cfe5",
+    "live_main_identity_commit": "3b39e0be05aef008f1bd442821daefa898a201dd",
+    "path_count": 11,
+    "depth": "SCOPED_SEMANTIC_REVIEW",
+    "line_ranges": [],
+    "canonical_ledger_sha256": "ff5c6621a78c14fc17802ecf01b4ef815867ccab95acce90c490973946d6279b",
+    "canonical_counts": {
+      "source_rows": 4325,
+      "direct_paths": 294,
+      "grouped_paths": 113,
+      "unverified_paths": 3918,
+      "semantically_classified_paths": 407
+    },
+    "meta_counts": {
+      "direct_paths": 81,
+      "unverified_paths": 93,
+      "source_rows": 174
+    },
+    "excluded_r4_paths_readopted": false,
+    "meta_aud_05_status": "PARTIALLY_REPAIRED",
+    "product_readiness_claimed": false,
+    "audit_completion_claimed": false,
+    "live_state_claimed": false,
+    "standing_authority_claimed": false
+  }
+}

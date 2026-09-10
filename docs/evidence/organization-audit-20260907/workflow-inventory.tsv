@@ -1,0 +1,78 @@
+repository	path	blob_sha	name	events	job_count	parse_result
+meta	.github/workflows/ci.yml	ee7d5dee4b7aafb2601a25fbbe5d789ab4627687	META CI	pull_request,merge_group,push,workflow_dispatch	1	PASS
+meta	.github/workflows/terminal-branch-lifecycle.yml	c10bf3b2abc239015cd3e132e6370ac354031207	Terminal Branch Lifecycle	pull_request,pull_request_target,push,schedule,workflow_dispatch	3	PASS
+game	.github/workflows/agent-governance.yml	10a4f282b7ee70ac2d5df81002e226ad598d997c	Agent governance	pull_request,push,workflow_dispatch	1	PASS
+game	.github/workflows/architecture-semantic-audit.yml	44f79456e85e682a4b710b51394330302a97526f	Architecture semantic audit	pull_request	1	PASS
+game	.github/workflows/codeql.yml	0dfff11a789ea1a2b49b518311cd8064aa4d7a7a	CodeQL	push,schedule,workflow_dispatch	1	PASS
+game	.github/workflows/game-atlas-animated-appearances.yml	57e8d3c9e38303c2a3bb69705a2a92b8cad360cc	Game Atlas animated appearances	pull_request,workflow_dispatch	1	PASS
+game	.github/workflows/game-atlas-creature-gameplay-profiles.yml	a83c34791fd4b53026f15e4e2cbc2f91beb0efc9	Game Atlas creature gameplay profiles	pull_request,workflow_dispatch	1	PASS
+game	.github/workflows/game-atlas-profile-spike.yml	710828c73107d14bf610d97fea3b76a99c3e24e0	Game Atlas Physical Profile Spike	pull_request	1	PASS
+game	.github/workflows/game-atlas-semantic-search.yml	31dba28c2b4f7e3bbdb1bf8822cc3cc0a3550fd0	Game Atlas semantic search	pull_request,push	1	PASS
+game	.github/workflows/game-atlas-static-creatures.yml	57be9d0228d642395354b49fc1e0f3222b43435e	Game Atlas static creatures	pull_request,workflow_dispatch	1	PASS
+game	.github/workflows/game-atlas-thais-fixture.yml	37a9a62dbc78a474558e993749a4048d8f92e43c	Game Atlas Thais Z7 fixture	pull_request	1	PASS
+game	.github/workflows/merge-authority-audit.yml	fdfb29c752290c6f47bc4cf80d0a79d7a666a323	Merge authority audit	pull_request_target	1	PASS
+game	.github/workflows/merge-gate.yml	71854b5b1811b5b70058197e8849a8f03c9670b6	Merge gate	pull_request	11	PASS
+game	.github/workflows/merge-group-gate.yml	539a726b7d39cabe785892f70ea30d1944189d91	Game Merge Queue gate	merge_group	8	PASS
+game	.github/workflows/repository-configuration.yml	e3b752f5b4712d07de13e88b909f99e40b3a99b6	Repository configuration	push,workflow_dispatch	1	PASS
+game	.github/workflows/rust.yml	dc2ea01a08d971735b382082caeae330349183ca	Rust workspace	push,workflow_dispatch	6	PASS
+game	.github/workflows/synology-game-runner-acceptance.yml	a14a130090614ec688914079a069f0edc8a267e3	Synology Game Runner Acceptance	push,workflow_dispatch	1	PASS
+game	.github/workflows/terminal-branch-lifecycle.yml	149a06a351145749f8076f70ed8aaf39ff98543c	Terminal Branch Lifecycle	pull_request,pull_request_target,push,schedule,workflow_dispatch	3	PASS
+game	.github/workflows/tibia-reference-tools.yml	e3cc54b5b7ceb593d03fe91827d3b2bb512d0331	Tibia Reference Tooling	pull_request,workflow_dispatch	1	PASS
+platform	.github/workflows/acceptance-soak.yml	a075c8ddd99bf0a30547bbff65110f10a3a5eb33	Acceptance E2E Public Soak	schedule,workflow_dispatch	1	PASS
+platform	.github/workflows/acceptance-stability.yml	6c1fa9f2fb4edea9415e3cbd9b5e717a04bcf43d	Acceptance E2E Stability Repeat	schedule,workflow_dispatch	1	PASS
+platform	.github/workflows/acceptance-validation.yml	75cd3865acb6d161091aebd489f070cff7aeede4	Acceptance E2E and Visual UX	pull_request,push,workflow_dispatch,workflow_call	1	PASS
+platform	.github/workflows/agent-governance.yml	4001daffe49b9432c88c64a1bc8ea036d6b19e7e	Agent Governance	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/announcements-acceptance.yml	399edcf4bbbbdf69d36f28d749cf32136848c4d7	Announcements Acceptance	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/branch-lifecycle.yml	1f79d5cbe4e4a4e919422b83667e8c297f267e10	Branch Lifecycle	pull_request,push,workflow_dispatch	3	PASS
+platform	.github/workflows/build-synology-staging-images.yml	ba34e84b99785f34eaee57d5335e009703b67850	Build Synology Staging Images	pull_request,push,workflow_dispatch	3	PASS
+platform	.github/workflows/character-bazaar-staging-control.yml	96aa133abfea547c2d6734d9967195dfa646fb9f	Character Bazaar Staging Control	push,workflow_dispatch	1	PASS
+platform	.github/workflows/character-bazaar-staging-validation.yml	528b5cb71a83660b3f32635e3ec0a9b23aabe7a7	Character Bazaar Staging Validation	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/ci.yml	2943cfc2220a6ddd72c99336500f2ef339d23b84	CI	push,pull_request,merge_group	5	PASS
+platform	.github/workflows/cloudflare-oteryn-edge-audit.yml	9c925918328f4f764dd5b95bec705cb4da77cb51	Cloudflare Oteryn Edge Audit	pull_request,pull_request_target	2	PASS
+platform	.github/workflows/cloudflare-oteryn-endpoint-main-operation.yml	db453f2aa2e741d0227790d8e411a5fdf87fee53	Cloudflare Oteryn Endpoint Main Operation	pull_request,push	2	PASS
+platform	.github/workflows/cloudflare-oteryn-endpoints.yml	e4501c0c9928166aacb14c98903ac701b634b969	Cloudflare Oteryn Endpoints	pull_request,pull_request_target,issue_comment,workflow_dispatch	4	PASS
+platform	.github/workflows/cloudflare-oteryn-hsts-stage1.yml	611b5d7e289e010cbfec0f2f3037f2eebef607f8	Cloudflare Oteryn HSTS Stage 1	pull_request,push	2	PASS
+platform	.github/workflows/cloudflare-oteryn-public-edge-repair.yml	b0726d2da58a5b5ccbc3b122145f0c7c5e08b281	Cloudflare Oteryn Public Edge Repair	pull_request,push	2	PASS
+platform	.github/workflows/cloudflare-zone-edge-audit.yml	570e79e93a9a2735480cd719e03324eaae663312	Cloudflare Zone Edge Audit	pull_request,push,workflow_dispatch	2	PASS
+platform	.github/workflows/codeql.yml	382b6512db7eb69ba35368d1e936945ec8e4667a	CodeQL	push,pull_request,schedule,workflow_dispatch	1	PASS
+platform	.github/workflows/community-data-acceptance.yml	d6825d59176541641c4caf48954baf82bb6f17a3	Community Data Acceptance	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/content-scale-acceptance.yml	52dd5b0b0f587256e8a4901c0f9c6e605c09f6d4	Content Scale Acceptance	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/deploy-synology-staging.yml	efb42e6ce71077c297b58e5ea9b5ee3ce24b84dc	Deploy Synology Staging	workflow_dispatch	1	PASS
+platform	.github/workflows/downloads-acceptance.yml	6cec1ab0a1046f3c4fab67b2dfe7600a5c5e2cfe	Downloads Acceptance	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/edge-security-emulation.yml	468ac8c416865907c8d34a029f340b60317b5a92	Edge Security Emulation	pull_request,workflow_dispatch	2	PASS
+platform	.github/workflows/editorial-media-acceptance.yml	7326dd827f4fb608af56fbe36d588360e764809f	Editorial Media Acceptance	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/error-state-acceptance.yml	3c28f9cb74cb46a6019305ddd5d2ce6be691acc8	Error State Acceptance	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/events-acceptance.yml	c09c0193a02b6478c39477ec958af865944fb6b7	Events Acceptance	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/game-auth-ticket-concurrency.yml	4e3b13c35e6c2ba650216eafbed70acd3e5ef3a4	Game Auth Ticket Concurrency	pull_request	2	PASS
+platform	.github/workflows/game-catalog-contract.yml	4144ff93641606fbd9122c0046a1a01a09439352	Game Catalog Contract	workflow_dispatch,push,pull_request	3	PASS
+platform	.github/workflows/game-gateway-ci.yml	4457167367a8ab20fbf81b18ab1663930450126c	Game Gateway CI	pull_request,push	1	PASS
+platform	.github/workflows/github-actions-storage-hygiene.yml	67cc9e8c359418c4457028add947feccc1c07654	GitHub Actions Storage Hygiene	pull_request,pull_request_target,schedule,workflow_dispatch	3	PASS
+platform	.github/workflows/historical-branch-audit.yml	ee5e19222995cdd71dd0b6370a81fdbdc6240ea5	Historical Branch Audit	pull_request,pull_request_target,push,schedule,workflow_dispatch	4	PASS
+platform	.github/workflows/native-auth-canary-cache-build.yml	7fe72e7b6d3ffac12bdbb667af6034f064cb62b7	Native Auth Canary Cache Header Build	pull_request,workflow_dispatch	1	PASS
+platform	.github/workflows/native-auth-ephemeral-cutover-rehearsal.yml	98f262c9e582db08180b2dbb98d4c2df69648155	Native Auth Ephemeral Cutover Rehearsal	workflow_dispatch,pull_request	5	PASS
+platform	.github/workflows/native-protocol-contract-audits.yml	a89c98a241e752327cbfd055efdbc59c96325639	Native protocol contract audits	pull_request,push	5	PASS
+platform	.github/workflows/native-protocol-contract.yml	e35be3b64e85cd08c2e9ba4bfae1231cf8e633aa	Native protocol contract	pull_request,push	1	PASS
+platform	.github/workflows/oteryn-public-edge-validation.yml	25d28edd3e64a67c1c2d40fab5b0fa02f38e57dc	Oteryn Public Edge Validation	pull_request,push	2	PASS
+platform	.github/workflows/parallel-coordinator-prompt-eval.yml	be41ad744782a4e2db63352e46f7f501a41a601d	Parallel Coordinator Prompt Eval	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/phase7-production-like-validation.yml	cc8936214fa5656e43db3e6bf68c49bd8ae0cd1a	Phase 7 Production-Like Validation	pull_request,workflow_dispatch	2	PASS
+platform	.github/workflows/platform-db-outage-validation.yml	2fd510aa1096028a0ef4b4a4740714bc969414cd	Platform DB Outage Validation	pull_request,workflow_dispatch	2	PASS
+platform	.github/workflows/playwright-runtime-validation.yml	d2abd869bf244363bf43bf1fb3c9da2d0cfadcc8	Playwright PHP 8.5 Runtime	pull_request,push,workflow_dispatch	2	PASS
+platform	.github/workflows/portal-acceptance-contract.yml	064dc65490e4d3988535d8418011e7696c00e942	Portal Acceptance Contract	pull_request,push,workflow_dispatch	2	PASS
+platform	.github/workflows/portal-e2e-audit.yml	e8043e251c07db30505ecc071712f94875952d62	Portal E2E Audit	pull_request,workflow_dispatch	1	PASS
+platform	.github/workflows/recover-synology-staging-schema.yml	5ccef4c0048906d2ff3fbd15948dc4bec95ab040	Recover Synology Staging Schema	workflow_dispatch	1	PASS
+platform	.github/workflows/repair-synology-autostart.yml	9eb17a0fcb9269a01f42ab79393e13df255e6b4b	Repair Synology Autostart	push,workflow_dispatch	1	PASS
+platform	.github/workflows/repair-synology-compose-orphans.yml	1ee5c3b664b249a8920fd428929246c3c5f4415b	Repair Synology Compose Container Names	workflow_dispatch	1	PASS
+platform	.github/workflows/support-legal-acceptance.yml	010d097d3b89313853b843c24c6cb7407abb0f06	Support Legal Acceptance	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/support-moderation-acceptance.yml	0457905e9c62ef5893b1f1d13cda78264bfeffbc	Support Moderation Acceptance	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/synology-container-hygiene.yml	c3f1edbe2cbea8120eab25190086c4b8e5e7a68b	Synology Container Hygiene	pull_request,workflow_dispatch	2	PASS
+platform	.github/workflows/synology-diagnostics.yml	a46d2c41ba7632c9620bfaf30a390519f00859da	Synology Diagnostics	push,workflow_dispatch	1	PASS
+platform	.github/workflows/synology-production-target-preflight.yml	6f64e7cfd57d575794e0461ec448db63dcf5382b	Synology Production Target Preflight	pull_request,workflow_dispatch	2	PASS
+platform	.github/workflows/synology-rollback-contract.yml	e1ebebe90dacc45bc14fec61b5a831d29a741273	Synology Rollback Contract	pull_request,push,workflow_dispatch	1	PASS
+platform	.github/workflows/terminal-branch-lifecycle-read-reusable.yml	e61700e57b3ec21349ec9fd25e707a546a65f692	Oteryn Terminal Branch Lifecycle Read Reusable	workflow_call	1	PASS
+platform	.github/workflows/terminal-branch-lifecycle-reusable.yml	7252d6cb0dfe435d429d6b0ecf9b406323355546	Oteryn Terminal Branch Lifecycle Reusable	workflow_call	3	PASS
+platform	.github/workflows/terminal-branch-lifecycle.yml	8d3eb95edaae4246df56102cb358568379dad2d6	Terminal Branch Lifecycle	pull_request,pull_request_target,push,workflow_dispatch	4	PASS
+platform	.github/workflows/tibia-linux-live-reference.yml	9660f835392e716d6530b368919d53843927c0b9	Tibia Linux Reference Harness	pull_request,workflow_dispatch	1	PASS
+platform	.github/workflows/wiki-reconciliation-acceptance.yml	219344788ae1e9abd9848648d7d9343064a086f7	Wiki Reconciliation Acceptance	pull_request,push,workflow_dispatch	1	PASS
+atlas	.github/workflows/merge-authority-audit.yml	3061a10b34041b965fc7fb605f243e26e109a3ec	Merge authority audit	pull_request_target,merge_group	1	PASS
+atlas	.github/workflows/merge-group-gate.yml	d07e0c5f82f7ffd23c408bf62ae67f293e15b182	Atlas maintenance Merge Queue gate	merge_group	1	PASS
+atlas	.github/workflows/terminal-branch-lifecycle.yml	55f09285e69d20b11d4766e8bf59e001cbeeb37d	Terminal Branch Lifecycle	pull_request,pull_request_target,push,schedule,workflow_dispatch	3	PASS
