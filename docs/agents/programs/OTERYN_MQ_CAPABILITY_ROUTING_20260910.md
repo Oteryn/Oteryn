@@ -20,9 +20,11 @@ cannot submit the PR to Merge Queue.
 
 1. `ecosystem/agent-execution-routing-policy.json` now contains a closed
    `integration_capability_routing` contract for protected integration.
-2. `tools/governance/integration_capability_routing.py` classifies current
-   capability as `NOT_REQUIRED`, `DIRECT_CAPABLE`, `DELEGATED_CAPABLE` or
-   `BLOCKED_CAPABILITY_UNAVAILABLE`.
+2. `tools/governance/integration_capability_routing.py` acquires evidence through
+   an installed trusted observer and then deterministically classifies the sealed
+   observation as `NOT_REQUIRED`, `DIRECT_CAPABLE`, `DELEGATED_CAPABLE` or
+   `BLOCKED_CAPABILITY_UNAVAILABLE`. Raw mappings/JSON are diagnostic fixtures only
+   and cannot authorize worker release.
 3. `docs/agents/policy/ORGANIZATION_AGENT_POLICY.md` requires that classification
    before releasing substantial mutating work expected to require autonomous
    protected integration.
@@ -42,6 +44,8 @@ cannot submit the PR to Merge Queue.
    repository change. Until protected integration + credential provisioning + a
    real canary are proven, the delegated route must not be advertised as
    operational.
+10. The standalone router CLI has no authoritative serialized-snapshot input. It
+    fails closed when no current-session discovery/readback observer is installed.
 
 ## Owned paths
 

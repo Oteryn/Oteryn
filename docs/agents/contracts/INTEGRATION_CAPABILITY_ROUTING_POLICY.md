@@ -16,24 +16,33 @@ required checks, Merge Queue, review policy, or provider ownership.
 ## Machine authority
 
 `ecosystem/agent-execution-routing-policy.json` owns the closed machine-readable
-capability route. `tools/governance/integration_capability_routing.py` validates
-and classifies the current execution-capability snapshot.
+capability route. `tools/governance/integration_capability_routing.py` separates
+trusted evidence acquisition from deterministic classification.
 
 For a substantial mutating task that is expected to require autonomous protected
 integration, capability preflight is required **before releasing the worker**.
 Do not wait until `READY_FOR_COORDINATOR_INTEGRATION`.
 
-The capability snapshot is observational only. It must come from current-session
-tool/action discovery plus protected executor operational readback; a task,
-prompt, caller boolean, comment, or previous-session assertion is not capability
-evidence.
+The worker-release authority function accepts an installed trusted capability
+observer, not a `Mapping`, JSON document, or caller-created snapshot. The observer
+obtains direct evidence from its current-session tool/action discovery adapter and
+delegated evidence from its live protected-executor readback adapter, then produces
+the sealed verified-observation type consumed by the deterministic classifier. A
+task, prompt, caller string/boolean, comment, serialized fixture, or previous-session
+assertion is not capability evidence. If no trusted observer is installed or its
+acquisition fails, classification is `BLOCKED_CAPABILITY_UNAVAILABLE`.
 
-Every capable snapshot carries an observation timestamp and is valid only for
+Every capable observation carries an observation timestamp and is valid only for
 the finite freshness interval in the machine policy. Future, stale, malformed
-or self-asserted observations fail closed. `DELEGATED_CAPABLE` additionally
+or unsealed observations fail closed. `DELEGATED_CAPABLE` additionally
 requires a fresh protected-META `refs/heads/main` readback bound to the canonical
 executor workflow path and exact blob, credential-operational proof and retained
 terminal canary evidence for that same identity.
+
+Raw serialized snapshots may be retained as diagnostics or test fixtures, but are
+never accepted by `validate_worker_release` or interpreted as scheduling authority.
+The standalone CLI intentionally has no authoritative `--snapshot` path and fails
+closed because no current-session trusted observer is installed there.
 
 ## States
 
@@ -58,7 +67,8 @@ merely to change capability state.
 
 ## Direct route
 
-`DIRECT_CAPABLE` means the execution surface exposes the governed native
+`DIRECT_CAPABLE` means the trusted current-session discovery adapter observed the
+execution surface exposing the governed native
 operation selected by META:
 
 `PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge-async`
@@ -134,9 +144,8 @@ fine-grained credential permitted by the bound organization policy.
 
 Credential provisioning and secret values are outside this repository change.
 Until the workflow is on protected META `main`, the fine-grained credential is
-provisioned, and a real bounded canary proves the route,
-`meta.governed_merge_queue_executor.v1` MUST NOT be listed in a capability
-snapshot's `operational_executor_routes`.
+provisioned, and a real bounded canary proves the route, the trusted readback
+adapter MUST NOT report `meta.governed_merge_queue_executor.v1` as operational.
 
 Do not create a custom GitHub App merely for this executor and do not recreate
 provider-local Merge Queue bridges.

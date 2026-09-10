@@ -27,8 +27,8 @@
     "max_age_seconds": 900
   },
   "integration_capability_routing": {
-    "schema_version": 1,
-    "snapshot_max_age_seconds": 300,
+    "schema_version": 2,
+    "observation_max_age_seconds": 300,
     "contract_path": "docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md",
     "require_preflight_before_worker_release": true,
     "states": [

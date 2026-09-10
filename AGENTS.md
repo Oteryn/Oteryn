@@ -23,9 +23,10 @@ Load the relevant procedure when performing its operation:
 - Protected-integration scheduling: before releasing a mutating worker expected to
   require autonomous protected integration, apply
   `docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md` through
-  `tools/governance/integration_capability_routing.py`. Only `DIRECT_CAPABLE` or
+  `tools/governance/integration_capability_routing.py` using an installed trusted
+  observer, never caller-created dictionaries or JSON. Only `DIRECT_CAPABLE` or
   verified `DELEGATED_CAPABLE` permits that worker release; capability is not merge
-  authority.
+  authority. Without a trusted observer, fail closed.
 - Retry/freeze decisions: `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md`.
   Productive work has no generic elapsed-time stop.
 - Session/context/wait transitions:
