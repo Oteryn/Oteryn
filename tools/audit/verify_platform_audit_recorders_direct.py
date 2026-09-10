@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import io
 import json
 from pathlib import Path
 import re
@@ -28,6 +29,10 @@ SOURCE_TREE = 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e'
 CURRENT_LEDGER_SHA = 'ff5c6621a78c14fc17802ecf01b4ef815867ccab95acce90c490973946d6279b'
 REVIEW_PROVENANCE = 'External mutable PR #185 metadata: reviewed implementation 3eb62ef72c1e13412fa45d5b25d597d112d9ae7d; review comment 5609072309. Not self-certified evidence.'
 SHA = re.compile(r'[0-9a-f]{40}\Z')
+OVERLAY_HEADER = (
+    'repository', 'path', 'blob_sha', 'depth', 'scope', 'line_ranges',
+    'execution_evidence',
+)
 
 
 def require(condition: bool, message: str) -> None:
@@ -97,17 +102,35 @@ def tree_blob(cwd: Path,path: str) -> str:
     return oid
 
 
+def parse_tsv_bytes(raw: bytes) -> list[dict[str,str]]:
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('invalid UTF-8 TSV') from exc
+    try:
+        rows = list(csv.reader(io.StringIO(text, newline=''), delimiter='\t', strict=True))
+    except csv.Error as exc:
+        raise ValueError('malformed TSV') from exc
+    require(bool(rows), 'recorder overlay header missing')
+    require(tuple(rows[0]) == OVERLAY_HEADER, 'recorder overlay header drift')
+    parsed = []
+    for row in rows[1:]:
+        require(len(row) == len(OVERLAY_HEADER), 'recorder overlay column count drift')
+        parsed.append(dict(zip(OVERLAY_HEADER, row, strict=True)))
+    return parsed
+
+
 def read_tsv(path: Path) -> list[dict[str,str]]:
-    with path.open(encoding='utf-8',newline='') as handle:
-        return list(csv.DictReader(handle,delimiter='\t'))
+    return parse_tsv_bytes(path.read_bytes())
 
 
 def validate_adopted_docs(candidate: dict, audit_root: Path) -> None:
     validate_candidate_shape(candidate)
     old_overlay=audit_root/OVERLAY_REL
     require(old_overlay.is_file(),'recorder overlay missing')
-    require(blob_sha(old_overlay.read_bytes())==OVERLAY_BLOB,'recorder overlay blob drift')
-    old_rows=read_tsv(old_overlay)
+    raw=old_overlay.read_bytes()
+    require(blob_sha(raw)==OVERLAY_BLOB,'recorder overlay blob drift')
+    old_rows=parse_tsv_bytes(raw)
     require(len(old_rows)==2,'recorder overlay row count drift')
     expected_paths={row['path'] for row in candidate['paths']}
     require({row['path'] for row in old_rows}==expected_paths,'recorder overlay membership drift')

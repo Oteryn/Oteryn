@@ -164,6 +164,46 @@ class AuditRecorderDirectVerifierTests(unittest.TestCase):
     def test_overlay_blob_hash_is_exact(self):
         self.assertEqual(v.blob_sha((ROOT / v.OVERLAY_REL).read_bytes()), v.OVERLAY_BLOB)
 
+    def test_overlay_uses_single_authenticated_read_during_replacement(self):
+        overlay = ROOT / v.OVERLAY_REL
+        canonical = overlay.read_bytes()
+        altered = canonical.replace(
+            b'bounded full-file recorder source review; not product readiness.',
+            b'unauthenticated replacement claims full product readiness.',
+            1,
+        )
+        self.assertNotEqual(altered, canonical)
+        original_read_bytes = Path.read_bytes
+        overlay_reads = 0
+
+        def replacing_read_bytes(current):
+            nonlocal overlay_reads
+            raw = original_read_bytes(current)
+            if current == overlay:
+                overlay_reads += 1
+                overlay.write_bytes(altered)
+            return raw
+
+        try:
+            with mock.patch.object(Path, 'read_bytes', replacing_read_bytes):
+                v.validate_adopted_docs(copy.deepcopy(self.candidate), ROOT)
+            self.assertEqual(overlay_reads, 1)
+        finally:
+            overlay.write_bytes(canonical)
+
+    def test_overlay_byte_parser_rejects_invalid_utf8_and_header_drift(self):
+        header = '\t'.join(v.OVERLAY_HEADER)
+        cases = (
+            (b'\xff', 'invalid UTF-8 TSV'),
+            ((header + '\textra\n').encode(), 'header drift'),
+            (('repository\tpath\tblob_sha\tdepth\tscope\tline_ranges\tpath\n').encode(), 'header drift'),
+            ((header + '\nmeta\tonly-two-columns\n').encode(), 'column count drift'),
+            ((header + '\n"unterminated\n').encode(), 'malformed TSV'),
+        )
+        for raw, message in cases:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                v.parse_tsv_bytes(raw)
+
     def test_canonical_recorder_rows_reject_complete_contract_drift(self):
         canonical = ROOT / v.CANONICAL_OVERLAY_REL
         original = canonical.read_text(encoding='utf-8')
