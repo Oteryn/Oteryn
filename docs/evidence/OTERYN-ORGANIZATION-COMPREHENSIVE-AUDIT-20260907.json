@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "report_id": "OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907",
-  "revision": "R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-258",
+  "revision": "R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-283",
   "status": "QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE",
   "governing_issue": "Oteryn/Oteryn#186",
   "pull_request": "Oteryn/Oteryn#185",
@@ -121,9 +121,9 @@
   "historical_candidate_p1_ids_not_counted_as_source_snapshot": [
     "GAME-CANDIDATE-361"
   ],
-  "scoped_review_paths": 258,
+  "scoped_review_paths": 283,
   "grouped_revalidated_paths": 113,
-  "semantically_classified_paths": 371,
+  "semantically_classified_paths": 396,
   "r3_native_results": "organization-audit-20260907/r3-native-results.json",
   "r3_source_review": "organization-audit-20260907/r3-source-review.md",
   "r3_visual_review": "organization-audit-20260907/r3-visual-review.json",
@@ -173,5 +173,8 @@
   "r3_platform_audit_recorders_direct_candidate": "organization-audit-20260907/r3-platform-audit-recorders-direct-candidate.json",
   "r3_platform_announcements_direct_candidate": "organization-audit-20260907/r3-platform-announcements-direct-candidate.json",
   "r3_meta_r4_direct_candidate": "organization-audit-20260907/r3-meta-r4-direct-candidate.json",
-  "r3_meta_r4_direct_adoption_overlay": "organization-audit-20260907/coverage-review-meta-r4-direct-additions.tsv"
+  "r3_meta_r4_direct_adoption_overlay": "organization-audit-20260907/coverage-review-meta-r4-direct-additions.tsv",
+  "coverage_review_meta_r5_instruction_efficiency_direct_additions": "organization-audit-20260907/coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv",
+  "r3_meta_r5_instruction_efficiency_direct_candidate": "organization-audit-20260907/r3-meta-r5-instruction-efficiency-direct-candidate.json",
+  "r3_meta_r5_instruction_efficiency_direct_adoption_overlay": "organization-audit-20260907/coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv"
 }

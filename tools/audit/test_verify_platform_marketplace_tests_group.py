@@ -95,13 +95,13 @@ class PlatformMarketplaceTestsAdoptedTests(unittest.TestCase):
     def test_summary_accounting_is_current_and_exact(self):
         s = self.summary(); p = s['per_repository']['platform']
         self.assertEqual(s['ledger_sha256'], verifier.CANONICAL_LEDGER_SHA)
-        self.assertEqual((s['scoped_review_paths'], s['grouped_revalidated_paths'], s['semantically_classified_paths'], s['unverified_semantics_total']), (258, 113, 371, 3954))
+        self.assertEqual((s['scoped_review_paths'], s['grouped_revalidated_paths'], s['semantically_classified_paths'], s['unverified_semantics_total']), (283, 113, 396, 3929))
         self.assertEqual((p['direct_scoped'], p['grouped'], p['unverified_semantics']), (168, 113, 1884))
 
     def test_report_accounting_and_candidate_binding_are_current_and_exact(self):
         r = self.report()
-        self.assertEqual(r['revision'], 'R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-258')
-        self.assertEqual((r['scoped_review_paths'], r['grouped_revalidated_paths'], r['semantically_classified_paths']), (258, 113, 371))
+        self.assertEqual(r['revision'], 'R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-283')
+        self.assertEqual((r['scoped_review_paths'], r['grouped_revalidated_paths'], r['semantically_classified_paths']), (283, 113, 396))
         self.assertEqual(r['r3_platform_marketplace_tests_candidate'], 'organization-audit-20260907/r3-platform-marketplace-tests-candidate.json')
 
     def test_companion_markdown_closeout_is_exact_and_fail_closed(self):

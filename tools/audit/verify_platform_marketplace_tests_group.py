@@ -27,7 +27,7 @@ PREFIX = 'tests/Feature/Marketplace/'
 EXACT_STATEMENT = '**FACT.** The following Marketplace tests were read directly during continuation:'
 ADOPTED = 'QUALIFIED_ADOPTED_AS_GROUPED'
 MARKETPLACE_LEDGER_SHA = '25ed5eb371279fbdb16a50263637856a3bc409b775387555efdaa17cebdc3617'
-CANONICAL_LEDGER_SHA = '71f41a16273b3eb16afc0a786f2ff4d2e83b737fac0e869d9e2cf97d43483d11'
+CANONICAL_LEDGER_SHA = '27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41'
 MARKETPLACE_CLOSEOUT = (
     'The exact six-file `tests/Feature/Marketplace/**` GROUPED batch completed fresh independent exact-head review at '
     '`7f53b509791aae6d56637522aee65891e449914c` with no new P0/P1/P2; its two temporary qualifier/ledger workflows '
@@ -291,10 +291,10 @@ def validate_accounting(audit_root: Path) -> None:
     summary = read_json(audit_root / SUMMARY); platform = summary['per_repository']['platform']
     require((platform['leaves'], platform['direct_scoped'], platform['grouped'], platform['unverified_semantics']) == (2165, 168, 113, 1884), 'Marketplace-test summary platform accounting drift')
     require(summary.get('ledger_sha256') == CANONICAL_LEDGER_SHA, 'Marketplace-test current canonical ledger digest drift')
-    require((summary.get('grouped_revalidated_paths'), summary.get('semantically_classified_paths'), summary.get('unverified_semantics_total')) == (113, 371, 3954), 'Marketplace-test summary totals drift')
+    require((summary.get('grouped_revalidated_paths'), summary.get('semantically_classified_paths'), summary.get('unverified_semantics_total')) == (113, 396, 3929), 'Marketplace-test summary totals drift')
     report = read_json(audit_root / REPORT)
-    require(report.get('revision') == 'R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-258', 'Marketplace-test report revision drift')
-    require((report.get('scoped_review_paths'), report.get('grouped_revalidated_paths'), report.get('semantically_classified_paths')) == (258, 113, 371), 'Marketplace-test report accounting drift')
+    require(report.get('revision') == 'R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-283', 'Marketplace-test report revision drift')
+    require((report.get('scoped_review_paths'), report.get('grouped_revalidated_paths'), report.get('semantically_classified_paths')) == (283, 113, 396), 'Marketplace-test report accounting drift')
     require(report.get('r3_platform_marketplace_tests_candidate') == 'organization-audit-20260907/r3-platform-marketplace-tests-candidate.json', 'Marketplace-test report candidate binding drift')
     index = read_json(audit_root / INDEX)
     require(json_exact(index.get('r3_platform_marketplace_tests_qualification'), expected_index_row()), 'Marketplace-test verification-index row drift')

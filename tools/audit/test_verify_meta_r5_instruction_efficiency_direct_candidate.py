@@ -17,7 +17,7 @@ class MetaR5CandidateTest(unittest.TestCase):
  def copied(self):
   t=tempfile.TemporaryDirectory(); root=Path(t.name); shutil.copytree(v.ROOT/'docs/evidence',root/'docs/evidence'); return t,root
  def test_committed_candidate_source_finding_and_accounting_pass(self):
-  v.validate_candidate(deepcopy(self.c)); v.validate_source(v.ROOT,self.c); v.validate_finding(v.ROOT); v.validate_accounting(v.ROOT,self.c,self.inventory)
+  v.validate_candidate(deepcopy(self.c)); v.validate_source(v.ROOT,self.c); v.validate_finding(v.ROOT); v.validate_adoption(v.ROOT,self.c); v.validate_accounting(v.ROOT,self.c,self.inventory)
  def test_missing_extra_duplicate_wrong_blob_tree_and_ref_fail(self):
   for fn in [lambda c:c['paths'].pop(),lambda c:c['paths'].append(deepcopy(c['paths'][0])),lambda c:c['paths'].append({'x':'y'}),lambda c:c['paths'][0].update(blob_sha='0'*40),lambda c:c['source'].update(subtree_tree='0'*40),lambda c:c['source'].update(commit='0'*40)]:
    with self.subTest(fn=fn): self.reject(fn)
@@ -35,6 +35,26 @@ class MetaR5CandidateTest(unittest.TestCase):
  def test_result_findings_cannot_be_promoted_to_source_findings(self):
   self.reject(lambda c:c['finding_disposition']['new_source_findings'].append('G3B'))
   self.reject(lambda c:c['finding_disposition'].update(result_findings_not_promoted_to_source_findings=[]))
+ def mutate_overlay(self,fn):
+  t,root=self.copied()
+  try:
+   p=root/v.OVERLAY_REL
+   with p.open(encoding='utf-8',newline='') as f:r=csv.DictReader(f,delimiter='\t');fields=r.fieldnames;rows=list(r)
+   fn(rows)
+   with p.open('w',encoding='utf-8',newline='') as f:w=csv.DictWriter(f,fields,delimiter='\t',lineterminator='\n');w.writeheader();w.writerows(rows)
+   with self.assertRaises(ValueError):v.validate_adoption(root,self.c)
+  finally:t.cleanup()
+ def test_adoption_overlay_complete_rows_fail_closed(self):
+  mutations=[lambda r:r.pop(),lambda r:r.append(deepcopy(r[0])),lambda r:r[0].update(blob_sha='0'*40),lambda r:r[0].update(depth='LINE_RANGE_REVIEW'),lambda r:r[0].update(scope='generic'),lambda r:r[0].update(line_ranges='[[1,1]]'),lambda r:r[0].update(execution_evidence='Runtime model, isolation, cost and product readiness proven.'),lambda r:r[0].update(path='docs/evidence/OTERYN-R5Q-RESULTS.md')]
+  for fn in mutations:
+   with self.subTest(fn=fn):self.mutate_overlay(fn)
+ def test_adoption_index_provenance_and_counts_fail_closed(self):
+  for key,value in [('candidate_path','wrong.json'),('adoption_overlay','wrong.tsv'),('canonical_ledger_sha256','0'*64),('runtime_attested',True)]:
+   t,root=self.copied()
+   try:
+    p=root/v.INDEX_REL;d=json.loads(p.read_text());d['r3_meta_r5_instruction_efficiency_direct_adoption'][key]=value;p.write_text(json.dumps(d))
+    with self.assertRaises(ValueError):v.validate_adoption(root,self.c)
+   finally:t.cleanup()
  def test_direct_or_grouped_overlap_fails(self):
   for rel in ['docs/evidence/organization-audit-20260907/coverage-review.tsv','docs/evidence/organization-audit-20260907/coverage-review-meta-r4-direct-additions.tsv']:
    t,root=self.copied()

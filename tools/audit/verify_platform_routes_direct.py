@@ -22,7 +22,7 @@ GROUPS_REL = Path("docs/evidence/organization-audit-20260907/coverage-groups.jso
 SOURCE_COMMIT = "de917b3477a1de0667531380de3660e8b2ab59aa"
 ROUTES_TREE = "424f8bae6f7b9de1726f7c62c606b3b0baa15b23"
 ROUTE_SNAPSHOT_LEDGER_SHA = "73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9"
-LEDGER_SHA = "71f41a16273b3eb16afc0a786f2ff4d2e83b737fac0e869d9e2cf97d43483d11"
+LEDGER_SHA = "27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41"
 ORIGINAL_REVIEW_SHA256 = "15d5982db9ff2c4bce7103ffb44f10bd9a5f0320145f94919d9593b1f07ff0dd"
 REPORT_REL = Path("docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json")
 COLLECTION_PLAN_REL = Path("docs/evidence/organization-audit-20260907/collection-plan.json")
@@ -210,9 +210,9 @@ def validate_current_accounting(audit_root: Path, inventory_dir: Path | None = N
     require(ledger_bytes.count(b"\n") - 1 == 4325, "recomputed canonical ledger row count drift")
     require(sum(grouped_counts.values()) == 113, "recomputed canonical GROUPED count drift")
     expected_result = {
-        "source_leaves": 4325, "scoped_review_paths": 258,
-        "grouped_revalidated_paths": 113, "semantically_classified_paths": 371,
-        "unverified_semantics": 3954,
+        "source_leaves": 4325, "scoped_review_paths": 283,
+        "grouped_revalidated_paths": 113, "semantically_classified_paths": 396,
+        "unverified_semantics": 3929,
     }
     for key, expected in expected_result.items():
         require(type(report_result.get(key)) is int and report_result[key] == expected,
@@ -238,9 +238,9 @@ def main() -> int:
     print(json.dumps({"result": "PLATFORM_ROUTES_DIRECT_EXISTING_REVALIDATION_VALID",
                       "review_method": "FRESH_FULL_FILE_DIRECT_READ", "route_files": 19,
                       "coverage_delta": 0, "already_canonical_direct": True,
-                      "re_adoption_permitted": False, "canonical_direct_paths": 258,
-                      "canonical_grouped_paths": 113, "canonical_unverified_paths": 3954,
-                      "canonical_semantically_classified_paths": 371,
+                      "re_adoption_permitted": False, "canonical_direct_paths": 283,
+                      "canonical_grouped_paths": 113, "canonical_unverified_paths": 3929,
+                      "canonical_semantically_classified_paths": 396,
                       "canonical_ledger_sha256": LEDGER_SHA,
                       "product_readiness_claimed": False,
                       "audit_completion_claimed": False}, sort_keys=True))

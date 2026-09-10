@@ -22,7 +22,7 @@ class AuditValidationTest(unittest.TestCase):
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
     def mutate(self,path,func):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
@@ -59,6 +59,11 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.path,lambda d:d.update(r3_meta_r4_direct_candidate='organization-audit-20260907/wrong.json'));self.reject()
     def test_meta_r4_overlay_pointer_drift_rejected(self):
         self.mutate(self.path,lambda d:d.update(r3_meta_r4_direct_adoption_overlay='organization-audit-20260907/wrong.tsv'));self.reject()
+    def test_meta_r5_candidate_pointer_drift_rejected(self):
+        self.mutate(self.path,lambda d:d.update(r3_meta_r5_instruction_efficiency_direct_candidate='organization-audit-20260907/wrong.json'));self.reject()
+    def test_meta_r5_overlay_pointer_drift_rejected(self):
+        self.mutate(self.path,lambda d:d.update(r3_meta_r5_instruction_efficiency_direct_adoption_overlay='organization-audit-20260907/wrong.tsv'));self.reject()
+
     def test_duplicate_finding_rejected(self):
         p=self.base/'finding-register.tsv';lines=p.read_text().splitlines();p.write_text('\n'.join(lines+[lines[1]])+'\n');self.reject()
     def test_missing_domain_rejected(self):
@@ -161,8 +166,8 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.base/'unknowns.json',mutate)
     def test_stale_semantic_coverage_transition_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('258 DIRECT', '233 DIRECT')
-                                .replace('3954 paths', '3979 paths')))
+            reason=row['reason'].replace('283 DIRECT', '258 DIRECT')
+                                .replace('3929 paths', '3954 paths')))
         self.reject()
     def test_changed_semantic_coverage_total_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(

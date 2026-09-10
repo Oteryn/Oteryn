@@ -17,7 +17,9 @@ The source set remains META@`1a01c5b3e08666a82245b1cac78da3736c65e785`, Game@`4d
 | platform | 2165 | 168 | 113 | 1884 |
 | atlas | 1155 | 10 | 0 | 1145 |
 | migration_archive | 1 | 1 | 0 | 0 |
-| **Total** | **4325** | **258** | **113** | **3954** |
+| **Total** | **4325** | **283** | **113** | **3929** |
+
+Exactly 25 META source files under `docs/agents/evals/r5-instruction-efficiency/**` are now separately adopted as DIRECT `SCOPED_SEMANTIC_REVIEW` rows through `coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv`, from immutable reviewed candidate `r3-meta-r5-instruction-efficiency-direct-candidate.json` (SHA-256 `a6ff7425e1a1d338bd02c769cc930109bf28c03db39b896c2ceb90233234eef3`). Each row records bounded full-file source semantics with empty line ranges. This adoption does not re-adopt the already-DIRECT `OTERYN-R5Q-RESULTS.md` evidence and does not attest runtime model/effort, fresh isolation, answer correctness or safety, A/B superiority, provider permission, measured cost, live state, or product readiness. The dated protected-main identity `3b39e0be05aef008f1bd442821daefa898a201dd` is source identity carry-forward only. `META-AUD-05` remains P2 / `PARTIALLY_REPAIRED`, and all 14 residual obligations remain open. The current canonical ledger is `27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41`.
 
 The following paragraph is retained verbatim as the bounded **pre-Announcements Marketplace closeout snapshot** required by the Marketplace durability contract. Within that paragraph, “the current revision” and its 223-path ledger refer to that historical pre-Announcements audit state, not to the present canonical 258-path state shown above and bound below.
 
