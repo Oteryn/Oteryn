@@ -192,6 +192,79 @@ class AuditValidationTest(unittest.TestCase):
         self.assertIn(marker,raw)
         companion.write_bytes(raw.replace(marker,b'R3 Preserves',1))
         self.reject()
+    def test_validate_uses_authenticated_bytes_after_atomic_companion_replacement(self):
+        companion=self.path.with_suffix('.md')
+        original_read_bytes=Path.read_bytes
+        canonical=original_read_bytes(companion)
+        malicious=canonical.replace(
+            audit.SECTION_1_HEADING.encode(),
+            b'##  1. Source identity and actual coverage\n\nProduct readiness is established.\n\n```text\n'
+            + audit.SECTION_1_HEADING.encode(),
+            1,
+        ).replace(audit.SECTION_2_HEADING.encode(),
+                  audit.SECTION_2_HEADING.encode()+b'\n```',1)
+        replacement=self.root/'replacement.md'
+        replacement.write_bytes(malicious)
+        reads=0
+        def swap_after_authenticated_read(path):
+            nonlocal reads
+            if path == companion:
+                reads+=1
+                if reads > 1:
+                    raise AssertionError('second companion read forbidden')
+                raw=original_read_bytes(path)
+                replacement.replace(path)
+                return raw
+            return original_read_bytes(path)
+        with mock.patch.object(Path,'read_bytes',autospec=True,
+                               side_effect=swap_after_authenticated_read):
+            self.assertEqual(audit.validate(self.path)['result'],
+                             'ACCOUNTING_VALID_NOT_SEMANTIC_PASS')
+        self.assertEqual(reads,1)
+        self.assertEqual(companion.read_bytes(),malicious)
+    def test_validate_uses_authenticated_bytes_after_companion_symlink_swap(self):
+        companion=self.path.with_suffix('.md')
+        original_read_bytes=Path.read_bytes
+        canonical=original_read_bytes(companion)
+        malicious_path=self.root/'malicious.md'
+        malicious_path.write_bytes(canonical.replace(b'R3 preserves',b'R3 Preserves',1))
+        reads=0
+        def symlink_swap_after_authenticated_read(path):
+            nonlocal reads
+            if path == companion:
+                reads+=1
+                if reads > 1:
+                    raise AssertionError('second companion read forbidden')
+                raw=original_read_bytes(path)
+                path.unlink()
+                path.symlink_to(malicious_path)
+                return raw
+            return original_read_bytes(path)
+        with mock.patch.object(Path,'read_bytes',autospec=True,
+                               side_effect=symlink_swap_after_authenticated_read):
+            self.assertEqual(audit.validate(self.path)['result'],
+                             'ACCOUNTING_VALID_NOT_SEMANTIC_PASS')
+        self.assertEqual(reads,1)
+        self.assertTrue(companion.is_symlink())
+    def test_second_companion_read_regression_guard_fails(self):
+        companion=self.path.with_suffix('.md')
+        original_read_bytes=Path.read_bytes
+        reads=0
+        def reject_second_read(path):
+            nonlocal reads
+            if path == companion:
+                reads+=1
+                if reads > 1:
+                    raise AssertionError('second companion read forbidden')
+            return original_read_bytes(path)
+        def regressed_semantic_validator(_text):
+            companion.read_bytes()
+        with mock.patch.object(Path,'read_bytes',autospec=True,side_effect=reject_second_read), \
+             mock.patch.object(audit,'validate_current_coverage_section',
+                               side_effect=regressed_semantic_validator):
+            with self.assertRaisesRegex(AssertionError,'second companion read forbidden'):
+                audit.validate(self.path)
+        self.assertEqual(reads,2)
     def test_boolean_schema_rejected(self):
         self.mutate(self.path,lambda d:d.update(schema_version=True));self.reject()
     def test_production_claim_rejected(self):

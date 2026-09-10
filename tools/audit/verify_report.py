@@ -426,10 +426,7 @@ def json_exact(left, right):
     return left == right
 
 
-def validate_residual_obligations_paragraph(report_path: Path) -> None:
-    companion = report_path.with_suffix('.md')
-    require(companion.is_file(), 'companion report missing')
-    text = companion.read_text(encoding='utf-8')
+def validate_residual_obligations_paragraph(text: str) -> None:
     require(text.count(SECTION_7_HEADING) == 1, 'section 7 heading missing/duplicated')
     require(text.count(SECTION_8_HEADING) == 1, 'section 8 heading missing/duplicated')
     start = text.index(SECTION_7_HEADING)
@@ -459,11 +456,8 @@ def _current_coverage_table() -> tuple[str, ...]:
     return tuple(rows)
 
 
-def validate_current_coverage_section(report_path: Path) -> None:
+def validate_current_coverage_section(text: str) -> None:
     """Bind the current §1 table/adoption/history slot while leaving scoped history intact."""
-    companion = report_path.with_suffix('.md')
-    require(companion.is_file(), 'companion report missing')
-    text = companion.read_text(encoding='utf-8')
     require(text.count(SECTION_1_HEADING) == 1 and text.count(SECTION_2_HEADING) == 1,
             'report section 1 boundary drift')
     section = text.split(SECTION_1_HEADING, 1)[1].split(SECTION_2_HEADING, 1)[0]
@@ -487,33 +481,29 @@ def validate_current_coverage_section(report_path: Path) -> None:
             'current history annotation missing or duplicated')
 
 
-def validate_complete_source_identity_section(report_path: Path) -> None:
+def validate_complete_source_identity_section(text: str) -> None:
     """Bind every UTF-8 byte in §1, including prose after the readable status slot."""
-    companion = report_path.with_suffix('.md')
-    require(companion.is_file(), 'companion report missing')
-    raw = companion.read_bytes()
-    section_1 = SECTION_1_HEADING.encode('utf-8')
-    section_2 = SECTION_2_HEADING.encode('utf-8')
-    require(raw.count(section_1) == 1, 'section 1 heading missing/duplicated')
-    require(raw.count(section_2) == 1, 'section 2 heading missing/duplicated')
-    start = raw.index(section_1)
-    end = raw.index(section_2)
+    require(text.count(SECTION_1_HEADING) == 1, 'section 1 heading missing/duplicated')
+    require(text.count(SECTION_2_HEADING) == 1, 'section 2 heading missing/duplicated')
+    start = text.index(SECTION_1_HEADING)
+    end = text.index(SECTION_2_HEADING)
     require(start < end, 'report section 1 boundary ordering drift')
-    digest = hashlib.sha256(raw[start:end]).hexdigest()
+    digest = hashlib.sha256(text[start:end].encode('utf-8')).hexdigest()
     require(digest == EXPECTED_SECTION_1_SHA256, 'complete report section 1 byte contract drift')
 
 
-def validate_complete_report_markdown(report_path: Path) -> None:
-    """Bind the companion report's complete, unnormalized raw UTF-8 byte sequence."""
+def load_authenticated_report_markdown(report_path: Path) -> str:
+    """Read, authenticate, and decode the companion Markdown exactly once."""
     companion = report_path.with_suffix('.md')
     require(companion.is_file(), 'companion report missing')
     raw = companion.read_bytes()
     try:
-        raw.decode('utf-8')
+        text = raw.decode('utf-8')
     except UnicodeDecodeError as exc:
         raise ValueError('companion report must be valid UTF-8') from exc
     require(hashlib.sha256(raw).hexdigest() == EXPECTED_REPORT_MARKDOWN_SHA256,
             'complete companion report byte contract drift')
+    return text
 
 
 def read_json(path):
@@ -736,10 +726,10 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(len(unknowns)==14,'unresolved unknown count must be exactly 14')
     require({row.get('id') for row in unknowns}==EXPECTED_UNRESOLVED_IDS,'unresolved unknown ID set drift')
     require(json_exact(unknowns,EXPECTED_UNKNOWNS),'unresolved unknown register drift')
-    validate_complete_report_markdown(report_path)
-    validate_complete_source_identity_section(report_path)
-    validate_current_coverage_section(report_path)
-    validate_residual_obligations_paragraph(report_path)
+    report_markdown = load_authenticated_report_markdown(report_path)
+    validate_complete_source_identity_section(report_markdown)
+    validate_current_coverage_section(report_markdown)
+    validate_residual_obligations_paragraph(report_markdown)
     semantic_coverage=[row for row in unknowns if row.get('id')=='SEMANTIC-COVERAGE']
     require(len(semantic_coverage)==1,'semantic-coverage unknown missing')
     require(json_exact(semantic_coverage[0],SEMANTIC_COVERAGE_UNKNOWN),'semantic-coverage unknown drift')
