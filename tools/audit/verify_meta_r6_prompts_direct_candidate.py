@@ -10,6 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 CANDIDATE_REL = Path('docs/evidence/organization-audit-20260907/r3-meta-r6-prompts-direct-candidate.json')
 CANDIDATE_SHA256 = '62b7f49af1434667f9ed293c896bc7f9b285cb8652883f00915607f0ce65381a'
 REPORT_REL = Path('docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json')
+INDEX_REL = Path('docs/evidence/organization-audit-20260907/verification-index.json')
+R6_ADOPTION_OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/coverage-review-meta-r6-prompts-direct-additions.tsv')
 PLAN_REL = Path('docs/evidence/organization-audit-20260907/collection-plan.json')
 FINDINGS_REL = Path('docs/evidence/organization-audit-20260907/finding-register.tsv')
 SOURCE = '1a01c5b3e08666a82245b1cac78da3736c65e785'
@@ -34,18 +36,25 @@ def json_exact(actual, expected, path='root'):
         for index, (item, wanted) in enumerate(zip(actual, expected)): json_exact(item, wanted, f'{path}[{index}]')
     else: require(actual == expected, path + ' value drift')
 
-def read_json(path):
+def parse_json_bytes(raw):
     def pairs(items):
         result = {}
         for key, value in items:
             require(key not in result, 'duplicate JSON key: ' + key); result[key] = value
         return result
-    return json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=pairs)
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError as error:
+        raise ValueError('invalid UTF-8 JSON') from error
+    return json.loads(text, object_pairs_hook=pairs)
+
+def read_json(path):
+    return parse_json_bytes(path.read_bytes())
 
 def expected_candidate(root=ROOT):
     raw = (root / CANDIDATE_REL).read_bytes()
     require(hashlib.sha256(raw).hexdigest() == CANDIDATE_SHA256, 'candidate complete-file SHA drift')
-    return read_json(root / CANDIDATE_REL)
+    return parse_json_bytes(raw)
 
 def validate_candidate(candidate, expected=None):
     json_exact(candidate, expected or expected_candidate(), 'candidate')
@@ -76,6 +85,21 @@ def validate_finding(root, candidate):
     json_exact(found[0], EXPECTED_META_AUD_05, 'META-AUD-05 register row')
     expected_binding = dict(EXPECTED_META_AUD_05, candidate_disposition='RECONFIRMED_NOT_CLOSED_NOT_DOWNGRADED_NOT_DUPLICATED')
     json_exact(candidate['finding_bindings'], [expected_binding], 'candidate finding bindings')
+
+def _is_r6_prompt_adoption_key(key):
+    normalized = key.lower().replace('-', '_')
+    return 'r6' in normalized and 'prompt' in normalized and (
+        'adoption' in normalized or 'adopted' in normalized or
+        ('coverage_review' in normalized and 'additions' in normalized)
+    )
+
+def validate_candidate_only_state(root):
+    overlay = root / R6_ADOPTION_OVERLAY_REL
+    require(not overlay.exists() and not overlay.is_symlink(), 'R6 prompt adoption overlay exists')
+    index = read_json(root / INDEX_REL)
+    require(not any(_is_r6_prompt_adoption_key(key) for key in index), 'R6 prompt adoption index record exists')
+    report = read_json(root / REPORT_REL)
+    require(not any(_is_r6_prompt_adoption_key(key) for key in report), 'R6 prompt adoption report pointer exists')
 
 def collect_inventories(root, output):
     plan = read_json(root / PLAN_REL)
@@ -116,7 +140,7 @@ def validate_accounting(root, candidate, inventory_dir=None):
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--audit-root', type=Path, default=ROOT); args = parser.parse_args()
     candidate = expected_candidate(args.audit_root)
-    validate_candidate(candidate, candidate); validate_source(args.audit_root, candidate); validate_finding(args.audit_root, candidate); validate_accounting(args.audit_root, candidate)
+    validate_candidate(candidate, candidate); validate_source(args.audit_root, candidate); validate_finding(args.audit_root, candidate); validate_accounting(args.audit_root, candidate); validate_candidate_only_state(args.audit_root)
     print(json.dumps({'result':'META_R6_PROMPTS_DIRECT_CANDIDATE_VALID_NOT_ADOPTED','family':candidate['family'],'candidate_paths':11,'candidate_sha256':CANDIDATE_SHA256,'coverage_delta':0,'coverage_adopted':False,'adoption_performed':False,'current_disposition':'UNVERIFIED','direct_paths':283,'grouped_paths':113,'unverified_paths':3929,'semantically_classified_paths':396,'ledger_sha256':LEDGER_SHA,'meta_aud_05_status':'PARTIALLY_REPAIRED','residual_obligations':14,'product_readiness_claimed':False,'audit_completion_claimed':False,'live_state_claimed':False}, sort_keys=True))
     return 0
 

@@ -2,6 +2,7 @@
 """Adversarial tests for the META R6 prompt-family candidate."""
 from copy import deepcopy
 from pathlib import Path
+from unittest import mock
 import csv, json, shutil, tempfile, unittest
 import verify_meta_r6_prompts_direct_candidate as v
 
@@ -23,6 +24,33 @@ class MetaR6PromptsCandidateTest(unittest.TestCase):
     def test_committed_candidate_source_finding_and_accounting_pass(self):
         v.validate_candidate(deepcopy(self.candidate)); v.validate_source(v.ROOT, self.candidate)
         v.validate_finding(v.ROOT, self.candidate); v.validate_accounting(v.ROOT, self.candidate, self.inventory)
+        v.validate_candidate_only_state(v.ROOT)
+    def test_expected_candidate_parses_the_authenticated_bytes(self):
+        temp, root = self.copied_evidence()
+        try:
+            candidate_path = root / v.CANDIDATE_REL
+            canonical = candidate_path.read_bytes()
+            replacement = deepcopy(self.candidate)
+            replacement['coverage_adopted'] = True
+            replacement['adoption_performed'] = True
+            replacement['product_readiness_claimed'] = True
+            original = Path.read_bytes
+            reads = 0
+            def replace_after_read(path):
+                nonlocal reads
+                data = original(path)
+                if path == candidate_path:
+                    reads += 1
+                    candidate_path.write_text(json.dumps(replacement), encoding='utf-8')
+                return data
+            with mock.patch.object(Path, 'read_bytes', replace_after_read):
+                actual = v.expected_candidate(root)
+            self.assertEqual(actual, self.candidate)
+            self.assertEqual(reads, 1)
+        finally: temp.cleanup()
+    def test_candidate_byte_parser_rejects_duplicates_and_invalid_utf8(self):
+        with self.assertRaises(ValueError): v.parse_json_bytes(b'{"a":1,"a":2}')
+        with self.assertRaises(ValueError): v.parse_json_bytes(b'\xff')
     def test_path_set_blob_source_tree_and_order_fail_closed(self):
         mutations = [lambda c: c['paths'].pop(), lambda c: c['paths'].append(deepcopy(c['paths'][0])), lambda c: c['paths'].append({'path':'extra'}), lambda c: c['paths'][0].update(blob_sha='0'*40), lambda c: c['source'].update(commit='0'*40), lambda c: c['source'].update(subtree_tree='0'*40), lambda c: c['paths'].reverse()]
         for mutation in mutations:
@@ -69,6 +97,36 @@ class MetaR6PromptsCandidateTest(unittest.TestCase):
             summary=root/'docs/evidence/organization-audit-20260907/coverage-summary.json'; data=json.loads(summary.read_text()); data['direct_paths']=282; data['unverified_paths']=3930; data['ledger_sha256']='0'*64; summary.write_text(json.dumps(data))
             report=root/v.REPORT_REL; data=json.loads(report.read_text()); data['scoped_review_paths']=282; data['unverified_semantics']=3930; report.write_text(json.dumps(data))
             with self.assertRaises((ValueError, KeyError)): v.validate_accounting(root,self.candidate,self.inventory)
+        finally: temp.cleanup()
+    def test_candidate_only_transition_artifacts_fail_closed(self):
+        mutations = [
+            ('overlay', None, None),
+            ('index', 'r3_meta_r6_prompts_direct_adoption', {'status':'ADOPTED'}),
+            ('report', 'coverage_review_meta_r6_prompts_direct_additions', 'organization-audit-20260907/coverage-review-meta-r6-prompts-direct-additions.tsv'),
+            ('report', 'r3_meta_r6_prompts_direct_adoption_overlay', 'organization-audit-20260907/coverage-review-meta-r6-prompts-direct-additions.tsv'),
+        ]
+        for location, key, value in mutations:
+            with self.subTest(location=location, key=key):
+                temp, root = self.copied_evidence()
+                try:
+                    if location == 'overlay':
+                        path = root / v.R6_ADOPTION_OVERLAY_REL
+                        path.write_text('adoption\n', encoding='utf-8')
+                    else:
+                        path = root / (v.INDEX_REL if location == 'index' else v.REPORT_REL)
+                        data = v.read_json(path); data[key] = value
+                        path.write_text(json.dumps(data), encoding='utf-8')
+                    with self.assertRaisesRegex(ValueError, 'R6 prompt adoption'):
+                        v.validate_candidate_only_state(root)
+                finally: temp.cleanup()
+    def test_candidate_provenance_pointer_is_not_adoption(self):
+        temp, root = self.copied_evidence()
+        try:
+            report = root / v.REPORT_REL
+            data = v.read_json(report)
+            data['r3_meta_r6_prompts_direct_candidate'] = str(v.CANDIDATE_REL.name)
+            report.write_text(json.dumps(data), encoding='utf-8')
+            v.validate_candidate_only_state(root)
         finally: temp.cleanup()
 
 if __name__ == '__main__': unittest.main()
