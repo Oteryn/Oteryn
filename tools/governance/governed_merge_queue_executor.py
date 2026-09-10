@@ -29,7 +29,7 @@ EXPECTED_BASE = "main"
 MERGE_ACTION = "merge_queue"
 AUTHORIZATION_HEADER = "OTERYN_MQ_AUTHORIZATION_V1"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-TRUSTED_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
+TRUSTED_ASSOCIATIONS = frozenset({"OWNER", "MEMBER"})
 TARGET_GATES = {
     "Oteryn/Oteryn": "meta-gate",
     "Oteryn/Oteryn-Game": "game-gate",
@@ -286,6 +286,8 @@ def qualify_target(
         if isinstance(run, dict)
         and run.get("name") == required_gate
         and str(run.get("head_sha") or "").lower() == expected_head_sha
+        and isinstance(run.get("app"), dict)
+        and run["app"].get("slug") == "github-actions"
     ]
     if not matching:
         raise ValueError(f"no {required_gate} check run matches the exact target head")

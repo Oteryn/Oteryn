@@ -94,8 +94,7 @@ A delegated submission requires two durable records:
    ```
 
 The transport request is not authority by itself. The executor must fetch the
-authorization comment live and bind it to the exact target PR, trusted actor
-association, repository, PR number, `base=main` and head.
+authorization comment live and bind it to the exact target PR, OWNER/MEMBER actor association, repository, PR number, `base=main` and head.
 
 ## Executor invariants
 

@@ -20,6 +20,12 @@ Load the relevant procedure when performing its operation:
 - Substantial starts/resumptions: validate the routing packet through
   `tools/governance/agent_execution_routing.py` with
   `ecosystem/agent-execution-routing-policy.json` and freshly verified GitHub facts.
+- Protected-integration scheduling: before releasing a mutating worker expected to
+  require autonomous protected integration, apply
+  `docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md` through
+  `tools/governance/integration_capability_routing.py`. Only `DIRECT_CAPABLE` or
+  verified `DELEGATED_CAPABLE` permits that worker release; capability is not merge
+  authority.
 - Retry/freeze decisions: `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md`.
   Productive work has no generic elapsed-time stop.
 - Session/context/wait transitions:

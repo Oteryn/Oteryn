@@ -63,8 +63,8 @@ Post exactly one comment to META Issue #196:
 ```
 
 The protected default-branch workflow parses this command with a closed regex.
-Anything else is ignored. OWNER/MEMBER/COLLABORATOR association is required on
-the control comment.
+Anything else is ignored. OWNER/MEMBER association is required on the control
+comment.
 
 The executor independently re-reads and validates the target authorization
 comment, target PR and exact-head required gate immediately before mutation.

@@ -101,6 +101,7 @@ def read_responses() -> dict[tuple[str, str], executor.Response]:
                         "head_sha": HEAD,
                         "status": "completed",
                         "conclusion": "success",
+                        "app": {"slug": "github-actions"},
                     }
                 ]
             },
@@ -141,6 +142,7 @@ def test_authorization_comment_wrong_target_or_body_fails_closed() -> None:
     for field, value in (
         ("issue_url", "https://api.github.com/repos/Oteryn/Oteryn-Game/issues/999"),
         ("body", authorization_body(head="a" * 40)),
+        ("author_association", "COLLABORATOR"),
         ("author_association", "CONTRIBUTOR"),
     ):
         responses = read_responses()
@@ -189,6 +191,7 @@ def test_latest_exact_head_provider_gate_must_be_success() -> None:
                     "head_sha": HEAD,
                     "status": "completed",
                     "conclusion": "failure",
+                    "app": {"slug": "github-actions"},
                 }
             ]
         },
@@ -199,6 +202,21 @@ def test_latest_exact_head_provider_gate_must_be_success() -> None:
         assert "completed/success" in str(exc)
     else:
         raise AssertionError("failed source-head gate was accepted")
+
+
+def test_exact_head_gate_must_come_from_github_actions() -> None:
+    responses = read_responses()
+    query = "check_name=game-gate&filter=latest&per_page=100"
+    key = ("GET", f"/repos/Oteryn/Oteryn-Game/commits/{HEAD}/check-runs?{query}")
+    spoofed = dict(responses[key].body["check_runs"][0])
+    spoofed["app"] = {"slug": "untrusted-app"}
+    responses[key] = executor.Response(200, {"check_runs": [spoofed]})
+    try:
+        qualified(FakeClient(responses))
+    except ValueError as exc:
+        assert "matches the exact target head" in str(exc)
+    else:
+        raise AssertionError("spoofed non-GitHub-Actions gate was accepted")
 
 
 def test_202_uses_only_exact_merge_async_request_and_causal_uuid_readback() -> None:
@@ -331,6 +349,7 @@ def test_workflow_is_narrow_and_never_uses_builtin_token_for_queue_mutation() ->
     assert "contents: read" in workflow
     assert "issues: read" in workflow
     assert "pull-requests: read" in workflow
+    assert '{"OWNER", "MEMBER", "COLLABORATOR"}' not in workflow
 
 
 def main() -> int:

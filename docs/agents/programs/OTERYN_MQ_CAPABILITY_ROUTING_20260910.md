@@ -52,6 +52,7 @@ cannot submit the PR to Merge Queue.
 - `docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md`
 - `docs/agents/operations/MERGE_QUEUE_EXECUTOR.md`
 - `docs/agents/programs/OTERYN_MQ_CAPABILITY_ROUTING_20260910.md`
+- `AGENTS.md`
 
 ## Security / authority invariants
 
@@ -76,9 +77,15 @@ cannot submit the PR to Merge Queue.
 Local deterministic fixture execution against the candidate source:
 
 - `test_integration_capability_routing.py`: 8 PASS.
-- `test_governed_merge_queue_executor.py`: 10 PASS.
+- `test_governed_merge_queue_executor.py`: 11 PASS.
 - workflow YAML parses successfully as YAML.
 - no network or live queue mutation was used by focused tests.
+
+Whole-diff self-review before the repair head move found and repaired two
+hardening gaps: trusted comment actors were narrowed from
+OWNER/MEMBER/COLLABORATOR to OWNER/MEMBER, and exact-head provider gate evidence
+is now accepted only from the `github-actions` app slug to reject same-name
+external check spoofing.
 
 These local results are development evidence only. Exact published-head GitHub
 CI and pull-request contract-test workflow are authoritative before readiness.
