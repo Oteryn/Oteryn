@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import hashlib
+import io
 import json
 from pathlib import Path
 import subprocess
@@ -169,7 +171,8 @@ def collect_canonical_inventories(audit_root: Path, output: Path) -> Path:
     plan["snapshots"] = [row for row in plan["snapshots"] if row["id"] in INVENTORY_IDS]
     require({row["id"] for row in plan["snapshots"]} == INVENTORY_IDS,
             "canonical inventory snapshot set drift")
-    organization_audit.collect(plan, output)
+    with contextlib.redirect_stdout(io.StringIO()):
+        organization_audit.collect(plan, output)
     return output / "inventories"
 
 

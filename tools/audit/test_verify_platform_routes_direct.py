@@ -5,6 +5,8 @@ from pathlib import Path
 import csv
 import json
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -32,6 +34,30 @@ class PlatformRoutesCandidateTest(unittest.TestCase):
     def test_committed_revalidation_passes(self):
         verifier.validate_candidate(deepcopy(self.candidate))
         verifier.validate_current_accounting(verifier.ROOT, self.inventory_dir)
+
+    def test_cli_stdout_is_exactly_one_verifier_json_document(self):
+        script = """
+import sys
+from unittest import mock
+import verify_platform_routes_direct as verifier
+
+with mock.patch.object(verifier, "validate_source"):
+    raise SystemExit(verifier.main())
+"""
+        completed = subprocess.run(
+            [sys.executable, "-c", script, "--audit-root", str(verifier.ROOT),
+             "--platform-root", str(verifier.ROOT)],
+            cwd=Path(__file__).resolve().parent,
+            check=False,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=180,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        parsed = json.loads(completed.stdout)
+        self.assertEqual(parsed["result"], "PLATFORM_ROUTES_DIRECT_EXISTING_REVALIDATION_VALID")
+        self.assertEqual(completed.stdout, json.dumps(parsed, sort_keys=True) + "\n")
 
     def mutate_accounting(self, mutation):
         with tempfile.TemporaryDirectory() as temporary:
