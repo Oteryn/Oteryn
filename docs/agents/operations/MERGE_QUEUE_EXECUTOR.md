@@ -1,8 +1,8 @@
 # Governed Merge Queue Executor
 
-Governing design: `docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md`  
-Control surface: `Oteryn/Oteryn#196`  
-Implementation: `tools/governance/governed_merge_queue_executor.py`  
+Governing design: `docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md`
+Control surface: `Oteryn/Oteryn#196`
+Implementation: `tools/governance/governed_merge_queue_executor.py`
 Workflow: `.github/workflows/governed-merge-queue-executor.yml`
 
 ## Purpose

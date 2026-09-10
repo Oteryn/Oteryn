@@ -1,10 +1,10 @@
 # Oteryn Merge Queue capability routing repair
 
-Governing Issue: #194  
-Control request Issue: #196  
-Admission META main: `3b39e0be05aef008f1bd442821daefa898a201dd`  
-Branch: `fix/194-capability-aware-mq-routing`  
-PR: #195  
+Governing Issue: #194
+Control request Issue: #196
+Admission META main: `3b39e0be05aef008f1bd442821daefa898a201dd`
+Branch: `fix/194-capability-aware-mq-routing`
+PR: #195
 Status: `VALIDATING`
 
 ## Problem
