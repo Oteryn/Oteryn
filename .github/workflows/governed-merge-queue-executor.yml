@@ -1,0 +1,89 @@
+name: Governed Merge Queue Executor
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: governed-mq-control
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    name: Submit exact authorized target
+    if: >-
+      github.repository == 'Oteryn/Oteryn' &&
+      github.event.issue.number == 196 &&
+      github.event.issue.pull_request == null
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Parse exact control request
+        id: parse
+        shell: bash
+        env:
+          CONTROL_ISSUE: '196'
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          output = os.environ["GITHUB_OUTPUT"]
+          body = os.environ.get("COMMENT_BODY", "")
+          association = os.environ.get("AUTHOR_ASSOCIATION", "")
+          issue = os.environ.get("ISSUE_NUMBER", "")
+          control = os.environ.get("CONTROL_ISSUE", "")
+
+          pattern = re.compile(
+              r"^/oteryn-mq-submit "
+              r"(Oteryn/(?:Oteryn|Oteryn-Game|Oteryn-Platform|Oteryn-Atlas)) "
+              r"([1-9][0-9]*) ([0-9a-f]{40})$"
+          )
+          match = pattern.fullmatch(body)
+          trusted = association in {"OWNER", "MEMBER"}
+          allowed = bool(match and trusted and issue == control)
+
+          values = {
+              "allowed": "true" if allowed else "false",
+              "repository": match.group(1) if allowed else "",
+              "pr_number": match.group(2) if allowed else "",
+              "expected_head_sha": match.group(3) if allowed else "",
+          }
+          with open(output, "a", encoding="utf-8") as handle:
+              for key, value in values.items():
+                  handle.write(f"{key}={value}\n")
+          PY
+
+      - name: Checkout protected META executor
+        if: ${{ steps.parse.outputs.allowed == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Execute governed native merge-async request
+        if: ${{ steps.parse.outputs.allowed == 'true' }}
+        env:
+          OTERYN_MQ_READ_TOKEN: ${{ github.token }}
+          OTERYN_MQ_FINE_GRAINED_PAT: ${{ secrets.OTERYN_MQ_FINE_GRAINED_PAT }}
+          TARGET_REPOSITORY: ${{ steps.parse.outputs.repository }}
+          TARGET_PR: ${{ steps.parse.outputs.pr_number }}
+          TARGET_HEAD: ${{ steps.parse.outputs.expected_head_sha }}
+          REQUEST_COMMENT_ID: ${{ github.event.comment.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/governance/governed_merge_queue_executor.py \
+            --repository "$TARGET_REPOSITORY" \
+            --pr-number "$TARGET_PR" \
+            --expected-head-sha "$TARGET_HEAD" \
+            --request-comment-id "$REQUEST_COMMENT_ID"
