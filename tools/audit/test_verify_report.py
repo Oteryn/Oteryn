@@ -94,6 +94,33 @@ class AuditValidationTest(unittest.TestCase):
         self.assertIn('223 DIRECT / 113 GROUPED / 3,989 UNVERIFIED',text)
         self.assertIn('2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f',text)
         self.assertEqual(audit.validate(self.path)['result'],'ACCOUNTING_VALID_NOT_SEMANTIC_PASS')
+    def test_historical_snapshot_contradictory_current_state_insertion_rejected(self):
+        insertion=' The present canonical state is 258 DIRECT / 113 GROUPED / 3954 UNVERIFIED and is product ready.'
+        marker=' Full CSV is reproducible'
+        self.mutate_companion(marker,insertion+marker)
+        self.reject()
+    def test_historical_snapshot_223_state_removal_or_replacement_rejected(self):
+        historical_delta='the current revision adds 158 DIRECT paths'
+        for replacement in ('', 'the current revision adds 159 DIRECT paths'):
+            with self.subTest(replacement=replacement):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
+                self.mutate_companion(historical_delta,replacement)
+                self.reject()
+    def test_historical_snapshot_digest_removal_or_replacement_rejected(self):
+        digest='2d823435f76f0c08b118ccb5dc1c9ccf9ef4acc41bffdd447b260e82ea404b0f'
+        for replacement in ('', '0'*64):
+            with self.subTest(replacement=replacement):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
+                self.mutate_companion(digest,replacement)
+                self.reject()
+    def test_historical_snapshot_arbitrary_status_append_rejected(self):
+        self.mutate_companion(audit.EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT,
+                              audit.EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT+' Arbitrary contradictory status.')
+        self.reject()
+    def test_historical_snapshot_truncation_rejected(self):
+        snapshot=audit.EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT
+        self.mutate_companion(snapshot,snapshot[:len(snapshot)//2])
+        self.reject()
     def test_boolean_schema_rejected(self):
         self.mutate(self.path,lambda d:d.update(schema_version=True));self.reject()
     def test_production_claim_rejected(self):
