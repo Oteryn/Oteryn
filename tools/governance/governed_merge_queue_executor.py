@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Bounded organization-owned native Merge Queue executor.
 
-The control request is transport only. The executor separately verifies a
-target-PR authorization comment, exact target identity, the provider source-head
-gate, and then invokes only REST merge-async with explicit merge_queue action.
-
-The script deliberately does not wait for or claim terminal merge_group
-integration. The owning coordinator must perform that later readback.
+The Issue comment is only a transport for a coordinator action already authorized
+by higher-level repository policy. This executor does not create merge authority.
+It re-reads the exact control comment and target state, then performs only the
+selected REST merge-async operation with exact-head fencing.
 """
 
 from __future__ import annotations
@@ -27,8 +25,14 @@ API_URL = "https://api.github.com"
 API_VERSION = "2026-03-10"
 EXPECTED_BASE = "main"
 MERGE_ACTION = "merge_queue"
-AUTHORIZATION_HEADER = "OTERYN_MQ_AUTHORIZATION_V1"
+CONTROL_REPOSITORY = "Oteryn/Oteryn"
+CONTROL_ISSUE = 196
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+CONTROL_COMMAND_RE = re.compile(
+    r"^/oteryn-mq-submit "
+    r"(Oteryn/(?:Oteryn|Oteryn-Game|Oteryn-Platform|Oteryn-Atlas)) "
+    r"([1-9][0-9]*) ([0-9a-f]{40})$"
+)
 TRUSTED_ASSOCIATIONS = frozenset({"OWNER", "MEMBER"})
 TARGET_GATES = {
     "Oteryn/Oteryn": "meta-gate",
@@ -124,7 +128,7 @@ class QualifiedTarget:
     base: str
     head_sha: str
     required_gate: str
-    authorization_comment_id: int
+    request_comment_id: int
 
 
 @dataclass(frozen=True)
@@ -156,62 +160,59 @@ def normalize_inputs(
     repository: str,
     pr_number: int,
     expected_head_sha: str,
-    authorization_comment_id: int,
+    request_comment_id: int,
 ) -> tuple[str, int, str, int]:
     repository = repository.strip()
-    expected_head_sha = expected_head_sha.strip().lower()
+    expected_head_sha = expected_head_sha.strip()
     if repository not in TARGET_GATES:
         raise ValueError("repository is not an allowed permanent Oteryn target")
     if isinstance(pr_number, bool) or not isinstance(pr_number, int) or pr_number <= 0:
         raise ValueError("PR number must be a positive integer")
     if not SHA_RE.fullmatch(expected_head_sha):
-        raise ValueError("expected head SHA must be exactly 40 lowercase hexadecimal characters")
+        raise ValueError(
+            "expected head SHA must be exactly 40 lowercase hexadecimal characters"
+        )
     if (
-        isinstance(authorization_comment_id, bool)
-        or not isinstance(authorization_comment_id, int)
-        or authorization_comment_id <= 0
+        isinstance(request_comment_id, bool)
+        or not isinstance(request_comment_id, int)
+        or request_comment_id <= 0
     ):
-        raise ValueError("authorization comment id must be a positive integer")
-    return repository, pr_number, expected_head_sha, authorization_comment_id
+        raise ValueError("request comment id must be a positive integer")
+    return repository, pr_number, expected_head_sha, request_comment_id
 
 
-def _expected_authorization_body(repository: str, pr_number: int, head_sha: str) -> list[str]:
-    return [
-        AUTHORIZATION_HEADER,
-        f"repository: {repository}",
-        f"pull_request: {pr_number}",
-        f"base: {EXPECTED_BASE}",
-        f"head_sha: {head_sha}",
-        "integration_authorized: true",
-    ]
-
-
-def verify_authorization_comment(
+def verify_control_request(
     read_client: Client,
     *,
     repository: str,
     pr_number: int,
     expected_head_sha: str,
-    authorization_comment_id: int,
+    request_comment_id: int,
 ) -> None:
-    owner, name = repository.split("/", 1)
     comment = _response_body(
         read_client.rest(
             "GET",
-            f"/repos/{owner}/{name}/issues/comments/{authorization_comment_id}",
+            f"/repos/Oteryn/Oteryn/issues/comments/{request_comment_id}",
         )
     )
     if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
-        raise ValueError("authorization comment actor is not a trusted repository association")
-    issue_url = comment.get("issue_url")
-    expected_issue_url = f"https://api.github.com/repos/{owner}/{name}/issues/{pr_number}"
-    if issue_url != expected_issue_url:
-        raise ValueError("authorization comment is not bound to the target pull request")
+        raise ValueError("control request actor must be OWNER or MEMBER of META")
+    expected_issue_url = (
+        f"https://api.github.com/repos/{CONTROL_REPOSITORY}/issues/{CONTROL_ISSUE}"
+    )
+    if comment.get("issue_url") != expected_issue_url:
+        raise ValueError("control request comment is not on the canonical META control issue")
     body = comment.get("body")
-    if not isinstance(body, str) or body.splitlines() != _expected_authorization_body(
-        repository, pr_number, expected_head_sha
+    match = CONTROL_COMMAND_RE.fullmatch(body) if isinstance(body, str) else None
+    if match is None:
+        raise ValueError("control request body does not match the closed command grammar")
+    requested_repository, requested_pr, requested_head = match.groups()
+    if (
+        requested_repository != repository
+        or int(requested_pr) != pr_number
+        or requested_head != expected_head_sha
     ):
-        raise ValueError("authorization comment body does not exactly bind repository/PR/base/head")
+        raise ValueError("live control request does not match workflow-bound target coordinates")
 
 
 def _validate_target_identity(
@@ -245,21 +246,23 @@ def qualify_target(
     repository: str,
     pr_number: int,
     expected_head_sha: str,
-    authorization_comment_id: int,
+    request_comment_id: int,
 ) -> QualifiedTarget:
-    repository, pr_number, expected_head_sha, authorization_comment_id = normalize_inputs(
-        repository, pr_number, expected_head_sha, authorization_comment_id
+    repository, pr_number, expected_head_sha, request_comment_id = normalize_inputs(
+        repository, pr_number, expected_head_sha, request_comment_id
     )
-    verify_authorization_comment(
+    verify_control_request(
         read_client,
         repository=repository,
         pr_number=pr_number,
         expected_head_sha=expected_head_sha,
-        authorization_comment_id=authorization_comment_id,
+        request_comment_id=request_comment_id,
     )
 
     owner, name = repository.split("/", 1)
-    pull = _response_body(read_client.rest("GET", f"/repos/{owner}/{name}/pulls/{pr_number}"))
+    pull = _response_body(
+        read_client.rest("GET", f"/repos/{owner}/{name}/pulls/{pr_number}")
+    )
     _validate_target_identity(
         pull,
         repository=repository,
@@ -290,19 +293,19 @@ def qualify_target(
         and run["app"].get("slug") == "github-actions"
     ]
     if not matching:
-        raise ValueError(f"no {required_gate} check run matches the exact target head")
+        raise ValueError(
+            f"no GitHub-Actions {required_gate} check run matches the exact target head"
+        )
     latest = max(matching, key=lambda run: int(run.get("id") or 0))
     if latest.get("status") != "completed" or latest.get("conclusion") != "success":
-        raise ValueError(
-            f"latest exact-head {required_gate} must be completed/success"
-        )
+        raise ValueError(f"latest exact-head {required_gate} must be completed/success")
     return QualifiedTarget(
         repository,
         pr_number,
         EXPECTED_BASE,
         expected_head_sha,
         required_gate,
-        authorization_comment_id,
+        request_comment_id,
     )
 
 
@@ -319,7 +322,9 @@ def _valid_uuid(value: object) -> str:
     return canonical
 
 
-def _server_fields(payload: Mapping[str, Any], *, require_uuid: bool) -> tuple[str, str, str, str]:
+def _server_fields(
+    payload: Mapping[str, Any], *, require_uuid: bool
+) -> tuple[str, str, str, str]:
     status = payload.get("status")
     details = payload.get("details")
     if not isinstance(status, str) or not status or not isinstance(details, dict):
@@ -346,7 +351,9 @@ def _readback(
             f"/repos/{owner}/{name}/pulls/{target.pr_number}/merge-async/{server_uuid}",
         )
     )
-    status, readback_uuid, action, head = _server_fields(async_result, require_uuid=True)
+    status, readback_uuid, action, head = _server_fields(
+        async_result, require_uuid=True
+    )
     if readback_uuid != server_uuid:
         raise ExecutorError("merge-async readback UUID differs from accepted request UUID")
     if action != MERGE_ACTION or head != target.head_sha:
@@ -402,9 +409,13 @@ def submit_merge_queue(
         )
 
     if response.status == 202:
-        status, server_uuid, action, head = _server_fields(response.body, require_uuid=True)
+        status, server_uuid, action, head = _server_fields(
+            response.body, require_uuid=True
+        )
         if action != MERGE_ACTION or head != target.head_sha:
-            raise ExecutorError("merge-async acceptance does not bind exact head and merge_queue")
+            raise ExecutorError(
+                "merge-async acceptance does not bind exact head and merge_queue"
+            )
         receipt_sequence = sequence.next()
         receipt = Receipt(
             target.repository,
@@ -426,10 +437,12 @@ def submit_merge_queue(
         )
         return {
             "result": "REQUEST_ACCEPTED_NON_TERMINAL",
+            "request_comment_id": target.request_comment_id,
             "receipt": asdict(receipt),
             "readback": asdict(readback),
         }
 
+    # HTTP 200/409 is reconciliation only: it never fabricates a new acceptance receipt.
     details = response.body.get("details")
     readback: Mapping[str, Any] | None = None
     if isinstance(details, dict) and details.get("uuid") is not None:
@@ -456,6 +469,7 @@ def submit_merge_queue(
         )
     return {
         "result": "RECONCILIATION_REQUIRED",
+        "request_comment_id": target.request_comment_id,
         "http_status": response.status,
         "accepted": False,
         "receipt": None,
@@ -468,7 +482,7 @@ def main() -> int:
     parser.add_argument("--repository", required=True)
     parser.add_argument("--pr-number", required=True, type=int)
     parser.add_argument("--expected-head-sha", required=True)
-    parser.add_argument("--authorization-comment-id", required=True, type=int)
+    parser.add_argument("--request-comment-id", required=True, type=int)
     args = parser.parse_args()
 
     mutation_token = os.environ.get("OTERYN_MQ_FINE_GRAINED_PAT", "").strip()
@@ -487,7 +501,7 @@ def main() -> int:
             repository=args.repository,
             pr_number=args.pr_number,
             expected_head_sha=args.expected_head_sha,
-            authorization_comment_id=args.authorization_comment_id,
+            request_comment_id=args.request_comment_id,
         )
         result = submit_merge_queue(read_client, mutation_client, target)
     except (ValueError, ExecutorError) as exc:

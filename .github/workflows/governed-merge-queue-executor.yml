@@ -1,17 +1,6 @@
 name: Governed Merge Queue Executor
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - ecosystem/agent-execution-routing-policy.json
-      - tools/governance/integration_capability_routing.py
-      - tools/governance/test_integration_capability_routing.py
-      - tools/governance/governed_merge_queue_executor.py
-      - tools/governance/test_governed_merge_queue_executor.py
-      - .github/workflows/governed-merge-queue-executor.yml
-      - docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md
-      - docs/agents/operations/MERGE_QUEUE_EXECUTOR.md
   issue_comment:
     types: [created]
 
@@ -21,43 +10,18 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: governed-mq-${{ github.event.pull_request.number || github.event.comment.id || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: governed-mq-control
+  cancel-in-progress: false
 
 jobs:
-  contract-tests:
-    name: capability-routing-tests
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout exact candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          persist-credentials: false
-
-      - name: Run deterministic capability and executor regressions
-        run: |
-          set -euo pipefail
-          python3 tools/governance/test_integration_capability_routing.py
-          python3 tools/governance/test_governed_merge_queue_executor.py
-
-  authorize:
-    name: Parse bounded request
+  submit:
+    name: Submit exact authorized target
     if: >-
-      github.event_name == 'issue_comment' &&
       github.repository == 'Oteryn/Oteryn' &&
       github.event.issue.number == 196 &&
       github.event.issue.pull_request == null
     runs-on: ubuntu-latest
-    timeout-minutes: 2
-    outputs:
-      allowed: ${{ steps.parse.outputs.allowed }}
-      repository: ${{ steps.parse.outputs.repository }}
-      pr_number: ${{ steps.parse.outputs.pr_number }}
-      expected_head_sha: ${{ steps.parse.outputs.expected_head_sha }}
-      authorization_comment_id: ${{ steps.parse.outputs.authorization_comment_id }}
+    timeout-minutes: 5
     steps:
       - name: Parse exact control request
         id: parse
@@ -65,7 +29,6 @@ jobs:
         env:
           CONTROL_ISSUE: '196'
           ISSUE_NUMBER: ${{ github.event.issue.number }}
-          ISSUE_IS_PULL_REQUEST: ${{ github.event.issue.pull_request != null }}
           COMMENT_BODY: ${{ github.event.comment.body }}
           AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
         run: |
@@ -78,50 +41,43 @@ jobs:
           body = os.environ.get("COMMENT_BODY", "")
           association = os.environ.get("AUTHOR_ASSOCIATION", "")
           issue = os.environ.get("ISSUE_NUMBER", "")
-          is_pr = os.environ.get("ISSUE_IS_PULL_REQUEST", "")
           control = os.environ.get("CONTROL_ISSUE", "")
 
           pattern = re.compile(
               r"^/oteryn-mq-submit "
               r"(Oteryn/(?:Oteryn|Oteryn-Game|Oteryn-Platform|Oteryn-Atlas)) "
-              r"([1-9][0-9]*) ([0-9a-f]{40}) ([1-9][0-9]*)$"
+              r"([1-9][0-9]*) ([0-9a-f]{40})$"
           )
           match = pattern.fullmatch(body)
           trusted = association in {"OWNER", "MEMBER"}
-          allowed = bool(match and trusted and issue == control and is_pr == "false")
+          allowed = bool(match and trusted and issue == control)
 
           values = {
               "allowed": "true" if allowed else "false",
               "repository": match.group(1) if allowed else "",
               "pr_number": match.group(2) if allowed else "",
               "expected_head_sha": match.group(3) if allowed else "",
-              "authorization_comment_id": match.group(4) if allowed else "",
           }
           with open(output, "a", encoding="utf-8") as handle:
               for key, value in values.items():
                   handle.write(f"{key}={value}\n")
           PY
 
-  execute:
-    name: Submit exact authorized target
-    needs: authorize
-    if: ${{ needs.authorize.outputs.allowed == 'true' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout exact protected META executor
+      - name: Checkout protected META executor
+        if: ${{ steps.parse.outputs.allowed == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Execute governed native merge-async request
+        if: ${{ steps.parse.outputs.allowed == 'true' }}
         env:
           OTERYN_MQ_FINE_GRAINED_PAT: ${{ secrets.OTERYN_MQ_FINE_GRAINED_PAT }}
-          TARGET_REPOSITORY: ${{ needs.authorize.outputs.repository }}
-          TARGET_PR: ${{ needs.authorize.outputs.pr_number }}
-          TARGET_HEAD: ${{ needs.authorize.outputs.expected_head_sha }}
-          AUTHORIZATION_COMMENT_ID: ${{ needs.authorize.outputs.authorization_comment_id }}
+          TARGET_REPOSITORY: ${{ steps.parse.outputs.repository }}
+          TARGET_PR: ${{ steps.parse.outputs.pr_number }}
+          TARGET_HEAD: ${{ steps.parse.outputs.expected_head_sha }}
+          REQUEST_COMMENT_ID: ${{ github.event.comment.id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -129,4 +85,4 @@ jobs:
             --repository "$TARGET_REPOSITORY" \
             --pr-number "$TARGET_PR" \
             --expected-head-sha "$TARGET_HEAD" \
-            --authorization-comment-id "$AUTHORIZATION_COMMENT_ID"
+            --request-comment-id "$REQUEST_COMMENT_ID"

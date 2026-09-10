@@ -1,15 +1,15 @@
 # Governed Merge Queue Executor
 
-Governing design: `docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md`
-Control surface: `Oteryn/Oteryn#196`
-Implementation: `tools/governance/governed_merge_queue_executor.py`
+Governing design: `docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md`  
+Control surface: `Oteryn/Oteryn#196`  
+Implementation: `tools/governance/governed_merge_queue_executor.py`  
 Workflow: `.github/workflows/governed-merge-queue-executor.yml`
 
 ## Purpose
 
 Provide one organization-owned bounded actuator for the already-selected META
-native exact-head Merge Queue route when the active coordinator can create
-repository comments but does not itself expose native `merge-async`.
+native exact-head Merge Queue route when the active coordinator can create a
+repository comment but does not itself expose native `merge-async`.
 
 This executor is execution capability only. It is not a second coordinator,
 review authority, architecture authority, protection bypass, or independent
@@ -36,41 +36,30 @@ Before `meta.governed_merge_queue_executor.v1` may be advertised as operational:
 The workflow's normal repository permissions are read-only. It never uses the
 built-in workflow token as the queue mutation credential.
 
-## Authorization record
-
-The owning provider coordinator first records exact integration authorization
-on the target PR:
-
-```text
-OTERYN_MQ_AUTHORIZATION_V1
-repository: Oteryn/Oteryn-Game
-pull_request: 528
-base: main
-head_sha: 97fcf72a2f29a8fc134c97dd3cdaf9237be7c6d3
-integration_authorized: true
-```
-
-That comment must be created only after the coordinator's normal fresh
-repository/PR/head/review/check/eligibility preflight. Its numeric comment ID is
-then passed to the control request.
-
 ## Control request
 
-Post exactly one comment to META Issue #196:
+The active provider coordinator must first perform the normal fresh
+repository/PR/base/head/authorization/eligibility preflight required by META
+policy. If the exact candidate remains authorized, post exactly one comment to
+META Issue #196:
 
 ```text
-/oteryn-mq-submit Oteryn/Oteryn-Game 528 97fcf72a2f29a8fc134c97dd3cdaf9237be7c6d3 <authorization-comment-id>
+/oteryn-mq-submit Oteryn/Oteryn-Game 528 97fcf72a2f29a8fc134c97dd3cdaf9237be7c6d3
 ```
 
-The protected default-branch workflow parses this command with a closed regex.
-Anything else is ignored. OWNER/MEMBER association is required on the control
-comment.
+The request does not grant authority. It is only the transport used by a
+coordinator that already has authority for that exact integration decision.
 
-The executor independently re-reads and validates the target authorization
-comment, target PR and exact-head required gate immediately before mutation.
-Changing any bound coordinate makes the request fail closed.
+The protected default-branch workflow accepts only the closed grammar above and
+OWNER/MEMBER META actor association. The executor re-fetches the same comment
+live and verifies that it is still on Issue #196 and still binds the same
+repository, PR and exact head before it reads the target PR.
 
 ## Native mutation
+
+The executor independently requires target PR `open`, unmerged, non-Draft,
+`base=main`, same-repository head, exact requested SHA and latest exact-head
+canonical provider gate from GitHub Actions in `completed/success`.
 
 The only positive mutation is:
 
@@ -80,14 +69,14 @@ sha=<exact qualified head>
 merge_action=merge_queue
 ```
 
-HTTP 202 produces a non-terminal receipt. The executor binds the returned
-server UUID to sequence 1, performs UUID-addressed status readback and fresh
-target identity readback, and requires a strictly later executor sequence.
+HTTP 202 produces a non-terminal receipt. The executor binds the returned server
+UUID to sequence 1, performs UUID-addressed status readback and fresh target
+identity readback, and requires a strictly later executor sequence.
 
-HTTP 200/409 is reconciliation only. HTTP 400/422 is rejection. HTTP 403/404 is
-a precise native capability/credential blocker. There is no direct merge,
-generic auto-merge, GraphQL enqueue, default merge action, automated dequeue,
-force, protection change, or no-op/retrigger fallback.
+HTTP 200/409 is reconciliation only. HTTP 400/422 is rejection. HTTP 403/404 is a
+precise native capability/credential blocker. There is no direct merge, generic
+auto-merge, GraphQL enqueue, default merge action, automated dequeue, force,
+protection change, or no-op/retrigger fallback.
 
 ## Terminal proof
 
@@ -108,5 +97,5 @@ previous request is awaiting reconciliation. Preserve the candidate and inspect
 the exact workflow result.
 
 If the credential is absent/denied, the executor is not operational. Continue
-safe path-disjoint work; do not weaken protections or resurrect the retired
-provider-local custom-App bridge.
+safe path-disjoint work; do not weaken protections or resurrect a provider-local
+custom-App bridge.

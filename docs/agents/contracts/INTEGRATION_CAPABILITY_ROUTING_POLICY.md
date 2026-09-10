@@ -25,7 +25,7 @@ Do not wait until `READY_FOR_COORDINATOR_INTEGRATION`.
 
 The capability snapshot is observational only. It must come from current-session
 tool/action discovery plus protected executor operational readback; a task,
-prompt, caller boolean, comment, or previous session assertion is not capability
+prompt, caller boolean, comment, or previous-session assertion is not capability
 evidence.
 
 ## States
@@ -36,7 +36,7 @@ The only states are:
   protected integration.
 - `DIRECT_CAPABLE` — the current session exposes the selected native exact-head
   `merge-async` operation.
-- `DELEGATED_CAPABLE` — the current session can write the bounded META control
+- `DELEGATED_CAPABLE` — the current session can create the bounded META control
   request and the protected META delegated executor has been independently
   verified operational.
 - `BLOCKED_CAPABILITY_UNAVAILABLE` — neither positive route is currently proven.
@@ -45,9 +45,9 @@ For work that requires autonomous protected integration, only `DIRECT_CAPABLE`
 or `DELEGATED_CAPABLE` permits release of a new mutating worker. This is a
 scheduling gate, not merge authorization.
 
-If a task is already in progress when the capability route becomes unavailable,
-preserve valid work and the qualified candidate. Do not create no-op/retrigger
-commits merely to change capability state.
+If a task is already in progress when capability becomes unavailable, preserve
+valid work and the qualified candidate. Do not create no-op/retrigger commits
+merely to change capability state.
 
 ## Direct route
 
@@ -58,43 +58,32 @@ operation selected by META:
 
 with the exact qualified `sha` and explicit `merge_action="merge_queue"`.
 
-All target-bound authorization, eligibility, receipt/readback and terminal
-proof requirements from the organization policy remain unchanged.
+All target-bound authorization, eligibility, receipt/readback and terminal proof
+requirements from the organization policy remain unchanged.
 
 ## Delegated route
 
 `DELEGATED_CAPABLE` does **not** transfer coordinator, repository, architecture,
 review or merge authority. The organization-owned executor
-`meta.governed_merge_queue_executor.v1` is a bounded actuator for one
-already-authorized exact-target request.
+`meta.governed_merge_queue_executor.v1` is only a bounded actuator for one action
+that the active coordinator is already authorized to request.
 
-The control transport is META Issue #196. An ordinary repository-native session
-may use it only when it can create the exact bounded request comment. The
-executor workflow must already exist on protected META `main` and its mutation
-credential must have been operationally verified. An unmerged PR containing the
-executor is not a verified route.
+The control transport is META Issue #196. The request comment is not merge
+authority and does not broaden the caller's authority. A coordinator may create
+it only after the normal fresh repository/PR/`base=main`/exact-head
+authorization and eligibility preflight required by the organization policy.
 
-A delegated submission requires two durable records:
+The command is exactly:
 
-1. a target-PR authorization comment with exactly:
+```text
+/oteryn-mq-submit <allowed owner/repo> <pr-number> <exact-40-lowercase-hex-head>
+```
 
-   ```text
-   OTERYN_MQ_AUTHORIZATION_V1
-   repository: <allowed owner/repo>
-   pull_request: <positive integer>
-   base: main
-   head_sha: <exact 40-lowercase-hex head>
-   integration_authorized: true
-   ```
-
-2. a META Issue #196 request comment with exactly:
-
-   ```text
-   /oteryn-mq-submit <allowed owner/repo> <pr-number> <exact-head> <authorization-comment-id>
-   ```
-
-The transport request is not authority by itself. The executor must fetch the
-authorization comment live and bind it to the exact target PR, OWNER/MEMBER actor association, repository, PR number, `base=main` and head.
+The protected executor re-fetches this same comment from Issue #196 immediately
+before target qualification and requires an OWNER/MEMBER META actor association,
+the closed command grammar, and exact agreement with the workflow-bound
+repository/PR/head. This live re-read protects transport integrity; it is not a
+second authorization proof or attestation system.
 
 ## Executor invariants
 
@@ -104,8 +93,8 @@ The protected META executor:
   gates (`meta-gate`, `game-gate`, `platform-gate`, `atlas-gate`);
 - requires target PR `open`, unmerged, non-Draft, `base=main`, same-repository
   head, exact requested SHA;
-- requires the latest matching exact-head provider gate to be
-  `completed/success`;
+- requires the latest matching exact-head provider gate from the
+  `github-actions` App to be `completed/success`;
 - performs only native `merge-async` with exact `sha` and
   `merge_action="merge_queue"`;
 - treats HTTP 202 as acceptance only and requires its server UUID plus a
@@ -129,7 +118,8 @@ mutation credential. The mutation route uses only the separately provisioned
 fine-grained credential permitted by the bound organization policy.
 
 Credential provisioning and secret values are outside this repository change.
-Until the secret exists and a real bounded canary proves the executor route,
+Until the workflow is on protected META `main`, the fine-grained credential is
+provisioned, and a real bounded canary proves the route,
 `meta.governed_merge_queue_executor.v1` MUST NOT be listed in a capability
 snapshot's `operational_executor_routes`.
 

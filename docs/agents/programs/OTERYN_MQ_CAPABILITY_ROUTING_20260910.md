@@ -1,10 +1,10 @@
 # Oteryn Merge Queue capability routing repair
 
-Governing Issue: #194
-Control request Issue: #196
-Admission META main: `3b39e0be05aef008f1bd442821daefa898a201dd`
-Branch: `fix/194-capability-aware-mq-routing`
-PR: #195
+Governing Issue: #194  
+Control request Issue: #196  
+Admission META main: `3b39e0be05aef008f1bd442821daefa898a201dd`  
+Branch: `fix/194-capability-aware-mq-routing`  
+PR: #195  
 Status: `VALIDATING`
 
 ## Problem
@@ -23,45 +23,52 @@ cannot submit the PR to Merge Queue.
 2. `tools/governance/integration_capability_routing.py` classifies current
    capability as `NOT_REQUIRED`, `DIRECT_CAPABLE`, `DELEGATED_CAPABLE` or
    `BLOCKED_CAPABILITY_UNAVAILABLE`.
-3. Worker release for expected autonomous protected integration is valid only
-   after direct native capability or a verified operational META delegated route
-   is observed.
-4. `tools/governance/governed_merge_queue_executor.py` provides the bounded
-   organization actuator for an already-authorized exact-target request.
-5. META Issue #196 is transport only. Delegated execution additionally requires
-   a live exact authorization comment on the target PR.
-6. `.github/workflows/governed-merge-queue-executor.yml` keeps normal workflow
-   permissions read-only, parses only the closed Issue #196 request command, and
-   passes the exact target to the protected executor.
-7. The same workflow runs deterministic capability/executor regressions on
-   relevant pull-request changes.
-8. The delegated mutation credential is a separately provisioned fine-grained
-   secret `OTERYN_MQ_FINE_GRAINED_PAT`; its provisioning/value is not part of
-   this repository change. Until protected integration + credential provisioning
-   + a real canary are proven, the delegated route must not be advertised as
+3. `docs/agents/policy/ORGANIZATION_AGENT_POLICY.md` requires that classification
+   before releasing substantial mutating work expected to require autonomous
+   protected integration.
+4. `ecosystem/organization-agent-policy.json` includes the new contract/router
+   and executor in the immutable META machine-authority bundle.
+5. `tools/governance/governed_merge_queue_executor.py` provides a bounded
+   organization actuator for an already-authorized coordinator action.
+6. META Issue #196 is a single transport surface. The executor live-re-reads the
+   same control comment; no second comment/attestation/authorization proof
+   engine is created.
+7. `.github/workflows/governed-merge-queue-executor.yml` is default-branch
+   `issue_comment` execution only and keeps normal workflow permissions read-only.
+8. Existing required `meta-gate` now validates all new contract/code/test
+   surfaces, so the repair does not add a second permanent required status.
+9. The delegated mutation credential is a separately provisioned fine-grained
+   secret `OTERYN_MQ_FINE_GRAINED_PAT`; its provisioning/value is outside this
+   repository change. Until protected integration + credential provisioning + a
+   real canary are proven, the delegated route must not be advertised as
    operational.
 
 ## Owned paths
 
-- `ecosystem/agent-execution-routing-policy.json`
-- `tools/governance/integration_capability_routing.py`
-- `tools/governance/test_integration_capability_routing.py`
-- `tools/governance/governed_merge_queue_executor.py`
-- `tools/governance/test_governed_merge_queue_executor.py`
+- `AGENTS.md`
+- `.github/workflows/ci.yml`
 - `.github/workflows/governed-merge-queue-executor.yml`
 - `docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md`
 - `docs/agents/operations/MERGE_QUEUE_EXECUTOR.md`
+- `docs/agents/policy/ORGANIZATION_AGENT_POLICY.md`
 - `docs/agents/programs/OTERYN_MQ_CAPABILITY_ROUTING_20260910.md`
-- `AGENTS.md`
+- `ecosystem/agent-execution-routing-policy.json`
+- `ecosystem/organization-agent-policy.json`
+- `tools/governance/governed_merge_queue_executor.py`
+- `tools/governance/integration_capability_routing.py`
+- `tools/governance/test_governed_merge_queue_executor.py`
+- `tools/governance/test_integration_capability_routing.py`
 
 ## Security / authority invariants
 
 - No new merge authority is created.
 - The delegated executor is not a second coordinator/control plane.
+- A control comment is transport only and cannot broaden the caller's authority.
 - Target repository is limited to the four permanent Oteryn repositories.
 - Target PR must be open, unmerged, non-Draft, `base=main`,
   same-repository-head and exact-SHA bound.
-- Target exact-head canonical provider gate must be `completed/success`.
+- Target exact-head canonical provider gate must be `completed/success` and
+  emitted by the GitHub Actions app.
 - Positive mutation is only REST `merge-async` with exact `sha` and explicit
   `merge_action=merge_queue`.
 - HTTP 202 requires server UUID and strictly-later UUID-bound status/target
@@ -72,30 +79,36 @@ cannot submit the PR to Merge Queue.
 - The built-in workflow token is never the queue mutation credential.
 - No credential value or provider product/runtime mutation is present.
 
-## Focused validation before publication
+## Self-review repairs
 
-Local deterministic fixture execution against the candidate source:
+The first material candidate `dbf4499d...` passed META CI and the temporary
+path-scoped capability workflow, but whole-diff self-review found two hardening
+gaps: trusted actor eligibility was too broad and same-name check-run spoofing
+was not rejected. Head `a90fc145...` narrowed control actors to OWNER/MEMBER and
+required the provider aggregate check to come from `github-actions`.
 
-- `test_integration_capability_routing.py`: 8 PASS.
-- `test_governed_merge_queue_executor.py`: 11 PASS.
-- workflow YAML parses successfully as YAML.
-- no network or live queue mutation was used by focused tests.
+A subsequent policy review against `docs/governance/AI_REVIEW_POLICY.md` found
+that the initial two-comment design was unnecessarily close to the retired
+duplicate-comment proof-engine pattern. The final design uses one exact
+Issue #196 request comment only. It remains transport, not merge authority; the
+coordinator must already possess exact integration authority before creating it.
 
-Whole-diff self-review before the repair head move found and repaired two
-hardening gaps: trusted comment actors were narrowed from
-OWNER/MEMBER/COLLABORATOR to OWNER/MEMBER, and exact-head provider gate evidence
-is now accepted only from the `github-actions` app slug to reject same-name
-external check spoofing.
+Focused local mocked validation on the final design produced 8 capability-routing
+PASS and 12 governed-executor PASS; workflow and META CI YAML both parse.
 
-These local results are development evidence only. Exact published-head GitHub
-CI and pull-request contract-test workflow are authoritative before readiness.
+The final design also folds deterministic capability/executor tests into the
+existing required `meta-gate` instead of creating an additional persistent PR
+status, reducing CI/control-plane duplication.
 
-## Remaining gates
+## Validation target
 
-- exact-head META `meta-gate`;
-- exact-head `capability-routing-tests`;
+- exact-head `meta-gate` including:
+  - existing META governance suites;
+  - `test_integration_capability_routing.py`;
+  - `test_governed_merge_queue_executor.py`;
 - full-diff self-review;
-- independent review if current META risk policy requires it;
+- one independent Codex deep review because this materially changes GitHub
+  Actions / token / Merge Queue execution routing;
 - normal protected Merge Queue integration;
 - protected-main readback;
 - credential provisioning + real executor canary before

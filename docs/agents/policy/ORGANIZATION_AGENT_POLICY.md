@@ -28,6 +28,8 @@ Use `single_agent` when one capable worker is proportionate. Use `parallel_when_
 
 For execution routing, `ecosystem/agent-execution-routing-policy.json` and `docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md` remain authoritative. Prefer repository-native GitHub/CI and an authorized isolated workspace. Remote Desktop remains exception-only under its existing exact per-call machine gate; availability is not permission. A denied route does not block another authorized route.
 
+Before releasing substantial mutating work that is expected to require autonomous protected integration, the active scheduling/control-plane agent must classify the current integration execution path through `docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md` and `tools/governance/integration_capability_routing.py`. `DIRECT_CAPABLE` uses the native exact-head `merge-async` operation exposed to the current session; `DELEGATED_CAPABLE` may use the protected META executor only after that executor is independently proven operational. Capability never grants or transfers merge authority. If neither route is proven, record `BLOCKED_CAPABILITY_UNAVAILABLE` **before worker release** rather than discovering the limitation only after implementation is complete.
+
 ## Progress and recovery
 
 `ecosystem/bounded-autonomous-execution-policy.json` and `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md` own lifecycle, freeze and retry semantics. `ecosystem/agent-continuation-policy.json` and `docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md` own resume mechanics subordinate to them. Do not reproduce their counters or enums in each prompt.
@@ -54,7 +56,7 @@ HTTP `202` from `merge-async` is request acceptance only. Preserve the returned 
 
 GraphQL `enqueuePullRequest(expectedHeadOid=...)` remains a documented queue-specific head-fenced primitive, but it is not the selected native Oteryn route in this policy revision. A later reviewed policy change may approve it separately if its operational contract and reconciliation semantics are desired. Do not infer authority from caller-provided capability booleans or self-asserted receipts.
 
-`enablePullRequestAutoMerge` is not a governed agent enqueue capability. `direct_merge`, immediate/direct merge APIs, `merge_action="direct_merge"`, bypass, force push, no-op/retrigger commits and protection changes are forbidden substitutes. If the active execution surface cannot invoke the exact native `merge-async` operation with `sha` plus `merge_action="merge_queue"`, integration is `BLOCKED_CAPABILITY_UNAVAILABLE`; continue other safe path-disjoint work rather than weakening Merge Queue authority. ADR 0005's retired custom review fingerprints, envelopes, attestations and `ai-review-gate` must not be recreated as merge authority.
+`enablePullRequestAutoMerge` is not a governed agent enqueue capability. `direct_merge`, immediate/direct merge APIs, `merge_action="direct_merge"`, bypass, force push, no-op/retrigger commits and protection changes are forbidden substitutes. If the active execution surface cannot invoke the exact native `merge-async` operation with `sha` plus `merge_action="merge_queue"` and no independently proven delegated execution route exists, integration is `BLOCKED_CAPABILITY_UNAVAILABLE`; continue other safe path-disjoint work rather than weakening Merge Queue authority. ADR 0005's retired custom review fingerprints, envelopes, attestations and `ai-review-gate` must not be recreated as merge authority.
 
 ## Adoption and authoring
 

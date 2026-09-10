@@ -17,7 +17,7 @@ SPEC.loader.exec_module(executor)
 REPO = "Oteryn/Oteryn-Game"
 PR = 528
 HEAD = "97fcf72a2f29a8fc134c97dd3cdaf9237be7c6d3"
-AUTH_COMMENT = 5617345429
+REQUEST_COMMENT = 5617345429
 SERVER_UUID = "f0a3d092-6c9f-4edd-9d3f-cb9d8865a935"
 
 
@@ -45,28 +45,26 @@ class FakeClient:
         return response
 
 
-def authorization_body(
+def control_body(
     repository: str = REPO, pr_number: int = PR, head: str = HEAD
 ) -> str:
-    return "\n".join(
-        [
-            executor.AUTHORIZATION_HEADER,
-            f"repository: {repository}",
-            f"pull_request: {pr_number}",
-            "base: main",
-            f"head_sha: {head}",
-            "integration_authorized: true",
-        ]
-    )
+    return f"/oteryn-mq-submit {repository} {pr_number} {head}"
 
 
-def pull(*, head: str = HEAD, base: str = "main", draft: bool = False, state: str = "open") -> dict:
+def pull(
+    *,
+    head: str = HEAD,
+    base: str = "main",
+    draft: bool = False,
+    state: str = "open",
+    head_repository: str = REPO,
+) -> dict:
     return {
         "state": state,
         "merged": state == "closed",
         "draft": draft,
         "base": {"ref": base},
-        "head": {"sha": head, "repo": {"full_name": REPO}},
+        "head": {"sha": head, "repo": {"full_name": head_repository}},
     }
 
 
@@ -75,13 +73,13 @@ def read_responses() -> dict[tuple[str, str], executor.Response]:
     return {
         (
             "GET",
-            f"/repos/Oteryn/Oteryn-Game/issues/comments/{AUTH_COMMENT}",
+            f"/repos/Oteryn/Oteryn/issues/comments/{REQUEST_COMMENT}",
         ): executor.Response(
             200,
             {
                 "author_association": "MEMBER",
-                "issue_url": f"https://api.github.com/repos/Oteryn/Oteryn-Game/issues/{PR}",
-                "body": authorization_body(),
+                "issue_url": "https://api.github.com/repos/Oteryn/Oteryn/issues/196",
+                "body": control_body(),
             },
         ),
         (
@@ -115,7 +113,7 @@ def qualified(read_client: FakeClient) -> executor.QualifiedTarget:
         repository=REPO,
         pr_number=PR,
         expected_head_sha=HEAD,
-        authorization_comment_id=AUTH_COMMENT,
+        request_comment_id=REQUEST_COMMENT,
     )
 
 
@@ -128,34 +126,35 @@ def test_allowlist_binds_every_permanent_repository_to_its_gate() -> None:
     }
 
 
-def test_authorization_comment_is_separate_exact_target_authority() -> None:
-    responses = read_responses()
-    client = FakeClient(responses)
+def test_control_request_is_one_live_exact_transport_record() -> None:
+    client = FakeClient(read_responses())
     target = qualified(client)
     assert target.repository == REPO
     assert target.pr_number == PR
     assert target.head_sha == HEAD
-    assert target.authorization_comment_id == AUTH_COMMENT
+    assert target.request_comment_id == REQUEST_COMMENT
 
 
-def test_authorization_comment_wrong_target_or_body_fails_closed() -> None:
-    for field, value in (
-        ("issue_url", "https://api.github.com/repos/Oteryn/Oteryn-Game/issues/999"),
-        ("body", authorization_body(head="a" * 40)),
+def test_control_request_wrong_issue_body_actor_or_coordinates_fail_closed() -> None:
+    comment_key = ("GET", f"/repos/Oteryn/Oteryn/issues/comments/{REQUEST_COMMENT}")
+    mutations = (
+        ("issue_url", "https://api.github.com/repos/Oteryn/Oteryn/issues/999"),
+        ("body", control_body(head="a" * 40)),
+        ("body", control_body() + "\n"),
         ("author_association", "COLLABORATOR"),
         ("author_association", "CONTRIBUTOR"),
-    ):
+    )
+    for field, value in mutations:
         responses = read_responses()
-        key = ("GET", f"/repos/Oteryn/Oteryn-Game/issues/comments/{AUTH_COMMENT}")
-        body = dict(responses[key].body)
+        body = dict(responses[comment_key].body)
         body[field] = value
-        responses[key] = executor.Response(200, body)
+        responses[comment_key] = executor.Response(200, body)
         try:
             qualified(FakeClient(responses))
         except ValueError:
             pass
         else:
-            raise AssertionError(f"invalid authorization comment field {field} was accepted")
+            raise AssertionError(f"invalid control request field {field} was accepted")
 
 
 def test_target_must_be_open_ready_main_same_repo_and_exact_head() -> None:
@@ -164,6 +163,7 @@ def test_target_must_be_open_ready_main_same_repo_and_exact_head() -> None:
         {"base": "other"},
         {"head": "a" * 40},
         {"state": "closed"},
+        {"head_repository": "someone/fork"},
     )
     for mutation in mutations:
         responses = read_responses()
@@ -214,7 +214,7 @@ def test_exact_head_gate_must_come_from_github_actions() -> None:
     try:
         qualified(FakeClient(responses))
     except ValueError as exc:
-        assert "matches the exact target head" in str(exc)
+        assert "GitHub-Actions" in str(exc)
     else:
         raise AssertionError("spoofed non-GitHub-Actions gate was accepted")
 
@@ -258,6 +258,7 @@ def test_202_uses_only_exact_merge_async_request_and_causal_uuid_readback() -> N
     result = executor.submit_merge_queue(read_client, mutation_client, target)
 
     assert result["result"] == "REQUEST_ACCEPTED_NON_TERMINAL"
+    assert result["request_comment_id"] == REQUEST_COMMENT
     assert result["receipt"]["server_uuid"] == SERVER_UUID
     assert result["receipt"]["executor_sequence"] == 1
     assert result["readback"]["server_uuid"] == SERVER_UUID
@@ -310,6 +311,7 @@ def test_200_and_409_never_fabricate_a_fresh_acceptance_receipt() -> None:
         )
         result = executor.submit_merge_queue(read_client, mutation_client, target)
         assert result["result"] == "RECONCILIATION_REQUIRED"
+        assert result["request_comment_id"] == REQUEST_COMMENT
         assert result["accepted"] is False
         assert result["receipt"] is None
 
@@ -334,12 +336,29 @@ def test_403_and_404_are_precise_capability_blockers() -> None:
             raise AssertionError(f"HTTP {status} was not classified as capability blocker")
 
 
-def test_workflow_is_narrow_and_never_uses_builtin_token_for_queue_mutation() -> None:
+def test_invalid_inputs_fail_before_any_target_mutation() -> None:
+    for values in (
+        ("Other/Repo", PR, HEAD, REQUEST_COMMENT),
+        (REPO, 0, HEAD, REQUEST_COMMENT),
+        (REPO, PR, "A" * 40, REQUEST_COMMENT),
+        (REPO, PR, HEAD, 0),
+    ):
+        try:
+            executor.normalize_inputs(*values)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"invalid input was accepted: {values}")
+
+
+def test_workflow_is_narrow_read_only_and_has_no_forbidden_merge_fallback() -> None:
     workflow = (
         ROOT / ".github/workflows/governed-merge-queue-executor.yml"
     ).read_text(encoding="utf-8")
     assert "issue_comment:" in workflow
+    assert "pull_request:" not in workflow
     assert "CONTROL_ISSUE: '196'" in workflow
+    assert "REQUEST_COMMENT_ID: ${{ github.event.comment.id }}" in workflow
     assert "OTERYN_MQ_FINE_GRAINED_PAT: ${{ secrets.OTERYN_MQ_FINE_GRAINED_PAT }}" in workflow
     assert "python3 tools/governance/governed_merge_queue_executor.py" in workflow
     assert "merge_pull_request" not in workflow
@@ -349,7 +368,8 @@ def test_workflow_is_narrow_and_never_uses_builtin_token_for_queue_mutation() ->
     assert "contents: read" in workflow
     assert "issues: read" in workflow
     assert "pull-requests: read" in workflow
-    assert '{"OWNER", "MEMBER", "COLLABORATOR"}' not in workflow
+    assert '{"OWNER", "MEMBER"}' in workflow
+    assert "COLLABORATOR" not in workflow
 
 
 def main() -> int:
