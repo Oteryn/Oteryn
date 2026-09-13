@@ -57,6 +57,7 @@ SOURCE_WORKFLOWS = {
     for repository, config in _TARGET_POLICY.items()
 }
 INTEGRATION_PERMISSIONS = frozenset({"admin", "maintain"})
+META_ORGANIZATION = "Oteryn"
 
 
 class ExecutorError(RuntimeError):
@@ -214,14 +215,21 @@ def verify_control_request(
     request_comment_id: int,
     protected_main_sha: str,
 ) -> str:
+    event_actor = os.environ.get("OTERYN_MQ_EVENT_ACTOR", "").strip()
+    event_association = os.environ.get("OTERYN_MQ_EVENT_ASSOCIATION", "").strip()
+    if event_association not in TRUSTED_ASSOCIATIONS:
+        raise ValueError(
+            "authenticated issue_comment actor must be OWNER or MEMBER of META"
+        )
+    if not event_actor:
+        raise ValueError("authenticated issue_comment actor login is missing")
+
     comment = _response_body(
         read_client.rest(
             "GET",
             f"/repos/Oteryn/Oteryn/issues/comments/{request_comment_id}",
         )
     )
-    if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
-        raise ValueError("control request actor must be OWNER or MEMBER of META")
     expected_issue_url = (
         f"https://api.github.com/repos/{CONTROL_REPOSITORY}/issues/{CONTROL_ISSUE}"
     )
@@ -243,6 +251,10 @@ def verify_control_request(
     login = actor.get("login") if isinstance(actor, dict) else None
     if not isinstance(login, str) or not login:
         raise ValueError("control request actor login is missing")
+    if login != event_actor:
+        raise ValueError(
+            "live control request actor differs from authenticated issue_comment actor"
+        )
     return login
 
 
@@ -523,6 +535,29 @@ def submit_merge_queue(
     principal = _response_body(mutation_client.rest("GET", "/user")).get("login")
     if principal != target.request_actor:
         raise ExecutorError("mutation principal must match the live control-request actor")
+    membership_response = mutation_client.rest(
+        "GET",
+        f"/user/memberships/orgs/{META_ORGANIZATION}",
+        allowed_statuses=(200, 403, 404),
+    )
+    if membership_response.status != 200:
+        raise ExecutorError(
+            "mutation principal's current Oteryn organization membership "
+            "could not be authoritatively read"
+        )
+    membership = _response_body(membership_response)
+    membership_user = membership.get("user")
+    membership_organization = membership.get("organization")
+    if (
+        membership.get("state") != "active"
+        or not isinstance(membership_user, dict)
+        or membership_user.get("login") != target.request_actor
+        or not isinstance(membership_organization, dict)
+        or membership_organization.get("login") != META_ORGANIZATION
+    ):
+        raise ExecutorError(
+            "mutation principal lacks current active Oteryn organization membership"
+        )
     permission = _response_body(mutation_client.rest(
         "GET", f"/repos/{owner}/{name}/collaborators/{urllib.parse.quote(target.request_actor, safe='')}/permission"
     )).get("permission")

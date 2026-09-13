@@ -94,6 +94,8 @@ jobs:
           TARGET_PR: ${{ steps.parse.outputs.pr_number }}
           TARGET_HEAD: ${{ steps.parse.outputs.expected_head_sha }}
           REQUEST_COMMENT_ID: ${{ github.event.comment.id }}
+          OTERYN_MQ_EVENT_ACTOR: ${{ github.event.comment.user.login }}
+          OTERYN_MQ_EVENT_ASSOCIATION: ${{ github.event.comment.author_association }}
           QUALIFIED_PROTECTED_MAIN_SHA: ${{ steps.parse.outputs.protected_main_sha }}
         shell: bash
         run: |

@@ -25,6 +25,10 @@ PROTECTED_MAIN_SHA = "0123456789abcdef0123456789abcdef01234567"
 REQUEST_COMMENT = 5617345429
 SERVER_UUID = "f0a3d092-6c9f-4edd-9d3f-cb9d8865a935"
 ACTOR = "maintainer-user"
+EVENT_ACTOR_ENV = "OTERYN_MQ_EVENT_ACTOR"
+EVENT_ASSOCIATION_ENV = "OTERYN_MQ_EVENT_ASSOCIATION"
+os.environ[EVENT_ACTOR_ENV] = ACTOR
+os.environ[EVENT_ASSOCIATION_ENV] = "MEMBER"
 HEAD_BRANCH = "fix/provider-change"
 
 
@@ -60,6 +64,14 @@ class FakeClient:
         response = self.responses.get((method, path))
         if response is None and (method, path) == ("GET", "/user"):
             response = executor.Response(200, {"login": ACTOR})
+        if response is None and (method, path) == (
+            "GET", "/user/memberships/orgs/Oteryn"
+        ):
+            response = executor.Response(200, {
+                "state": "active",
+                "user": {"login": ACTOR},
+                "organization": {"login": "Oteryn"},
+            })
         if response is None and method == "GET" and path.endswith(
             f"/collaborators/{ACTOR}/permission"
         ):
@@ -191,8 +203,7 @@ def test_control_request_wrong_issue_body_actor_or_coordinates_fail_closed() -> 
         ("body", control_body(head="a" * 40)),
         ("body", control_body(protected_main_sha="a" * 40)),
         ("body", control_body() + "\n"),
-        ("author_association", "COLLABORATOR"),
-        ("author_association", "CONTRIBUTOR"),
+        ("user", {"login": "different-maintainer"}),
     )
     for field, value in mutations:
         responses = read_responses()
@@ -205,6 +216,30 @@ def test_control_request_wrong_issue_body_actor_or_coordinates_fail_closed() -> 
             pass
         else:
             raise AssertionError(f"invalid control request field {field} was accepted")
+
+
+def test_hidden_member_live_association_does_not_override_authenticated_event() -> None:
+    responses = read_responses()
+    comment_key = ("GET", f"/repos/Oteryn/Oteryn/issues/comments/{REQUEST_COMMENT}")
+    body = dict(responses[comment_key].body)
+    body["author_association"] = "COLLABORATOR"
+    responses[comment_key] = executor.Response(200, body)
+    target = qualified(FakeClient(responses))
+    assert target.request_actor == ACTOR
+
+
+def test_untrusted_event_association_fails_closed() -> None:
+    previous = os.environ[EVENT_ASSOCIATION_ENV]
+    os.environ[EVENT_ASSOCIATION_ENV] = "COLLABORATOR"
+    try:
+        try:
+            qualified(FakeClient(read_responses()))
+        except ValueError as exc:
+            assert "authenticated issue_comment actor" in str(exc)
+        else:
+            raise AssertionError("untrusted event association was accepted")
+    finally:
+        os.environ[EVENT_ASSOCIATION_ENV] = previous
 
 
 def test_target_must_be_open_ready_main_same_repo_and_exact_head() -> None:
@@ -600,6 +635,36 @@ def test_put_requires_same_authenticated_actor_with_target_integration_permissio
         assert not any(call[0] == "PUT" for call in mutation_client.calls)
 
 
+def test_stale_member_event_cannot_replace_current_active_meta_membership() -> None:
+    invalid_memberships = (
+        executor.Response(404, {"message": "Not Found"}),
+        executor.Response(403, {"message": "Resource not accessible"}),
+        executor.Response(200, {"state": "pending", "user": {"login": ACTOR},
+                                "organization": {"login": "Oteryn"}}),
+        executor.Response(200, {"state": "inactive", "user": {"login": ACTOR},
+                                "organization": {"login": "Oteryn"}}),
+        executor.Response(200, {"state": "active"}),
+    )
+    for membership in invalid_memberships:
+        read_client = FakeClient(read_responses())
+        target = qualified(read_client)
+        mutation_client = FakeClient({
+            ("GET", "/user/memberships/orgs/Oteryn"): membership,
+        })
+        try:
+            executor.submit_merge_queue(read_client, mutation_client, target)
+        except executor.ExecutorError:
+            pass
+        else:
+            raise AssertionError("stale creation-time MEMBER association reached merge-async")
+        assert os.environ[EVENT_ASSOCIATION_ENV] == "MEMBER"
+        assert any(
+            call[1] == "/user/memberships/orgs/Oteryn"
+            for call in mutation_client.calls
+        )
+        assert not any(call[0] == "PUT" for call in mutation_client.calls)
+
+
 def test_live_protected_main_must_still_match_canary_qualified_sha_before_put() -> None:
     read_client = FakeClient({
         **read_responses(),
@@ -659,6 +724,8 @@ def test_workflow_is_narrow_read_only_and_has_no_forbidden_merge_fallback() -> N
     assert "pull_request:" not in workflow
     assert "CONTROL_ISSUE: '196'" in workflow
     assert "REQUEST_COMMENT_ID: ${{ github.event.comment.id }}" in workflow
+    assert "OTERYN_MQ_EVENT_ACTOR: ${{ github.event.comment.user.login }}" in workflow
+    assert "OTERYN_MQ_EVENT_ASSOCIATION: ${{ github.event.comment.author_association }}" in workflow
     assert "ref: main" in workflow
     assert "- name: Verify checked-out protected META main" in workflow
     assert 'checked_out_main="$(git rev-parse HEAD)"' in workflow
