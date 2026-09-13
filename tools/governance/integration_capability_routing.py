@@ -23,6 +23,7 @@ DEFAULT_MAX_AGE_SECONDS = 300
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
 _OBSERVATION_SEAL = object()
+_DECISION_SEAL = object()
 
 
 def _mapping(value: object) -> Mapping[str, object]:
@@ -126,6 +127,19 @@ class VerifiedCapabilityObservation:
             raise ValueError("verified capability observations must be produced by a trusted observer")
 
 
+@dataclass(frozen=True)
+class CapabilityDecision:
+    """Sealed scheduling decision retaining delegated request authority bindings."""
+
+    state: str
+    delegated_protected_main_sha: str | None
+    _seal: object = field(repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self._seal is not _DECISION_SEAL:
+            raise ValueError("capability decisions must be produced from a verified observation")
+
+
 class TrustedCapabilityObserver(ABC):
     """Installed trust boundary for live tool discovery and executor readback."""
 
@@ -207,23 +221,23 @@ def _same_valid_actor(actor: object, principal: object) -> bool:
     )
 
 
-def classify(observation: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
-    """Purely classify a sealed observation; arbitrary mappings fail closed."""
+def decide(observation: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
+    """Classify sealed evidence while retaining its delegated canary binding."""
     errors = validate_policy(policy)
     if errors:
         raise ValueError("; ".join(errors))
     if not isinstance(observation, VerifiedCapabilityObservation) or observation._seal is not _OBSERVATION_SEAL:
-        return BLOCKED_CAPABILITY_UNAVAILABLE
+        return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
     evidence = observation.evidence
     if not evidence.requires_autonomous_protected_integration:
-        return NOT_REQUIRED
+        return CapabilityDecision(NOT_REQUIRED, None, _DECISION_SEAL)
     now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
     cfg = integration_policy(policy)
     maximum_age = int(cfg.get("observation_max_age_seconds", DEFAULT_MAX_AGE_SECONDS))
     if not _fresh(evidence.observed_at_epoch_seconds, now, maximum_age):
-        return BLOCKED_CAPABILITY_UNAVAILABLE
+        return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
     if cfg["direct_operation"] in evidence.available_operations:
-        return DIRECT_CAPABLE
+        return CapabilityDecision(DIRECT_CAPABLE, None, _DECISION_SEAL)
     if (cfg["delegated_request_operation"] in evidence.available_operations
             and cfg["delegated_route"] in evidence.operational_executor_routes
             and _delegated_executor_is_operational(evidence.protected_executor, cfg, now_epoch_seconds=now)
@@ -232,8 +246,38 @@ def classify(observation: object, policy: Mapping[str, object], *, now_epoch_sec
                 evidence.protected_executor.credential_principal
                 if evidence.protected_executor is not None else None,
             )):
-        return DELEGATED_CAPABLE
-    return BLOCKED_CAPABILITY_UNAVAILABLE
+        assert evidence.protected_executor is not None
+        return CapabilityDecision(
+            DELEGATED_CAPABLE,
+            evidence.protected_executor.canary_protected_main_sha,
+            _DECISION_SEAL,
+        )
+    return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
+
+
+def classify(observation: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
+    """Compatibility classifier; delegated request construction must use ``decide``."""
+    return decide(observation, policy, now_epoch_seconds=now_epoch_seconds).state
+
+
+def build_delegated_request(
+    decision: object, *, repository: str, pr_number: int, expected_head_sha: str
+) -> str:
+    """Construct the canonical control request only from its sealed canary binding."""
+    if (not isinstance(decision, CapabilityDecision)
+            or decision._seal is not _DECISION_SEAL
+            or decision.state != DELEGATED_CAPABLE
+            or not isinstance(decision.delegated_protected_main_sha, str)
+            or SHA_RE.fullmatch(decision.delegated_protected_main_sha) is None):
+        raise ValueError("a sealed delegated-capable decision is required")
+    if not isinstance(repository, str) or not repository.strip():
+        raise ValueError("repository must be non-empty")
+    if not isinstance(pr_number, int) or isinstance(pr_number, bool) or pr_number <= 0:
+        raise ValueError("pull request number must be positive")
+    if not isinstance(expected_head_sha, str) or SHA_RE.fullmatch(expected_head_sha) is None:
+        raise ValueError("expected head SHA must be lowercase hexadecimal")
+    return (f"/oteryn-mq-submit {repository} {pr_number} {expected_head_sha} "
+            f"{decision.delegated_protected_main_sha}")
 
 
 def observe_and_classify(observer: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
@@ -248,9 +292,21 @@ def observe_and_classify(observer: object, policy: Mapping[str, object], *, now_
     return classify(observation, policy, now_epoch_seconds=now)
 
 
+def observe_and_decide(observer: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
+    """Acquire a sealed decision suitable for delegated request construction."""
+    now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
+    if not isinstance(observer, TrustedCapabilityObserver):
+        return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
+    try:
+        observation = observer.observe(policy, now_epoch_seconds=now)
+    except (OSError, TypeError, ValueError):
+        return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
+    return decide(observation, policy, now_epoch_seconds=now)
+
+
 def validate_worker_release(observer: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> list[str]:
-    state = observe_and_classify(observer, policy, now_epoch_seconds=now_epoch_seconds)
-    if state == BLOCKED_CAPABILITY_UNAVAILABLE:
+    decision = observe_and_decide(observer, policy, now_epoch_seconds=now_epoch_seconds)
+    if decision.state == BLOCKED_CAPABILITY_UNAVAILABLE:
         return ["protected integration capability unavailable before worker release: "
                 "no trusted observer proved direct native merge-async or the bounded META executor"]
     return []

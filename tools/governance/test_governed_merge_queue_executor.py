@@ -289,7 +289,7 @@ def test_gate_must_bind_canonical_workflow_identity_and_pr_relation() -> None:
             raise AssertionError(f"noncanonical workflow field {field} was accepted")
 
 
-def test_atlas_requires_both_source_workflows_but_allows_empty_relations() -> None:
+def test_atlas_uses_base_main_run_sha_and_requires_exact_pr_relations() -> None:
     repository = "Oteryn/Oteryn-Atlas"
     responses = read_responses()
     comment_key = ("GET", f"/repos/Oteryn/Oteryn/issues/comments/{REQUEST_COMMENT}")
@@ -304,10 +304,11 @@ def test_atlas_requires_both_source_workflows_but_allows_empty_relations() -> No
         workflow_runs.append({
                 "id": 100 + index, "workflow_id": workflow_id, "path": path,
                 "event": event, "head_repository": {"full_name": repository},
-                "head_branch": HEAD_BRANCH, "head_sha": HEAD, "pull_requests": [],
+                "head_branch": "main", "head_sha": PROTECTED_MAIN_SHA,
+                "pull_requests": [{"number": PR}],
                 "status": "completed", "conclusion": "success",
         })
-    query = f"head_sha={HEAD}&event=pull_request_target&per_page=100"
+    query = "event=pull_request_target&per_page=100"
     responses[("GET", f"/repos/{repository}/actions/runs?{query}")] = executor.Response(
         200, {"workflow_runs": workflow_runs}
     )
@@ -319,7 +320,7 @@ def test_atlas_requires_both_source_workflows_but_allows_empty_relations() -> No
     assert target.required_gate is None
 
     first_path, first_event, _ = executor.SOURCE_WORKFLOWS[repository][0]
-    responses[("GET", f"/repos/{repository}/actions/runs?head_sha={HEAD}&event={first_event}&per_page=100")] = executor.Response(
+    responses[("GET", f"/repos/{repository}/actions/runs?event={first_event}&per_page=100")] = executor.Response(
         200, {"workflow_runs": workflow_runs[1:]}
     )
     try:
@@ -332,6 +333,29 @@ def test_atlas_requires_both_source_workflows_but_allows_empty_relations() -> No
         assert first_path in str(exc)
     else:
         raise AssertionError("Atlas qualification accepted missing canonical source workflow")
+
+    for relation in ([], [{"number": PR + 1}]):
+        rejected = read_responses()
+        comment = dict(rejected[comment_key].body)
+        comment["body"] = control_body(repository=repository)
+        rejected[comment_key] = executor.Response(200, comment)
+        rejected[("GET", f"/repos/{repository}/pulls/{PR}")] = executor.Response(
+            200, pull(head_repository=repository)
+        )
+        bad_runs = [dict(run, pull_requests=relation) for run in workflow_runs]
+        rejected[("GET", f"/repos/{repository}/actions/runs?{query}")] = executor.Response(
+            200, {"workflow_runs": bad_runs}
+        )
+        try:
+            executor.qualify_target(
+                FakeClient(rejected), repository=repository, pr_number=PR,
+                expected_head_sha=HEAD, request_comment_id=REQUEST_COMMENT,
+                protected_main_sha=PROTECTED_MAIN_SHA,
+            )
+        except ValueError as exc:
+            assert "target pull request" in str(exc)
+        else:
+            raise AssertionError(f"Atlas qualification accepted relation {relation}")
 
 
 def test_202_uses_only_exact_merge_async_request_and_causal_uuid_readback() -> None:

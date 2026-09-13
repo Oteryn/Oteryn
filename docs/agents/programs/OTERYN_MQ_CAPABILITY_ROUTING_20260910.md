@@ -50,8 +50,14 @@ cannot submit the PR to Merge Queue.
     to the fine-grained credential principal; missing, malformed or mismatched
     identities block worker release while direct capability remains independent.
 12. The request carries the exact canary-qualified protected META `main` SHA. The
-    executor checks out that commit and live-re-reads `main` immediately before
-    mutation, failing closed on movement rather than trusting `github.sha`.
+    sealed capability decision retains that observer-supplied SHA for canonical
+    request construction; a caller-supplied current-main SHA cannot replace it.
+    The executor checks out trusted `main`, fences it to the qualified SHA, and
+    live-re-reads `main` immediately before mutation rather than trusting
+    `github.sha`.
+13. Atlas source qualification queries its canonical `pull_request_target` runs
+    without a PR-head-SHA filter and binds each base-main run through a non-empty
+    exact target-PR relation.
 
 ## Owned paths
 

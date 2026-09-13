@@ -92,6 +92,43 @@ def test_verified_delegated_executor_prevents_late_worker_block() -> None:
     assert state(FakeObserver(current)) == routing.DELEGATED_CAPABLE
 
 
+def test_delegated_request_retains_sealed_canary_sha() -> None:
+    canary_x = PROTECTED_MAIN_SHA
+    current_main_y = "a" * 40
+    current = routing.AcquiredCapabilityEvidence(
+        True, NOW, ("github.issue_comment.create",),
+        ("meta.governed_merge_queue_executor.v1",), executor_evidence(), "maintainer-user"
+    )
+    decision = routing.observe_and_decide(FakeObserver(current), policy(), now_epoch_seconds=NOW)
+    request = routing.build_delegated_request(
+        decision, repository="Oteryn/Oteryn-Game", pr_number=528,
+        expected_head_sha=current_main_y,
+    )
+    assert request.endswith(f" {current_main_y} {canary_x}")
+
+
+def test_forged_decision_or_sha_cannot_replace_sealed_canary() -> None:
+    for forged in (
+        {"state": routing.DELEGATED_CAPABLE, "delegated_protected_main_sha": "a" * 40},
+        object(),
+    ):
+        try:
+            routing.build_delegated_request(
+                forged, repository="Oteryn/Oteryn-Game", pr_number=528,
+                expected_head_sha="a" * 40,
+            )
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("forged delegated decision constructed a request")
+    try:
+        routing.CapabilityDecision(routing.DELEGATED_CAPABLE, "a" * 40, object())
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("caller manufactured a delegated decision")
+
+
 def test_unverified_delegated_executor_is_not_capability() -> None:
     current = routing.AcquiredCapabilityEvidence(
         True, NOW, ("github.issue_comment.create",), ("meta.governed_merge_queue_executor.v1",)

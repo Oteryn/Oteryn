@@ -32,6 +32,14 @@ task, prompt, caller string/boolean, comment, serialized fixture, or previous-se
 assertion is not capability evidence. If no trusted observer is installed or its
 acquisition fails, classification is `BLOCKED_CAPABILITY_UNAVAILABLE`.
 
+The authoritative classification API returns a sealed capability decision. For a
+delegated route that decision retains the exact canary-qualified protected-META
+`main` SHA from the observer evidence, and canonical control-request construction
+must consume that retained binding. A caller-provided current-main SHA cannot
+replace it. The enum-only compatibility view is diagnostic and is not sufficient
+to construct a delegated request. Direct capability has no delegated canary
+binding and remains independent of this rule.
+
 Every capable observation carries an observation timestamp and is valid only for
 the finite freshness interval in the machine policy. Future, stale, malformed
 or unsealed observations fail closed. `DELEGATED_CAPABLE` additionally
@@ -127,8 +135,9 @@ The protected META executor:
   workflow ID, PR head branch and SHA, plus target PR relation whenever GitHub
   supplies a non-empty relation. META, Game and Platform also bind the named gate
   check suite to that run. Atlas requires both canonical `pull_request_target`
-  source workflows; empty relations are permitted there and terminal
-  `atlas-gate` remains merge-group proof;
+  source workflows, queries them without a PR-head-SHA filter because those runs
+  report the base SHA, and requires each run's non-empty PR relation to contain
+  the exact target PR. Terminal `atlas-gate` remains merge-group proof;
 - authenticates the fine-grained PAT human principal, requires it to equal the
   control-comment actor and requires current target `admin` or `maintain`;
 - immediately before mutation, re-reads comment, PR, eligibility and workflow

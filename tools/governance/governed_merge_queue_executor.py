@@ -333,7 +333,13 @@ def qualify_target(
         gate_suite_id = latest["check_suite"]["id"]
 
     for workflow_path, event, workflow_id in SOURCE_WORKFLOWS[repository]:
-        query = urllib.parse.urlencode({"head_sha": expected_head_sha, "event": event, "per_page": "100"})
+        is_atlas_target = repository == "Oteryn/Oteryn-Atlas" and event == "pull_request_target"
+        query_parameters = (
+            {"event": event, "per_page": "100"}
+            if is_atlas_target
+            else {"head_sha": expected_head_sha, "event": event, "per_page": "100"}
+        )
+        query = urllib.parse.urlencode(query_parameters)
         payload = _response_body(read_client.rest(
             "GET", f"/repos/{owner}/{name}/actions/runs?{query}"
         ))
@@ -345,8 +351,8 @@ def qualify_target(
             and run.get("event") == event
             and isinstance(run.get("head_repository"), dict)
             and run["head_repository"].get("full_name") == repository
-            and run.get("head_branch") == head_branch
-            and str(run.get("head_sha") or "").lower() == expected_head_sha
+            and (is_atlas_target or run.get("head_branch") == head_branch)
+            and (is_atlas_target or str(run.get("head_sha") or "").lower() == expected_head_sha)
             and (gate_suite_id is None or run.get("check_suite_id") == gate_suite_id)
         ] if isinstance(workflow_runs, list) else []
         if not canonical:
@@ -355,6 +361,8 @@ def qualify_target(
         relations = latest_workflow.get("pull_requests")
         if not isinstance(relations, list):
             raise ValueError("canonical workflow pull-request relation is malformed")
+        if is_atlas_target and not relations:
+            raise ValueError("Atlas canonical workflow must relate to the target pull request")
         if relations and not any(item.get("number") == pr_number for item in relations if isinstance(item, dict)):
             raise ValueError("canonical workflow does not relate to the target pull request")
         if latest_workflow.get("status") != "completed" or latest_workflow.get("conclusion") != "success":
