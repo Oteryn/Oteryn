@@ -69,8 +69,21 @@ jobs:
         if: ${{ steps.parse.outputs.allowed == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.parse.outputs.protected_main_sha }}
+          ref: main
           persist-credentials: false
+
+      - name: Verify checked-out protected META main
+        if: ${{ steps.parse.outputs.allowed == 'true' }}
+        env:
+          QUALIFIED_PROTECTED_MAIN_SHA: ${{ steps.parse.outputs.protected_main_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          checked_out_main="$(git rev-parse HEAD)"
+          if [[ "$checked_out_main" != "$QUALIFIED_PROTECTED_MAIN_SHA" ]]; then
+            echo "BLOCKED_STALE_STATE: protected META main moved after canary qualification" >&2
+            exit 1
+          fi
 
       - name: Execute governed native merge-async request
         if: ${{ steps.parse.outputs.allowed == 'true' }}
