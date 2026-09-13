@@ -30,7 +30,7 @@ def valid_binding() -> dict[str, object]:
     return {
         "schema_version": 1,
         "policy_id": "OTERYN_ORGANIZATION_AGENT_POLICY",
-        "policy_version": "3.0.0",
+        "policy_version": "3.1.0",
         "authority_repository": "Oteryn/Oteryn",
         "authority_commit": FULL_SHA,
         "organization_policy_path": "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md",

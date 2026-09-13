@@ -1,6 +1,6 @@
 # Oteryn Prompting Standard
 
-Policy: `OTERYN_ORGANIZATION_AGENT_POLICY@3.0.0`
+Policy: `OTERYN_ORGANIZATION_AGENT_POLICY@3.1.0`
 
 Write a **task-specific delta** over applicable repository instructions. Keep the observable objective, important boundaries, unique domain knowledge and acceptance evidence. Do not restate the agent operating system.
 
