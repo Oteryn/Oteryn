@@ -214,14 +214,21 @@ def verify_control_request(
     request_comment_id: int,
     protected_main_sha: str,
 ) -> str:
+    event_actor = os.environ.get("OTERYN_MQ_EVENT_ACTOR", "").strip()
+    event_association = os.environ.get("OTERYN_MQ_EVENT_ASSOCIATION", "").strip()
+    if event_association not in TRUSTED_ASSOCIATIONS:
+        raise ValueError(
+            "authenticated issue_comment actor must be OWNER or MEMBER of META"
+        )
+    if not event_actor:
+        raise ValueError("authenticated issue_comment actor login is missing")
+
     comment = _response_body(
         read_client.rest(
             "GET",
             f"/repos/Oteryn/Oteryn/issues/comments/{request_comment_id}",
         )
     )
-    if comment.get("author_association") not in TRUSTED_ASSOCIATIONS:
-        raise ValueError("control request actor must be OWNER or MEMBER of META")
     expected_issue_url = (
         f"https://api.github.com/repos/{CONTROL_REPOSITORY}/issues/{CONTROL_ISSUE}"
     )
@@ -243,6 +250,10 @@ def verify_control_request(
     login = actor.get("login") if isinstance(actor, dict) else None
     if not isinstance(login, str) or not login:
         raise ValueError("control request actor login is missing")
+    if login != event_actor:
+        raise ValueError(
+            "live control request actor differs from authenticated issue_comment actor"
+        )
     return login
 
 
