@@ -18,6 +18,9 @@ VERIFICATION_INDEX = EVIDENCE_ROOT / "verification-index.json"
 COVERAGE_GROUPS = EVIDENCE_ROOT / "coverage-groups.json"
 COVERAGE_SUMMARY = EVIDENCE_ROOT / "coverage-summary.json"
 COLLECTION_PLAN = EVIDENCE_ROOT / "collection-plan.json"
+COVERAGE_GROUPS_BLOB_SHA = "b3313b4a0831b9fcc528665dca25bdccdb9dab59"
+COVERAGE_SUMMARY_BLOB_SHA = "515cd146782cac3018c95032d83f76b795d67872"
+REPORT_BLOB_SHA = "643dee5d05ff32f45771ff8737fd58b3dc4d641d"
 OLD_COMMIT = "1a01c5b3e08666a82245b1cac78da3736c65e785"
 OLD_TREE = "f084e824ec5e14d5909c9750d906d91d51425fd5"
 SOURCE_COMMIT = "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090"
@@ -91,15 +94,27 @@ def _pairs_hook(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def _json_bytes(path: Path, *, label: str = "JSON") -> tuple[bytes, dict[str, Any]]:
-    raw = path.read_bytes()
+def _parse_json_bytes(raw: bytes, *, label: str = "JSON") -> dict[str, Any]:
     try:
         data = json.loads(raw.decode("utf-8"), object_pairs_hook=_pairs_hook)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise CandidateError(f"{label} invalid: {exc}") from exc
     if not isinstance(data, dict):
         raise CandidateError(f"{label} root must be an object")
+    return data
+
+
+def _json_bytes(path: Path, *, label: str = "JSON") -> tuple[bytes, dict[str, Any]]:
+    raw = path.read_bytes()
+    data = _parse_json_bytes(raw, label=label)
     return raw, data
+
+
+def _bound_json(path: Path, expected_blob_sha: str, *, label: str) -> dict[str, Any]:
+    raw = path.read_bytes()
+    if git_blob_sha(raw) != expected_blob_sha:
+        raise CandidateError(f"candidate-only {label} complete-file blob drift")
+    return _parse_json_bytes(raw, label=label)
 
 
 def git_blob_sha(raw: bytes) -> str:
@@ -340,7 +355,11 @@ def validate_candidate_only_state(
         if candidate_path not in prior_direct:
             raise CandidateError(f"prior DIRECT row disappeared: {candidate_path}")
 
-    _, groups = _json_bytes(evidence_root / "coverage-groups.json", label="coverage groups")
+    groups = _bound_json(
+        evidence_root / "coverage-groups.json",
+        COVERAGE_GROUPS_BLOB_SHA,
+        label="coverage groups",
+    )
     serialized_groups = json.dumps(groups, sort_keys=True)
     all_candidate_paths = {
         row["path"]
@@ -350,7 +369,7 @@ def validate_candidate_only_state(
     if any(path in serialized_groups for path in all_candidate_paths):
         raise CandidateError("candidate-only state cannot coexist with R7 GROUPED classification")
 
-    _, report = _json_bytes(report_path, label="canonical report")
+    report = _bound_json(report_path, REPORT_BLOB_SHA, label="canonical report")
     meta_report = report.get("repositories", {}).get("meta") if isinstance(report.get("repositories"), dict) else None
     if meta_report != {
         "repository": "Oteryn/Oteryn",
@@ -372,7 +391,11 @@ def validate_candidate_only_state(
     if _has_r7_adoption_marker(index):
         raise CandidateError("candidate-only verification index contains R7 adoption representation")
 
-    _, summary = _json_bytes(evidence_root / "coverage-summary.json", label="coverage summary")
+    summary = _bound_json(
+        evidence_root / "coverage-summary.json",
+        COVERAGE_SUMMARY_BLOB_SHA,
+        label="coverage summary",
+    )
     _validate_old_summary(summary)
 
     _, plan = _json_bytes(evidence_root / "collection-plan.json", label="collection plan")

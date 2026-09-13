@@ -217,6 +217,52 @@ def test_candidate_only_rejects_grouped_classification() -> None:
         temp.cleanup()
 
 
+def test_candidate_only_rejects_grouped_prefix_covering_candidate_path() -> None:
+    temp, evidence, report = _fixture()
+    try:
+        path = evidence / "coverage-groups.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["groups"].append(
+            {
+                "group_id": "R7-ILLICIT-WORKFLOW-PREFIX",
+                "repository": "meta",
+                "path_prefix": ".github/workflows/",
+                "disposition": "GROUPED",
+            }
+        )
+        path.write_text(json.dumps(data), encoding="utf-8")
+        _expect_state_invalid(evidence, report)
+    finally:
+        temp.cleanup()
+
+
+def test_candidate_only_rejects_summary_durability_adoption_claim() -> None:
+    temp, evidence, report = _fixture()
+    try:
+        path = evidence / "coverage-summary.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["durability"] = (
+            "R7 current-main META governance coverage is adopted as canonical DIRECT evidence."
+        )
+        path.write_text(json.dumps(data), encoding="utf-8")
+        _expect_state_invalid(evidence, report)
+    finally:
+        temp.cleanup()
+
+
+def test_candidate_only_rejects_report_source_cut_advance() -> None:
+    temp, evidence, report = _fixture()
+    try:
+        data = json.loads(report.read_text(encoding="utf-8"))
+        data["source_cut_policy"] = (
+            "META source cut has advanced to " + verify.SOURCE_COMMIT
+        )
+        report.write_text(json.dumps(data), encoding="utf-8")
+        _expect_state_invalid(evidence, report)
+    finally:
+        temp.cleanup()
+
+
 def test_candidate_only_rejects_summary_or_source_cut_transition() -> None:
     temp, evidence, report = _fixture()
     try:
