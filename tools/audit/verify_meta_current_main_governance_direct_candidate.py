@@ -141,6 +141,19 @@ def _tsv_rows(path: Path, *, expected_blob_sha: str | None = None) -> list[dict[
     return rows
 
 
+def _coverage_rows(path: Path) -> list[dict[str, str]]:
+    raw = path.read_bytes()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise CandidateError(f"coverage TSV is not UTF-8: {path.name}") from exc
+    reader = csv.DictReader(text.splitlines(), delimiter="\t")
+    fields = set(reader.fieldnames or ())
+    if not {"repository", "path", "blob_sha"}.issubset(fields):
+        raise CandidateError(f"coverage TSV required columns missing: {path.name}")
+    return list(reader)
+
+
 def _direct_meta_rows(evidence_root: Path = EVIDENCE_ROOT) -> dict[str, dict[str, str]]:
     result: dict[str, dict[str, str]] = {}
     for name, expected_blob in DIRECT_TSV_BLOBS.items():
@@ -312,7 +325,7 @@ def validate_candidate_only_state(
     }
 
     for path in sorted(evidence_root.glob("coverage-review*.tsv")):
-        rows = _tsv_rows(path)
+        rows = _coverage_rows(path)
         for row in rows:
             if row.get("repository") != "meta":
                 continue
