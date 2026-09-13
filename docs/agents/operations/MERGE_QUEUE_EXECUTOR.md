@@ -70,10 +70,13 @@ workflow to submit the same comment again.
 
 Immediately before the PUT the executor repeats the comment, target and
 source-workflow qualification. Workflow proof binds exact repository, path,
-event, stable ID, PR head branch/SHA and any non-empty PR relation. Atlas's two
-canonical `pull_request_target` workflows may have empty relations; both
-identities must still pass, and terminal `atlas-gate` is not source
-qualification.
+event and stable workflow ID. META, Game and Platform additionally bind the PR
+head branch/SHA and named gate/check-suite identity. Atlas's two canonical
+`pull_request_target` workflows are qualified through a required non-empty
+`pull_requests` relation that must contain the exact target PR number and
+`head.sha == expected_head_sha`; their run-level `head_sha` may reflect protected
+base `main` and is not used as the PR-head fence. Both Atlas workflow identities
+must pass, and terminal `atlas-gate` is not source qualification.
 
 ## Native mutation
 
