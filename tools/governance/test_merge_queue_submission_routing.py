@@ -240,15 +240,12 @@ def test_post_submission_target_readback_is_mandatory_and_exact() -> None:
         attempt(), current_receipt, post_observation(), now_epoch_seconds=NOW
     ) == routing.POST_SUBMISSION_TARGET_CONFIRMED
 
-    # Causal order comes from the executor-owned sequence, not whole-second time.
     for sequence in (RECEIPT_SEQUENCE - 1, RECEIPT_SEQUENCE):
         assert routing.verify_post_submission_target(
             attempt(), current_receipt, post_observation(executor_sequence=sequence),
             now_epoch_seconds=NOW,
         ) == routing.BLOCKED_POST_SUBMISSION_TARGET_MISMATCH
 
-    # A readback timestamp before the accepted receipt is stale even if its
-    # sequence was otherwise greater.
     assert routing.verify_post_submission_target(
         attempt(),
         current_receipt,
@@ -272,8 +269,6 @@ def test_post_submission_target_readback_is_mandatory_and_exact() -> None:
             attempt(), current_receipt, post_observation(**changes), now_epoch_seconds=NOW
         ) == routing.BLOCKED_POST_SUBMISSION_TARGET_MISMATCH, changes
 
-    # Reconciliation states are not accepted receipts and therefore cannot be
-    # promoted to a post-submission confirmation.
     assert routing.verify_post_submission_target(
         attempt(), receipt(http_status=409), post_observation(), now_epoch_seconds=NOW
     ) == routing.BLOCKED_RECEIPT_INVALID
@@ -290,13 +285,16 @@ def test_no_generic_auto_merge_direct_merge_or_ambiguous_cleanup_route_exists() 
         assert forbidden not in text, forbidden
 
 
-def test_policy_declares_app_free_auth_and_terminal_proof() -> None:
+def test_policy_declares_app_free_auth_broker_and_terminal_proof() -> None:
     text = POLICY.read_text(encoding="utf-8")
     for marker in (
-        "Policy version: `3.1.0`",
+        "Policy version: `3.2.0`",
         "merge_action=\"merge_queue\"",
         "does **not** require or authorize creating a dedicated custom GitHub App",
         "fine-grained personal access token",
+        "protected central META Merge Queue broker",
+        "/oteryn-mq-enqueue <repository> <pr-number> <exact-head-sha>",
+        "Oteryn/Oteryn#187",
         "keep built-in `GITHUB_TOKEN` read-only",
         "Do not use `GITHUB_TOKEN` as the queue mutation credential",
         "`BLOCKED_CAPABILITY_UNAVAILABLE`",
@@ -304,7 +302,8 @@ def test_policy_declares_app_free_auth_and_terminal_proof() -> None:
     ):
         assert marker in text, marker
     policy_json = json.loads(POLICY_JSON.read_text(encoding="utf-8"))
-    assert policy_json["policy_version"] == "3.1.0"
+    assert policy_json["policy_version"] == "3.2.0"
+    assert ".github/workflows/merge-queue-broker.yml" in policy_json["machine_authorities"]
 
 
 def main() -> int:
