@@ -355,14 +355,34 @@ def qualify_target(
             and (is_atlas_target or str(run.get("head_sha") or "").lower() == expected_head_sha)
             and (gate_suite_id is None or run.get("check_suite_id") == gate_suite_id)
         ] if isinstance(workflow_runs, list) else []
+        if is_atlas_target:
+            canonical = [
+                run for run in canonical
+                if isinstance(run.get("pull_requests"), list)
+                and run["pull_requests"]
+                and any(
+                    isinstance(relation, dict)
+                    and relation.get("number") == pr_number
+                    and isinstance(relation.get("head"), dict)
+                    and isinstance(relation["head"].get("sha"), str)
+                    and SHA_RE.fullmatch(relation["head"]["sha"].strip().lower())
+                    and relation["head"]["sha"].strip().lower() == expected_head_sha
+                    for relation in run.get("pull_requests", [])
+                )
+            ]
         if not canonical:
             raise ValueError(f"canonical source workflow did not run: {workflow_path}")
+        if is_atlas_target:
+            canonical = [
+                run for run in canonical
+                if run.get("status") == "completed" and run.get("conclusion") == "success"
+            ]
+            if not canonical:
+                raise ValueError(f"canonical source workflow must be completed/success: {workflow_path}")
         latest_workflow = max(canonical, key=lambda run: int(run.get("id") or 0))
         relations = latest_workflow.get("pull_requests")
         if not isinstance(relations, list):
             raise ValueError("canonical workflow pull-request relation is malformed")
-        if is_atlas_target and not relations:
-            raise ValueError("Atlas canonical workflow must relate to the target pull request")
         if relations and not any(item.get("number") == pr_number for item in relations if isinstance(item, dict)):
             raise ValueError("canonical workflow does not relate to the target pull request")
         if latest_workflow.get("status") != "completed" or latest_workflow.get("conclusion") != "success":

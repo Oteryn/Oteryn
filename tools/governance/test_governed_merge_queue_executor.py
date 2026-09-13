@@ -289,7 +289,7 @@ def test_gate_must_bind_canonical_workflow_identity_and_pr_relation() -> None:
             raise AssertionError(f"noncanonical workflow field {field} was accepted")
 
 
-def test_atlas_uses_base_main_run_sha_and_requires_exact_pr_relations() -> None:
+def test_atlas_selects_latest_successful_run_after_exact_pr_and_head_relation() -> None:
     repository = "Oteryn/Oteryn-Atlas"
     responses = read_responses()
     comment_key = ("GET", f"/repos/Oteryn/Oteryn/issues/comments/{REQUEST_COMMENT}")
@@ -305,7 +305,14 @@ def test_atlas_uses_base_main_run_sha_and_requires_exact_pr_relations() -> None:
                 "id": 100 + index, "workflow_id": workflow_id, "path": path,
                 "event": event, "head_repository": {"full_name": repository},
                 "head_branch": "main", "head_sha": PROTECTED_MAIN_SHA,
-                "pull_requests": [{"number": PR}],
+                "pull_requests": [{"number": PR, "head": {"sha": HEAD.upper()}}],
+                "status": "completed", "conclusion": "success",
+        })
+        workflow_runs.append({
+                "id": 200 + index, "workflow_id": workflow_id, "path": path,
+                "event": event, "head_repository": {"full_name": repository},
+                "head_branch": "main", "head_sha": PROTECTED_MAIN_SHA,
+                "pull_requests": [{"number": PR + 1, "head": {"sha": "a" * 40}}],
                 "status": "completed", "conclusion": "success",
         })
     query = "event=pull_request_target&per_page=100"
@@ -321,7 +328,9 @@ def test_atlas_uses_base_main_run_sha_and_requires_exact_pr_relations() -> None:
 
     first_path, first_event, _ = executor.SOURCE_WORKFLOWS[repository][0]
     responses[("GET", f"/repos/{repository}/actions/runs?event={first_event}&per_page=100")] = executor.Response(
-        200, {"workflow_runs": workflow_runs[1:]}
+        200, {"workflow_runs": [
+            run for run in workflow_runs if run["path"] != first_path
+        ]}
     )
     try:
         executor.qualify_target(
@@ -334,7 +343,12 @@ def test_atlas_uses_base_main_run_sha_and_requires_exact_pr_relations() -> None:
     else:
         raise AssertionError("Atlas qualification accepted missing canonical source workflow")
 
-    for relation in ([], [{"number": PR + 1}]):
+    for relation in (
+        [],
+        [{"number": PR}],
+        [{"number": PR, "head": {"sha": "not-a-sha"}}],
+        [{"number": PR, "head": {"sha": "a" * 40}}],
+    ):
         rejected = read_responses()
         comment = dict(rejected[comment_key].body)
         comment["body"] = control_body(repository=repository)
@@ -353,7 +367,7 @@ def test_atlas_uses_base_main_run_sha_and_requires_exact_pr_relations() -> None:
                 protected_main_sha=PROTECTED_MAIN_SHA,
             )
         except ValueError as exc:
-            assert "target pull request" in str(exc)
+            assert "canonical source workflow did not run" in str(exc)
         else:
             raise AssertionError(f"Atlas qualification accepted relation {relation}")
 
