@@ -30,7 +30,10 @@ Before `meta.governed_merge_queue_executor.v1` may be advertised as operational:
 4. one real bounded canary must prove 202 UUID capture, strictly-later
    UUID-addressed readback, the normal provider `merge_group` aggregate gate and
    protected-main readback;
-5. any denied credential/endpoint result keeps the delegated route
+5. the retained canary must be bound to the exact protected META `main` commit
+   SHA currently hosting the executor. Any protected-main movement invalidates
+   the canary until a new terminal canary proves the new executable tree;
+6. any denied credential/endpoint result keeps the delegated route
    `BLOCKED_CAPABILITY_UNAVAILABLE`.
 
 The workflow's normal repository permissions are read-only. It never uses the
@@ -60,11 +63,17 @@ OWNER/MEMBER META actor association. The executor re-fetches the same comment
 live and verifies that it is still on Issue #196 and still binds the same
 repository, PR and exact head before it reads the target PR.
 
-Immediately before the PUT it repeats that read and all target/source-workflow
-qualification. Workflow proof binds exact repository, path, event, stable ID,
-PR head branch/SHA and any non-empty PR relation. Atlas's two canonical
-`pull_request_target` workflows may have empty relations; both identities must
-still pass, and terminal `atlas-gate` is not source qualification.
+GitHub Actions reruns are not retries for queue submission. The workflow admits
+only `github.run_attempt == 1`. If the first run accepted a request and later
+failed, reconcile the persisted UUID from that first run; never rerun the
+workflow to submit the same comment again.
+
+Immediately before the PUT the executor repeats the comment, target and
+source-workflow qualification. Workflow proof binds exact repository, path,
+event, stable ID, PR head branch/SHA and any non-empty PR relation. Atlas's two
+canonical `pull_request_target` workflows may have empty relations; both
+identities must still pass, and terminal `atlas-gate` is not source
+qualification.
 
 ## Native mutation
 
@@ -81,12 +90,15 @@ merge_action=merge_queue
 ```
 
 HTTP 202 produces a non-terminal receipt. The executor binds the returned server
-UUID to sequence 1 and, before any fallible status or target readback, flushes a
-machine-readable non-secret `REQUEST_ACCEPTED_NON_TERMINAL` record to stdout and
-durably appends it to `GITHUB_STEP_SUMMARY`. The record carries the request comment
-ID, repository, PR, base, exact head, merge action, UUID and receipt sequence. Only
-then does it perform UUID-addressed status readback and fresh target identity
-readback, requiring a strictly later executor sequence.
+UUID to sequence 1 and, before any fallible response-metadata validation, status
+or target readback, flushes a machine-readable non-secret
+`REQUEST_ACCEPTED_NON_TERMINAL` record to stdout and durably appends it to
+`GITHUB_STEP_SUMMARY`. The record carries the request comment ID, repository, PR,
+base, exact requested head/action, returned UUID and receipt sequence. If returned
+metadata disagrees after a canonical UUID was accepted, reconciliation is required
+by that UUID and the PUT must not be repeated. Only valid metadata proceeds to
+UUID-addressed status readback and fresh target identity readback with a strictly
+later executor sequence.
 
 HTTP 200/409 is reconciliation only. HTTP 400/422 is rejection. HTTP 403/404 is a
 precise native capability/credential blocker. There is no direct merge, generic
@@ -116,6 +128,9 @@ operator/coordinator must recover the persisted UUID, reconcile that exact async
 request and must not repeat the PUT. If receipt persistence itself fails, the
 executor stops with a UUID-bearing `RECONCILIATION_REQUIRED` blocker and never
 issues another PUT as fallback.
+
+A GitHub Actions rerun of the same Issue-comment event is intentionally blocked
+from executing the mutating job. Reconcile the original run's receipt instead.
 
 If the credential is absent/denied, the executor is not operational. Continue
 safe path-disjoint work; do not weaken protections or resurrect a provider-local

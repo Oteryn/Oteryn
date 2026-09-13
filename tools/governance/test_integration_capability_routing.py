@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 NOW = 1_800_000_000
+PROTECTED_MAIN_SHA = "0123456789abcdef0123456789abcdef01234567"
 MODULE_PATH = Path(__file__).with_name("integration_capability_routing.py")
 SPEC = importlib.util.spec_from_file_location("integration_capability_routing", MODULE_PATH)
 assert SPEC and SPEC.loader
@@ -40,9 +41,11 @@ def executor_evidence(**changes: object) -> object:
     values = {
         "repository": expected["repository"], "ref": expected["ref"],
         "workflow_path": expected["workflow_path"], "workflow_blob_sha": expected["workflow_blob_sha"],
+        "protected_main_sha": PROTECTED_MAIN_SHA,
         "observed_at_epoch_seconds": NOW, "credential_operational": True,
         "canary_repository": expected["repository"],
         "canary_workflow_blob_sha": expected["workflow_blob_sha"],
+        "canary_protected_main_sha": PROTECTED_MAIN_SHA,
         "terminal_canary_proof_retained": True,
     }
     values.update(changes)
@@ -117,10 +120,13 @@ def test_magic_dictionary_cannot_authorize_delegated_worker_release() -> None:
         "operational_executor_routes": ["meta.governed_merge_queue_executor.v1"],
         "protected_meta_executor_readback": {
             "source": "live_protected_meta_executor_readback", **expected,
+            "protected_main_sha": PROTECTED_MAIN_SHA,
             "observed_at_epoch_seconds": NOW, "credential_operational": True,
             "retained_canary_evidence": {
                 "source": "retained_terminal_executor_canary", "repository": expected["repository"],
-                "workflow_blob_sha": expected["workflow_blob_sha"], "terminal_proof_retained": True,
+                "workflow_blob_sha": expected["workflow_blob_sha"],
+                "protected_main_sha": PROTECTED_MAIN_SHA,
+                "terminal_proof_retained": True,
             },
         },
     }
@@ -143,12 +149,36 @@ def test_delegated_route_rejects_invalid_executor_readback() -> None:
         {"ref": "refs/heads/feature"}, {"workflow_blob_sha": "a" * 40},
         {"credential_operational": False}, {"observed_at_epoch_seconds": NOW - 301},
         {"canary_repository": "Oteryn/Other"}, {"terminal_canary_proof_retained": False},
+        {"protected_main_sha": "not-a-sha"}, {"canary_protected_main_sha": "not-a-sha"},
+        {"canary_protected_main_sha": "a" * 40},
     ):
         current = routing.AcquiredCapabilityEvidence(
             True, NOW, ("github.issue_comment.create",),
             ("meta.governed_merge_queue_executor.v1",), executor_evidence(**changes)
         )
         assert state(FakeObserver(current)) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+
+
+def test_delegated_canary_is_invalidated_by_any_protected_main_change() -> None:
+    current = routing.AcquiredCapabilityEvidence(
+        True, NOW, ("github.issue_comment.create",),
+        ("meta.governed_merge_queue_executor.v1",),
+        executor_evidence(protected_main_sha="a" * 40, canary_protected_main_sha="b" * 40),
+    )
+    assert state(FakeObserver(current)) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+
+
+def test_executor_workflow_rejects_github_reruns() -> None:
+    text = (ROOT / ".github/workflows/governed-merge-queue-executor.yml").read_text(encoding="utf-8")
+    assert "github.run_attempt == 1" in text
+
+
+def test_policy_binds_current_executor_workflow_blob() -> None:
+    import hashlib
+    cfg = policy()["integration_capability_routing"]["protected_executor"]
+    workflow = (ROOT / cfg["workflow_path"]).read_bytes()
+    header = f"blob {len(workflow)}\0".encode("ascii")
+    assert hashlib.sha1(header + workflow).hexdigest() == cfg["workflow_blob_sha"]
 
 
 def test_current_session_adapter_acquires_instead_of_accepting_serialized_input() -> None:

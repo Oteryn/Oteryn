@@ -2,7 +2,7 @@
 """Trusted-observer routing for protected-integration capability.
 
 Capability classification is deterministic, but worker-release authority never
-accepts serialized evidence.  A trusted observer acquires live evidence and the
+accepts serialized evidence. A trusted observer acquires live evidence and the
 module seals the resulting observation before classification.
 """
 
@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
+import re
 import time
 from typing import Mapping, Protocol
 
@@ -19,6 +20,7 @@ DELEGATED_CAPABLE = "DELEGATED_CAPABLE"
 BLOCKED_CAPABILITY_UNAVAILABLE = "BLOCKED_CAPABILITY_UNAVAILABLE"
 
 DEFAULT_MAX_AGE_SECONDS = 300
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _OBSERVATION_SEAL = object()
 
 
@@ -66,7 +68,7 @@ def validate_policy(policy: Mapping[str, object]) -> list[str]:
         "ref": "refs/heads/main",
         "workflow_path": ".github/workflows/governed-merge-queue-executor.yml",
         "workflow_blob_sha": executor.get("workflow_blob_sha") if isinstance(executor, dict) else None,
-    } or not isinstance(executor.get("workflow_blob_sha"), str) or len(executor["workflow_blob_sha"]) != 40:
+    } or not isinstance(executor.get("workflow_blob_sha"), str) or SHA_RE.fullmatch(executor["workflow_blob_sha"]) is None:
         errors.append("integration_capability_routing.protected_executor must bind protected META workflow identity")
     targets = cfg.get("allowed_target_repositories")
     expected_targets = {
@@ -89,10 +91,12 @@ class ProtectedExecutorEvidence:
     ref: str
     workflow_path: str
     workflow_blob_sha: str
+    protected_main_sha: str
     observed_at_epoch_seconds: int
     credential_operational: bool
     canary_repository: str
     canary_workflow_blob_sha: str
+    canary_protected_main_sha: str
     terminal_canary_proof_retained: bool
 
 
@@ -174,10 +178,15 @@ def _delegated_executor_is_operational(
         and evidence.ref == expected.get("ref")
         and evidence.workflow_path == expected.get("workflow_path")
         and evidence.workflow_blob_sha == expected.get("workflow_blob_sha")
+        and isinstance(evidence.protected_main_sha, str)
+        and SHA_RE.fullmatch(evidence.protected_main_sha) is not None
         and evidence.credential_operational is True
         and _fresh(evidence.observed_at_epoch_seconds, now_epoch_seconds, int(cfg["observation_max_age_seconds"]))
         and evidence.canary_repository == expected.get("repository")
         and evidence.canary_workflow_blob_sha == expected.get("workflow_blob_sha")
+        and isinstance(evidence.canary_protected_main_sha, str)
+        and SHA_RE.fullmatch(evidence.canary_protected_main_sha) is not None
+        and evidence.canary_protected_main_sha == evidence.protected_main_sha
         and evidence.terminal_canary_proof_retained is True
     )
 

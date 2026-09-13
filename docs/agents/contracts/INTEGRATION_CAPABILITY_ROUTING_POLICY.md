@@ -36,8 +36,10 @@ Every capable observation carries an observation timestamp and is valid only for
 the finite freshness interval in the machine policy. Future, stale, malformed
 or unsealed observations fail closed. `DELEGATED_CAPABLE` additionally
 requires a fresh protected-META `refs/heads/main` readback bound to the canonical
-executor workflow path and exact blob, credential-operational proof and retained
-terminal canary evidence for that same identity.
+executor workflow path and exact blob, the exact current protected-main commit
+SHA, credential-operational proof and retained terminal canary evidence bound to
+that same protected-main SHA. Any protected-main movement invalidates the retained
+canary even when the workflow YAML blob itself is unchanged.
 
 Raw serialized snapshots may be retained as diagnostics or test fixtures, but are
 never accepted by `validate_worker_release` or interpreted as scheduling authority.
@@ -108,6 +110,8 @@ The protected META executor:
 
 - accepts only the four permanent Oteryn repositories and their immutable
   source-workflow identities in the organization routing policy;
+- admits only the first GitHub Actions run attempt for an Issue-comment event;
+  workflow reruns are reconciliation-only and cannot replay the queue mutation;
 - requires target PR `open`, unmerged, non-Draft, `base=main`, same-repository
   head, exact requested SHA;
 - binds source qualification to exact repository, workflow path, event, stable
@@ -124,7 +128,7 @@ The protected META executor:
   `merge_action="merge_queue"`;
 - treats HTTP 202 as acceptance only, creates the UUID-bound receipt immediately,
   and durably emits its non-secret machine record to stdout and
-  `GITHUB_STEP_SUMMARY` before any fallible readback;
+  `GITHUB_STEP_SUMMARY` before any fallible metadata validation or readback;
 - requires a strictly later UUID-bound status/target readback; readback failure
   preserves the accepted receipt and requires UUID reconciliation without a
   repeated PUT, while persistence failure is a UUID-bearing
@@ -149,8 +153,9 @@ fine-grained credential permitted by the bound organization policy.
 
 Credential provisioning and secret values are outside this repository change.
 Until the workflow is on protected META `main`, the fine-grained credential is
-provisioned, and a real bounded canary proves the route, the trusted readback
-adapter MUST NOT report `meta.governed_merge_queue_executor.v1` as operational.
+provisioned, and a real bounded canary proves the route for the exact current
+protected-main SHA, the trusted readback adapter MUST NOT report
+`meta.governed_merge_queue_executor.v1` as operational.
 
 Do not create a custom GitHub App merely for this executor and do not recreate
 provider-local Merge Queue bridges.

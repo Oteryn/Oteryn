@@ -46,7 +46,7 @@
       "repository": "Oteryn/Oteryn",
       "ref": "refs/heads/main",
       "workflow_path": ".github/workflows/governed-merge-queue-executor.yml",
-      "workflow_blob_sha": "1e6aa15cb557386c67b09ca332f69d5cfd75f6b7"
+      "workflow_blob_sha": "22ea2d223f71495629308d991f74619b7dc21986"
     },
     "allowed_target_repositories": {
       "Oteryn/Oteryn": {

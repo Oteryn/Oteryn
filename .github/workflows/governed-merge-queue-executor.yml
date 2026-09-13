@@ -18,6 +18,7 @@ jobs:
     name: Submit exact authorized target
     if: >-
       github.repository == 'Oteryn/Oteryn' &&
+      github.run_attempt == 1 &&
       github.event.issue.number == 196 &&
       github.event.issue.pull_request == null
     runs-on: ubuntu-latest
