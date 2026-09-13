@@ -1,0 +1,89 @@
+{
+  "adoption_performed": false,
+  "candidate": {
+    "new_active_governance": [
+      {"blob_sha": "00247bc74b1a123ad96f8b9d219eb018581c6f1d", "path": ".github/workflows/governed-merge-queue-executor.yml"},
+      {"blob_sha": "fcb3272d505ad92705e3cce1a5e4c302d97b4b7f", "path": "docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md"},
+      {"blob_sha": "d239c00581c0c45085c35200bb43f306b457bdac", "path": "docs/agents/operations/MERGE_QUEUE_EXECUTOR.md"},
+      {"blob_sha": "03b0a28835271c7b76651214105aa29a00ee1b67", "path": "docs/agents/programs/OTERYN_MQ_CAPABILITY_ROUTING_20260910.md"},
+      {"blob_sha": "e05e616498400a289d7d66cca484817586872291", "path": "tools/governance/governed_merge_queue_executor.py"},
+      {"blob_sha": "54ceb3a0ccc7a211f41145cf7350fe96f54d9078", "path": "tools/governance/integration_capability_routing.py"},
+      {"blob_sha": "4ff446f076e235eef60bb9a56e95a879406f1c2c", "path": "tools/governance/merge_queue_submission_routing.py"},
+      {"blob_sha": "e35511f916d5a93e52daff7be5021d7d2d85edcf", "path": "tools/governance/test_governed_merge_queue_executor.py"},
+      {"blob_sha": "26d8945fdb1a6c7f59f5d4da0c0a69db2a4bc2e0", "path": "tools/governance/test_integration_capability_routing.py"},
+      {"blob_sha": "3379cd8882fd03f7a4aa20a91ec9c2f171c3770c", "path": "tools/governance/test_merge_queue_submission_routing.py"}
+    ],
+    "path_count": 19,
+    "previous_direct_modified": [
+      {"blob_sha": "9a4e944d322b682a1cf61fa0110e69e69c8bb4ba", "path": ".github/workflows/ci.yml"},
+      {"blob_sha": "f093e904bba52eb8827a90b1024b7d21fa42d500", "path": "AGENTS.md"},
+      {"blob_sha": "6902d9f4f28701d73240fb37a8104cbf349333e0", "path": "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md"},
+      {"blob_sha": "bd2a0a6cecaa474a6e3bb8902aa2e67be12fc0c1", "path": "ecosystem/agent-execution-routing-policy.json"},
+      {"blob_sha": "44f9940259f645652cfed0ea5e9595f37e111dcf", "path": "tools/governance/test_central_agent_policy.py"}
+    ],
+    "previous_unverified_modified": [
+      {"blob_sha": "1f47189ad7859534740ee844c787fa3b248304fe", "path": "docs/agents/policy/PROMPTING_STANDARD.md"},
+      {"blob_sha": "af3e22cd36b3522b603be0c72d645b1b713b86dc", "path": "docs/agents/policy/PROMPT_EVAL_STANDARD.md"},
+      {"blob_sha": "1bdae7e48a9d3d93bd8f8850b7610840cfeafa10", "path": "ecosystem/organization-agent-policy.json"},
+      {"blob_sha": "def581adb5dd26040ce2943491894908fcd1870d", "path": "tools/governance/central_agent_policy.py"}
+    ],
+    "proposed_state": "DIRECT",
+    "semantic_scope": {
+      "capability_routing": "Trusted-observer DIRECT/DELEGATED/BLOCKED scheduling gate; capability never grants merge authority and delegated canary is exact-current-main bound.",
+      "executor": "Issue #196 transport, live comment/PR/workflow/actor/membership/permission qualification and one exact merge-async mutation route; source existence is not operational proof.",
+      "human_and_machine_policy": "Current META authority/routing/prompt/evaluation semantics; no provider/runtime/readiness inference.",
+      "merge_queue": "Native exact-head merge-async, app-free auth, exact target pre/post validation, UUID reconciliation, real merge_group and protected-main terminal proof.",
+      "program_record": "Historical #194/#195 implementation provenance, not current lifecycle or operational-capability authority.",
+      "tests": "Deterministic regression contracts executed by exact-head META CI; scope is limited to exercised assertions."
+    }
+  },
+  "coverage_adopted": false,
+  "exact_head_validation": {
+    "central_agent_policy": "PASS",
+    "governed_executor_tests": 22,
+    "integration_capability_tests": 19,
+    "meta_ci_run": 34787598536,
+    "meta_gate_job": 103805804171,
+    "native_merge_queue_regressions": 11,
+    "status": "SUCCESS"
+  },
+  "historical_evidence_family": {
+    "path_count": 26,
+    "prefix": "docs/evidence/repository-audit-2026-09-06/",
+    "reason": "tracked current-tree identity but historical package assertions are not automatically current live authority",
+    "state": "UNVERIFIED"
+  },
+  "identity_rebaseline": {
+    "added": 36,
+    "job": 103805803939,
+    "meta_leaf_count": 210,
+    "modified": 9,
+    "organization_source_archive_leaf_count": 4361,
+    "removed": 0,
+    "result_sha256": "bb592edba0090a218b7c979791be495f59698112544c3768e4884c35e84ef5ea",
+    "workflow_run": 34787598530
+  },
+  "independent_review_required": true,
+  "limitations": [
+    "Candidate-only; no coverage adoption or canonical ledger mutation.",
+    "Delegated executor is not operationally proven for current protected main; prior canary stopped before mutation because the fine-grained PAT was not provisioned.",
+    "No provider runtime, admin/security state, production, recovery, cost, supply-chain, privacy, telemetry, product readiness, organization-wide completion or independent 10/10 is established."
+  ],
+  "organization_audit_completion_claimed": false,
+  "product_readiness_claimed": false,
+  "projection_if_adopted": {
+    "direct": 308,
+    "grouped": 113,
+    "meta": {"direct": 95, "grouped": 0, "leaves": 210, "unverified": 115},
+    "semantically_classified": 421,
+    "source_archive_leaves": 4361,
+    "unverified": 3940
+  },
+  "schema_version": 1,
+  "source": {
+    "commit_sha": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+    "repository": "Oteryn/Oteryn",
+    "tree_sha": "b8ebb8e50bce14a736fa65590ac121655c52fd12"
+  },
+  "status": "DIRECT_CANDIDATE_ONLY_NOT_ADOPTED"
+}

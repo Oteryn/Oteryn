@@ -1,0 +1,42 @@
+name: Organization Audit META Current-Main Governance Qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/organization-audit-meta-current-main-governance-qualification.yml'
+      - 'docs/evidence/organization-audit-20260907/r7-meta-current-main-governance-direct-candidate.json'
+      - 'tools/audit/verify_meta_current_main_governance_direct_candidate.py'
+      - 'tools/audit/test_verify_meta_current_main_governance_direct_candidate.py'
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    name: Qualify current-main governance candidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact PR candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Candidate regressions
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 tools/audit/test_verify_meta_current_main_governance_direct_candidate.py
+
+      - name: Verify exact current-main candidate
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: python3 tools/audit/verify_meta_current_main_governance_direct_candidate.py
+
+      - name: Assert candidate remains non-adopted
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e docs/evidence/organization-audit-20260907/coverage-review-meta-current-main-governance-direct-additions.tsv
