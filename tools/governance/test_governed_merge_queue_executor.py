@@ -463,12 +463,38 @@ def test_202_rejects_wrong_uuid_bound_head_or_action() -> None:
                 ): executor.Response(202, {"status": "accepted", "details": details})
             }
         )
-        try:
-            executor.submit_merge_queue(read_client, mutation_client, target)
-        except executor.ExecutorError:
-            pass
+        output = io.StringIO()
+        with step_summary() as summary_path, contextlib.redirect_stdout(output):
+            try:
+                executor.submit_merge_queue(read_client, mutation_client, target)
+            except executor.ExecutorError as exc:
+                if details["uuid"] == SERVER_UUID:
+                    assert "RECONCILIATION_REQUIRED" in str(exc)
+                    assert SERVER_UUID in str(exc)
+                    assert "do not repeat" in str(exc)
+                else:
+                    assert "UUID is invalid" in str(exc)
+            else:
+                raise AssertionError(f"invalid acceptance was accepted: {details}")
+
+            stdout_record = output.getvalue()
+            summary_record = (
+                summary_path.read_text(encoding="utf-8")
+                if summary_path.exists()
+                else ""
+            )
+
+        if details["uuid"] == SERVER_UUID:
+            for persisted in (stdout_record, summary_record):
+                assert "REQUEST_ACCEPTED_NON_TERMINAL" in persisted
+                assert f'"server_uuid":"{SERVER_UUID}"' in persisted
+                assert f'"expected_head_sha":"{HEAD}"' in persisted
+                assert '"merge_action":"merge_queue"' in persisted
         else:
-            raise AssertionError(f"invalid acceptance was accepted: {details}")
+            assert SERVER_UUID not in stdout_record
+            assert summary_record == ""
+        assert [call[0] for call in mutation_client.calls].count("PUT") == 1
+        assert not any("merge-async/" in call[1] for call in mutation_client.calls)
 
 
 def test_200_and_409_never_fabricate_a_fresh_acceptance_receipt() -> None:

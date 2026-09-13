@@ -528,21 +528,27 @@ def submit_merge_queue(
         )
 
     if response.status == 202:
-        status, server_uuid, action, head = _server_fields(
-            response.body, require_uuid=True
+        # A 202 may already have changed server state. Capture its canonical UUID
+        # before validating any other response metadata so even a malformed binding
+        # leaves a durable causal handle and can never invite a repeated PUT.
+        details = response.body.get("details")
+        server_uuid = _valid_uuid(
+            details.get("uuid") if isinstance(details, dict) else None
         )
-        if action != MERGE_ACTION or head != target.head_sha:
-            raise ExecutorError(
-                "merge-async acceptance does not bind exact head and merge_queue"
-            )
+        response_status = response.body.get("status")
+        receipt_status = (
+            response_status
+            if isinstance(response_status, str) and response_status
+            else "http_202_accepted"
+        )
         receipt_sequence = sequence.next()
         receipt = Receipt(
             target.repository,
             target.pr_number,
             target.base,
             target.head_sha,
-            action,
-            status,
+            MERGE_ACTION,
+            receipt_status,
             server_uuid,
             receipt_sequence,
         )
@@ -552,6 +558,13 @@ def submit_merge_queue(
             "receipt": asdict(receipt),
         }
         _persist_accepted_receipt(accepted_result)
+        status, _, action, head = _server_fields(response.body, require_uuid=True)
+        if action != MERGE_ACTION or head != target.head_sha:
+            raise ExecutorError(
+                "RECONCILIATION_REQUIRED: merge-async acceptance metadata does not "
+                f"bind exact head and merge_queue for server UUID {server_uuid}; "
+                "do not repeat the request"
+            )
         readback = _readback(
             read_client,
             mutation_client,
