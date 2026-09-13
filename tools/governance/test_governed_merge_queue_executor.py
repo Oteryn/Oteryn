@@ -621,7 +621,10 @@ def test_workflow_is_narrow_read_only_and_has_no_forbidden_merge_fallback() -> N
     assert "pull_request:" not in workflow
     assert "CONTROL_ISSUE: '196'" in workflow
     assert "REQUEST_COMMENT_ID: ${{ github.event.comment.id }}" in workflow
-    assert "ref: ${{ steps.parse.outputs.protected_main_sha }}" in workflow
+    assert "ref: main" in workflow
+    assert "- name: Verify checked-out protected META main" in workflow
+    assert 'checked_out_main="$(git rev-parse HEAD)"' in workflow
+    assert '[[ "$checked_out_main" != "$QUALIFIED_PROTECTED_MAIN_SHA" ]]' in workflow
     assert '--protected-main-sha "$QUALIFIED_PROTECTED_MAIN_SHA"' in workflow
     assert "OTERYN_MQ_FINE_GRAINED_PAT: ${{ secrets.OTERYN_MQ_FINE_GRAINED_PAT }}" in workflow
     assert "python3 tools/governance/governed_merge_queue_executor.py" in workflow
