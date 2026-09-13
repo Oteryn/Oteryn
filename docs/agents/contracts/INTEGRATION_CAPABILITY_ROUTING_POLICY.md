@@ -114,10 +114,11 @@ The command is exactly:
 ```
 
 The protected executor re-fetches this same comment from Issue #196 immediately
-before target qualification and requires an OWNER/MEMBER META actor association,
-the closed command grammar, and exact agreement with the workflow-bound
-repository/PR/head. This live re-read protects transport integrity; it is not a
-second authorization proof or attestation system.
+before target qualification and requires the closed command grammar and exact
+agreement with the workflow-bound repository/PR/head. The authenticated
+issue-comment event's OWNER/MEMBER association is ingress evidence only, not
+current membership authority. This live re-read protects transport integrity;
+it is not a second authorization proof or attestation system.
 The final SHA is the exact protected META `main` commit bound to the retained
 canary proof; it is not inferred from the workflow event's `github.sha`.
 
@@ -139,7 +140,8 @@ The protected META executor:
   report the base SHA, and requires each run's non-empty PR relation to contain
   the exact target PR. Terminal `atlas-gate` remains merge-group proof;
 - authenticates the fine-grained PAT human principal, requires it to equal the
-  control-comment actor and requires current target `admin` or `maintain`;
+  control-comment actor, revalidates that principal's current active `Oteryn`
+  organization membership, and requires current target `admin` or `maintain`;
 - immediately before mutation, re-reads comment, PR, eligibility and workflow
   evidence and consumes the canonical authorization/freeze/attempt route objects;
 - immediately before mutation, live-reads `Oteryn/Oteryn` protected `main` and

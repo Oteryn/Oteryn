@@ -64,6 +64,14 @@ class FakeClient:
         response = self.responses.get((method, path))
         if response is None and (method, path) == ("GET", "/user"):
             response = executor.Response(200, {"login": ACTOR})
+        if response is None and (method, path) == (
+            "GET", "/user/memberships/orgs/Oteryn"
+        ):
+            response = executor.Response(200, {
+                "state": "active",
+                "user": {"login": ACTOR},
+                "organization": {"login": "Oteryn"},
+            })
         if response is None and method == "GET" and path.endswith(
             f"/collaborators/{ACTOR}/permission"
         ):
@@ -624,6 +632,36 @@ def test_put_requires_same_authenticated_actor_with_target_integration_permissio
             pass
         else:
             raise AssertionError("unauthorized mutation principal reached merge-async")
+        assert not any(call[0] == "PUT" for call in mutation_client.calls)
+
+
+def test_stale_member_event_cannot_replace_current_active_meta_membership() -> None:
+    invalid_memberships = (
+        executor.Response(404, {"message": "Not Found"}),
+        executor.Response(403, {"message": "Resource not accessible"}),
+        executor.Response(200, {"state": "pending", "user": {"login": ACTOR},
+                                "organization": {"login": "Oteryn"}}),
+        executor.Response(200, {"state": "inactive", "user": {"login": ACTOR},
+                                "organization": {"login": "Oteryn"}}),
+        executor.Response(200, {"state": "active"}),
+    )
+    for membership in invalid_memberships:
+        read_client = FakeClient(read_responses())
+        target = qualified(read_client)
+        mutation_client = FakeClient({
+            ("GET", "/user/memberships/orgs/Oteryn"): membership,
+        })
+        try:
+            executor.submit_merge_queue(read_client, mutation_client, target)
+        except executor.ExecutorError:
+            pass
+        else:
+            raise AssertionError("stale creation-time MEMBER association reached merge-async")
+        assert os.environ[EVENT_ASSOCIATION_ENV] == "MEMBER"
+        assert any(
+            call[1] == "/user/memberships/orgs/Oteryn"
+            for call in mutation_client.calls
+        )
         assert not any(call[0] == "PUT" for call in mutation_client.calls)
 
 

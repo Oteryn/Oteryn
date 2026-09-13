@@ -57,6 +57,7 @@ SOURCE_WORKFLOWS = {
     for repository, config in _TARGET_POLICY.items()
 }
 INTEGRATION_PERMISSIONS = frozenset({"admin", "maintain"})
+META_ORGANIZATION = "Oteryn"
 
 
 class ExecutorError(RuntimeError):
@@ -534,6 +535,29 @@ def submit_merge_queue(
     principal = _response_body(mutation_client.rest("GET", "/user")).get("login")
     if principal != target.request_actor:
         raise ExecutorError("mutation principal must match the live control-request actor")
+    membership_response = mutation_client.rest(
+        "GET",
+        f"/user/memberships/orgs/{META_ORGANIZATION}",
+        allowed_statuses=(200, 403, 404),
+    )
+    if membership_response.status != 200:
+        raise ExecutorError(
+            "mutation principal's current Oteryn organization membership "
+            "could not be authoritatively read"
+        )
+    membership = _response_body(membership_response)
+    membership_user = membership.get("user")
+    membership_organization = membership.get("organization")
+    if (
+        membership.get("state") != "active"
+        or not isinstance(membership_user, dict)
+        or membership_user.get("login") != target.request_actor
+        or not isinstance(membership_organization, dict)
+        or membership_organization.get("login") != META_ORGANIZATION
+    ):
+        raise ExecutorError(
+            "mutation principal lacks current active Oteryn organization membership"
+        )
     permission = _response_body(mutation_client.rest(
         "GET", f"/repos/{owner}/{name}/collaborators/{urllib.parse.quote(target.request_actor, safe='')}/permission"
     )).get("permission")

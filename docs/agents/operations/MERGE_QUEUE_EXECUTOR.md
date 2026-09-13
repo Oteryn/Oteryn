@@ -24,7 +24,8 @@ Before `meta.governed_merge_queue_executor.v1` may be advertised as operational:
 1. this workflow/executor must be integrated to protected META `main`;
 2. repository secret `OTERYN_MQ_FINE_GRAINED_PAT` must be provisioned with a
    fine-grained token scoped only to the required permanent repository set and
-   the minimum permissions required by the native `merge-async` route;
+   the minimum permissions required by the native `merge-async` route, plus
+   organization `Members: read` solely to revalidate current META membership;
 3. no token value may be committed, printed, copied into an Issue/PR/comment, or
    exposed to provider code;
 4. one real bounded canary must prove 202 UUID capture, strictly-later
@@ -40,9 +41,11 @@ The workflow's normal repository permissions are read-only. It never uses the
 built-in workflow token as the queue mutation credential.
 
 The mutation credential authenticates a human principal. The executor requires
-that principal to equal the live control-comment actor and to have current
-`admin` or `maintain` permission in the target repository. META organization
-membership alone is transport eligibility, never cross-repository authority.
+that principal to equal the live control-comment actor, have current active
+membership in `Oteryn`, and have current `admin` or `maintain` permission in the
+target repository. The issue-comment event's OWNER/MEMBER association is ingress
+evidence rather than current authorization. META organization membership alone
+is transport eligibility, never cross-repository authority.
 
 ## Control request
 
