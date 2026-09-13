@@ -47,7 +47,7 @@ jobs:
           pattern = re.compile(
               r"^/oteryn-mq-submit "
               r"(Oteryn/(?:Oteryn|Oteryn-Game|Oteryn-Platform|Oteryn-Atlas)) "
-              r"([1-9][0-9]*) ([0-9a-f]{40})$"
+              r"([1-9][0-9]*) ([0-9a-f]{40}) ([0-9a-f]{40})$"
           )
           match = pattern.fullmatch(body)
           trusted = association in {"OWNER", "MEMBER"}
@@ -58,6 +58,7 @@ jobs:
               "repository": match.group(1) if allowed else "",
               "pr_number": match.group(2) if allowed else "",
               "expected_head_sha": match.group(3) if allowed else "",
+              "protected_main_sha": match.group(4) if allowed else "",
           }
           with open(output, "a", encoding="utf-8") as handle:
               for key, value in values.items():
@@ -68,7 +69,7 @@ jobs:
         if: ${{ steps.parse.outputs.allowed == 'true' }}
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ steps.parse.outputs.protected_main_sha }}
           persist-credentials: false
 
       - name: Execute governed native merge-async request
@@ -80,6 +81,7 @@ jobs:
           TARGET_PR: ${{ steps.parse.outputs.pr_number }}
           TARGET_HEAD: ${{ steps.parse.outputs.expected_head_sha }}
           REQUEST_COMMENT_ID: ${{ github.event.comment.id }}
+          QUALIFIED_PROTECTED_MAIN_SHA: ${{ steps.parse.outputs.protected_main_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -87,4 +89,5 @@ jobs:
             --repository "$TARGET_REPOSITORY" \
             --pr-number "$TARGET_PR" \
             --expected-head-sha "$TARGET_HEAD" \
-            --request-comment-id "$REQUEST_COMMENT_ID"
+            --request-comment-id "$REQUEST_COMMENT_ID" \
+            --protected-main-sha "$QUALIFIED_PROTECTED_MAIN_SHA"

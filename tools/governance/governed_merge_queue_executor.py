@@ -44,7 +44,7 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 CONTROL_COMMAND_RE = re.compile(
     r"^/oteryn-mq-submit "
     r"(Oteryn/(?:Oteryn|Oteryn-Game|Oteryn-Platform|Oteryn-Atlas)) "
-    r"([1-9][0-9]*) ([0-9a-f]{40})$"
+    r"([1-9][0-9]*) ([0-9a-f]{40}) ([0-9a-f]{40})$"
 )
 TRUSTED_ASSOCIATIONS = frozenset({"OWNER", "MEMBER"})
 POLICY_PATH = Path(__file__).resolve().parents[2] / "ecosystem/agent-execution-routing-policy.json"
@@ -148,6 +148,7 @@ class QualifiedTarget:
     request_comment_id: int
     request_actor: str
     head_branch: str
+    protected_main_sha: str
 
 
 @dataclass(frozen=True)
@@ -180,9 +181,11 @@ def normalize_inputs(
     pr_number: int,
     expected_head_sha: str,
     request_comment_id: int,
-) -> tuple[str, int, str, int]:
+    protected_main_sha: str,
+) -> tuple[str, int, str, int, str]:
     repository = repository.strip()
     expected_head_sha = expected_head_sha.strip()
+    protected_main_sha = protected_main_sha.strip()
     if repository not in TARGET_GATES:
         raise ValueError("repository is not an allowed permanent Oteryn target")
     if isinstance(pr_number, bool) or not isinstance(pr_number, int) or pr_number <= 0:
@@ -191,13 +194,15 @@ def normalize_inputs(
         raise ValueError(
             "expected head SHA must be exactly 40 lowercase hexadecimal characters"
         )
+    if not SHA_RE.fullmatch(protected_main_sha):
+        raise ValueError("protected META main SHA must be exactly 40 lowercase hexadecimal characters")
     if (
         isinstance(request_comment_id, bool)
         or not isinstance(request_comment_id, int)
         or request_comment_id <= 0
     ):
         raise ValueError("request comment id must be a positive integer")
-    return repository, pr_number, expected_head_sha, request_comment_id
+    return repository, pr_number, expected_head_sha, request_comment_id, protected_main_sha
 
 
 def verify_control_request(
@@ -207,6 +212,7 @@ def verify_control_request(
     pr_number: int,
     expected_head_sha: str,
     request_comment_id: int,
+    protected_main_sha: str,
 ) -> str:
     comment = _response_body(
         read_client.rest(
@@ -225,11 +231,12 @@ def verify_control_request(
     match = CONTROL_COMMAND_RE.fullmatch(body) if isinstance(body, str) else None
     if match is None:
         raise ValueError("control request body does not match the closed command grammar")
-    requested_repository, requested_pr, requested_head = match.groups()
+    requested_repository, requested_pr, requested_head, requested_main = match.groups()
     if (
         requested_repository != repository
         or int(requested_pr) != pr_number
         or requested_head != expected_head_sha
+        or requested_main != protected_main_sha
     ):
         raise ValueError("live control request does not match workflow-bound target coordinates")
     actor = comment.get("user")
@@ -271,9 +278,10 @@ def qualify_target(
     pr_number: int,
     expected_head_sha: str,
     request_comment_id: int,
+    protected_main_sha: str,
 ) -> QualifiedTarget:
-    repository, pr_number, expected_head_sha, request_comment_id = normalize_inputs(
-        repository, pr_number, expected_head_sha, request_comment_id
+    repository, pr_number, expected_head_sha, request_comment_id, protected_main_sha = normalize_inputs(
+        repository, pr_number, expected_head_sha, request_comment_id, protected_main_sha
     )
     request_actor = verify_control_request(
         read_client,
@@ -281,6 +289,7 @@ def qualify_target(
         pr_number=pr_number,
         expected_head_sha=expected_head_sha,
         request_comment_id=request_comment_id,
+        protected_main_sha=protected_main_sha,
     )
 
     owner, name = repository.split("/", 1)
@@ -359,6 +368,7 @@ def qualify_target(
         request_comment_id,
         request_actor,
         head_branch,
+        protected_main_sha,
     )
 
 
@@ -479,6 +489,7 @@ def submit_merge_queue(
         pr_number=target.pr_number,
         expected_head_sha=target.head_sha,
         request_comment_id=target.request_comment_id,
+        protected_main_sha=target.protected_main_sha,
     )
     owner, name = target.repository.split("/", 1)
     principal = _response_body(mutation_client.rest("GET", "/user")).get("login")
@@ -512,6 +523,13 @@ def submit_merge_queue(
     )
     if request is None:
         raise ExecutorError("canonical merge-async request construction failed")
+    live_main = _response_body(
+        read_client.rest("GET", "/repos/Oteryn/Oteryn/commits/main")
+    ).get("sha")
+    if live_main != target.protected_main_sha:
+        raise ExecutorError(
+            "protected META main moved after canary qualification; fail closed before mutation"
+        )
     sequence = ExecutorSequence()
     response = mutation_client.rest(
         request.method,
@@ -616,6 +634,7 @@ def main() -> int:
     parser.add_argument("--pr-number", required=True, type=int)
     parser.add_argument("--expected-head-sha", required=True)
     parser.add_argument("--request-comment-id", required=True, type=int)
+    parser.add_argument("--protected-main-sha", required=True)
     args = parser.parse_args()
 
     mutation_token = os.environ.get("OTERYN_MQ_FINE_GRAINED_PAT", "").strip()
@@ -635,6 +654,7 @@ def main() -> int:
             pr_number=args.pr_number,
             expected_head_sha=args.expected_head_sha,
             request_comment_id=args.request_comment_id,
+            protected_main_sha=args.protected_main_sha,
         )
         result = submit_merge_queue(read_client, mutation_client, target)
     except (ValueError, ExecutorError) as exc:

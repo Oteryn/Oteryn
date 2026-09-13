@@ -21,6 +21,7 @@ BLOCKED_CAPABILITY_UNAVAILABLE = "BLOCKED_CAPABILITY_UNAVAILABLE"
 
 DEFAULT_MAX_AGE_SECONDS = 300
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
 _OBSERVATION_SEAL = object()
 
 
@@ -48,6 +49,8 @@ def validate_policy(policy: Mapping[str, object]) -> list[str]:
         errors.append("integration_capability_routing.schema_version must be 2")
     if cfg.get("require_preflight_before_worker_release") is not True:
         errors.append("integration capability preflight must be required before worker release")
+    if cfg.get("delegated_identity_binding") != "control_actor_equals_credential_principal":
+        errors.append("delegated capability must bind the control actor to the credential principal")
     states = _unique_strings(cfg.get("states"))
     expected_states = (NOT_REQUIRED, DIRECT_CAPABLE, DELEGATED_CAPABLE, BLOCKED_CAPABILITY_UNAVAILABLE)
     if states != expected_states:
@@ -98,6 +101,7 @@ class ProtectedExecutorEvidence:
     canary_workflow_blob_sha: str
     canary_protected_main_sha: str
     terminal_canary_proof_retained: bool
+    credential_principal: str
 
 
 @dataclass(frozen=True)
@@ -107,6 +111,7 @@ class AcquiredCapabilityEvidence:
     available_operations: tuple[str, ...]
     operational_executor_routes: tuple[str, ...]
     protected_executor: ProtectedExecutorEvidence | None = None
+    control_comment_actor: str | None = None
 
 
 @dataclass(frozen=True)
@@ -137,7 +142,7 @@ class TrustedCapabilityObserver(ABC):
 
 
 class CurrentSessionToolDiscovery(Protocol):
-    def discover_operations(self) -> tuple[int, tuple[str, ...]]: ...
+    def discover_operations(self) -> tuple[int, tuple[str, ...], str | None]: ...
 
 
 class ProtectedMetaExecutorObserver(Protocol):
@@ -154,10 +159,11 @@ class CurrentSessionCapabilityObserver(TrustedCapabilityObserver):
         self._executor = executor
 
     def acquire(self, policy: Mapping[str, object], *, now_epoch_seconds: int) -> AcquiredCapabilityEvidence:
-        observed_at, operations = self._tools.discover_operations()
+        observed_at, operations, control_actor = self._tools.discover_operations()
         routes, executor_evidence = self._executor.readback()
         return AcquiredCapabilityEvidence(
-            self._required, observed_at, operations, routes, executor_evidence
+            self._required, observed_at, operations, routes, executor_evidence,
+            control_actor,
         )
 
 
@@ -191,6 +197,16 @@ def _delegated_executor_is_operational(
     )
 
 
+def _same_valid_actor(actor: object, principal: object) -> bool:
+    return (
+        isinstance(actor, str)
+        and isinstance(principal, str)
+        and LOGIN_RE.fullmatch(actor) is not None
+        and LOGIN_RE.fullmatch(principal) is not None
+        and actor.casefold() == principal.casefold()
+    )
+
+
 def classify(observation: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
     """Purely classify a sealed observation; arbitrary mappings fail closed."""
     errors = validate_policy(policy)
@@ -210,7 +226,12 @@ def classify(observation: object, policy: Mapping[str, object], *, now_epoch_sec
         return DIRECT_CAPABLE
     if (cfg["delegated_request_operation"] in evidence.available_operations
             and cfg["delegated_route"] in evidence.operational_executor_routes
-            and _delegated_executor_is_operational(evidence.protected_executor, cfg, now_epoch_seconds=now)):
+            and _delegated_executor_is_operational(evidence.protected_executor, cfg, now_epoch_seconds=now)
+            and _same_valid_actor(
+                evidence.control_comment_actor,
+                evidence.protected_executor.credential_principal
+                if evidence.protected_executor is not None else None,
+            )):
         return DELEGATED_CAPABLE
     return BLOCKED_CAPABILITY_UNAVAILABLE
 

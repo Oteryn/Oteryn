@@ -46,6 +46,12 @@ cannot submit the PR to Merge Queue.
    operational.
 10. The standalone router CLI has no authoritative serialized-snapshot input. It
     fails closed when no current-session discovery/readback observer is installed.
+11. Delegated preflight binds the trusted session's actual control-comment actor
+    to the fine-grained credential principal; missing, malformed or mismatched
+    identities block worker release while direct capability remains independent.
+12. The request carries the exact canary-qualified protected META `main` SHA. The
+    executor checks out that commit and live-re-reads `main` immediately before
+    mutation, failing closed on movement rather than trusting `github.sha`.
 
 ## Owned paths
 

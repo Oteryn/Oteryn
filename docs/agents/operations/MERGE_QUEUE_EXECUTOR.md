@@ -52,7 +52,7 @@ policy. If the exact candidate remains authorized, post exactly one comment to
 META Issue #196:
 
 ```text
-/oteryn-mq-submit Oteryn/Oteryn-Game 528 97fcf72a2f29a8fc134c97dd3cdaf9237be7c6d3
+/oteryn-mq-submit Oteryn/Oteryn-Game 528 97fcf72a2f29a8fc134c97dd3cdaf9237be7c6d3 <canary-qualified-protected-META-main-SHA>
 ```
 
 The request does not grant authority. It is only the transport used by a

@@ -41,6 +41,13 @@ SHA, credential-operational proof and retained terminal canary evidence bound to
 that same protected-main SHA. Any protected-main movement invalidates the retained
 canary even when the workflow YAML blob itself is unchanged.
 
+The trusted current-session discovery adapter also obtains the actual human actor
+identity used by its control-comment operation, and the protected-executor adapter
+obtains the human principal identity of the fine-grained mutation credential.
+Delegated capability requires both identities to be present, well formed and equal.
+Caller-supplied actor strings are not evidence. This check is independent of the
+direct-native route and cannot block an otherwise verified direct capability.
+
 Raw serialized snapshots may be retained as diagnostics or test fixtures, but are
 never accepted by `validate_worker_release` or interpreted as scheduling authority.
 The standalone CLI intentionally has no authoritative `--snapshot` path and fails
@@ -95,7 +102,7 @@ authorization and eligibility preflight required by the organization policy.
 The command is exactly:
 
 ```text
-/oteryn-mq-submit <allowed owner/repo> <pr-number> <exact-40-lowercase-hex-head>
+/oteryn-mq-submit <allowed owner/repo> <pr-number> <exact-40-lowercase-hex-head> <canary-qualified-protected-META-main-SHA>
 ```
 
 The protected executor re-fetches this same comment from Issue #196 immediately
@@ -103,6 +110,8 @@ before target qualification and requires an OWNER/MEMBER META actor association,
 the closed command grammar, and exact agreement with the workflow-bound
 repository/PR/head. This live re-read protects transport integrity; it is not a
 second authorization proof or attestation system.
+The final SHA is the exact protected META `main` commit bound to the retained
+canary proof; it is not inferred from the workflow event's `github.sha`.
 
 ## Executor invariants
 
@@ -124,6 +133,8 @@ The protected META executor:
   control-comment actor and requires current target `admin` or `maintain`;
 - immediately before mutation, re-reads comment, PR, eligibility and workflow
   evidence and consumes the canonical authorization/freeze/attempt route objects;
+- immediately before mutation, live-reads `Oteryn/Oteryn` protected `main` and
+  requires it still to equal the canary-qualified SHA carried by the request;
 - performs only native `merge-async` with exact `sha` and
   `merge_action="merge_queue"`;
 - treats HTTP 202 as acceptance only, creates the UUID-bound receipt immediately,

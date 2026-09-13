@@ -40,13 +40,14 @@
     "direct_operation": "github.merge_async.put_exact_head",
     "delegated_route": "meta.governed_merge_queue_executor.v1",
     "delegated_request_operation": "github.issue_comment.create",
+    "delegated_identity_binding": "control_actor_equals_credential_principal",
     "control_repository": "Oteryn/Oteryn",
     "control_issue": 196,
     "protected_executor": {
       "repository": "Oteryn/Oteryn",
       "ref": "refs/heads/main",
       "workflow_path": ".github/workflows/governed-merge-queue-executor.yml",
-      "workflow_blob_sha": "22ea2d223f71495629308d991f74619b7dc21986"
+      "workflow_blob_sha": "46f69b6eaa610a967e9d6e7c8053f171a827c26c"
     },
     "allowed_target_repositories": {
       "Oteryn/Oteryn": {

@@ -21,6 +21,7 @@ SPEC.loader.exec_module(executor)
 REPO = "Oteryn/Oteryn-Game"
 PR = 528
 HEAD = "97fcf72a2f29a8fc134c97dd3cdaf9237be7c6d3"
+PROTECTED_MAIN_SHA = "0123456789abcdef0123456789abcdef01234567"
 REQUEST_COMMENT = 5617345429
 SERVER_UUID = "f0a3d092-6c9f-4edd-9d3f-cb9d8865a935"
 ACTOR = "maintainer-user"
@@ -63,6 +64,8 @@ class FakeClient:
             f"/collaborators/{ACTOR}/permission"
         ):
             response = executor.Response(200, {"permission": "maintain"})
+        if response is None and (method, path) == ("GET", "/repos/Oteryn/Oteryn/commits/main"):
+            response = executor.Response(200, {"sha": PROTECTED_MAIN_SHA})
         if response is None:
             raise AssertionError(f"unexpected request: {method} {path}")
         if response.status not in allowed_statuses:
@@ -73,9 +76,10 @@ class FakeClient:
 
 
 def control_body(
-    repository: str = REPO, pr_number: int = PR, head: str = HEAD
+    repository: str = REPO, pr_number: int = PR, head: str = HEAD,
+    protected_main_sha: str = PROTECTED_MAIN_SHA,
 ) -> str:
-    return f"/oteryn-mq-submit {repository} {pr_number} {head}"
+    return f"/oteryn-mq-submit {repository} {pr_number} {head} {protected_main_sha}"
 
 
 def pull(
@@ -153,6 +157,7 @@ def qualified(read_client: FakeClient) -> executor.QualifiedTarget:
         pr_number=PR,
         expected_head_sha=HEAD,
         request_comment_id=REQUEST_COMMENT,
+        protected_main_sha=PROTECTED_MAIN_SHA,
     )
 
 
@@ -184,6 +189,7 @@ def test_control_request_wrong_issue_body_actor_or_coordinates_fail_closed() -> 
     mutations = (
         ("issue_url", "https://api.github.com/repos/Oteryn/Oteryn/issues/999"),
         ("body", control_body(head="a" * 40)),
+        ("body", control_body(protected_main_sha="a" * 40)),
         ("body", control_body() + "\n"),
         ("author_association", "COLLABORATOR"),
         ("author_association", "CONTRIBUTOR"),
@@ -308,6 +314,7 @@ def test_atlas_requires_both_source_workflows_but_allows_empty_relations() -> No
     target = executor.qualify_target(
         FakeClient(responses), repository=repository, pr_number=PR,
         expected_head_sha=HEAD, request_comment_id=REQUEST_COMMENT,
+        protected_main_sha=PROTECTED_MAIN_SHA,
     )
     assert target.required_gate is None
 
@@ -319,6 +326,7 @@ def test_atlas_requires_both_source_workflows_but_allows_empty_relations() -> No
         executor.qualify_target(
             FakeClient(responses), repository=repository, pr_number=PR,
             expected_head_sha=HEAD, request_comment_id=REQUEST_COMMENT,
+            protected_main_sha=PROTECTED_MAIN_SHA,
         )
     except ValueError as exc:
         assert first_path in str(exc)
@@ -554,6 +562,23 @@ def test_put_requires_same_authenticated_actor_with_target_integration_permissio
         assert not any(call[0] == "PUT" for call in mutation_client.calls)
 
 
+def test_live_protected_main_must_still_match_canary_qualified_sha_before_put() -> None:
+    read_client = FakeClient({
+        **read_responses(),
+        ("GET", "/repos/Oteryn/Oteryn/commits/main"):
+            executor.Response(200, {"sha": "a" * 40}),
+    })
+    target = qualified(read_client)
+    mutation_client = FakeClient({})
+    try:
+        executor.submit_merge_queue(read_client, mutation_client, target)
+    except executor.ExecutorError as exc:
+        assert "protected META main moved" in str(exc)
+    else:
+        raise AssertionError("stale canary-qualified protected main reached mutation")
+    assert not any(call[0] == "PUT" for call in mutation_client.calls)
+
+
 def test_target_permission_read_uses_the_authenticated_pat_client() -> None:
     read_client = FakeClient(read_responses())
     target = qualified(read_client)
@@ -574,10 +599,11 @@ def test_target_permission_read_uses_the_authenticated_pat_client() -> None:
 
 def test_invalid_inputs_fail_before_any_target_mutation() -> None:
     for values in (
-        ("Other/Repo", PR, HEAD, REQUEST_COMMENT),
-        (REPO, 0, HEAD, REQUEST_COMMENT),
-        (REPO, PR, "A" * 40, REQUEST_COMMENT),
-        (REPO, PR, HEAD, 0),
+        ("Other/Repo", PR, HEAD, REQUEST_COMMENT, PROTECTED_MAIN_SHA),
+        (REPO, 0, HEAD, REQUEST_COMMENT, PROTECTED_MAIN_SHA),
+        (REPO, PR, "A" * 40, REQUEST_COMMENT, PROTECTED_MAIN_SHA),
+        (REPO, PR, HEAD, 0, PROTECTED_MAIN_SHA),
+        (REPO, PR, HEAD, REQUEST_COMMENT, "A" * 40),
     ):
         try:
             executor.normalize_inputs(*values)
@@ -595,6 +621,8 @@ def test_workflow_is_narrow_read_only_and_has_no_forbidden_merge_fallback() -> N
     assert "pull_request:" not in workflow
     assert "CONTROL_ISSUE: '196'" in workflow
     assert "REQUEST_COMMENT_ID: ${{ github.event.comment.id }}" in workflow
+    assert "ref: ${{ steps.parse.outputs.protected_main_sha }}" in workflow
+    assert '--protected-main-sha "$QUALIFIED_PROTECTED_MAIN_SHA"' in workflow
     assert "OTERYN_MQ_FINE_GRAINED_PAT: ${{ secrets.OTERYN_MQ_FINE_GRAINED_PAT }}" in workflow
     assert "python3 tools/governance/governed_merge_queue_executor.py" in workflow
     assert "merge_pull_request" not in workflow

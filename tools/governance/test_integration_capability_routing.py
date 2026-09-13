@@ -33,7 +33,9 @@ class FakeObserver(routing.TrustedCapabilityObserver):
 
 
 def evidence(*, required: bool = True) -> object:
-    return routing.AcquiredCapabilityEvidence(required, NOW, (), ())
+    return routing.AcquiredCapabilityEvidence(
+        required, NOW, (), (), control_comment_actor="maintainer-user"
+    )
 
 
 def executor_evidence(**changes: object) -> object:
@@ -47,6 +49,7 @@ def executor_evidence(**changes: object) -> object:
         "canary_workflow_blob_sha": expected["workflow_blob_sha"],
         "canary_protected_main_sha": PROTECTED_MAIN_SHA,
         "terminal_canary_proof_retained": True,
+        "credential_principal": "maintainer-user",
     }
     values.update(changes)
     return routing.ProtectedExecutorEvidence(**values)
@@ -84,7 +87,7 @@ def test_direct_native_operation_is_preferred() -> None:
 def test_verified_delegated_executor_prevents_late_worker_block() -> None:
     current = routing.AcquiredCapabilityEvidence(
         True, NOW, ("github.issue_comment.create",),
-        ("meta.governed_merge_queue_executor.v1",), executor_evidence()
+        ("meta.governed_merge_queue_executor.v1",), executor_evidence(), "maintainer-user"
     )
     assert state(FakeObserver(current)) == routing.DELEGATED_CAPABLE
 
@@ -151,10 +154,12 @@ def test_delegated_route_rejects_invalid_executor_readback() -> None:
         {"canary_repository": "Oteryn/Other"}, {"terminal_canary_proof_retained": False},
         {"protected_main_sha": "not-a-sha"}, {"canary_protected_main_sha": "not-a-sha"},
         {"canary_protected_main_sha": "a" * 40},
+        {"credential_principal": ""},
     ):
         current = routing.AcquiredCapabilityEvidence(
             True, NOW, ("github.issue_comment.create",),
-            ("meta.governed_merge_queue_executor.v1",), executor_evidence(**changes)
+            ("meta.governed_merge_queue_executor.v1",), executor_evidence(**changes),
+            "maintainer-user",
         )
         assert state(FakeObserver(current)) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
 
@@ -164,6 +169,7 @@ def test_delegated_canary_is_invalidated_by_any_protected_main_change() -> None:
         True, NOW, ("github.issue_comment.create",),
         ("meta.governed_merge_queue_executor.v1",),
         executor_evidence(protected_main_sha="a" * 40, canary_protected_main_sha="b" * 40),
+        "maintainer-user",
     )
     assert state(FakeObserver(current)) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
 
@@ -171,6 +177,26 @@ def test_delegated_canary_is_invalidated_by_any_protected_main_change() -> None:
 def test_executor_workflow_rejects_github_reruns() -> None:
     text = (ROOT / ".github/workflows/governed-merge-queue-executor.yml").read_text(encoding="utf-8")
     assert "github.run_attempt == 1" in text
+
+
+def test_delegated_route_requires_control_actor_to_match_credential_principal() -> None:
+    for actor, principal in (
+        (None, "maintainer-user"), ("maintainer-user", ""),
+        ("different-user", "maintainer-user"), ("bad actor", "bad actor"),
+    ):
+        current = routing.AcquiredCapabilityEvidence(
+            True, NOW, ("github.issue_comment.create",),
+            ("meta.governed_merge_queue_executor.v1",),
+            executor_evidence(credential_principal=principal), actor,
+        )
+        assert state(FakeObserver(current)) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+
+
+def test_direct_route_is_independent_of_delegated_actor_identity() -> None:
+    current = routing.AcquiredCapabilityEvidence(
+        True, NOW, ("github.merge_async.put_exact_head",), (), None, None
+    )
+    assert state(FakeObserver(current)) == routing.DIRECT_CAPABLE
 
 
 def test_policy_binds_current_executor_workflow_blob() -> None:
@@ -183,8 +209,8 @@ def test_policy_binds_current_executor_workflow_blob() -> None:
 
 def test_current_session_adapter_acquires_instead_of_accepting_serialized_input() -> None:
     class Tools:
-        def discover_operations(self) -> tuple[int, tuple[str, ...]]:
-            return NOW, ("github.merge_async.put_exact_head",)
+        def discover_operations(self) -> tuple[int, tuple[str, ...], str]:
+            return NOW, ("github.merge_async.put_exact_head",), "maintainer-user"
 
     class Executor:
         def readback(self) -> tuple[tuple[str, ...], None]:
