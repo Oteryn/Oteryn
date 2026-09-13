@@ -1,0 +1,218 @@
+name: Oteryn Merge Queue Broker
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Exact approved Oteryn repository
+        required: true
+        type: string
+      pr_number:
+        description: Pull request number
+        required: true
+        type: string
+      expected_head_sha:
+        description: Exact qualified 40-hex PR head
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  authorize:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    outputs:
+      allowed: ${{ steps.parse.outputs.allowed }}
+      repository: ${{ steps.parse.outputs.repository }}
+      pr_number: ${{ steps.parse.outputs.pr_number }}
+      expected_head_sha: ${{ steps.parse.outputs.expected_head_sha }}
+    steps:
+      - name: Parse exact broker request
+        id: parse
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_IS_PR: ${{ github.event.issue.pull_request != null }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          AUTHOR_ASSOCIATION: ${{ github.event.comment.author_association }}
+          INPUT_REPOSITORY: ${{ inputs.repository }}
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          INPUT_EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+        run: |
+          set -euo pipefail
+          allowed=false
+          repository=''
+          pr_number=''
+          expected_head_sha=''
+
+          if [[ "$EVENT_NAME" == issue_comment \
+            && "$ISSUE_NUMBER" == 187 \
+            && "$ISSUE_IS_PR" != true \
+            && "$AUTHOR_ASSOCIATION" =~ ^(OWNER|MEMBER|COLLABORATOR)$ \
+            && "$COMMENT_BODY" =~ ^/oteryn-mq-enqueue\ (Oteryn/Oteryn|Oteryn/Oteryn-Game|Oteryn/Oteryn-Platform|Oteryn/Oteryn-Atlas)\ ([1-9][0-9]*)\ ([0-9a-f]{40})$ ]]; then
+            repository="${BASH_REMATCH[1]}"
+            pr_number="${BASH_REMATCH[2]}"
+            expected_head_sha="${BASH_REMATCH[3]}"
+            allowed=true
+          elif [[ "$EVENT_NAME" == workflow_dispatch && "$EVENT_REF" == refs/heads/main ]]; then
+            repository="$INPUT_REPOSITORY"
+            pr_number="$INPUT_PR_NUMBER"
+            expected_head_sha="$INPUT_EXPECTED_HEAD_SHA"
+            if [[ "$repository" =~ ^Oteryn/(Oteryn|Oteryn-Game|Oteryn-Platform|Oteryn-Atlas)$ \
+              && "$pr_number" =~ ^[1-9][0-9]*$ \
+              && "$expected_head_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              allowed=true
+            fi
+          fi
+
+          {
+            echo "allowed=$allowed"
+            echo "repository=$repository"
+            echo "pr_number=$pr_number"
+            echo "expected_head_sha=$expected_head_sha"
+          } >> "$GITHUB_OUTPUT"
+
+  enqueue:
+    needs: authorize
+    if: ${{ needs.authorize.outputs.allowed == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    concurrency:
+      group: oteryn-mq-${{ needs.authorize.outputs.repository }}-${{ needs.authorize.outputs.pr_number }}
+      cancel-in-progress: false
+    env:
+      TARGET_REPOSITORY: ${{ needs.authorize.outputs.repository }}
+      TARGET_PR: ${{ needs.authorize.outputs.pr_number }}
+      EXPECTED_HEAD_SHA: ${{ needs.authorize.outputs.expected_head_sha }}
+      MQ_TOKEN: ${{ secrets.OTERYN_MQ_TOKEN }}
+      META_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require bounded mutation credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$MQ_TOKEN" ]]; then
+            echo 'BLOCKED_CAPABILITY_UNAVAILABLE: OTERYN_MQ_TOKEN is not configured' >&2
+            exit 1
+          fi
+
+      - name: Fresh exact-target preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GH_TOKEN="$MQ_TOKEN"
+          pr_json="$(gh api "repos/$TARGET_REPOSITORY/pulls/$TARGET_PR")"
+          state="$(jq -r '.state' <<<"$pr_json")"
+          draft="$(jq -r '.draft' <<<"$pr_json")"
+          merged="$(jq -r '.merged' <<<"$pr_json")"
+          base="$(jq -r '.base.ref' <<<"$pr_json")"
+          head="$(jq -r '.head.sha' <<<"$pr_json")"
+          head_repo="$(jq -r '.head.repo.full_name' <<<"$pr_json")"
+          [[ "$state" == open && "$draft" == false && "$merged" == false ]]
+          [[ "$base" == main ]]
+          [[ "$head" == "$EXPECTED_HEAD_SHA" ]]
+          [[ "$head_repo" == "$TARGET_REPOSITORY" ]]
+
+          required="$(gh pr checks "$TARGET_PR" --repo "$TARGET_REPOSITORY" --required --json name,state)"
+          python3 - "$required" <<'PY'
+          import json, sys
+          rows = json.loads(sys.argv[1])
+          if not rows:
+              raise SystemExit('no required checks resolved for exact candidate')
+          bad = [row for row in rows if row.get('state') != 'SUCCESS']
+          if bad:
+              raise SystemExit(f'required checks are not successful: {bad}')
+          PY
+
+          owner="${TARGET_REPOSITORY%%/*}"
+          repo="${TARGET_REPOSITORY#*/}"
+          threads="$(gh api graphql \
+            -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved isOutdated} pageInfo{hasNextPage}}}}}' \
+            -f owner="$owner" -f repo="$repo" -F number="$TARGET_PR")"
+          python3 - "$threads" <<'PY'
+          import json, sys
+          data = json.loads(sys.argv[1])['data']['repository']['pullRequest']['reviewThreads']
+          if data['pageInfo']['hasNextPage']:
+              raise SystemExit('review thread set exceeds bounded preflight')
+          unresolved = [row for row in data['nodes'] if not row['isResolved'] and not row['isOutdated']]
+          if unresolved:
+              raise SystemExit(f'unresolved current review threads: {len(unresolved)}')
+          PY
+
+      - name: Submit native exact-head Merge Queue request
+        id: submit
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(mktemp)"
+          body="$(mktemp)"
+          request_body="$(jq -cn --arg sha "$EXPECTED_HEAD_SHA" '{sha:$sha,merge_action:"merge_queue"}')"
+          status="$(curl --silent --show-error \
+            --output "$body" --dump-header "$headers" --write-out '%{http_code}' \
+            --request PUT \
+            --header 'Accept: application/vnd.github+json' \
+            --header "Authorization: Bearer $MQ_TOKEN" \
+            --header 'X-GitHub-Api-Version: 2026-03-10' \
+            --header 'Content-Type: application/json' \
+            --data "$request_body" \
+            "https://api.github.com/repos/$TARGET_REPOSITORY/pulls/$TARGET_PR/merge-async")"
+
+          if [[ "$status" == 202 ]]; then
+            uuid="$(jq -r '.details.uuid // empty' "$body")"
+            action="$(jq -r '.details.merge_action // empty' "$body")"
+            head="$(jq -r '.details.expected_head_sha // empty' "$body")"
+            [[ "$uuid" =~ ^[0-9a-fA-F-]{36}$ ]]
+            [[ "$action" == merge_queue ]]
+            [[ "$head" == "$EXPECTED_HEAD_SHA" ]]
+            export GH_TOKEN="$MQ_TOKEN"
+            readback="$(gh api "repos/$TARGET_REPOSITORY/pulls/$TARGET_PR/merge-async/$uuid")"
+            readback_status="$(jq -r '.status // empty' <<<"$readback")"
+            [[ -n "$readback_status" ]]
+            fresh="$(gh api "repos/$TARGET_REPOSITORY/pulls/$TARGET_PR")"
+            [[ "$(jq -r '.base.ref' <<<"$fresh")" == main ]]
+            [[ "$(jq -r '.head.sha' <<<"$fresh")" == "$EXPECTED_HEAD_SHA" ]]
+            [[ "$(jq -r '.head.repo.full_name' <<<"$fresh")" == "$TARGET_REPOSITORY" ]]
+            echo "result=MQ_ACCEPTED" >> "$GITHUB_OUTPUT"
+            echo "uuid=$uuid" >> "$GITHUB_OUTPUT"
+            echo "readback_status=$readback_status" >> "$GITHUB_OUTPUT"
+          elif [[ "$status" == 200 || "$status" == 409 ]]; then
+            export GH_TOKEN="$MQ_TOKEN"
+            fresh="$(gh api "repos/$TARGET_REPOSITORY/pulls/$TARGET_PR")"
+            [[ "$(jq -r '.base.ref' <<<"$fresh")" == main ]]
+            [[ "$(jq -r '.head.sha' <<<"$fresh")" == "$EXPECTED_HEAD_SHA" ]]
+            echo "result=RECONCILE_REQUIRED" >> "$GITHUB_OUTPUT"
+            echo 'uuid=' >> "$GITHUB_OUTPUT"
+            echo "readback_status=http-$status" >> "$GITHUB_OUTPUT"
+          elif [[ "$status" == 403 || "$status" == 404 ]]; then
+            echo "BLOCKED_CAPABILITY_UNAVAILABLE: merge-async returned HTTP $status" >&2
+            cat "$body" >&2
+            exit 1
+          else
+            echo "BLOCKED_NOT_ELIGIBLE: merge-async returned HTTP $status" >&2
+            cat "$body" >&2
+            exit 1
+          fi
+
+      - name: Publish non-secret receipt
+        if: ${{ always() && steps.submit.outcome == 'success' }}
+        shell: bash
+        env:
+          RESULT: ${{ steps.submit.outputs.result }}
+          UUID: ${{ steps.submit.outputs.uuid }}
+          READBACK_STATUS: ${{ steps.submit.outputs.readback_status }}
+        run: |
+          set -euo pipefail
+          receipt="$RESULT $TARGET_REPOSITORY#$TARGET_PR $EXPECTED_HEAD_SHA"
+          if [[ -n "$UUID" ]]; then
+            receipt="$receipt $UUID readback=$READBACK_STATUS"
+          fi
+          echo "$receipt" >> "$GITHUB_STEP_SUMMARY"
+          export GH_TOKEN="$META_TOKEN"
+          gh issue comment 187 --repo Oteryn/Oteryn --body "$receipt"
