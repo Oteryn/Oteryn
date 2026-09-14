@@ -10,6 +10,40 @@ ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / 'docs/evidence/organization-audit-20260907/README.md'
 CI_WORKFLOW = ROOT / '.github/workflows/ci.yml'
 
+EXPECTED_TERMINAL_GATE_STEP = """      - name: Validate audit terminal state
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/test_verify_readme_current_state.py
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/verify_readme_current_state.py"""
+
+
+def validate_terminal_gate_step(workflow: str) -> None:
+    lines = workflow.splitlines()
+    job_markers = [index for index, line in enumerate(lines) if line == '  meta-gate:']
+    if len(job_markers) != 1:
+        raise ValueError('meta-gate job must exist exactly once')
+    job_start = job_markers[0]
+    job_end = len(lines)
+    for index in range(job_start + 1, len(lines)):
+        line = lines[index]
+        if line.startswith('  ') and not line.startswith('    ') and line.endswith(':'):
+            job_end = index
+            break
+    job_lines = lines[job_start:job_end]
+    step_markers = [index for index, line in enumerate(job_lines) if line == '      - name: Validate audit terminal state']
+    if len(step_markers) != 1:
+        raise ValueError('terminal-state step must exist exactly once in meta-gate')
+    step_start = step_markers[0]
+    step_end = len(job_lines)
+    for index in range(step_start + 1, len(job_lines)):
+        if job_lines[index].startswith('      - '):
+            step_end = index
+            break
+    actual = '\n'.join(job_lines[step_start:step_end]).rstrip()
+    if actual != EXPECTED_TERMINAL_GATE_STEP:
+        raise ValueError('terminal-state step must be exact executable fail-closed commands')
+
 
 class ReadmeCurrentStateTest(unittest.TestCase):
     @classmethod
@@ -35,9 +69,26 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         self.assertFalse(result['audit_completion_claimed'])
 
     def test_required_meta_gate_runs_terminal_state_contract(self):
+        validate_terminal_gate_step(CI_WORKFLOW.read_text(encoding='utf-8'))
+
+    def test_required_meta_gate_rejects_non_executable_or_suppressed_commands(self):
         workflow = CI_WORKFLOW.read_text(encoding='utf-8')
-        self.assertEqual(workflow.count('python3 tools/audit/test_verify_readme_current_state.py'), 1)
-        self.assertEqual(workflow.count('python3 tools/audit/verify_readme_current_state.py'), 1)
+        command = '          PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/verify_readme_current_state.py'
+        test_command = '          PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/test_verify_readme_current_state.py'
+        step_mutations = (
+            EXPECTED_TERMINAL_GATE_STEP.replace(command, '          echo PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/verify_readme_current_state.py', 1),
+            EXPECTED_TERMINAL_GATE_STEP.replace(command, '          # PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/verify_readme_current_state.py', 1),
+            EXPECTED_TERMINAL_GATE_STEP.replace(command, command + ' || true', 1),
+            EXPECTED_TERMINAL_GATE_STEP.replace(test_command, test_command + ' || true', 1),
+            EXPECTED_TERMINAL_GATE_STEP.replace('        run: |', '        continue-on-error: true\n        run: |', 1),
+            EXPECTED_TERMINAL_GATE_STEP.replace('        shell: bash', '        if: false\n        shell: bash', 1),
+        )
+        for mutated_step in step_mutations:
+            with self.subTest(mutated_step=mutated_step):
+                mutated_workflow = workflow.replace(EXPECTED_TERMINAL_GATE_STEP, mutated_step, 1)
+                self.assertNotEqual(mutated_workflow, workflow)
+                with self.assertRaisesRegex(ValueError, 'exact executable fail-closed commands'):
+                    validate_terminal_gate_step(mutated_workflow)
 
     def test_terminal_workflow_state_rejects_reintroduced_audit_workflow(self):
         with tempfile.TemporaryDirectory() as td:
