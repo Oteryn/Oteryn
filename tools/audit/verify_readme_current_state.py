@@ -8,6 +8,8 @@ import json
 from pathlib import Path
 import re
 
+ROOT = Path(__file__).resolve().parents[2]
+RETAINED_R7_WORKFLOW = Path('.github/workflows/organization-audit-meta-current-main-governance-qualification.yml')
 EXPECTED_TITLE = '# Organization audit R3 evidence'
 EXPECTED_LOCAL_HEADING = '## Local checks'
 EXPECTED_EVIDENCE_HEADING = '## Evidence map and durability'
@@ -108,12 +110,29 @@ def validate_text(text: str) -> dict[str, object]:
         'grouped_paths': 113,
         'unverified_paths': 3940,
         'semantically_classified_paths': 421,
-        'remaining_bounded_proof_workflows': [
-            '.github/workflows/organization-audit-meta-current-main-governance-qualification.yml'
-        ],
+        'remaining_bounded_proof_workflows': [RETAINED_R7_WORKFLOW.as_posix()],
         'product_readiness_claimed': False,
         'audit_completion_claimed': False,
     }
+
+
+def validate_retained_workflow(root: Path = ROOT) -> str:
+    workflow = root / RETAINED_R7_WORKFLOW
+    require(
+        workflow.is_file() and not workflow.is_symlink(),
+        'retained R7 qualification workflow missing or not a regular file',
+    )
+    return RETAINED_R7_WORKFLOW.as_posix()
+
+
+def validate(text: str, root: Path = ROOT) -> dict[str, object]:
+    result = validate_text(text)
+    retained = validate_retained_workflow(root)
+    require(
+        result['remaining_bounded_proof_workflows'] == [retained],
+        'README retained-workflow record drift',
+    )
+    return result
 
 
 def main() -> int:
@@ -126,7 +145,7 @@ def main() -> int:
         readme_text = readme_bytes.decode('utf-8')
     except UnicodeDecodeError as exc:
         raise ValueError('README is not valid UTF-8') from exc
-    result = validate_text(readme_text)
+    result = validate(readme_text)
     print(json.dumps(result, sort_keys=True))
     return 0
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Adversarial tests for the bounded R3 README current-state contract."""
 from pathlib import Path
+import tempfile
 import unittest
 
 import verify_readme_current_state as readme_contract
@@ -19,7 +20,7 @@ class ReadmeCurrentStateTest(unittest.TestCase):
             readme_contract.validate_text(text)
 
     def test_current_readme_passes(self):
-        result = readme_contract.validate_text(self.current)
+        result = readme_contract.validate(self.current)
         self.assertEqual(result['result'], 'README_CURRENT_STATE_VALIDATED_NOT_PRODUCT_PASS')
         self.assertEqual(result['direct_paths'], 308)
         self.assertEqual(result['grouped_paths'], 113)
@@ -31,6 +32,34 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         )
         self.assertFalse(result['product_readiness_claimed'])
         self.assertFalse(result['audit_completion_claimed'])
+
+    def test_retained_workflow_must_exist_as_regular_file(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            workflow = root / readme_contract.RETAINED_R7_WORKFLOW
+            workflow.parent.mkdir(parents=True)
+            with self.assertRaisesRegex(ValueError, 'missing or not a regular file'):
+                readme_contract.validate_retained_workflow(root)
+            workflow.mkdir()
+            with self.assertRaisesRegex(ValueError, 'missing or not a regular file'):
+                readme_contract.validate_retained_workflow(root)
+            workflow.rmdir()
+            target = root / 'target.yml'
+            target.write_text('name: target\n', encoding='utf-8')
+            workflow.symlink_to(target)
+            with self.assertRaisesRegex(ValueError, 'missing or not a regular file'):
+                readme_contract.validate_retained_workflow(root)
+            workflow.unlink()
+            workflow.write_text('name: retained\n', encoding='utf-8')
+            self.assertEqual(
+                readme_contract.validate_retained_workflow(root),
+                readme_contract.RETAINED_R7_WORKFLOW.as_posix(),
+            )
+
+    def test_validate_rejects_missing_retained_workflow(self):
+        with tempfile.TemporaryDirectory() as td:
+            with self.assertRaisesRegex(ValueError, 'missing or not a regular file'):
+                readme_contract.validate(self.current, Path(td))
 
     def test_old_accounting_transition_rejected(self):
         mutated = self.current.replace('308 DIRECT scoped path reviews', '258 DIRECT scoped path reviews', 1)
