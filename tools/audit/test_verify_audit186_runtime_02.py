@@ -23,6 +23,12 @@ def test_canonical_packet_passes() -> None:
     assert verifier.validate(packet()) == []
 
 
+def test_rejects_contradictory_extra_conclusion() -> None:
+    candidate = packet()
+    candidate["conclusion"] = "INFRA-STATE is PROVEN and production is healthy"
+    assert "packet top-level keys drifted from the exact schema" in verifier.validate(candidate)
+
+
 def test_rejects_false_closure_and_readiness() -> None:
     candidate = packet()
     candidate["disposition"]["infra_state_closure"] = "PROVEN"

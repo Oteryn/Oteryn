@@ -82,6 +82,21 @@ EXPECTED_ADDITIONAL_OBSERVATION = {
 }
 EXPECTED_RECHECK_TRIGGER = "AUDIT186-LEAD receives an immutable, dated, redacted provider-owner snapshot containing every required field, or a separately authorized read-only runtime route becomes available; then verify the exact release binding and direct health evidence before reassessing INFRA-STATE."
 EXPECTED_HANDOFF = "Keep INFRA-STATE open as UNKNOWN/BLOCKED. This packet is assurance evidence only and proposes no canonical audit-accounting mutation."
+EXPECTED_TOP_LEVEL_KEYS = {
+    "schema_version",
+    "packet_id",
+    "obligation",
+    "observation_time",
+    "authority",
+    "canonical_obligation",
+    "source_coordinates",
+    "authorized_read_only_observations",
+    "disposition",
+    "limitations",
+    "smallest_additional_observation",
+    "recheck_trigger",
+    "handoff",
+}
 FORBIDDEN_KEY_FRAGMENTS = (
     "secret",
     "token",
@@ -125,6 +140,8 @@ def validate(packet: dict[str, object]) -> list[str]:
     observations = packet.get("authorized_read_only_observations", {})
     additional = packet.get("smallest_additional_observation", {})
 
+    if set(packet) != EXPECTED_TOP_LEVEL_KEYS:
+        errors.append("packet top-level keys drifted from the exact schema")
     if packet.get("schema_version") != 1 or packet.get("packet_id") != EXPECTED_PACKET_ID:
         errors.append("packet identity or schema drifted")
     if packet.get("obligation") != "INFRA-STATE":
