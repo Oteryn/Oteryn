@@ -47,6 +47,13 @@ EXPECTED_PROJECTION = {
         "meta": {"leaves": 210, "direct": 121, "grouped": 0, "unverified": 89},
     },
 }
+EXPECTED_CANDIDATE_DIGEST = "97b20b6d7c0aee80eab487bc59c7662acd1851bd86cb6a9643d9a007fd007b4b"
+ALLOWED_CHANGED_PATHS = {
+    "docs/agents/workers/AUDIT186-SEMANTIC-01.md",
+    "docs/evidence/organization-audit-20260907/audit186-semantic-01-historical-candidate.json",
+    "tools/audit/test_verify_audit186_semantic_01.py",
+    "tools/audit/verify_audit186_semantic_01.py",
+}
 CANONICAL_PATHS = (
     "docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.md",
     "docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json",
@@ -154,6 +161,11 @@ def validate_document(doc: dict[str, Any]) -> list[dict[str, Any]]:
             raise CandidateError(f"payload role missing: {item.get('path')}")
     if not isinstance(doc.get("recheck_triggers"), list) or len(doc["recheck_triggers"]) != 6:
         raise CandidateError("exact recheck triggers drift")
+    canonical = json.dumps(
+        doc, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+    ).encode("utf-8")
+    if hashlib.sha256(canonical).hexdigest() != EXPECTED_CANDIDATE_DIGEST:
+        raise CandidateError("immutable candidate semantic guard digest drift")
     return paths
 
 
@@ -205,6 +217,10 @@ def validate_repository(paths: list[dict[str, Any]]) -> None:
     for path in CANONICAL_PATHS:
         if (ROOT / path).read_bytes() != git("show", f"{BASELINE}:{path}"):
             raise CandidateError(f"canonical audit surface mutated: {path}")
+    changed_paths = set(git("diff", "--name-only", BASELINE, "--").decode().splitlines())
+    unexpected_paths = sorted(changed_paths - ALLOWED_CHANGED_PATHS)
+    if unexpected_paths:
+        raise CandidateError(f"worker changed path outside exact allowlist: {unexpected_paths[0]}")
     review_paths = git("ls-tree", "-r", "--name-only", BASELINE, "docs/evidence/organization-audit-20260907").decode().splitlines()
     for path in review_paths:
         if Path(path).name.startswith("coverage-review") and (ROOT / path).read_bytes() != git("show", f"{BASELINE}:{path}"):

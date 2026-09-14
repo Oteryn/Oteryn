@@ -97,8 +97,8 @@ class Audit186Semantic01Tests(unittest.TestCase):
     def test_blob_and_byte_drift_are_rejected(self):
         doc = self.candidate()
         doc["family"]["paths"][0]["blob_sha"] = "0" * 40
-        with self.assertRaisesRegex(verifier.CandidateError, "path/blob set drift"):
-            verifier.validate_repository(verifier.validate_document(doc))
+        with self.assertRaisesRegex(verifier.CandidateError, "semantic guard digest drift"):
+            verifier.validate_document(doc)
 
     def test_known_manifest_mismatch_cannot_be_silently_repaired(self):
         doc = self.candidate()
@@ -138,6 +138,43 @@ class Audit186Semantic01Tests(unittest.TestCase):
         self.assertEqual(len(claims), 3)
         self.assertTrue(any("runtime" in claim for claim in claims))
         self.assertTrue(any("SHA256SUMS" in claim for claim in claims))
+
+    def test_semantic_guards_and_recheck_triggers_are_bound_exactly(self):
+        mutations = (
+            lambda doc: doc["family"]["paths"][0].__setitem__(
+                "semantic_scope",
+                "Current runtime truth is accepted; this is not current authority or present-state proof.",
+            ),
+            lambda doc: doc["family"]["intentionally_unverified_claim_surfaces"].__setitem__(
+                0, "Current runtime, security, and CI claims are verified."
+            ),
+            lambda doc: doc["recheck_triggers"].__setitem__(0, "No meaningful recheck is required."),
+            lambda doc: doc.__setitem__("unrecognized_semantic_override", True),
+        )
+        for mutate in mutations:
+            with self.subTest(mutation=mutate):
+                doc = self.candidate()
+                mutate(doc)
+                with self.assertRaisesRegex(verifier.CandidateError, "semantic guard digest drift"):
+                    verifier.validate_document(doc)
+
+    def test_new_canonical_coverage_review_surface_is_rejected(self):
+        doc = self.candidate()
+        paths = verifier.validate_document(doc)
+        real_git = verifier.git
+
+        def added_coverage_review(*args):
+            if args[:3] == ("diff", "--name-only", verifier.BASELINE):
+                changed = sorted(
+                    verifier.ALLOWED_CHANGED_PATHS
+                    | {"docs/evidence/organization-audit-20260907/coverage-review-new.tsv"}
+                )
+                return ("\n".join(changed) + "\n").encode()
+            return real_git(*args)
+
+        with mock.patch.object(verifier, "git", side_effect=added_coverage_review):
+            with self.assertRaisesRegex(verifier.CandidateError, "outside exact allowlist"):
+                verifier.validate_repository(paths)
 
 
 if __name__ == "__main__":
