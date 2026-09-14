@@ -14,7 +14,7 @@ Reduce `SEMANTIC-COVERAGE` UNVERIFIED scope through one bounded, coherent semant
 ## Current boundaries
 - Provider repositories are read-only.
 - Historical pinned audit evidence remains historical; current-main claims require explicit rebind/revalidation.
-- Current provider main coordinates at release: Game `775a09091743af395ecb8f1e440cb9c286bc0dd2`, Platform `84d504c98acc8134eb4c9545711010b74c987974`, Atlas `bf57f1ca5193112dc8d1951638c300e167032010`.
+- Current provider main coordinates at release: Game `775a09091743af395ecb8f1e440cb9c286bc0dd2`, Platform `84d504c98acc8134eb4c9545711010b74c987974`, Atlas `0d22a8d4378e66441502482ce715e226d487248e`.
 - Do not mutate canonical audit accounting/report/README/coverage-summary/coverage-review/coverage-groups/unknowns/verification-index/collection-plan surfaces. Those remain lead-only.
 - Lane output may add lane-specific candidate/revalidation evidence, verifier code and focused tests on this branch only.
 - Current canonical accounting before this candidate is `4361 / 309 DIRECT / 113 GROUPED / 3939 UNVERIFIED / 422 classified`; META is `96 DIRECT / 114 UNVERIFIED`.

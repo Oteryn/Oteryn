@@ -111,6 +111,16 @@ class Audit186Semantic01Tests(unittest.TestCase):
                 with self.assertRaises(verifier.CandidateError):
                     verifier.validate_document(doc)
 
+    def test_superseded_atlas_observation_is_rejected(self):
+        doc = self.candidate()
+        doc["source_coordinates"]["release_observed_current_heads"]["atlas"] = (
+            "bf57f1ca5193112dc8d1951638c300e167032010"
+        )
+        with self.assertRaisesRegex(
+            verifier.CandidateError, "current default-branch coordinate drift"
+        ):
+            verifier.validate_document(doc)
+
     def test_semantic_03_overlap_or_readoption_is_rejected(self):
         mutations = (
             lambda doc: doc["canonical_overlap_guard"][

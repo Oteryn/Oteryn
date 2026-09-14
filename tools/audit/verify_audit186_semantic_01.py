@@ -51,7 +51,7 @@ EXPECTED_CURRENT_HEADS = {
     "meta": "d9419b05eb98c81279297563c11fc90e4fe708ac",
     "game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
     "platform": "84d504c98acc8134eb4c9545711010b74c987974",
-    "atlas": "bf57f1ca5193112dc8d1951638c300e167032010",
+    "atlas": "0d22a8d4378e66441502482ce715e226d487248e",
 }
 EXPECTED_CANONICAL_ACCOUNTING = {
     "source_leaves": 4361,
@@ -67,7 +67,7 @@ EXPECTED_OVERLAP_GUARD = {
     "candidate_historical_paths_current_disposition": "UNVERIFIED",
     "candidate_historical_paths_current_unverified_count": 26,
 }
-EXPECTED_CANDIDATE_DIGEST = "5e538c84f0cc3f4459328e5a2ffc21a1f2e1fee61d67036b17822e8eed43a8dd"
+EXPECTED_CANDIDATE_DIGEST = "034ce7d51430725750befcb486f766970a354958c4a2b11798bb238ccec7b85e"
 ALLOWED_CHANGED_PATHS = {
     "docs/agents/workers/AUDIT186-SEMANTIC-01.md",
     "docs/evidence/organization-audit-20260907/audit186-semantic-01-historical-candidate.json",
