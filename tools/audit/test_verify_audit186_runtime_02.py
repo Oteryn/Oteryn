@@ -28,8 +28,19 @@ def test_rejects_false_closure_and_readiness() -> None:
     candidate["disposition"]["infra_state_closure"] = "PROVEN"
     candidate["disposition"]["product_or_deployment_readiness"] = "READY"
     errors = verifier.validate(candidate)
+    assert "INFRA disposition drifted from the bounded open state" in errors
     assert "INFRA-STATE must remain UNKNOWN_BLOCKED" in errors
     assert "readiness must remain NOT_ESTABLISHED" in errors
+
+
+def test_rejects_nested_health_promotion() -> None:
+    candidate = packet()
+    candidate["disposition"]["configuration_health_snapshot"] = {
+        "state": "PROVEN",
+        "claim": "GitHub deployment metadata establishes direct runtime health and deployment readiness.",
+    }
+    errors = verifier.validate(candidate)
+    assert "INFRA disposition drifted from the bounded open state" in errors
 
 
 def test_rejects_closure_condition_drift() -> None:
@@ -46,10 +57,24 @@ def test_rejects_missing_release_or_direct_health_requirement() -> None:
 
 
 def test_rejects_sensitive_payload_keys() -> None:
-    candidate = deepcopy(packet())
-    candidate["authorized_read_only_observations"]["nested"] = {"api_token": "redacted-is-still-not-needed"}
-    errors = verifier.validate(candidate)
-    assert any(error.startswith("packet contains forbidden sensitive key: api_token") for error in errors)
+    for key in ("api_token", "cookie", "session-cookie", "connection_string", "connection-string"):
+        candidate = deepcopy(packet())
+        candidate["authorized_read_only_observations"]["nested"] = {key: "redacted-is-still-not-needed"}
+        errors = verifier.validate(candidate)
+        assert any(error.startswith("packet contains forbidden sensitive key:") for error in errors), key
+
+
+def test_rejects_observation_payload_drift() -> None:
+    mutations = (
+        lambda d: d["authorized_read_only_observations"]["repositories"]["Oteryn/Oteryn-Platform"]["latest_deployments"][0].update(latest_status="success"),
+        lambda d: d["authorized_read_only_observations"]["repositories"]["Oteryn/Oteryn-Platform"]["latest_deployments"][0].update(source_sha="0" * 40),
+        lambda d: d["authorized_read_only_observations"]["repositories"]["Oteryn/Oteryn-Platform"]["latest_deployments"][0].update(created_at="2026-07-23T17:35:37Z"),
+        lambda d: d["authorized_read_only_observations"]["repositories"].pop("Oteryn/Oteryn-Atlas"),
+    )
+    for mutate in mutations:
+        candidate = packet()
+        mutate(candidate)
+        assert "authorized read-only observations drifted from the exact recorded payload" in verifier.validate(candidate)
 
 
 def test_rejects_partial_or_unbound_source_coordinates() -> None:
