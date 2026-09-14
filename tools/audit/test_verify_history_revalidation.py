@@ -84,6 +84,20 @@ class HistoryRevalidationTests(unittest.TestCase):
             with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "lifecycle baseline provenance drift"):
                 self.validate_mutation(mutate)
 
+    def test_declared_provenance_method_and_endpoints_are_exactly_bound(self):
+        mutations = (
+            lambda d: d["provenance"].pop("method"),
+            lambda d: d["provenance"].update(method="Unspecified observation method."),
+            lambda d: d["provenance"].pop("github_endpoints"),
+            lambda d: d["provenance"]["github_endpoints"].pop(),
+            lambda d: d["provenance"]["github_endpoints"].append("GET /unbound/source"),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(
+                ValueError, "provenance (?:method|endpoint inventory) drift"
+            ):
+                self.validate_mutation(mutate)
+
     def test_current_and_historical_coordinates_cannot_be_conflated(self):
         with self.assertRaisesRegex(ValueError, "source boundary provenance drift"):
             self.validate_mutation(lambda d: d["source_boundaries"][1].update(current_main_commit=d["source_boundaries"][1]["historical_commit"]))
@@ -161,6 +175,19 @@ class HistoryRevalidationTests(unittest.TestCase):
             lambda d: d.update(security={"remediation_status": "complete"}),
             lambda d: d.update(organization={"audit_status": "complete"}),
             lambda d: d.update(game={"compare_status": "complete"}),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
+                self.validate_mutation(mutate)
+
+    def test_intervening_path_segments_cannot_hide_governed_assertions(self):
+        mutations = (
+            lambda d: d.update(history={"assessment": {"revalidation_status": "closed"}}),
+            lambda d: d.update(product={"current": {"readiness_status": "proven"}}),
+            lambda d: d.update(runtime={"qualification": {"readiness": True}}),
+            lambda d: d.update(security={"external": {"remediation_status": "complete"}}),
+            lambda d: d.update(organization={"current": {"audit_status": "complete"}}),
+            lambda d: d.update(game={"partial": {"compare_status": "complete"}}),
         )
         for mutate in mutations:
             with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):

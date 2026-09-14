@@ -73,14 +73,26 @@ EXPECTED_CLAIMS = {
     "security_remediation_claimed": False,
     "organization_audit_completion_claimed": False,
 }
-GOVERNED_ASSERTION_KEY_STEMS = (
-    "history_revalidation",
-    "product_readiness",
-    "runtime_readiness",
-    "security_remediation",
-    "organization_audit",
-    "game_compare",
+GOVERNED_ASSERTION_KEY_COMPONENTS = (
+    ("history", "revalidation"),
+    ("product", "readiness"),
+    ("runtime", "readiness"),
+    ("security", "remediation"),
+    ("organization", "audit"),
+    ("game", "compare"),
 )
+EXPECTED_PROVENANCE_METHOD = (
+    "Read-only GitHub REST default-branch, Git commit/tree, compare, PR and issue-comment reads; local immutable "
+    "audit inputs are bound below by Git blob and SHA-256."
+)
+EXPECTED_GITHUB_ENDPOINTS = [
+    "GET /repos/{owner}/{repo}",
+    "GET /repos/{owner}/{repo}/branches/main",
+    "GET /repos/{owner}/{repo}/git/commits/{sha}",
+    "GET /repos/{owner}/{repo}/compare/{historical}...{current}",
+    "GET /repos/Oteryn/Oteryn/pulls/{number}",
+    "GET /repos/Oteryn/Oteryn/issues/comments/5666964258",
+]
 EXPECTED_OBSERVED_AT = "2026-09-14T16:23:00Z"
 EXPECTED_BASELINE = {
     "repository": "Oteryn/Oteryn",
@@ -169,14 +181,28 @@ def unexpected_governed_assertion_keys(value: object, path: tuple[str, ...] = ()
         for key, item in value.items():
             normalized = normalize_key(key)
             next_path = (*path, normalized)
-            joined_path = "_".join(part for part in next_path if part)
-            if any(stem in joined_path for stem in GOVERNED_ASSERTION_KEY_STEMS):
+            path_components = [component for part in next_path for component in part.split("_") if component]
+            if any(
+                _is_ordered_subsequence(components, path_components)
+                for components in GOVERNED_ASSERTION_KEY_COMPONENTS
+            ):
                 found.add(".".join(str(part) for part in next_path))
             found.update(unexpected_governed_assertion_keys(item, next_path))
     elif isinstance(value, list):
         for item in value:
             found.update(unexpected_governed_assertion_keys(item, path))
     return found
+
+
+def _is_ordered_subsequence(needle: tuple[str, ...], haystack: list[str]) -> bool:
+    """Return whether semantic key components occur in order, wrappers notwithstanding."""
+    position = 0
+    for component in haystack:
+        if component == needle[position]:
+            position += 1
+            if position == len(needle):
+                return True
+    return False
 
 
 def validate(path: Path = CANDIDATE) -> dict:
@@ -198,7 +224,11 @@ def validate(path: Path = CANDIDATE) -> dict:
     )
     require(boundaries == EXPECTED_BOUNDARIES, "source boundary provenance drift")
 
-    canonical_inputs = data.get("provenance", {}).get("canonical_inputs", [])
+    provenance = data.get("provenance", {})
+    require(isinstance(provenance, dict), "provenance must be an object")
+    require(provenance.get("method") == EXPECTED_PROVENANCE_METHOD, "provenance method drift")
+    require(provenance.get("github_endpoints") == EXPECTED_GITHUB_ENDPOINTS, "provenance endpoint inventory drift")
+    canonical_inputs = provenance.get("canonical_inputs", [])
     require(isinstance(canonical_inputs, list), "canonical input manifest must be a list")
     require(len(canonical_inputs) == len(EXPECTED_INPUTS), "canonical input manifest cardinality drift")
     paths = [item.get("path") for item in canonical_inputs if isinstance(item, dict)]
