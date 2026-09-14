@@ -19,4 +19,7 @@ class Adoption(unittest.TestCase):
  def test_stale_projection(self):self.reject(lambda c,r,s,i:s.update(scoped_review_paths=334))
  def test_ledger_report_summary_binding(self):
   self.reject(lambda c,r,s,i:s.update(ledger_sha256='0'*64)); self.reject(lambda c,r,s,i:i.update(canonical_ledger_sha256='0'*64)); self.reject(lambda c,r,s,i:i.update(semantic_coverage_complete=True))
+ def test_durability_requires_historical_transition_and_current_adoption(self):
+  self.reject(lambda c,r,s,i:s.update(durability=s['durability'].replace(v.HISTORICAL_DURABILITY_FRAGMENT,v.FORBIDDEN_STALE_DURABILITY_FRAGMENT)))
+  self.reject(lambda c,r,s,i:s.update(durability=s['durability'].replace(v.ADOPTION_DURABILITY_FRAGMENT,'The historical packet is not adopted')))
 if __name__=='__main__':unittest.main()
