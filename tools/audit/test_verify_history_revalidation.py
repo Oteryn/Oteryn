@@ -124,8 +124,15 @@ class HistoryRevalidationTests(unittest.TestCase):
             lambda d: d.update(stale_evidence_rejection_rules=[x for x in d["stale_evidence_rejection_rules"] if x != verify.GAME_CARRY_FORWARD_RULE]),
         )
         for mutate in mutations:
-            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "Game compare truncation"):
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "Game compare truncation|stale-evidence rule set drift"):
                 self.validate_mutation(mutate)
+
+    def test_complete_stale_evidence_rule_set_is_exactly_bound(self):
+        for index in range(len(self.base["stale_evidence_rejection_rules"])):
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "stale-evidence rule set drift"):
+                self.validate_mutation(lambda d, index=index: d["stale_evidence_rejection_rules"].pop(index))
+        with self.assertRaisesRegex(ValueError, "stale-evidence rule set drift"):
+            self.validate_mutation(lambda d: d["stale_evidence_rejection_rules"].append("Unexpected weaker rule."))
 
     def test_contradictory_game_completeness_prose_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
@@ -220,9 +227,13 @@ class HistoryRevalidationTests(unittest.TestCase):
     def test_contradictory_positive_readiness_prose_is_rejected(self):
         assertions = (
             "HISTORY-REVALIDATION is closed.",
+            "HISTORY-REVALIDATION is complete.",
             "Product readiness is established.",
+            "Product readiness is complete.",
             "Runtime readiness has been proven.",
+            "Runtime readiness is completed.",
             "Security remediation is complete.",
+            "Security remediation is completed.",
             "The organization-wide audit is complete.",
         )
         for assertion in assertions:
@@ -246,7 +257,7 @@ class HistoryRevalidationTests(unittest.TestCase):
 
     def test_disclosure_and_digest_rejection_rules_are_mandatory(self):
         for phrase in ("digest without retrievable bytes", "public disclosure remains disclosed"):
-            with self.subTest(phrase=phrase), self.assertRaisesRegex(ValueError, "stale-evidence rules weakened"):
+            with self.subTest(phrase=phrase), self.assertRaisesRegex(ValueError, "stale-evidence rule set drift"):
                 self.validate_mutation(lambda d, phrase=phrase: d.update(stale_evidence_rejection_rules=[x.replace(phrase, "weakened") for x in d["stale_evidence_rejection_rules"]]))
 
 if __name__ == "__main__":
