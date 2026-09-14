@@ -73,6 +73,14 @@ EXPECTED_CLAIMS = {
     "security_remediation_claimed": False,
     "organization_audit_completion_claimed": False,
 }
+GOVERNED_ASSERTION_KEY_STEMS = (
+    "history_revalidation",
+    "product_readiness",
+    "runtime_readiness",
+    "security_remediation",
+    "organization_audit",
+    "game_compare",
+)
 EXPECTED_OBSERVED_AT = "2026-09-14T16:23:00Z"
 EXPECTED_BASELINE = {
     "repository": "Oteryn/Oteryn",
@@ -104,6 +112,10 @@ EXPECTED_INPUTS = {
 def require(ok: bool, message: str) -> None:
     if not ok:
         raise ValueError(message)
+
+
+def normalize_key(key: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
 
 
 def reject_duplicate_json_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -150,6 +162,21 @@ def duplicated_governed_claim_keys(value: object) -> set[str]:
     return found
 
 
+def unexpected_governed_assertion_keys(value: object) -> set[str]:
+    """Reject new machine-readable assertion fields that can shadow governed negative claims."""
+    found: set[str] = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized = normalize_key(key)
+            if any(stem in normalized for stem in GOVERNED_ASSERTION_KEY_STEMS):
+                found.add(str(key))
+            found.update(unexpected_governed_assertion_keys(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.update(unexpected_governed_assertion_keys(item))
+    return found
+
+
 def validate(path: Path = CANDIDATE) -> dict:
     raw = path.read_text(encoding="utf-8")
     data = json.loads(raw, object_pairs_hook=reject_duplicate_json_members)
@@ -182,6 +209,8 @@ def validate(path: Path = CANDIDATE) -> dict:
     require(claims == EXPECTED_CLAIMS, "readiness/closure claims must have exact keys and all be false")
     outside_claims = {key: value for key, value in data.items() if key != "claims"}
     require(not duplicated_governed_claim_keys(outside_claims), "governed claim key duplicated outside claims")
+    unexpected = unexpected_governed_assertion_keys(outside_claims)
+    require(not unexpected, f"unexpected governed assertion key: {sorted(unexpected)[0] if unexpected else ''}")
     prose = "\n".join(assertion_strings(outside_claims))
     contradictory = (
         r"history[- ]revalidation (?:is |has been )?closed",
