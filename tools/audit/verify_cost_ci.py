@@ -35,6 +35,19 @@ EXPECTED_WORKFLOW = {
     "concurrency_group": "meta-ci-${{ github.event.pull_request.number || github.ref }}",
     "cancel_in_progress_pull_request_only": True,
 }
+EXPECTED_SAMPLING = {
+    "method": "For each event class pull_request, merge_group and push, select the two most recent completed META CI runs returned by the event-filtered GitHub Actions runs endpoint at the observation cutoff. Selection is not filtered by conclusion.",
+    "event_classes": ["pull_request", "merge_group", "push"],
+    "per_event": 2,
+    "sample_count": 6,
+    "scope": "Oteryn/Oteryn META CI only; recent trigger-stratified operational sample, not a statistically representative long-term workload sample.",
+    "source_endpoints": [
+        "GET /repos/Oteryn/Oteryn/actions/runs?event=pull_request",
+        "GET /repos/Oteryn/Oteryn/actions/runs?event=merge_group",
+        "GET /repos/Oteryn/Oteryn/actions/runs?event=push",
+        "GET /repos/Oteryn/Oteryn/actions/runs/{run_id}/jobs",
+    ],
+}
 EXPECTED_RUNS = [
     {
         "event": "pull_request", "run_id": 34865871915, "workflow_id": 336924336, "pr_number": 203,
@@ -90,6 +103,15 @@ EXPECTED_RUN_IDS = {
     "merge_group": [34832322263, 34831302624],
     "push": [34832368949, 34831352610],
 }
+EXPECTED_PROVEN = {
+    "trigger_stratification": "The bounded sample contains exactly two recent completed META CI runs for each of pull_request, merge_group and push.",
+    "sample_outcomes": "All six sampled meta-gate jobs concluded success and all six sampled workflow runs have run_attempt=1.",
+    "observed_created_to_start_delay": "Within this sample, job created-to-start delay is 2-3 seconds (median 2 seconds). This is a timestamp interval only, not pure queue time.",
+    "observed_execution": "Within this sample, meta-gate start-to-completion is 10-13 seconds (median 12 seconds).",
+    "runner_allocation": "The six jobs report ubuntu-latest and six distinct GitHub-hosted runner IDs; this proves distinct observed allocations only, not fleet capacity.",
+    "workflow_cache_configuration": "The bound ci.yml has no explicit actions/cache step. GitHub Actions metadata collected here does not expose cache hit/miss or provider-level package-cache behavior.",
+    "verification_yield_proxy": "The six successful jobs expose 33 successful named Check/Validate steps in authoritative job metadata. The packet records only the count; source job IDs are the recheck authority. This is a bounded execution-count proxy, not proof of defect-detection value or economic efficiency.",
+}
 EXPECTED_UNKNOWN = {
     "billing_cost": "UNKNOWN: collected run/job metadata does not include authoritative billed minutes, spend or marginal cost.",
     "runner_capacity": "UNKNOWN: short created-to-start delays and distinct runner IDs do not expose available fleet capacity, saturation or concurrency headroom.",
@@ -100,6 +122,12 @@ EXPECTED_UNKNOWN = {
     "useful_verification_yield": "PARTIAL: named successful validation steps are observable, but prevented defects, redundant work and value per billed minute are not.",
     "pure_queue_time": "UNKNOWN: job created-to-start delay does not identify when the job became runnable or when a runner was assigned, so pure queue time is not measured.",
 }
+EXPECTED_RECHECK_TRIGGERS = [
+    "The protected-main .github/workflows/ci.yml blob changes.",
+    "Any selected run/job identity, timestamp, attempt or conclusion no longer matches authoritative GitHub readback.",
+    "Authoritative billing/usage or cache telemetry becomes available for the sampled run IDs.",
+    "A larger rolling cohort is collected for a long-term efficiency or flake/capacity claim.",
+]
 EXPECTED_CLAIMS = {
     "cost_ci_closed": False,
     "cost_savings_claimed": False,
@@ -127,12 +155,7 @@ def validate(path: Path = CANDIDATE) -> dict:
     require(data.get("source_observation_cutoff") == "2026-09-14T17:37:30Z", "observation cutoff drift")
     require(data.get("baseline") == EXPECTED_BASELINE, "baseline provenance drift")
     require(data.get("workflow_source") == EXPECTED_WORKFLOW, "workflow source drift")
-
-    sampling = data.get("sampling", {})
-    require(sampling.get("event_classes") == ["pull_request", "merge_group", "push"], "event strata")
-    require(sampling.get("per_event") == 2 and sampling.get("sample_count") == 6, "sample size")
-    require("not filtered by conclusion" in sampling.get("method", ""), "selection must be conclusion-neutral")
-    require("not a statistically representative long-term workload sample" in sampling.get("scope", ""), "scope limitation missing")
+    require(data.get("sampling") == EXPECTED_SAMPLING, "sampling provenance drift")
 
     runs = data.get("runs", [])
     require(runs == EXPECTED_RUNS, "sample raw provenance drift")
@@ -159,15 +182,7 @@ def validate(path: Path = CANDIDATE) -> dict:
         "successful_named_verification_steps": sum(r["verification_steps_success"] for r in runs),
     }
     require(data.get("aggregates") == expected_aggregates, "aggregate drift")
-
-    proven = data.get("proven", {})
-    require("observed_job_queue" not in proven, "created-to-start delay must not be labelled as queue time")
-    delay_claim = proven.get("observed_created_to_start_delay", "")
-    require("created-to-start delay" in delay_claim and "not pure queue time" in delay_claim, "created-to-start delay semantics drift")
-    require("not fleet capacity" in proven.get("runner_allocation", ""), "capacity overclaim")
-    require("does not expose cache hit/miss" in proven.get("workflow_cache_configuration", ""), "cache overclaim")
-    require("not proof of defect-detection value or economic efficiency" in proven.get("verification_yield_proxy", ""), "yield overclaim")
-
+    require(data.get("proven") == EXPECTED_PROVEN, "proven observation map drift")
     require(data.get("unknown_or_blocked") == EXPECTED_UNKNOWN, "unknown/blocked surface drift")
 
     limits = " ".join(data.get("limitations", [])).lower()
@@ -184,6 +199,7 @@ def validate(path: Path = CANDIDATE) -> dict:
     additional = data.get("smallest_additional_observation", {})
     require("billable execution/usage" in additional.get("cohort_cost_cache", ""), "cost recheck input missing")
     require("unfiltered rolling cohort" in additional.get("generalized_efficiency", ""), "generalization recheck input missing")
+    require(data.get("recheck_triggers") == EXPECTED_RECHECK_TRIGGERS, "recheck trigger drift")
     return {
         "result": "COST_CI_HANDOFF_VALID_OBLIGATION_OPEN",
         "sampled_runs": len(runs),
