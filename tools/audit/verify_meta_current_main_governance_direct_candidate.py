@@ -59,8 +59,14 @@ def json_exact(actual,expected):
 def validate_adoption_index(index):
  if not json_exact(index.get('r7_meta_current_main_governance_direct_adoption'),EXPECTED_R7_ADOPTION_INDEX):
   raise CandidateError('R7 adoption index drift')
-def report_module():
- p=ROOT/'tools/audit/verify_report.py'; spec=importlib.util.spec_from_file_location('r7_report',p);m=importlib.util.module_from_spec(spec);assert spec.loader;spec.loader.exec_module(m);return m
+def report_module(base_review_raw:bytes):
+ p=ROOT/'tools/audit/verify_report.py'; spec=importlib.util.spec_from_file_location('r7_report',p);m=importlib.util.module_from_spec(spec);assert spec.loader;spec.loader.exec_module(m)
+ canonical=E/'coverage-review.tsv'; frozen=tuple(tsv_bytes(base_review_raw)); read_tsv=m.read_tsv
+ def frozen_read_tsv(path):
+  if Path(path)==canonical:return [dict(row) for row in frozen]
+  return read_tsv(path)
+ m.read_tsv=frozen_read_tsv
+ return m
 def entries(doc):return [x for k in ('previous_direct_modified','previous_unverified_modified','new_active_governance') for x in doc['candidate'][k]]
 def validate_rows(doc,base_raw=None):
  raw=OVERLAY.read_bytes()
@@ -84,7 +90,7 @@ def validate():
  doc=load_candidate()
  if doc['source']!={'repository':'Oteryn/Oteryn','commit_sha':SOURCE,'tree_sha':TREE}:raise CandidateError('candidate source drift')
  base_raw=load_base_review_raw()
- rows=validate_rows(doc,base_raw); vr=report_module(); report=ROOT/'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'
+ rows=validate_rows(doc,base_raw); vr=report_module(base_raw); report=ROOT/'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'
  with tempfile.TemporaryDirectory() as td:
   out=Path(td)/'inv'; import contextlib
   spec=importlib.util.spec_from_file_location('r7_collect',ROOT/'tools/audit/organization_audit.py');co=importlib.util.module_from_spec(spec);assert spec.loader;spec.loader.exec_module(co)

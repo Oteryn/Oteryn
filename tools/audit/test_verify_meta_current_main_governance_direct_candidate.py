@@ -34,6 +34,13 @@ class R7(unittest.TestCase):
     (evidence/'coverage-review.tsv').write_bytes(canonical+b'\n')
     with self.assertRaisesRegex(m.CandidateError,'changed during verification'):
      m.validate_base_review_unchanged(captured)
+ def test_report_module_reuses_captured_base_review(self):
+  with tempfile.TemporaryDirectory() as td:
+   evidence=Path(td); canonical=m.load_base_review_raw(); path=evidence/'coverage-review.tsv'; path.write_bytes(canonical)
+   with mock.patch.object(m,'E',evidence):
+    vr=m.report_module(canonical); first=vr.load_review(evidence,{})
+    path.write_bytes(canonical+b'\n')
+    self.assertEqual(vr.load_review(evidence,{}),first)
  def test_base_review_blob_is_pinned(self):
   self.assertEqual(m.blob(m.load_base_review_raw()),m.BASE_REVIEW_BLOB)
  def test_historical_packet_remains_unverified(self):self.assertEqual(m.validate()['historical_packet_paths_unverified'],26)
