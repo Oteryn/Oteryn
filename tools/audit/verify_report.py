@@ -23,10 +23,13 @@ SHA = re.compile(r'[0-9a-f]{40}\Z')
 COVERAGE_GROUPS_BLOB_SHA = 'b3313b4a0831b9fcc528665dca25bdccdb9dab59'
 FINDING_REGISTER_SHA256 = 'c5402f1618cfe4cd03d2ad50cd0946ec86f19e834b02128199b31b808cc64e94'
 DOMAIN_MATRIX_SHA256 = '34e46372880cbb932b2ed26d89cf71448d360fecd0a90f562ee693698ca10ac4'
+WORKFLOW_INVENTORY_SHA256 = 'af259f1b33a699ec756ed531f7e325b5e0b1301f690930ea6fc2b2e1376463cd'
 FINDING_REGISTER_FIELDS = ('id', 'priority', 'repository', 'state', 'scope', 'title',
                            'evidence', 'owner_route', 'closure_condition')
 DOMAIN_MATRIX_FIELDS = ('domain', 'name', 'acceptance_criterion', 'method_and_evidence',
                         'opinion', 'remaining_limit', 'references')
+WORKFLOW_INVENTORY_FIELDS = ('repository', 'path', 'blob_sha', 'name', 'events',
+                             'job_count', 'parse_result')
 STATES = {'SOURCE_REPAIRED_TESTED','PARTIALLY_REPAIRED','RETIRED_SOURCE','SOURCE_REPAIRED',
           'UNKNOWN_LIVE','REQUIRES_REVALIDATION','REQUIRES_LIVE_REVALIDATION',
           'SOURCE_REPAIRED_RECORDED_CI','OPEN_QUALIFICATION','HISTORICAL_NOTE','CONFIRMED_SOURCE',
@@ -626,6 +629,77 @@ def read_tsv(path):
     return rows
 
 
+def validate_workflow_inventory(base: Path, doc: dict, inventory_dir: Path | None) -> list[dict]:
+    """Authenticate one workflow snapshot and reconcile it with source inventories."""
+    path = base / 'workflow-inventory.tsv'
+    require(path.is_file(), 'workflow inventory missing')
+    raw = path.read_bytes()
+    require(hashlib.sha256(raw).hexdigest() == WORKFLOW_INVENTORY_SHA256,
+            'workflow inventory snapshot drift')
+    rows = parse_tsv_bytes(raw, WORKFLOW_INVENTORY_FIELDS, 'workflow inventory')
+    unique(rows, lambda row: (row['repository'], row['path']), 'workflow')
+
+    repositories = ('meta', 'game', 'platform', 'atlas')
+    parsed = []
+    for row in rows:
+        require(row['repository'] in repositories, 'workflow repository drift')
+        require(safe_relative(row['path']) and
+                row['path'].startswith('.github/workflows/') and
+                row['path'].endswith(('.yml', '.yaml')), 'workflow path drift')
+        require(SHA.fullmatch(row['blob_sha']) is not None, 'workflow blob drift')
+        require(row['name'].strip(), 'workflow name missing')
+        events = row['events'].split(',')
+        require(events and all(event.strip() == event and event for event in events),
+                'workflow event schema drift')
+        require(len(events) == len(set(events)), 'duplicate workflow event')
+        require(row['parse_result'] == 'PASS', 'workflow parse failure')
+        require(row['job_count'].isascii() and row['job_count'].isdigit() and
+                int(row['job_count']) > 0, 'workflow job count drift')
+        parsed.append((row, events, int(row['job_count'])))
+
+    derived = {}
+    for repository in repositories:
+        subset = [(row, events, jobs) for row, events, jobs in parsed
+                  if row['repository'] == repository]
+        derived[repository] = {
+            'workflows': len(subset),
+            'jobs': sum(jobs for _, _, jobs in subset),
+            'merge_group_workflows': sum('merge_group' in events for _, events, _ in subset),
+        }
+    derived.update({
+        'total_workflows': len(parsed),
+        'total_declared_jobs': sum(jobs for _, _, jobs in parsed),
+        'matrix_expanded': False,
+        'semantic_qualification_claimed': False,
+    })
+    require(json_exact(doc.get('workflow_census'), derived), 'workflow census drift')
+
+    if inventory_dir is not None:
+        for repository in repositories:
+            inventory = read_json(inventory_dir / (repository + '.json'))
+            source = doc['repositories'][repository]
+            require(inventory.get('commit_sha') == source['commit_sha'] and
+                    inventory.get('tree_sha') == source['tree_sha'],
+                    'workflow source inventory coordinate mismatch')
+            entries = inventory.get('entries')
+            require(isinstance(entries, list), 'workflow source inventory entries missing')
+            source_workflows = {
+                entry['path']: entry for entry in entries
+                if isinstance(entry, dict) and isinstance(entry.get('path'), str) and
+                entry['path'].startswith('.github/workflows/') and
+                entry['path'].endswith(('.yml', '.yaml'))
+            }
+            recorded = {row['path']: row for row, _, _ in parsed
+                        if row['repository'] == repository}
+            require(set(recorded) == set(source_workflows),
+                    'workflow inventory missing or extra source row')
+            for workflow_path, row in recorded.items():
+                entry = source_workflows[workflow_path]
+                require(entry.get('mode') == '100644', 'workflow source is not regular')
+                require(entry.get('object_sha') == row['blob_sha'], 'workflow source blob drift')
+    return rows
+
+
 def parse_tsv_bytes(raw: bytes, expected_fields: tuple[str, ...], label: str):
     """Parse the same complete TSV snapshot whose bytes were authenticated."""
     try:
@@ -953,12 +1027,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
         require(c['not_applicable']==0,'unexpected N/A reclassification')
         require(c['unverified_semantics']==c['leaves']-direct-grouped,'hidden coverage reclassification')
     require(coverage.get('unverified_semantics_total')==sum(c['unverified_semantics'] for c in coverage['per_repository'].values()),'unverified total mismatch')
-    workflows=read_tsv(base/'workflow-inventory.tsv');unique(workflows,lambda r:(r['repository'],r['path']),'workflow')
-    require(len(workflows)==doc['workflow_census']['total_workflows'],'workflow count')
-    require(sum(int(r['job_count']) for r in workflows)==doc['workflow_census']['total_declared_jobs'],'job count')
-    for key in ['meta','game','platform','atlas']:
-        subset=[r for r in workflows if r['repository']==key];c=doc['workflow_census'][key]
-        require(len(subset)==c['workflows'] and sum(int(r['job_count']) for r in subset)==c['jobs'],'repository workflow/job count')
+    validate_workflow_inventory(base, doc, inventory_dir)
     require(hashlib.sha256((base/'audit186-semantic-03-ci-contract-candidate.json').read_bytes()).hexdigest()==AUDIT186_SEMANTIC_03_CANDIDATE_SHA256,'AUDIT186 Semantic 03 candidate digest drift')
     require(hashlib.sha256((base/AUDIT186_SEMANTIC_03_DIRECT_ADDITIONS).read_bytes()).hexdigest()==AUDIT186_SEMANTIC_03_OVERLAY_SHA256,'AUDIT186 Semantic 03 overlay digest drift')
     proof=read_json(base/'verification-index.json')

@@ -574,6 +574,46 @@ class AuditValidationTest(unittest.TestCase):
         self.reject()
     def test_workflow_count_inflation_rejected(self):
         self.mutate(self.path,lambda d:d['workflow_census'].update(total_workflows=77));self.reject()
+    def test_workflow_inventory_blob_event_and_parse_drift_rejected(self):
+        path=self.base/'workflow-inventory.tsv'
+        rows=path.read_text(encoding='utf-8').splitlines()
+        fields=rows[1].split('\t')
+        fields[2]='0'*40
+        fields[4]=','.join(event for event in fields[4].split(',') if event!='merge_group')
+        fields[6]='FAIL'
+        rows[1]='\t'.join(fields)
+        path.write_text('\n'.join(rows)+'\n',encoding='utf-8')
+        self.reject()
+    def test_workflow_merge_group_report_count_drift_rejected(self):
+        self.mutate(self.path,lambda d:d['workflow_census']['meta'].update(merge_group_workflows=0))
+        self.reject()
+    def test_workflow_inventory_missing_extra_and_duplicate_rows_rejected(self):
+        path=self.base/'workflow-inventory.tsv'
+        original=path.read_text(encoding='utf-8').splitlines()
+        variants=(original[:-1], original+[original[1]], original+[original[-1].replace('atlas\t','meta\t',1)])
+        for rows in variants:
+            with self.subTest(rows=len(rows)):
+                path.write_text('\n'.join(rows)+'\n',encoding='utf-8')
+                self.reject()
+                shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/'workflow-inventory.tsv',path)
+    def test_workflow_inventory_source_blob_and_complete_path_set_bound(self):
+        inventory=self.root/'inventories';inventory.mkdir()
+        report=audit.read_json(self.path)
+        workflow_rows=audit.read_tsv(self.base/'workflow-inventory.tsv')
+        for repository in ('meta','game','platform','atlas'):
+            entries=[{'path':row['path'],'mode':'100644','object_sha':row['blob_sha']}
+                     for row in workflow_rows if row['repository']==repository]
+            (inventory/(repository+'.json')).write_text(json.dumps({
+                'commit_sha':report['repositories'][repository]['commit_sha'],
+                'tree_sha':report['repositories'][repository]['tree_sha'],
+                'entries':entries,
+            }),encoding='utf-8')
+        audit.validate_workflow_inventory(self.base,report,inventory)
+        data=audit.read_json(inventory/'meta.json')
+        data['entries'][0]['object_sha']='0'*40
+        (inventory/'meta.json').write_text(json.dumps(data),encoding='utf-8')
+        with self.assertRaises(ValueError):
+            audit.validate_workflow_inventory(self.base,report,inventory)
     def test_direct_additions_binding_drift_rejected(self):
         self.mutate(self.path,lambda d:d.update(coverage_review_additions='organization-audit-20260907/other.tsv'));self.reject()
     def test_recorder_evidence_binding_drift_rejected(self):
