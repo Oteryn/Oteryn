@@ -25,7 +25,10 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         self.assertEqual(result['grouped_paths'], 113)
         self.assertEqual(result['unverified_paths'], 3940)
         self.assertEqual(result['semantically_classified_paths'], 421)
-        self.assertEqual(result['remaining_bounded_proof_workflows'], [])
+        self.assertEqual(
+            result['remaining_bounded_proof_workflows'],
+            ['.github/workflows/organization-audit-meta-current-main-governance-qualification.yml'],
+        )
         self.assertFalse(result['product_readiness_claimed'])
         self.assertFalse(result['audit_completion_claimed'])
 
@@ -121,8 +124,16 @@ class ReadmeCurrentStateTest(unittest.TestCase):
 
     def test_terminal_bounded_proof_workflow_wording_rejected(self):
         mutated = self.current.replace(
-            'The current tree retains no bounded audit-proof workflows.',
+            'The sole retained temporary bounded audit-proof workflow is `.github/workflows/organization-audit-meta-current-main-governance-qualification.yml`; it remains pending R7 cleanup.',
             'The current tree retains two bounded audit-proof workflows: the Platform audit-recorder adopted-proof workflow and the Platform Announcements adopted-proof workflow.',
+            1,
+        )
+        self.reject(mutated)
+
+    def test_premature_no_bounded_workflow_claim_rejected(self):
+        mutated = self.current.replace(
+            'The sole retained temporary bounded audit-proof workflow is `.github/workflows/organization-audit-meta-current-main-governance-qualification.yml`; it remains pending R7 cleanup.',
+            'The current tree retains no bounded audit-proof workflows.',
             1,
         )
         self.reject(mutated)

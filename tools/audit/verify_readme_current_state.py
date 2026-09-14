@@ -11,7 +11,7 @@ import re
 EXPECTED_TITLE = '# Organization audit R3 evidence'
 EXPECTED_LOCAL_HEADING = '## Local checks'
 EXPECTED_EVIDENCE_HEADING = '## Evidence map and durability'
-EXPECTED_README_SHA256 = '8730039d22ac6bfd487dcbe9cd7e8808e729ae0ee40369618d19be2c083a9de7'
+EXPECTED_README_SHA256 = '795fe3a4c05e50855ea9f4779bf1aecce9ef7db3820d08e02e3c3b223de0feed'
 EXPECTED_INTRO = (
     'Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; '
     'this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 14 residual '
@@ -36,10 +36,11 @@ EXPECTED_DURABILITY_CLOSEOUT = (
     'Marketplace-test temporary proof workflows were removed after their completed review/cleanup. The '
     'Announcements pre-adoption qualification and projection workflows are removed after their bound successful '
     'runs. The temporary Platform audit-recorder adopted-proof workflow and temporary Platform Announcements '
-    'adopted-proof workflow are also absent after their bounded exact-head proof lifecycle. The current tree '
-    'retains no bounded audit-proof workflows. Historical Actions run/artifact provenance remains external GitHub '
+    'adopted-proof workflow are also absent after their bounded exact-head proof lifecycle. The sole retained '
+    'temporary bounded audit-proof workflow is `.github/workflows/organization-audit-meta-current-main-governance-qualification.yml`; '
+    'it remains pending R7 cleanup. Historical Actions run/artifact provenance remains external GitHub '
     'Actions metadata; mutable independent-review lifecycle/outcome remains external PR #185 metadata, and PR #185 '
-    'remains Draft. No provider writes, deployment, new required gate, automatic background worker, full semantic '
+    'remains Draft. No permanent gate, provider writes, deployment, automatic background worker, full semantic '
     'completion, product readiness, or self-awarded score is implied.'
 )
 STALE_MARKERS = (
@@ -107,7 +108,9 @@ def validate_text(text: str) -> dict[str, object]:
         'grouped_paths': 113,
         'unverified_paths': 3940,
         'semantically_classified_paths': 421,
-        'remaining_bounded_proof_workflows': [],
+        'remaining_bounded_proof_workflows': [
+            '.github/workflows/organization-audit-meta-current-main-governance-qualification.yml'
+        ],
         'product_readiness_claimed': False,
         'audit_completion_claimed': False,
     }
