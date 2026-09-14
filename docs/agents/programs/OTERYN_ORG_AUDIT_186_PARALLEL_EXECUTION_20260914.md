@@ -1,9 +1,9 @@
 # Oteryn organization audit #186 parallel execution programme
 
-Governing Issue: #186  
-Governing audit PR: #185  
-Programme role: continuation acceleration after R7 terminal closeout  
-Prepared from protected META `main`: `23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090`  
+Governing Issue: #186
+Governing audit PR: #185
+Programme role: continuation acceleration after R7 terminal closeout
+Prepared from protected META `main`: `23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090`
 Status: `PREPARED_NOT_RELEASED`
 
 ## Purpose
