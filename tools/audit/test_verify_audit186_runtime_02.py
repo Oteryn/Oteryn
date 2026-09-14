@@ -46,19 +46,40 @@ def test_rejects_missing_release_or_direct_health_requirement() -> None:
 
 
 def test_rejects_sensitive_payload_keys() -> None:
-    for key in verifier.FORBIDDEN_KEYS:
-        candidate = deepcopy(packet())
-        candidate[key] = "redacted-is-still-not-needed"
-        assert f"packet contains forbidden sensitive key: {key}" in verifier.validate(candidate)
+    candidate = deepcopy(packet())
+    candidate["authorized_read_only_observations"]["nested"] = {"api_token": "redacted-is-still-not-needed"}
+    errors = verifier.validate(candidate)
+    assert any(error.startswith("packet contains forbidden sensitive key: api_token") for error in errors)
 
 
 def test_rejects_partial_or_unbound_source_coordinates() -> None:
     candidate = packet()
     candidate["source_coordinates"].pop("Oteryn/Oteryn-Atlas")
-    assert "source coordinates must contain exactly four full commit SHAs" in verifier.validate(candidate)
+    assert "source coordinates drifted from the exact observed repository heads" in verifier.validate(candidate)
     candidate = packet()
     candidate["source_coordinates"]["Oteryn/Oteryn-Platform"] = "84d504c"
-    assert "source coordinates must contain exactly four full commit SHAs" in verifier.validate(candidate)
+    assert "source coordinates drifted from the exact observed repository heads" in verifier.validate(candidate)
+
+
+def test_rejects_same_shape_wrong_source_coordinate() -> None:
+    candidate = packet()
+    candidate["source_coordinates"]["Oteryn/Oteryn-Platform"] = "0" * 40
+    assert "source coordinates drifted from the exact observed repository heads" in verifier.validate(candidate)
+
+
+def test_rejects_authority_or_observation_drift() -> None:
+    candidate = packet()
+    candidate["authority"]["programme"] = "Oteryn/Oteryn#203@" + "0" * 40
+    assert "authority coordinates drifted" in verifier.validate(candidate)
+    candidate = packet()
+    candidate["observation_time"] = "2026-09-14T17:27:24Z"
+    assert "observation time drifted from the recorded read" in verifier.validate(candidate)
+
+
+def test_rejects_packet_identity_drift() -> None:
+    candidate = packet()
+    candidate["packet_id"] = "AUDIT186-RUNTIME-02-INFRA-STATE-OTHER"
+    assert "packet identity or schema drifted" in verifier.validate(candidate)
 
 
 if __name__ == "__main__":
