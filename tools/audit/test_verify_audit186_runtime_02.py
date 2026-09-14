@@ -54,11 +54,28 @@ def test_rejects_canonical_obligation_health_promotion() -> None:
     assert "canonical obligation drifted from the exact fail-closed claim" in verifier.validate(candidate)
 
 
-def test_rejects_missing_release_or_direct_health_requirement() -> None:
-    for field in ("exact deployed release and source digest", "direct health checks and results"):
+def test_rejects_additional_observation_contract_drift() -> None:
+    mutations = (
+        lambda d: d["smallest_additional_observation"].update(needed="No observation needed."),
+        lambda d: d["smallest_additional_observation"].update(current_authorization="Production mutation is authorized."),
+        lambda d: d["smallest_additional_observation"]["required_fields"].remove("provider/runtime identity"),
+        lambda d: d["smallest_additional_observation"]["required_fields"].remove("exact deployed release and source digest"),
+        lambda d: d["smallest_additional_observation"].update(current_readability="AVAILABLE"),
+    )
+    for mutate in mutations:
         candidate = packet()
-        candidate["smallest_additional_observation"]["required_fields"].remove(field)
-        assert "additional observation must bind exact release and direct health" in verifier.validate(candidate)
+        mutate(candidate)
+        assert "additional observation contract drifted from the exact authorized requirement" in verifier.validate(candidate)
+
+
+def test_rejects_limitations_drift() -> None:
+    candidate = packet()
+    candidate["limitations"].append("Infrastructure health and deployment readiness are established.")
+    assert "limitations drifted from the exact fail-closed list" in verifier.validate(candidate)
+
+    candidate = packet()
+    candidate["limitations"].pop()
+    assert "limitations drifted from the exact fail-closed list" in verifier.validate(candidate)
 
 
 def test_rejects_sensitive_payload_keys() -> None:

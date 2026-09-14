@@ -59,6 +59,27 @@ EXPECTED_DISPOSITION = {
     "infra_state_closure": "UNKNOWN_BLOCKED",
     "product_or_deployment_readiness": "NOT_ESTABLISHED",
 }
+EXPECTED_LIMITATIONS = [
+    "A GitHub deployment status is an orchestration record, not a direct service-health observation or configuration snapshot.",
+    "Zero GitHub deployment, environment, or release records does not prove that no external deployment or release exists.",
+    "The successful staging deployment record does not establish present health, production health, or deployment readiness.",
+    "The production and production-cloudflare records are historical and do not establish current runtime state.",
+    "No exact release is designated by a GitHub Release record, and no provider-owner release-to-runtime attestation was readable.",
+    "No production, provider, administrative, DNS, database, deployment, runner, environment, secret, or host mutation was authorized or performed.",
+]
+EXPECTED_ADDITIONAL_OBSERVATION = {
+    "needed": "One provider-operations-owner-authorized, dated, redacted read-only snapshot for each claimed production runtime, binding sanitized configuration and direct health results to an exact deployed release/source digest.",
+    "required_fields": [
+        "provider/runtime identity",
+        "observation time",
+        "exact deployed release and source digest",
+        "sanitized configuration invariants",
+        "direct health checks and results",
+        "authorized verifier identity or immutable evidence digest",
+    ],
+    "current_authorization": "Read-only observation is authorized in principle by this batch, but no private runtime connector or owner-produced snapshot was available in this session.",
+    "current_readability": "BLOCKED_UNAVAILABLE",
+}
 EXPECTED_RECHECK_TRIGGER = "AUDIT186-LEAD receives an immutable, dated, redacted provider-owner snapshot containing every required field, or a separately authorized read-only runtime route becomes available; then verify the exact release binding and direct health evidence before reassessing INFRA-STATE."
 EXPECTED_HANDOFF = "Keep INFRA-STATE open as UNKNOWN/BLOCKED. This packet is assurance evidence only and proposes no canonical audit-accounting mutation."
 FORBIDDEN_KEY_FRAGMENTS = (
@@ -137,18 +158,11 @@ def validate(packet: dict[str, object]) -> list[str]:
         if any(fragment in key or fragment.replace("_", "") in compact for fragment in FORBIDDEN_KEY_FRAGMENTS):
             errors.append(f"packet contains forbidden sensitive key: {key}")
 
-    limitations = packet.get("limitations", [])
-    required_limits = ("not a direct service-health observation", "does not establish present health", "no exact release")
-    joined = " ".join(limitations).lower() if isinstance(limitations, list) else ""
-    for phrase in required_limits:
-        if phrase not in joined:
-            errors.append(f"missing fail-closed limitation: {phrase}")
+    if packet.get("limitations") != EXPECTED_LIMITATIONS:
+        errors.append("limitations drifted from the exact fail-closed list")
 
-    if not isinstance(additional, dict) or additional.get("current_readability") != "BLOCKED_UNAVAILABLE":
-        errors.append("private runtime observation readability must remain BLOCKED_UNAVAILABLE")
-    fields = additional.get("required_fields", []) if isinstance(additional, dict) else []
-    if not isinstance(fields, list) or "exact deployed release and source digest" not in fields or "direct health checks and results" not in fields:
-        errors.append("additional observation must bind exact release and direct health")
+    if not isinstance(additional, dict) or additional != EXPECTED_ADDITIONAL_OBSERVATION:
+        errors.append("additional observation contract drifted from the exact authorized requirement")
     if packet.get("recheck_trigger") != EXPECTED_RECHECK_TRIGGER:
         errors.append("recheck trigger must preserve the exact fail-closed reassessment condition")
     if packet.get("handoff") != EXPECTED_HANDOFF:
