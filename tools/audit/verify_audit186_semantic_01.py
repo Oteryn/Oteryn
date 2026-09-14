@@ -244,9 +244,13 @@ def validate_repository(paths: list[dict[str, Any]]) -> None:
         if (ROOT / path).read_bytes() != git("show", f"{BASELINE}:{path}"):
             raise CandidateError(f"canonical audit surface mutated: {path}")
     changed_paths = set(git("diff", "--name-only", BASELINE, "--").decode().splitlines())
+    missing_paths = sorted(ALLOWED_CHANGED_PATHS - changed_paths)
     unexpected_paths = sorted(changed_paths - ALLOWED_CHANGED_PATHS)
-    if unexpected_paths:
-        raise CandidateError(f"worker changed path outside exact allowlist: {unexpected_paths[0]}")
+    if changed_paths != ALLOWED_CHANGED_PATHS:
+        raise CandidateError(
+            "worker changed paths do not match exact allowlist: "
+            f"missing={missing_paths}, unexpected={unexpected_paths}"
+        )
     review_paths = git("ls-tree", "-r", "--name-only", BASELINE, "docs/evidence/organization-audit-20260907").decode().splitlines()
     for path in review_paths:
         if Path(path).name.startswith("coverage-review") and (ROOT / path).read_bytes() != git("show", f"{BASELINE}:{path}"):

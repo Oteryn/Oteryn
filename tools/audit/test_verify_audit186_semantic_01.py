@@ -212,7 +212,43 @@ class Audit186Semantic01Tests(unittest.TestCase):
             return real_git(*args)
 
         with mock.patch.object(verifier, "git", side_effect=added_coverage_review):
-            with self.assertRaisesRegex(verifier.CandidateError, "outside exact allowlist"):
+            with self.assertRaisesRegex(verifier.CandidateError, "do not match exact allowlist"):
+                verifier.validate_repository(paths)
+
+    def test_missing_worker_handoff_document_is_rejected(self):
+        doc = self.candidate()
+        paths = verifier.validate_document(doc)
+        real_git = verifier.git
+
+        def missing_worker_handoff(*args):
+            if args[:3] == ("diff", "--name-only", verifier.BASELINE):
+                changed = sorted(
+                    verifier.ALLOWED_CHANGED_PATHS
+                    - {"docs/agents/workers/AUDIT186-SEMANTIC-01.md"}
+                )
+                return ("\n".join(changed) + "\n").encode()
+            return real_git(*args)
+
+        with mock.patch.object(verifier, "git", side_effect=missing_worker_handoff):
+            with self.assertRaisesRegex(verifier.CandidateError, "do not match exact allowlist"):
+                verifier.validate_repository(paths)
+
+    def test_missing_focused_test_file_is_rejected(self):
+        doc = self.candidate()
+        paths = verifier.validate_document(doc)
+        real_git = verifier.git
+
+        def missing_focused_test(*args):
+            if args[:3] == ("diff", "--name-only", verifier.BASELINE):
+                changed = sorted(
+                    verifier.ALLOWED_CHANGED_PATHS
+                    - {"tools/audit/test_verify_audit186_semantic_01.py"}
+                )
+                return ("\n".join(changed) + "\n").encode()
+            return real_git(*args)
+
+        with mock.patch.object(verifier, "git", side_effect=missing_focused_test):
+            with self.assertRaisesRegex(verifier.CandidateError, "do not match exact allowlist"):
                 verifier.validate_repository(paths)
 
 
