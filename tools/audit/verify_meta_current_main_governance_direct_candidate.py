@@ -8,6 +8,7 @@ ROOT=Path(__file__).resolve().parents[2]; E=ROOT/'docs/evidence/organization-aud
 CANDIDATE=E/'r7-meta-current-main-governance-direct-candidate.json'; OVERLAY=E/'coverage-review-meta-current-main-governance-direct-additions.tsv'
 CANDIDATE_BLOB='6a3e98ad65f52015a43a84e39a8940f64b31dc65'; OVERLAY_SHA='8c9064552ea9592d7c5b51852333add3f58cdb4963f4316c2dd6bcbd21b44e16'; LEDGER_SHA='8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94'
 SOURCE='23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090'; TREE='b8ebb8e50bce14a736fa65590ac121655c52fd12'; HIST='docs/evidence/repository-audit-2026-09-06/'
+BASE_REVIEW_BLOB='9f24e951b7012d6bdbfafb19c8f2470c22a01467'
 FIELDS=('repository','path','blob_sha','depth','scope','line_ranges','execution_evidence')
 REFRESH_EXECUTION_EVIDENCE='BOUNDED_FULL_FILE_SOURCE_REVIEW_REFRESH; source semantics/exercised assertions only; no live provider, admin, runtime, operational-capability, readiness, or completion inference'
 EXPECTED_R7_ADOPTION_INDEX={
@@ -46,6 +47,13 @@ def load_candidate():
  raw=CANDIDATE.read_bytes()
  if blob(raw)!=CANDIDATE_BLOB:raise CandidateError('immutable reviewed candidate blob drift')
  return json_bytes(raw)
+def load_base_review_raw():
+ raw=(E/'coverage-review.tsv').read_bytes()
+ if blob(raw)!=BASE_REVIEW_BLOB:raise CandidateError('canonical coverage-review.tsv blob drift')
+ return raw
+def validate_base_review_unchanged(initial:bytes):
+ current=(E/'coverage-review.tsv').read_bytes()
+ if current!=initial or blob(current)!=BASE_REVIEW_BLOB:raise CandidateError('canonical coverage-review.tsv changed during verification')
 def json_exact(actual,expected):
  return json.dumps(actual,sort_keys=True,separators=(',',':'))==json.dumps(expected,sort_keys=True,separators=(',',':'))
 def validate_adoption_index(index):
@@ -54,7 +62,7 @@ def validate_adoption_index(index):
 def report_module():
  p=ROOT/'tools/audit/verify_report.py'; spec=importlib.util.spec_from_file_location('r7_report',p);m=importlib.util.module_from_spec(spec);assert spec.loader;spec.loader.exec_module(m);return m
 def entries(doc):return [x for k in ('previous_direct_modified','previous_unverified_modified','new_active_governance') for x in doc['candidate'][k]]
-def validate_rows(doc):
+def validate_rows(doc,base_raw=None):
  raw=OVERLAY.read_bytes()
  if hashlib.sha256(raw).hexdigest()!=OVERLAY_SHA:raise CandidateError('R7 overlay SHA drift')
  rows=tsv_bytes(raw); expected=doc['candidate']['previous_unverified_modified']+doc['candidate']['new_active_governance']
@@ -64,7 +72,8 @@ def validate_rows(doc):
  for r,x in zip(rows,expected):
   if r['repository']!='meta' or r['blob_sha']!=x['blob_sha'] or r['depth']!='SCOPED_SEMANTIC_REVIEW' or r['line_ranges']!='[]' or r['scope'] not in allowed:raise CandidateError(f'R7 overlay row drift: {x["path"]}')
   if not r['execution_evidence'] or any(word in r['execution_evidence'].casefold() for word in ('product readiness established','live operational capability proven')):raise CandidateError('R7 execution evidence overclaim')
- base=tsv_bytes((E/'coverage-review.tsv').read_bytes()); refresh=doc['candidate']['previous_direct_modified']
+ if base_raw is None:base_raw=load_base_review_raw()
+ base=tsv_bytes(base_raw); refresh=doc['candidate']['previous_direct_modified']
  br={r['path']:r for r in base if r['repository']=='meta'}
  if set(x['path'] for x in refresh)&set(r['path'] for r in rows):raise CandidateError('refreshed DIRECT row duplicated in overlay')
  for x in refresh:
@@ -74,7 +83,8 @@ def validate_rows(doc):
 def validate():
  doc=load_candidate()
  if doc['source']!={'repository':'Oteryn/Oteryn','commit_sha':SOURCE,'tree_sha':TREE}:raise CandidateError('candidate source drift')
- rows=validate_rows(doc); vr=report_module(); report=ROOT/'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'
+ base_raw=load_base_review_raw()
+ rows=validate_rows(doc,base_raw); vr=report_module(); report=ROOT/'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'
  with tempfile.TemporaryDirectory() as td:
   out=Path(td)/'inv'; import contextlib
   spec=importlib.util.spec_from_file_location('r7_collect',ROOT/'tools/audit/organization_audit.py');co=importlib.util.module_from_spec(spec);assert spec.loader;spec.loader.exec_module(co)
@@ -94,6 +104,7 @@ def validate():
  validate_adoption_index(json_bytes((E/'verification-index.json').read_bytes()))
  rep=json_bytes(report.read_bytes())
  if rep.get('audit_completion')!='NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial' or rep.get('production_readiness_claimed') is not False:raise CandidateError('R7 completion/readiness drift')
+ validate_base_review_unchanged(base_raw)
  return {'result':'META_CURRENT_MAIN_GOVERNANCE_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS','source_leaves':4361,'direct':308,'grouped':113,'unverified':3940,'semantically_classified':421,'meta':{'leaves':210,'direct':95,'grouped':0,'unverified':115},'ledger_sha256':LEDGER_SHA,'refreshed_existing_direct':5,'newly_direct':14,'historical_packet_paths_unverified':26,'residual_obligations':14,'meta_aud_05':'P2_PARTIALLY_REPAIRED','product_readiness_claimed':False,'organization_audit_completion_claimed':False}
 def main():
  try:print(json.dumps(validate(),sort_keys=True));return 0

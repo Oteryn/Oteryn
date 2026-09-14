@@ -15,17 +15,27 @@ class R7(unittest.TestCase):
   d=m.load_candidate(); overlay={r['path'] for r in m.tsv_bytes(m.OVERLAY.read_bytes())};self.assertFalse(overlay & {x['path'] for x in d['candidate']['previous_direct_modified']})
  def test_each_refreshed_row_requires_exact_execution_evidence(self):
   doc=m.load_candidate(); refresh=[x['path'] for x in doc['candidate']['previous_direct_modified']]
-  base=m.tsv_bytes((m.E/'coverage-review.tsv').read_bytes())
+  base=m.tsv_bytes(m.load_base_review_raw())
   for path in refresh:
    with self.subTest(path=path),tempfile.TemporaryDirectory() as td:
     evidence=Path(td); (evidence/'coverage-review-meta-current-main-governance-direct-additions.tsv').write_bytes(m.OVERLAY.read_bytes())
     changed=copy.deepcopy(base)
     next(r for r in changed if r['repository']=='meta' and r['path']==path)['execution_evidence']='Product readiness and live operational capability established'
     output=io.StringIO(); writer=csv.DictWriter(output,fieldnames=m.FIELDS,delimiter='\t',lineterminator='\n');writer.writeheader();writer.writerows(changed)
-    (evidence/'coverage-review.tsv').write_text(output.getvalue(),encoding='utf-8')
+    bad_raw=output.getvalue().encode()
     with mock.patch.object(m,'E',evidence),mock.patch.object(m,'OVERLAY',evidence/'coverage-review-meta-current-main-governance-direct-additions.tsv'):
      with self.assertRaisesRegex(m.CandidateError,'refreshed prior DIRECT row drift'):
-      m.validate_rows(doc)
+      m.validate_rows(doc,bad_raw)
+ def test_base_review_snapshot_rejects_replacement_after_first_read(self):
+  with tempfile.TemporaryDirectory() as td:
+   evidence=Path(td); canonical=m.load_base_review_raw(); (evidence/'coverage-review.tsv').write_bytes(canonical)
+   with mock.patch.object(m,'E',evidence):
+    captured=m.load_base_review_raw()
+    (evidence/'coverage-review.tsv').write_bytes(canonical+b'\n')
+    with self.assertRaisesRegex(m.CandidateError,'changed during verification'):
+     m.validate_base_review_unchanged(captured)
+ def test_base_review_blob_is_pinned(self):
+  self.assertEqual(m.blob(m.load_base_review_raw()),m.BASE_REVIEW_BLOB)
  def test_historical_packet_remains_unverified(self):self.assertEqual(m.validate()['historical_packet_paths_unverified'],26)
  def test_wrong_overlay_blob_rejected(self):
   raw=m.OVERLAY.read_bytes().replace(b'00247bc74b1a123ad96f8b9d219eb018581c6f1d',b'0'*40)
