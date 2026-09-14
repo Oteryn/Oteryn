@@ -39,8 +39,7 @@ def test_rejects_nested_health_promotion() -> None:
         "state": "PROVEN",
         "claim": "GitHub deployment metadata establishes direct runtime health and deployment readiness.",
     }
-    errors = verifier.validate(candidate)
-    assert "INFRA disposition drifted from the bounded open state" in errors
+    assert "INFRA disposition drifted from the bounded open state" in verifier.validate(candidate)
 
 
 def test_rejects_closure_condition_drift() -> None:
@@ -86,6 +85,12 @@ def test_rejects_handoff_promotion() -> None:
     candidate = packet()
     candidate["handoff"] = "INFRA-STATE is closed and PROVEN; mark PR ready."
     assert "handoff must preserve the exact fail-closed open disposition" in verifier.validate(candidate)
+
+
+def test_rejects_recheck_trigger_promotion() -> None:
+    candidate = packet()
+    candidate["recheck_trigger"] = "INFRA-STATE is proven; mark the PR Ready now."
+    assert "recheck trigger must preserve the exact fail-closed reassessment condition" in verifier.validate(candidate)
 
 
 def test_rejects_partial_or_unbound_source_coordinates() -> None:
