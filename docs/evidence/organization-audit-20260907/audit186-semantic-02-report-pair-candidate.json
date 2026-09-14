@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "status": "DIRECT_CANDIDATE_ONLY_NOT_ADOPTED",
+  "adoption_performed": false,
+  "coverage_adopted": false,
+  "authority": {
+    "programme": "Oteryn/Oteryn#203@82bc113797ecdc70d79aee628d339136b816e15d",
+    "release_checkpoint": "Oteryn/Oteryn#186-comment-5666964258:AUDIT186_PARALLEL_RELEASE_READY",
+    "worker_pull_request": "Oteryn/Oteryn#207",
+    "prior_frozen_worker_packet": "Oteryn/Oteryn#204@d11bf85619b15fc627adaa889f9f686d74d8a165"
+  },
+  "source_coordinates": {
+    "repository": "Oteryn/Oteryn",
+    "baseline_head": "2d877271afa8f177983f3c6147472372adca0ed1",
+    "baseline_tree": "206b56085bbe12f9471be3dcfdbaa48947da7d5d",
+    "canonical_meta_source_commit": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+    "canonical_meta_source_tree": "b8ebb8e50bce14a736fa65590ac121655c52fd12",
+    "historical_provider_source_cuts": {
+      "game": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "platform": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "atlas": "f00815858bb5b031c502ad19fb96a05ff66b4d84"
+    }
+  },
+  "family": {
+    "name": "qualified_organization_audit_companion_report_pair",
+    "selection_basis": "The Markdown report and its explicitly named machine-readable companion form a two-leaf publication unit. This is the smallest non-singleton structurally declared companion family remaining in canonical META UNVERIFIED scope after excluding PR #204’s 26 historical leaves.",
+    "path_count": 2,
+    "paths": [
+      {
+        "path": "docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json",
+        "blob_sha": "def469a4392e1202f7dc79dbb73bfb6f801d21cd",
+        "sha256": "3f6f6c0e4b7bffac9e240b3e9ccb1ee080be181aff6b29e2d7347107b3313b64",
+        "bytes": 10879,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_BOUNDED_REPORT_SEMANTIC_REVIEW",
+        "semantic_scope": "Complete-file review of the pinned qualified audit report as a dated, explicitly incomplete evidence presentation. DIRECT attests its stated opinion, source/evidence references, limitations, and negative readiness/completion boundaries; it does not independently validate every referenced artifact or promote embedded historical/live observations to current truth.",
+        "payload_role": "machine_readable_qualified_audit_report"
+      },
+      {
+        "path": "docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.md",
+        "blob_sha": "9b0b92a654bc898456e218c9e5bca94d4b766635",
+        "sha256": "d1de72816bb338ccd4ae72505cbe5584e1554a9495d71521e82b99270ccc5220",
+        "bytes": 27802,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_BOUNDED_REPORT_SEMANTIC_REVIEW",
+        "semantic_scope": "Complete-file review of the pinned qualified audit report as a dated, explicitly incomplete evidence presentation. DIRECT attests its stated opinion, source/evidence references, limitations, and negative readiness/completion boundaries; it does not independently validate every referenced artifact or promote embedded historical/live observations to current truth.",
+        "payload_role": "human_readable_qualified_audit_report"
+      }
+    ],
+    "proposed_disposition": "DIRECT",
+    "disposition_basis": "Each exact leaf received complete-file review at its pinned baseline blob. DIRECT is bounded to the report’s qualified, incomplete, source-pinned presentation semantics and explicit negative claims; references are not recursively adopted or independently re-proven.",
+    "grouped_equivalence": {
+      "proposed": false,
+      "result": "NOT_APPLICABLE",
+      "reason": "The prose and JSON have different schemas and detail. Each leaf is proposed DIRECT after individual complete-file review; no interchangeable-payload or GROUPED claim is made."
+    },
+    "intentionally_unverified_paths": [],
+    "intentionally_unverified_claim_surfaces": [
+      "Every referenced provider/runtime/admin/security/CI/workflow/lifecycle observation beyond its exact recorded evidence and time boundary.",
+      "The current truth of mutable PR, Issue, Actions, artifact-retention, protection, repository-head, and provider state described or linked by either report.",
+      "Every other canonical UNVERIFIED source leaf outside this exact two-path family, including the 26 historical leaves frozen separately in PR #204."
+    ]
+  },
+  "review": {
+    "method": "Complete reading of both exact baseline blobs; strict parsing of the JSON companion; comparison of report identity, qualified opinion, five source coordinates/counts, 308 DIRECT / 113 GROUPED / 3940 UNVERIFIED accounting, 14 unresolved obligations, and explicit no-readiness/no-completion boundaries.",
+    "scope": "The two reports as a source-pinned qualified audit presentation and machine-readable companion, not recursive review of referenced registers or present-state revalidation.",
+    "limitations": [
+      "No provider source was written or executed, and no live provider/runtime/admin state was observed by this candidate.",
+      "Agreement checks cover identity, top-level disposition/accounting, source coordinates/counts, open-obligation count, and negative readiness/completion semantics; they are not proof that every narrative sentence mirrors every referenced register.",
+      "Mutable external review, workflow, artifact, PR, Issue, repository, and protection observations require fresh authoritative readback before reuse.",
+      "The reports are canonical accounting surfaces and remain byte-identical; this worker proposes coverage only and does not edit or adopt them.",
+      "The prior PR #204 +26 DIRECT / -26 UNVERIFIED projection remains separate and unadopted."
+    ],
+    "adversarial_cases": [
+      "Reject a missing, extra, duplicated, reordered, renamed, or blob/byte-drifted report leaf.",
+      "Reject GROUPED or any disposition other than per-leaf DIRECT.",
+      "Reject malformed or duplicate-key JSON and disagreement in bound report identity, source coordinates/counts, semantic accounting, obligation count, or negative readiness/completion fields.",
+      "Reject current/live truth, recursive-reference verification, readiness, completion, authority, adoption, or provider-write claims.",
+      "Reject standalone or sequential projection totals that do not isolate this +2 delta from PR #204’s still-unadopted +26 delta.",
+      "Reject any mutation outside the exact worker path allowlist, especially canonical accounting/report surfaces."
+    ]
+  },
+  "projection_if_adopted": {
+    "label": "PROJECTION_ONLY",
+    "batch_02_delta": {
+      "direct": 2,
+      "grouped": 0,
+      "unverified": -2,
+      "semantically_classified": 2
+    },
+    "batch_02_only_result_from_canonical": {
+      "source_leaves": 4361,
+      "direct": 310,
+      "grouped": 113,
+      "unverified": 3938,
+      "semantically_classified": 423,
+      "meta": {
+        "leaves": 210,
+        "direct": 97,
+        "grouped": 0,
+        "unverified": 113
+      }
+    },
+    "prior_pr_204_projection_not_adopted": {
+      "direct": 26,
+      "grouped": 0,
+      "unverified": -26,
+      "semantically_classified": 26
+    },
+    "sequential_result_if_pr_204_then_batch_02_are_both_later_adopted": {
+      "source_leaves": 4361,
+      "direct": 336,
+      "grouped": 113,
+      "unverified": 3912,
+      "semantically_classified": 449,
+      "meta": {
+        "leaves": 210,
+        "direct": 123,
+        "grouped": 0,
+        "unverified": 87
+      }
+    }
+  },
+  "recheck_triggers": [
+    "Either report path, byte content, Git blob identity, baseline tree, or source coordinate changes.",
+    "PR #185 advances in a way that changes either report or its canonical accounting/source assumptions before lead handoff or adoption.",
+    "PR #204 is adopted, modified, closed, superseded, or its exact +26 projection changes.",
+    "A referenced mutable repository, provider, runtime/admin surface, Issue, PR, workflow, review, artifact, or protection fact is proposed as current truth.",
+    "Either report is proposed as proof of product/runtime readiness, audit completion, independent 10/10, provider remediation, or recursive verification of referenced evidence.",
+    "Canonical adoption or any canonical report/accounting mutation is attempted."
+  ],
+  "claims": {
+    "current_runtime_truth": false,
+    "current_admin_truth": false,
+    "current_product_truth": false,
+    "recursive_reference_verification": false,
+    "product_readiness": false,
+    "organization_audit_completion": false,
+    "independent_10_of_10": false,
+    "provider_mutation": false
+  }
+}
