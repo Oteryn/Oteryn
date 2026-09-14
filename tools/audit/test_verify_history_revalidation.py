@@ -124,6 +124,11 @@ class HistoryRevalidationTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
                 self.validate_mutation(lambda d, key=key, value=value: d.update({key: value}))
 
+    def test_boolean_positive_machine_readable_assertion_fields_are_rejected(self):
+        for key in ("product_readiness", "history_revalidation", "game_compare"):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
+                self.validate_mutation(lambda d, key=key: d.update({key: True}))
+
     def test_disclosure_and_digest_rejection_rules_are_mandatory(self):
         for phrase in ("digest without retrievable bytes", "public disclosure remains disclosed"):
             with self.subTest(phrase=phrase), self.assertRaisesRegex(ValueError, "stale-evidence rules weakened"):
