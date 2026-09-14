@@ -56,7 +56,7 @@ The smallest sufficient addition is one organization-owner-produced, dated, nons
 - the dated current private-reporting setting **and a verified private reporting channel** (`META-AUD-08`);
 - current code-scanning capability, scan scope, explicitly excluded languages, current findings, and triage evidence, with no zero-CVE inference (`META-AUD-09`);
 - the relevant membership and privilege settings needed to attest the remaining ADMIN-STATE categories;
-- observation time, verifier identity/role, exact organization identity, and an immutable evidence coordinate or digest suitable for authorized verification.
+- observation time, verifier role/authority, exact organization identity, and an immutable evidence coordinate or digest suitable for authorized verification. The verifier's personal name, login, email address, or other personal identifier is not required and must not be retained merely for this audit closure.
 
 A settings/status-only export that does not establish the verified private-reporting channel or the scan capability/scope/exclusions/findings/triage evidence is **insufficient** and must not close `ADMIN-STATE`. All retained evidence must remain sanitized and nonsecret.
 
