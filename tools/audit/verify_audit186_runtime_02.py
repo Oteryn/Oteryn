@@ -35,36 +35,28 @@ EXPECTED_SOURCE_COORDINATES = {
 }
 EXPECTED_OBSERVATIONS = {
     "route": "Authenticated GitHub REST repository metadata only",
-    "repositories": {
-        "Oteryn/Oteryn": {"environment_count": 0, "deployment_records_observed": 0, "release_records_observed": 0},
-        "Oteryn/Oteryn-Game": {"environment_count": 0, "deployment_records_observed": 0, "release_records_observed": 0},
-        "Oteryn/Oteryn-Atlas": {"environment_count": 0, "deployment_records_observed": 0, "release_records_observed": 0},
-        "Oteryn/Oteryn-Platform": {
-            "environment_count": 3,
-            "release_records_observed": 0,
-            "environment_names": ["production", "production-cloudflare", "synology-staging"],
-            "latest_deployments": [
-                {"environment": "production", "deployment_id": 5577006747, "source_sha": "7a8def78f86f5fc128448e3e7c11d191a1ebe595", "created_at": "2026-07-23T17:35:36Z", "latest_status": "failure", "status_time": "2026-07-23T17:35:52Z"},
-                {"environment": "production-cloudflare", "deployment_id": 6338740997, "source_sha": "ba5f8ca3c9f99b7947b8aee24883aa304314076b", "created_at": "2026-09-08T22:50:59Z", "latest_status": "waiting", "status_time": "2026-09-08T22:51:00Z"},
-                {"environment": "synology-staging", "deployment_id": 6414573336, "source_sha": "224e5f0719114652a42f60ad63e28ce7559097c5", "created_at": "2026-09-12T21:26:46Z", "latest_status": "success", "status_time": "2026-09-12T21:44:06Z"},
-            ],
-        },
-    },
+    "verification_state": "UNVERIFIED",
+    "claim": "No independently revalidatable sanitized response coordinates or immutable response digests were retained for the REST reads.",
+    "unverified_fact_classes": [
+        "repository environment counts",
+        "repository deployment-record counts",
+        "repository release-record counts",
+        "environment names",
+        "latest-deployment identity, source, creation time, status, and status time",
+    ],
     "redaction": "No secret values, environment variables, URLs, logs, host identifiers, service payloads, or private configuration were requested or retained.",
 }
 EXPECTED_DISPOSITION = {
     "source": {"state": "PROVEN_BOUNDED", "claim": "The exact canonical obligation and current repository source heads are identified."},
-    "deployment_metadata": {"state": "PROVEN_BOUNDED", "claim": "GitHub records the listed environments and historical deployment statuses at the observation time."},
-    "configuration_health_snapshot": {"state": "UNKNOWN_BLOCKED", "claim": "No authorized readable evidence exposed a redacted private runtime configuration and health snapshot bound to an exact deployed release."},
-    "infra_state_closure": "UNKNOWN_BLOCKED",
+    "deployment_metadata": {"state": "UNKNOWN_UNVERIFIED", "claim": "REST-derived counts and latest-deployment facts are not treated as proven because independently revalidatable sanitized observation coordinates or immutable response digests were not retained."},
+    "configuration_health_snapshot": {"state": "UNKNOWN", "claim": "No exact private-runtime route or action and no observed access blocker are durably evidenced; direct runtime configuration and health readability remains unknown."},
+    "infra_state_closure": "UNKNOWN_OPEN",
     "product_or_deployment_readiness": "NOT_ESTABLISHED",
 }
 EXPECTED_LIMITATIONS = [
-    "A GitHub deployment status is an orchestration record, not a direct service-health observation or configuration snapshot.",
-    "Zero GitHub deployment, environment, or release records does not prove that no external deployment or release exists.",
-    "The successful staging deployment record does not establish present health, production health, or deployment readiness.",
-    "The production and production-cloudflare records are historical and do not establish current runtime state.",
-    "No exact release is designated by a GitHub Release record, and no provider-owner release-to-runtime attestation was readable.",
+    "REST-derived environment, deployment, release, and latest-deployment facts are explicitly unverified because no independently revalidatable sanitized response coordinates or immutable response digests were retained.",
+    "Unverified GitHub orchestration metadata does not establish an external deployment, an exact release, present runtime health, production health, or deployment readiness.",
+    "No provider-owner release-to-runtime attestation was readable.",
     "No production, provider, administrative, DNS, database, deployment, runner, environment, secret, or host mutation was authorized or performed.",
 ]
 EXPECTED_ADDITIONAL_OBSERVATION = {
@@ -77,11 +69,11 @@ EXPECTED_ADDITIONAL_OBSERVATION = {
         "direct health checks and results",
         "authorized verifier identity or immutable evidence digest",
     ],
-    "current_authorization": "Read-only observation is authorized in principle by this batch, but no private runtime connector or owner-produced snapshot was available in this session.",
-    "current_readability": "BLOCKED_UNAVAILABLE",
+    "current_authorization": "Read-only observation is authorized in principle by this batch; no exact private-runtime route or action was identified, inspected, or attempted in this session.",
+    "current_readability": "UNKNOWN",
 }
-EXPECTED_RECHECK_TRIGGER = "AUDIT186-LEAD receives an immutable, dated, redacted provider-owner snapshot containing every required field, or a separately authorized read-only runtime route becomes available; then verify the exact release binding and direct health evidence before reassessing INFRA-STATE."
-EXPECTED_HANDOFF = "Keep INFRA-STATE open as UNKNOWN/BLOCKED. This packet is assurance evidence only and proposes no canonical audit-accounting mutation."
+EXPECTED_RECHECK_TRIGGER = "AUDIT186-LEAD receives an immutable, dated, redacted provider-owner snapshot containing every required field, or identifies and separately authorizes an exact read-only runtime route and records its observed result; then verify the exact release binding and direct health evidence before reassessing INFRA-STATE."
+EXPECTED_HANDOFF = "Keep INFRA-STATE open as UNKNOWN. REST-derived deployment counts and latest-deployment facts are unverified, runtime readability is unknown, readiness remains NOT_ESTABLISHED, and this packet proposes no canonical audit-accounting mutation."
 EXPECTED_TOP_LEVEL_KEYS = {
     "schema_version",
     "packet_id",
@@ -133,6 +125,19 @@ def _iter_keys(value: object):
             yield from _iter_keys(child)
 
 
+def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
+def load_packet(path: Path) -> dict[str, object]:
+    return json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicate_keys)
+
+
 def validate(packet: dict[str, object]) -> list[str]:
     errors: list[str] = []
     canonical = packet.get("canonical_obligation", {})
@@ -142,7 +147,11 @@ def validate(packet: dict[str, object]) -> list[str]:
 
     if set(packet) != EXPECTED_TOP_LEVEL_KEYS:
         errors.append("packet top-level keys drifted from the exact schema")
-    if packet.get("schema_version") != 1 or packet.get("packet_id") != EXPECTED_PACKET_ID:
+    if (
+        type(packet.get("schema_version")) is not int
+        or packet.get("schema_version") != 1
+        or packet.get("packet_id") != EXPECTED_PACKET_ID
+    ):
         errors.append("packet identity or schema drifted")
     if packet.get("obligation") != "INFRA-STATE":
         errors.append("packet must cover only INFRA-STATE")
@@ -155,8 +164,8 @@ def validate(packet: dict[str, object]) -> list[str]:
         errors.append("canonical obligation drifted from the exact fail-closed claim")
     if not isinstance(disposition, dict) or disposition != EXPECTED_DISPOSITION:
         errors.append("INFRA disposition drifted from the bounded open state")
-    if not isinstance(disposition, dict) or disposition.get("infra_state_closure") != "UNKNOWN_BLOCKED":
-        errors.append("INFRA-STATE must remain UNKNOWN_BLOCKED")
+    if not isinstance(disposition, dict) or disposition.get("infra_state_closure") != "UNKNOWN_OPEN":
+        errors.append("INFRA-STATE must remain UNKNOWN_OPEN")
     if not isinstance(disposition, dict) or disposition.get("product_or_deployment_readiness") != "NOT_ESTABLISHED":
         errors.append("readiness must remain NOT_ESTABLISHED")
 
@@ -189,7 +198,12 @@ def validate(packet: dict[str, object]) -> list[str]:
 
 def main() -> int:
     path = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_PACKET
-    packet = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        packet = load_packet(path)
+    except (json.JSONDecodeError, ValueError) as error:
+        print("FAIL")
+        print(f"- {error}")
+        return 1
     errors = validate(packet)
     if errors:
         print("FAIL")

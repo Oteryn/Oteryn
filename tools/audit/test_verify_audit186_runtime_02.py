@@ -16,7 +16,7 @@ SPEC.loader.exec_module(verifier)
 
 
 def packet() -> dict[str, object]:
-    return json.loads(verifier.DEFAULT_PACKET.read_text(encoding="utf-8"))
+    return verifier.load_packet(verifier.DEFAULT_PACKET)
 
 
 def test_canonical_packet_passes() -> None:
@@ -35,7 +35,7 @@ def test_rejects_false_closure_and_readiness() -> None:
     candidate["disposition"]["product_or_deployment_readiness"] = "READY"
     errors = verifier.validate(candidate)
     assert "INFRA disposition drifted from the bounded open state" in errors
-    assert "INFRA-STATE must remain UNKNOWN_BLOCKED" in errors
+    assert "INFRA-STATE must remain UNKNOWN_OPEN" in errors
     assert "readiness must remain NOT_ESTABLISHED" in errors
 
 
@@ -99,15 +99,27 @@ def test_rejects_sensitive_payload_keys() -> None:
 
 def test_rejects_observation_payload_drift() -> None:
     mutations = (
-        lambda d: d["authorized_read_only_observations"]["repositories"]["Oteryn/Oteryn-Platform"]["latest_deployments"][0].update(latest_status="success"),
-        lambda d: d["authorized_read_only_observations"]["repositories"]["Oteryn/Oteryn-Platform"]["latest_deployments"][0].update(source_sha="0" * 40),
-        lambda d: d["authorized_read_only_observations"]["repositories"]["Oteryn/Oteryn-Platform"]["latest_deployments"][0].update(created_at="2026-07-23T17:35:37Z"),
-        lambda d: d["authorized_read_only_observations"]["repositories"].pop("Oteryn/Oteryn-Atlas"),
+        lambda d: d["authorized_read_only_observations"].update(verification_state="PROVEN"),
+        lambda d: d["authorized_read_only_observations"].update(environment_count=3),
+        lambda d: d["authorized_read_only_observations"]["unverified_fact_classes"].remove("repository deployment-record counts"),
     )
     for mutate in mutations:
         candidate = packet()
         mutate(candidate)
         assert "authorized read-only observations drifted from the exact recorded payload" in verifier.validate(candidate)
+
+
+def test_rest_facts_and_runtime_readability_remain_unverified_or_unknown() -> None:
+    candidate = packet()
+    observations = candidate["authorized_read_only_observations"]
+    assert observations["verification_state"] == "UNVERIFIED"
+    assert "repositories" not in observations
+    assert candidate["disposition"]["deployment_metadata"]["state"] == "UNKNOWN_UNVERIFIED"
+    assert candidate["disposition"]["configuration_health_snapshot"]["state"] == "UNKNOWN"
+    assert candidate["smallest_additional_observation"]["current_readability"] == "UNKNOWN"
+
+    candidate["smallest_additional_observation"]["current_readability"] = "BLOCKED_UNAVAILABLE"
+    assert "additional observation contract drifted from the exact authorized requirement" in verifier.validate(candidate)
 
 
 def test_rejects_handoff_promotion() -> None:
@@ -150,6 +162,22 @@ def test_rejects_packet_identity_drift() -> None:
     candidate = packet()
     candidate["packet_id"] = "AUDIT186-RUNTIME-02-INFRA-STATE-OTHER"
     assert "packet identity or schema drifted" in verifier.validate(candidate)
+
+
+def test_rejects_boolean_schema_version() -> None:
+    candidate = packet()
+    candidate["schema_version"] = True
+    assert "packet identity or schema drifted" in verifier.validate(candidate)
+
+
+def test_rejects_duplicate_json_keys() -> None:
+    raw = '{"handoff":"INFRA-STATE is PROVEN","handoff":"canonical"}'
+    try:
+        json.loads(raw, object_pairs_hook=verifier._reject_duplicate_keys)
+    except ValueError as error:
+        assert "duplicate JSON object key: handoff" in str(error)
+    else:
+        raise AssertionError("duplicate JSON object key was accepted")
 
 
 if __name__ == "__main__":
