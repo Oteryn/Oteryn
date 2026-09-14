@@ -51,6 +51,7 @@ EXPECTED_DISPOSITION = {
     "infra_state_closure": "UNKNOWN_BLOCKED",
     "product_or_deployment_readiness": "NOT_ESTABLISHED",
 }
+EXPECTED_RECHECK_TRIGGER = "AUDIT186-LEAD receives an immutable, dated, redacted provider-owner snapshot containing every required field, or a separately authorized read-only runtime route becomes available; then verify the exact release binding and direct health evidence before reassessing INFRA-STATE."
 EXPECTED_HANDOFF = "Keep INFRA-STATE open as UNKNOWN/BLOCKED. This packet is assurance evidence only and proposes no canonical audit-accounting mutation."
 FORBIDDEN_KEY_FRAGMENTS = (
     "secret",
@@ -141,8 +142,8 @@ def validate(packet: dict[str, object]) -> list[str]:
     fields = additional.get("required_fields", []) if isinstance(additional, dict) else []
     if not isinstance(fields, list) or "exact deployed release and source digest" not in fields or "direct health checks and results" not in fields:
         errors.append("additional observation must bind exact release and direct health")
-    if not packet.get("recheck_trigger"):
-        errors.append("exact recheck trigger is required")
+    if packet.get("recheck_trigger") != EXPECTED_RECHECK_TRIGGER:
+        errors.append("recheck trigger must preserve the exact fail-closed reassessment condition")
     if packet.get("handoff") != EXPECTED_HANDOFF:
         errors.append("handoff must preserve the exact fail-closed open disposition")
     return errors
