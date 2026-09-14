@@ -26,6 +26,17 @@ class CostCiVerifierTests(unittest.TestCase):
         result = validate(SOURCE)
         self.assertEqual(result["result"], "COST_CI_HANDOFF_VALID_OBLIGATION_OPEN")
 
+    def test_rejects_sampling_provenance_drift(self) -> None:
+        mutations = (
+            lambda d: d["sampling"].pop("source_endpoints"),
+            lambda d: d["sampling"].update(method="Different method; not filtered by conclusion."),
+            lambda d: d["sampling"].update(per_event=3),
+        )
+        for mutate in mutations:
+            data = self.load()
+            mutate(data)
+            self.expect_rejected(data)
+
     def test_rejects_missing_event_stratum(self) -> None:
         data = self.load()
         del data["runs"][2]
@@ -74,6 +85,28 @@ class CostCiVerifierTests(unittest.TestCase):
         data["proven"]["observed_job_queue"] = value.replace("created-to-start delay", "job queue")
         self.expect_rejected(data)
 
+    def test_rejects_proven_observation_map_drift(self) -> None:
+        mutations = (
+            lambda d: d["proven"].pop("trigger_stratification"),
+            lambda d: d["proven"].pop("sample_outcomes"),
+            lambda d: d["proven"].update(observed_execution="PROVEN: execution is always fast."),
+        )
+        for mutate in mutations:
+            data = self.load()
+            mutate(data)
+            self.expect_rejected(data)
+
+    def test_rejects_recheck_trigger_drift(self) -> None:
+        mutations = (
+            lambda d: d.pop("recheck_triggers"),
+            lambda d: d.update(recheck_triggers=[]),
+            lambda d: d["recheck_triggers"].pop(),
+        )
+        for mutate in mutations:
+            data = self.load()
+            mutate(data)
+            self.expect_rejected(data)
+
     def test_rejects_capacity_claim(self) -> None:
         data = self.load()
         data["claims"]["runner_capacity_claimed"] = True
@@ -86,9 +119,7 @@ class CostCiVerifierTests(unittest.TestCase):
 
     def test_rejects_removed_long_term_limitation(self) -> None:
         data = self.load()
-        data["limitations"] = [
-            item for item in data["limitations"] if "statistically representative" not in item
-        ]
+        data["limitations"] = [item for item in data["limitations"] if "statistically representative" not in item]
         self.expect_rejected(data)
 
 
