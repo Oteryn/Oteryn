@@ -8,6 +8,7 @@ import verify_readme_current_state as readme_contract
 
 ROOT = Path(__file__).resolve().parents[2]
 README = ROOT / 'docs/evidence/organization-audit-20260907/README.md'
+CI_WORKFLOW = ROOT / '.github/workflows/ci.yml'
 
 
 class ReadmeCurrentStateTest(unittest.TestCase):
@@ -32,6 +33,11 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         )
         self.assertFalse(result['product_readiness_claimed'])
         self.assertFalse(result['audit_completion_claimed'])
+
+    def test_required_meta_gate_runs_terminal_state_contract(self):
+        workflow = CI_WORKFLOW.read_text(encoding='utf-8')
+        self.assertEqual(workflow.count('python3 tools/audit/test_verify_readme_current_state.py'), 1)
+        self.assertEqual(workflow.count('python3 tools/audit/verify_readme_current_state.py'), 1)
 
     def test_terminal_workflow_state_rejects_reintroduced_audit_workflow(self):
         with tempfile.TemporaryDirectory() as td:
