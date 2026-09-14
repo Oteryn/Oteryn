@@ -28,38 +28,35 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         self.assertEqual(result['semantically_classified_paths'], 421)
         self.assertEqual(
             result['remaining_bounded_proof_workflows'],
-            ['.github/workflows/organization-audit-meta-current-main-governance-qualification.yml'],
+            [],
         )
         self.assertFalse(result['product_readiness_claimed'])
         self.assertFalse(result['audit_completion_claimed'])
 
-    def test_retained_workflow_must_exist_as_regular_file(self):
+    def test_terminal_workflow_state_rejects_reintroduced_audit_workflow(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            workflow = root / readme_contract.RETAINED_R7_WORKFLOW
-            workflow.parent.mkdir(parents=True)
-            with self.assertRaisesRegex(ValueError, 'missing or not a regular file'):
-                readme_contract.validate_retained_workflow(root)
-            workflow.mkdir()
-            with self.assertRaisesRegex(ValueError, 'missing or not a regular file'):
-                readme_contract.validate_retained_workflow(root)
-            workflow.rmdir()
-            target = root / 'target.yml'
-            target.write_text('name: target\n', encoding='utf-8')
-            workflow.symlink_to(target)
-            with self.assertRaisesRegex(ValueError, 'missing or not a regular file'):
-                readme_contract.validate_retained_workflow(root)
-            workflow.unlink()
-            workflow.write_text('name: retained\n', encoding='utf-8')
-            self.assertEqual(
-                readme_contract.validate_retained_workflow(root),
-                readme_contract.RETAINED_R7_WORKFLOW.as_posix(),
-            )
+            workflow_dir = root / readme_contract.WORKFLOW_DIR
+            workflow_dir.mkdir(parents=True)
+            self.assertEqual(readme_contract.validate_terminal_workflow_state(root), [])
+            retired = root / readme_contract.RETIRED_R7_WORKFLOW
+            retired.write_text('name: retired\n', encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'retired R7 qualification workflow still present'):
+                readme_contract.validate_terminal_workflow_state(root)
+            retired.unlink()
+            (workflow_dir / 'organization-audit-unexpected.yml').write_text('name: unexpected\n', encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'bounded audit-proof workflow still present'):
+                readme_contract.validate_terminal_workflow_state(root)
 
-    def test_validate_rejects_missing_retained_workflow(self):
+    def test_validate_rejects_reintroduced_r7_workflow(self):
         with tempfile.TemporaryDirectory() as td:
-            with self.assertRaisesRegex(ValueError, 'missing or not a regular file'):
-                readme_contract.validate(self.current, Path(td))
+            root = Path(td)
+            workflow_dir = root / readme_contract.WORKFLOW_DIR
+            workflow_dir.mkdir(parents=True)
+            retired = root / readme_contract.RETIRED_R7_WORKFLOW
+            retired.write_text('name: retired\n', encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'retired R7 qualification workflow still present'):
+                readme_contract.validate(self.current, root)
 
     def test_old_accounting_transition_rejected(self):
         mutated = self.current.replace('308 DIRECT scoped path reviews', '258 DIRECT scoped path reviews', 1)
@@ -153,7 +150,7 @@ class ReadmeCurrentStateTest(unittest.TestCase):
 
     def test_terminal_bounded_proof_workflow_wording_rejected(self):
         mutated = self.current.replace(
-            'The sole retained temporary bounded audit-proof workflow is `.github/workflows/organization-audit-meta-current-main-governance-qualification.yml`; it remains pending R7 cleanup.',
+            'The temporary R7 META current-main governance qualification workflow was removed after its successful exact-head qualification and clean independent review; no `organization-audit-*.yml` bounded audit-proof workflows remain in the effective tree.',
             'The current tree retains two bounded audit-proof workflows: the Platform audit-recorder adopted-proof workflow and the Platform Announcements adopted-proof workflow.',
             1,
         )
@@ -161,7 +158,7 @@ class ReadmeCurrentStateTest(unittest.TestCase):
 
     def test_premature_no_bounded_workflow_claim_rejected(self):
         mutated = self.current.replace(
-            'The sole retained temporary bounded audit-proof workflow is `.github/workflows/organization-audit-meta-current-main-governance-qualification.yml`; it remains pending R7 cleanup.',
+            'The temporary R7 META current-main governance qualification workflow was removed after its successful exact-head qualification and clean independent review; no `organization-audit-*.yml` bounded audit-proof workflows remain in the effective tree.',
             'The current tree retains no bounded audit-proof workflows.',
             1,
         )

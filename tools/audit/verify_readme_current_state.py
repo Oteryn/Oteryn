@@ -9,11 +9,12 @@ from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[2]
-RETAINED_R7_WORKFLOW = Path('.github/workflows/organization-audit-meta-current-main-governance-qualification.yml')
+WORKFLOW_DIR = Path('.github/workflows')
+RETIRED_R7_WORKFLOW = WORKFLOW_DIR / 'organization-audit-meta-current-main-governance-qualification.yml'
 EXPECTED_TITLE = '# Organization audit R3 evidence'
 EXPECTED_LOCAL_HEADING = '## Local checks'
 EXPECTED_EVIDENCE_HEADING = '## Evidence map and durability'
-EXPECTED_README_SHA256 = '795fe3a4c05e50855ea9f4779bf1aecce9ef7db3820d08e02e3c3b223de0feed'
+EXPECTED_README_SHA256 = 'fe02bf2edb42e7b42e73016defc0b55753c66738c87672ddf1c77e8289f00e87'
 EXPECTED_INTRO = (
     'Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; '
     'this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 14 residual '
@@ -38,9 +39,10 @@ EXPECTED_DURABILITY_CLOSEOUT = (
     'Marketplace-test temporary proof workflows were removed after their completed review/cleanup. The '
     'Announcements pre-adoption qualification and projection workflows are removed after their bound successful '
     'runs. The temporary Platform audit-recorder adopted-proof workflow and temporary Platform Announcements '
-    'adopted-proof workflow are also absent after their bounded exact-head proof lifecycle. The sole retained '
-    'temporary bounded audit-proof workflow is `.github/workflows/organization-audit-meta-current-main-governance-qualification.yml`; '
-    'it remains pending R7 cleanup. Historical Actions run/artifact provenance remains external GitHub '
+    'adopted-proof workflow are also absent after their bounded exact-head proof lifecycle. The temporary R7 META '
+    'current-main governance qualification workflow was removed after its successful exact-head qualification and '
+    'clean independent review; no `organization-audit-*.yml` bounded audit-proof workflows remain in the effective '
+    'tree. Historical Actions run/artifact provenance remains external GitHub '
     'Actions metadata; mutable independent-review lifecycle/outcome remains external PR #185 metadata, and PR #185 '
     'remains Draft. No permanent gate, provider writes, deployment, automatic background worker, full semantic '
     'completion, product readiness, or self-awarded score is implied.'
@@ -57,6 +59,8 @@ STALE_MARKERS = (
     'only the temporary Platform audit-recorder adopted-proof workflow remains',
     'canonical adoption is verified by the temporary Platform Announcements adopted-proof workflow',
     'The current tree retains two bounded audit-proof workflows',
+    'The sole retained temporary bounded audit-proof workflow is',
+    'it remains pending R7 cleanup',
 )
 OBLIGATION_TOKEN = re.compile(r'\bobligations?\b', re.IGNORECASE)
 
@@ -110,28 +114,26 @@ def validate_text(text: str) -> dict[str, object]:
         'grouped_paths': 113,
         'unverified_paths': 3940,
         'semantically_classified_paths': 421,
-        'remaining_bounded_proof_workflows': [RETAINED_R7_WORKFLOW.as_posix()],
+        'remaining_bounded_proof_workflows': [],
         'product_readiness_claimed': False,
         'audit_completion_claimed': False,
     }
 
 
-def validate_retained_workflow(root: Path = ROOT) -> str:
-    workflow = root / RETAINED_R7_WORKFLOW
-    require(
-        workflow.is_file() and not workflow.is_symlink(),
-        'retained R7 qualification workflow missing or not a regular file',
-    )
-    return RETAINED_R7_WORKFLOW.as_posix()
+def validate_terminal_workflow_state(root: Path = ROOT) -> list[str]:
+    workflow_dir = root / WORKFLOW_DIR
+    require(workflow_dir.is_dir() and not workflow_dir.is_symlink(), 'workflow directory missing or not a regular directory')
+    retired = root / RETIRED_R7_WORKFLOW
+    require(not retired.exists() and not retired.is_symlink(), 'retired R7 qualification workflow still present')
+    remaining = sorted(path.name for path in workflow_dir.glob('organization-audit-*.yml'))
+    require(not remaining, f'bounded audit-proof workflow still present: {remaining}')
+    return remaining
 
 
 def validate(text: str, root: Path = ROOT) -> dict[str, object]:
     result = validate_text(text)
-    retained = validate_retained_workflow(root)
-    require(
-        result['remaining_bounded_proof_workflows'] == [retained],
-        'README retained-workflow record drift',
-    )
+    remaining = validate_terminal_workflow_state(root)
+    require(result['remaining_bounded_proof_workflows'] == remaining, 'README terminal workflow record drift')
     return result
 
 
