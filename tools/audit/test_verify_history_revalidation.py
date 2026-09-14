@@ -17,6 +17,7 @@ class HistoryRevalidationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.base = json.loads(verify.CANDIDATE.read_text(encoding="utf-8"))
+        cls.raw = verify.CANDIDATE.read_text(encoding="utf-8")
 
     def validate_mutation(self, mutate):
         data = copy.deepcopy(self.base)
@@ -26,10 +27,38 @@ class HistoryRevalidationTests(unittest.TestCase):
             path.write_text(json.dumps(data), encoding="utf-8")
             return verify.validate(path)
 
+    def validate_raw(self, raw: str):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "candidate.json"
+            path.write_text(raw, encoding="utf-8")
+            return verify.validate(path)
+
     def test_candidate_is_valid_but_obligation_stays_open(self):
         result = verify.validate()
         self.assertEqual(result["result"], "HISTORY_REVALIDATION_HANDOFF_VALID_OBLIGATION_OPEN")
         self.assertEqual(result["revalidation_findings"], 30)
+
+    def test_duplicate_top_level_claims_object_is_rejected_before_materialization(self):
+        marker = '  "claims": {'
+        raw = self.raw.replace(
+            marker,
+            '  "claims": {"history_revalidation_closed": true},\n' + marker,
+            1,
+        )
+        self.assertNotEqual(raw, self.raw)
+        with self.assertRaisesRegex(ValueError, "duplicate JSON member: claims"):
+            self.validate_raw(raw)
+
+    def test_duplicate_governed_claim_member_is_rejected_before_materialization(self):
+        marker = '    "history_revalidation_closed": false'
+        raw = self.raw.replace(
+            marker,
+            '    "history_revalidation_closed": true,\n' + marker,
+            1,
+        )
+        self.assertNotEqual(raw, self.raw)
+        with self.assertRaisesRegex(ValueError, "duplicate JSON member: history_revalidation_closed"):
+            self.validate_raw(raw)
 
     def test_observation_time_is_exactly_bound(self):
         mutations = (
