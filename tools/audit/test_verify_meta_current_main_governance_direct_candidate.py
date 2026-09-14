@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-import copy,importlib.util,json,tempfile,unittest
+import copy,csv,importlib.util,io,json,tempfile,unittest
 from pathlib import Path
+from unittest import mock
 P=Path(__file__).with_name('verify_meta_current_main_governance_direct_candidate.py');S=importlib.util.spec_from_file_location('r7',P);m=importlib.util.module_from_spec(S);S.loader.exec_module(m)
 class R7(unittest.TestCase):
  def test_adopted_state(self):
@@ -12,6 +13,19 @@ class R7(unittest.TestCase):
   bad=rows[:-1];self.assertNotEqual(len(bad),14)
  def test_refreshes_not_in_overlay(self):
   d=m.load_candidate(); overlay={r['path'] for r in m.tsv_bytes(m.OVERLAY.read_bytes())};self.assertFalse(overlay & {x['path'] for x in d['candidate']['previous_direct_modified']})
+ def test_each_refreshed_row_requires_exact_execution_evidence(self):
+  doc=m.load_candidate(); refresh=[x['path'] for x in doc['candidate']['previous_direct_modified']]
+  base=m.tsv_bytes((m.E/'coverage-review.tsv').read_bytes())
+  for path in refresh:
+   with self.subTest(path=path),tempfile.TemporaryDirectory() as td:
+    evidence=Path(td); (evidence/'coverage-review-meta-current-main-governance-direct-additions.tsv').write_bytes(m.OVERLAY.read_bytes())
+    changed=copy.deepcopy(base)
+    next(r for r in changed if r['repository']=='meta' and r['path']==path)['execution_evidence']='Product readiness and live operational capability established'
+    output=io.StringIO(); writer=csv.DictWriter(output,fieldnames=m.FIELDS,delimiter='\t',lineterminator='\n');writer.writeheader();writer.writerows(changed)
+    (evidence/'coverage-review.tsv').write_text(output.getvalue(),encoding='utf-8')
+    with mock.patch.object(m,'E',evidence),mock.patch.object(m,'OVERLAY',evidence/'coverage-review-meta-current-main-governance-direct-additions.tsv'):
+     with self.assertRaisesRegex(m.CandidateError,'refreshed prior DIRECT row drift'):
+      m.validate_rows(doc)
  def test_historical_packet_remains_unverified(self):self.assertEqual(m.validate()['historical_packet_paths_unverified'],26)
  def test_wrong_overlay_blob_rejected(self):
   raw=m.OVERLAY.read_bytes().replace(b'00247bc74b1a123ad96f8b9d219eb018581c6f1d',b'0'*40)

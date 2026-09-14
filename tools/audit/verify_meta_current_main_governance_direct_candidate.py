@@ -9,6 +9,7 @@ CANDIDATE=E/'r7-meta-current-main-governance-direct-candidate.json'; OVERLAY=E/'
 CANDIDATE_BLOB='6a3e98ad65f52015a43a84e39a8940f64b31dc65'; OVERLAY_SHA='8c9064552ea9592d7c5b51852333add3f58cdb4963f4316c2dd6bcbd21b44e16'; LEDGER_SHA='8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94'
 SOURCE='23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090'; TREE='b8ebb8e50bce14a736fa65590ac121655c52fd12'; HIST='docs/evidence/repository-audit-2026-09-06/'
 FIELDS=('repository','path','blob_sha','depth','scope','line_ranges','execution_evidence')
+REFRESH_EXECUTION_EVIDENCE='BOUNDED_FULL_FILE_SOURCE_REVIEW_REFRESH; source semantics/exercised assertions only; no live provider, admin, runtime, operational-capability, readiness, or completion inference'
 class CandidateError(ValueError): pass
 def blob(raw:bytes)->str:return hashlib.sha1(f'blob {len(raw)}\0'.encode()+raw).hexdigest()
 def pairs(ps):
@@ -51,7 +52,7 @@ def validate_rows(doc):
  if set(x['path'] for x in refresh)&set(r['path'] for r in rows):raise CandidateError('refreshed DIRECT row duplicated in overlay')
  for x in refresh:
   r=br.get(x['path'])
-  if not r or r['blob_sha']!=x['blob_sha'] or r['depth']!='SCOPED_SEMANTIC_REVIEW' or r['line_ranges']!='[]' or r['scope'] not in allowed:raise CandidateError(f'refreshed prior DIRECT row drift: {x["path"]}')
+  if not r or r['blob_sha']!=x['blob_sha'] or r['depth']!='SCOPED_SEMANTIC_REVIEW' or r['line_ranges']!='[]' or r['scope'] not in allowed or r['execution_evidence']!=REFRESH_EXECUTION_EVIDENCE:raise CandidateError(f'refreshed prior DIRECT row drift: {x["path"]}')
  return rows
 def validate():
  doc=load_candidate()
