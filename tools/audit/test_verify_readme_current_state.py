@@ -16,6 +16,7 @@ EXPECTED_TERMINAL_GATE_STEP = """      - name: Validate audit terminal state
           set -euo pipefail
           PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/test_verify_readme_current_state.py
           PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/verify_readme_current_state.py"""
+EXPECTED_META_GATE_NAME = '    name: meta-gate'
 
 
 def validate_terminal_gate_step(workflow: str) -> None:
@@ -31,6 +32,13 @@ def validate_terminal_gate_step(workflow: str) -> None:
             job_end = index
             break
     job_lines = lines[job_start:job_end]
+    job_names = [line for line in job_lines if line.startswith('    name:')]
+    if job_names != [EXPECTED_META_GATE_NAME]:
+        raise ValueError('meta-gate job must retain the exact required-check display name')
+    if any(line.startswith('    if:') for line in job_lines):
+        raise ValueError('meta-gate job must not have a disabling condition')
+    if any(line.startswith('    continue-on-error:') for line in job_lines):
+        raise ValueError('meta-gate job must not suppress job failure')
     step_markers = [index for index, line in enumerate(job_lines) if line == '      - name: Validate audit terminal state']
     if len(step_markers) != 1:
         raise ValueError('terminal-state step must exist exactly once in meta-gate')
@@ -88,6 +96,24 @@ class ReadmeCurrentStateTest(unittest.TestCase):
                 mutated_workflow = workflow.replace(EXPECTED_TERMINAL_GATE_STEP, mutated_step, 1)
                 self.assertNotEqual(mutated_workflow, workflow)
                 with self.assertRaisesRegex(ValueError, 'exact executable fail-closed commands'):
+                    validate_terminal_gate_step(mutated_workflow)
+
+    def test_required_meta_gate_rejects_disabled_or_rebound_job(self):
+        workflow = CI_WORKFLOW.read_text(encoding='utf-8')
+        mutations = (
+            workflow.replace('  meta-gate:\n    name: meta-gate', '  meta-gate:\n    if: false\n    name: meta-gate', 1),
+            workflow.replace('  meta-gate:\n    name: meta-gate', '  meta-gate:\n    continue-on-error: true\n    name: meta-gate', 1),
+            workflow.replace('    name: meta-gate', '    name: disabled-meta-gate', 1),
+            workflow.replace(
+                '  meta-gate:\n    name: meta-gate',
+                '  disabled-gate:\n    name: disabled-meta-gate',
+                1,
+            ) + '\n  decoy:\n    name: meta-gate\n    runs-on: ubuntu-latest\n    steps: []\n',
+        )
+        for mutated_workflow in mutations:
+            with self.subTest(mutated_workflow=mutated_workflow):
+                self.assertNotEqual(mutated_workflow, workflow)
+                with self.assertRaises(ValueError):
                     validate_terminal_gate_step(mutated_workflow)
 
     def test_terminal_workflow_state_rejects_reintroduced_audit_workflow(self):
