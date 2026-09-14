@@ -102,6 +102,11 @@ class HistoryRevalidationTests(unittest.TestCase):
             with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "exact keys and all be false"):
                 self.validate_mutation(mutate)
 
+    def test_governed_claim_keys_cannot_be_duplicated_outside_claims(self):
+        for key in verify.EXPECTED_CLAIMS:
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "governed claim key duplicated outside claims"):
+                self.validate_mutation(lambda d, key=key: d.update({key: True}))
+
     def test_contradictory_positive_readiness_prose_is_rejected(self):
         assertions = (
             "HISTORY-REVALIDATION is closed.",
