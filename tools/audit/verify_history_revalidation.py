@@ -104,6 +104,22 @@ EXPECTED_BASELINE = {
     "programme_head": "82bc113797ecdc70d79aee628d339136b816e15d",
     "release_comment_id": 5666964258,
 }
+EXPECTED_REVALIDATION_SCOPE = {
+    "rule": (
+        "Every provider current-main source, runtime, security, remediation, lifecycle, CI, admin or "
+        "product-outcome statement requires evidence bound to the applicable current commit and observation time; "
+        "historical disposition labels alone cannot satisfy it."
+    ),
+    "provider_scope": (
+        "All provider-source conclusions asserted against current main require path/blob impact analysis and "
+        "applicable current qualification because Game, Platform and Atlas main are ahead of their audit cuts."
+    ),
+    "live_scope": (
+        "Runtime, production, admin, telemetry, recovery, artifact availability/deletion, private-advisory "
+        "submission and remediation remain mutable external facts and require fresh authoritative observation "
+        "even when source bytes are unchanged."
+    ),
+}
 GAME_CARRY_FORWARD_RULE = (
     "Reject source carry-forward when affected paths, dependent contracts or consumer paths are not exhaustively "
     "compared by blob identity; an API-truncated changed-file list is insufficient."
@@ -127,7 +143,10 @@ def require(ok: bool, message: str) -> None:
 
 
 def normalize_key(key: object) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
+    text = str(key)
+    text = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", text)
+    text = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", "_", text)
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
 
 
 def reject_duplicate_json_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -242,7 +261,14 @@ def validate(path: Path = CANDIDATE) -> dict:
     with (ROOT / "docs/evidence/organization-audit-20260907/finding-register.tsv").open(encoding="utf-8") as stream:
         register = list(csv.DictReader(stream, delimiter="\t"))
     expected_ids = {r["id"] for r in register if r["state"] in REQUIRED_STATES}
-    actual_ids = set(data.get("claims_requiring_rebind_or_revalidation", {}).get("finding_ids", []))
+    revalidation = data.get("claims_requiring_rebind_or_revalidation", {})
+    require(isinstance(revalidation, dict), "revalidation scope must be an object")
+    require(
+        {key: revalidation.get(key) for key in EXPECTED_REVALIDATION_SCOPE} == EXPECTED_REVALIDATION_SCOPE
+        and set(revalidation) == {*EXPECTED_REVALIDATION_SCOPE, "finding_ids"},
+        "revalidation rule/scope drift",
+    )
+    actual_ids = set(revalidation.get("finding_ids", []))
     require(actual_ids == expected_ids, "revalidation finding set drift")
     claims = data.get("claims", {})
     require(claims == EXPECTED_CLAIMS, "readiness/closure claims must have exact keys and all be false")

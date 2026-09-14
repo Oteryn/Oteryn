@@ -135,6 +135,17 @@ class HistoryRevalidationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "revalidation finding set drift"):
             self.validate_mutation(lambda d: d["claims_requiring_rebind_or_revalidation"]["finding_ids"].pop())
 
+    def test_revalidation_rule_and_scopes_are_exactly_bound(self):
+        mutations = (
+            lambda d: d["claims_requiring_rebind_or_revalidation"].pop("rule"),
+            lambda d: d["claims_requiring_rebind_or_revalidation"].update(provider_scope="Unbound."),
+            lambda d: d["claims_requiring_rebind_or_revalidation"].pop("live_scope"),
+            lambda d: d["claims_requiring_rebind_or_revalidation"].update(extra_scope="Unexpected."),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "revalidation rule/scope drift"):
+                self.validate_mutation(mutate)
+
     def test_historical_packet_cannot_claim_closure_or_readiness(self):
         for claim in self.base["claims"]:
             with self.subTest(claim=claim), self.assertRaisesRegex(ValueError, "exact keys and all be false"):
@@ -162,6 +173,19 @@ class HistoryRevalidationTests(unittest.TestCase):
             ("security_remediation_status", "complete"),
             ("organization_audit_status", "complete"),
             ("game_compare_status", "complete"),
+        )
+        for key, value in assertions:
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
+                self.validate_mutation(lambda d, key=key, value=value: d.update({key: value}))
+
+    def test_camel_case_governed_assertion_keys_are_rejected(self):
+        assertions = (
+            ("historyRevalidationStatus", "closed"),
+            ("productReadinessStatus", "proven"),
+            ("runtimeReadiness", True),
+            ("securityRemediationStatus", "complete"),
+            ("organizationAuditStatus", "complete"),
+            ("gameCompareStatus", "complete"),
         )
         for key, value in assertions:
             with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
