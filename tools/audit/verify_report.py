@@ -24,6 +24,7 @@ COVERAGE_GROUPS_BLOB_SHA = 'b3313b4a0831b9fcc528665dca25bdccdb9dab59'
 FINDING_REGISTER_SHA256 = 'c5402f1618cfe4cd03d2ad50cd0946ec86f19e834b02128199b31b808cc64e94'
 DOMAIN_MATRIX_SHA256 = '34e46372880cbb932b2ed26d89cf71448d360fecd0a90f562ee693698ca10ac4'
 WORKFLOW_INVENTORY_SHA256 = 'af259f1b33a699ec756ed531f7e325b5e0b1301f690930ea6fc2b2e1376463cd'
+WORKFLOW_INVENTORY_BINDING = 'organization-audit-20260907/workflow-inventory.tsv'
 FINDING_REGISTER_FIELDS = ('id', 'priority', 'repository', 'state', 'scope', 'title',
                            'evidence', 'owner_route', 'closure_condition')
 DOMAIN_MATRIX_FIELDS = ('domain', 'name', 'acceptance_criterion', 'method_and_evidence',
@@ -631,6 +632,8 @@ def read_tsv(path):
 
 def validate_workflow_inventory(base: Path, doc: dict, inventory_dir: Path | None) -> list[dict]:
     """Authenticate one workflow snapshot and reconcile it with source inventories."""
+    require(doc.get('workflow_inventory') == WORKFLOW_INVENTORY_BINDING,
+            'workflow inventory evidence binding drift')
     path = base / 'workflow-inventory.tsv'
     require(path.is_file(), 'workflow inventory missing')
     raw = path.read_bytes()

@@ -584,6 +584,13 @@ class AuditValidationTest(unittest.TestCase):
         rows[1]='\t'.join(fields)
         path.write_text('\n'.join(rows)+'\n',encoding='utf-8')
         self.reject()
+    def test_workflow_inventory_report_binding_drift_rejected(self):
+        for binding in ('organization-audit-20260907/alternate-workflow-inventory.tsv',
+                        'organization-audit-20260907/missing-workflow-inventory.tsv'):
+            with self.subTest(binding=binding):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
+                self.mutate(self.path,lambda d, value=binding:d.update(workflow_inventory=value))
+                self.reject()
     def test_workflow_merge_group_report_count_drift_rejected(self):
         self.mutate(self.path,lambda d:d['workflow_census']['meta'].update(merge_group_workflows=0))
         self.reject()
