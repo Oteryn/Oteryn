@@ -20,6 +20,7 @@ from pathlib import Path
 import re
 
 SHA = re.compile(r'[0-9a-f]{40}\Z')
+COVERAGE_GROUPS_BLOB_SHA = 'b3313b4a0831b9fcc528665dca25bdccdb9dab59'
 STATES = {'SOURCE_REPAIRED_TESTED','PARTIALLY_REPAIRED','RETIRED_SOURCE','SOURCE_REPAIRED',
           'UNKNOWN_LIVE','REQUIRES_REVALIDATION','REQUIRES_LIVE_REVALIDATION',
           'SOURCE_REPAIRED_RECORDED_CI','OPEN_QUALIFICATION','HISTORICAL_NOTE','CONFIRMED_SOURCE',
@@ -558,14 +559,27 @@ def load_authenticated_report_markdown(report_path: Path) -> str:
     return text
 
 
-def read_json(path):
+def parse_json_bytes(raw: bytes):
     def pairs(items):
         result={}
         for key,value in items:
             require(key not in result,'duplicate JSON key')
             result[key]=value
         return result
-    return json.loads(path.read_text(encoding='utf-8'), object_pairs_hook=pairs)
+    try:
+        text=raw.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('JSON must be valid UTF-8') from exc
+    return json.loads(text, object_pairs_hook=pairs)
+
+
+def read_json(path):
+    return parse_json_bytes(path.read_bytes())
+
+
+def git_blob_sha(raw: bytes) -> str:
+    header=b'blob '+str(len(raw)).encode('ascii')+b'\0'
+    return hashlib.sha1(header+raw).hexdigest()
 
 
 def read_tsv(path):
@@ -655,7 +669,11 @@ def tree_sha(entries):
 
 
 def load_groups(base, repo):
-    doc=read_json(base/'coverage-groups.json')
+    path=base/'coverage-groups.json'
+    raw=path.read_bytes()
+    require(git_blob_sha(raw)==COVERAGE_GROUPS_BLOB_SHA,
+            'coverage groups canonical blob drift')
+    doc=parse_json_bytes(raw)
     require(type(doc.get('schema_version')) is int and doc['schema_version']==1,'coverage group schema')
     groups=doc.get('groups')
     require(isinstance(groups,list),'coverage groups missing')

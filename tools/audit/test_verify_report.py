@@ -329,6 +329,35 @@ class AuditValidationTest(unittest.TestCase):
         }))
         with self.assertRaisesRegex(ValueError,'coverage current blob OID mismatch'):
             audit.build_ledger(doc,[],groups,inventory)
+    def test_group_required_checks_drift_rejected_by_canonical_blob(self):
+        self.mutate(self.base/'coverage-groups.json',lambda d:
+                    d['groups'][0]['current_revalidation'].update(required_checks=['NOT_EXECUTED']))
+        with self.assertRaisesRegex(ValueError,'coverage groups canonical blob drift'):
+            audit.validate(self.path)
+    def test_group_qualification_basis_drift_rejected_by_canonical_blob(self):
+        self.mutate(self.base/'coverage-groups.json',lambda d:
+                    d['groups'][0]['historical_evidence'].update(basis='unsupported replacement evidence'))
+        with self.assertRaisesRegex(ValueError,'coverage groups canonical blob drift'):
+            audit.validate(self.path)
+    def test_group_snapshot_is_parsed_once_from_authenticated_bytes(self):
+        path=self.base/'coverage-groups.json'
+        canonical=path.read_bytes()
+        replacement=json.loads(canonical)
+        replacement['groups'][0]['current_revalidation']['required_checks']=['NOT_EXECUTED']
+        reads=0
+        original_read_bytes=Path.read_bytes
+        def replace_after_read(current):
+            nonlocal reads
+            raw=original_read_bytes(current)
+            if current == path:
+                reads+=1
+                path.write_text(json.dumps(replacement),encoding='utf-8')
+            return raw
+        report=audit.read_json(self.path)
+        with mock.patch.object(Path,'read_bytes',autospec=True,side_effect=replace_after_read):
+            groups=audit.load_groups(self.base,report['repositories'])
+        self.assertEqual(reads,1)
+        self.assertNotEqual(groups[0]['current_revalidation']['required_checks'],['NOT_EXECUTED'])
     def test_missing_domain_rejected(self):
         p=self.base/'domain-matrix.tsv';p.write_text('\n'.join(p.read_text().splitlines()[:-1])+'\n');self.reject()
     def test_historical_candidate_counted_as_snapshot_rejected(self):
