@@ -31,6 +31,26 @@ class HistoryRevalidationTests(unittest.TestCase):
         self.assertEqual(result["result"], "HISTORY_REVALIDATION_HANDOFF_VALID_OBLIGATION_OPEN")
         self.assertEqual(result["revalidation_findings"], 30)
 
+    def test_observation_time_is_exactly_bound(self):
+        mutations = (
+            lambda d: d.pop("observed_at"),
+            lambda d: d.update(observed_at="2026-09-14T16:24:00Z"),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "observation provenance drift"):
+                self.validate_mutation(mutate)
+
+    def test_lifecycle_baseline_is_exactly_bound(self):
+        mutations = (
+            lambda d: d["baseline"].update(canonical_audit_head="0" * 40),
+            lambda d: d["baseline"].update(programme_head="0" * 40),
+            lambda d: d["baseline"].update(release_comment_id=1),
+            lambda d: d["baseline"].pop("canonical_audit_pr"),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "lifecycle baseline provenance drift"):
+                self.validate_mutation(mutate)
+
     def test_current_and_historical_coordinates_cannot_be_conflated(self):
         with self.assertRaisesRegex(ValueError, "source boundary provenance drift"):
             self.validate_mutation(lambda d: d["source_boundaries"][1].update(current_main_commit=d["source_boundaries"][1]["historical_commit"]))
@@ -93,6 +113,16 @@ class HistoryRevalidationTests(unittest.TestCase):
         for assertion in assertions:
             with self.subTest(assertion=assertion), self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
                 self.validate_mutation(lambda d, assertion=assertion: d["limitations"].append(assertion))
+
+    def test_contradictory_machine_readable_assertion_fields_are_rejected(self):
+        assertions = (
+            ("product_readiness", "established"),
+            ("history_revalidation", "closed"),
+            ("game_compare", "complete"),
+        )
+        for key, value in assertions:
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
+                self.validate_mutation(lambda d, key=key, value=value: d.update({key: value}))
 
     def test_disclosure_and_digest_rejection_rules_are_mandatory(self):
         for phrase in ("digest without retrievable bytes", "public disclosure remains disclosed"):

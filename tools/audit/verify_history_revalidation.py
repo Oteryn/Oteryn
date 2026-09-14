@@ -73,6 +73,17 @@ EXPECTED_CLAIMS = {
     "security_remediation_claimed": False,
     "organization_audit_completion_claimed": False,
 }
+EXPECTED_OBSERVED_AT = "2026-09-14T16:23:00Z"
+EXPECTED_BASELINE = {
+    "repository": "Oteryn/Oteryn",
+    "canonical_audit_pr": 185,
+    "canonical_audit_head": "2d877271afa8f177983f3c6147472372adca0ed1",
+    "worker_pr": 206,
+    "worker_seed_head": "c5a410873124adde191514bc86a79ed50583b918",
+    "programme_pr": 203,
+    "programme_head": "82bc113797ecdc70d79aee628d339136b816e15d",
+    "release_comment_id": 5666964258,
+}
 GAME_CARRY_FORWARD_RULE = (
     "Reject source carry-forward when affected paths, dependent contracts or consumer paths are not exhaustively "
     "compared by blob identity; an API-truncated changed-file list is insufficient."
@@ -98,22 +109,28 @@ def git_blob(path: Path) -> str:
     return subprocess.check_output(["git", "hash-object", str(path)], cwd=ROOT, text=True).strip()
 
 
-def strings(value: object):
-    """Yield all prose so contradictory assertions cannot hide in another field."""
+def assertion_strings(value: object, path: tuple[str, ...] = ()):
+    """Yield prose and normalized field/value assertions from outside ``claims``."""
     if isinstance(value, str):
         yield value.lower()
     elif isinstance(value, dict):
-        for item in value.values():
-            yield from strings(item)
+        for key, item in value.items():
+            normalized_key = key.lower().replace("_", " ")
+            if isinstance(item, (str, bool, int, float)):
+                normalized_path = " ".join((*path, normalized_key))
+                yield f"{normalized_path} {str(item).lower()}"
+            yield from assertion_strings(item, (*path, normalized_key))
     elif isinstance(value, list):
         for item in value:
-            yield from strings(item)
+            yield from assertion_strings(item, path)
 
 
 def validate(path: Path = CANDIDATE) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     require(data.get("schema_version") == 1 and data.get("obligation") == "HISTORY-REVALIDATION", "candidate identity")
     require(data.get("disposition") == "HANDOFF_COMPLETE_OBLIGATION_REMAINS_OPEN", "obligation must remain open")
+    require(data.get("observed_at") == EXPECTED_OBSERVED_AT, "observation provenance drift")
+    require(data.get("baseline") == EXPECTED_BASELINE, "lifecycle baseline provenance drift")
     boundaries = data.get("source_boundaries", [])
     require([x.get("id") for x in boundaries] == [x["id"] for x in EXPECTED_BOUNDARIES], "source boundary set/order")
     game = boundaries[1]
@@ -137,7 +154,7 @@ def validate(path: Path = CANDIDATE) -> dict:
     require(actual_ids == expected_ids, "revalidation finding set drift")
     claims = data.get("claims", {})
     require(claims == EXPECTED_CLAIMS, "readiness/closure claims must have exact keys and all be false")
-    prose = "\n".join(strings({key: value for key, value in data.items() if key != "claims"}))
+    prose = "\n".join(assertion_strings({key: value for key, value in data.items() if key != "claims"}))
     contradictory = (
         r"history[- ]revalidation (?:is |has been )?closed",
         r"(?:product|runtime) readiness (?:is |has been )?(?:claimed|established|proven)",
