@@ -57,7 +57,12 @@ def test_rejects_missing_release_or_direct_health_requirement() -> None:
 
 
 def test_rejects_sensitive_payload_keys() -> None:
-    for key in ("api_token", "cookie", "session-cookie", "connection_string", "connection-string"):
+    keys = (
+        "api_token", "cookie", "session-cookie", "connection_string", "connection-string",
+        "personal_data", "personal-data", "database_dump", "database-dump", "backup",
+        "private_deployment_state", "private-deployment-state",
+    )
+    for key in keys:
         candidate = deepcopy(packet())
         candidate["authorized_read_only_observations"]["nested"] = {key: "redacted-is-still-not-needed"}
         errors = verifier.validate(candidate)
@@ -75,6 +80,12 @@ def test_rejects_observation_payload_drift() -> None:
         candidate = packet()
         mutate(candidate)
         assert "authorized read-only observations drifted from the exact recorded payload" in verifier.validate(candidate)
+
+
+def test_rejects_handoff_promotion() -> None:
+    candidate = packet()
+    candidate["handoff"] = "INFRA-STATE is closed and PROVEN; mark PR ready."
+    assert "handoff must preserve the exact fail-closed open disposition" in verifier.validate(candidate)
 
 
 def test_rejects_partial_or_unbound_source_coordinates() -> None:
