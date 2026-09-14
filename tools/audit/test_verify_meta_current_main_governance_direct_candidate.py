@@ -30,6 +30,18 @@ class R7(unittest.TestCase):
  def test_wrong_overlay_blob_rejected(self):
   raw=m.OVERLAY.read_bytes().replace(b'00247bc74b1a123ad96f8b9d219eb018581c6f1d',b'0'*40)
   self.assertNotEqual(__import__('hashlib').sha256(raw).hexdigest(),m.OVERLAY_SHA)
+ def test_adoption_index_is_complete_and_type_exact(self):
+  index=m.json_bytes((m.E/'verification-index.json').read_bytes())
+  m.validate_adoption_index(index)
+  for field,value in (('state','PRODUCT_PASS'),('live_operational_capability_claimed',True),('path_count',True)):
+   with self.subTest(field=field):
+    changed=copy.deepcopy(index)
+    changed['r7_meta_current_main_governance_direct_adoption'][field]=value
+    with self.assertRaisesRegex(m.CandidateError,'R7 adoption index drift'):
+     m.validate_adoption_index(changed)
+  changed=copy.deepcopy(index);changed['r7_meta_current_main_governance_direct_adoption']['unexpected_claim']='ready'
+  with self.assertRaisesRegex(m.CandidateError,'R7 adoption index drift'):
+   m.validate_adoption_index(changed)
  def test_double_count_projection_rejected(self):self.assertEqual(m.validate()['newly_direct'],14);self.assertNotEqual(m.validate()['direct'],313)
  def test_no_completion(self):
   r=m.validate();self.assertFalse(r['product_readiness_claimed']);self.assertFalse(r['organization_audit_completion_claimed'])

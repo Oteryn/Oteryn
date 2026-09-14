@@ -10,6 +10,18 @@ CANDIDATE_BLOB='6a3e98ad65f52015a43a84e39a8940f64b31dc65'; OVERLAY_SHA='8c906455
 SOURCE='23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090'; TREE='b8ebb8e50bce14a736fa65590ac121655c52fd12'; HIST='docs/evidence/repository-audit-2026-09-06/'
 FIELDS=('repository','path','blob_sha','depth','scope','line_ranges','execution_evidence')
 REFRESH_EXECUTION_EVIDENCE='BOUNDED_FULL_FILE_SOURCE_REVIEW_REFRESH; source semantics/exercised assertions only; no live provider, admin, runtime, operational-capability, readiness, or completion inference'
+EXPECTED_R7_ADOPTION_INDEX={
+ 'state':'ADOPTED_BOUNDED_SOURCE_SEMANTICS_NOT_PRODUCT_PASS',
+ 'candidate':'r7-meta-current-main-governance-direct-candidate.json','candidate_git_blob':CANDIDATE_BLOB,
+ 'adoption_overlay':'coverage-review-meta-current-main-governance-direct-additions.tsv','adoption_overlay_sha256':OVERLAY_SHA,
+ 'source_commit':SOURCE,'source_tree':TREE,'path_count':14,'refreshed_existing_direct_paths':5,
+ 'depth':'SCOPED_SEMANTIC_REVIEW','line_ranges':[],'ledger_sha256':LEDGER_SHA,
+ 'counts':{'source_leaves':4361,'direct':308,'grouped':113,'unverified':3940,'semantically_classified':421},
+ 'meta':{'leaves':210,'direct':95,'grouped':0,'unverified':115},
+ 'historical_packet_paths_remaining_unverified':26,'meta_aud_05':'P2_PARTIALLY_REPAIRED',
+ 'product_readiness_claimed':False,'organization_audit_completion_claimed':False,
+ 'live_operational_capability_claimed':False,
+}
 class CandidateError(ValueError): pass
 def blob(raw:bytes)->str:return hashlib.sha1(f'blob {len(raw)}\0'.encode()+raw).hexdigest()
 def pairs(ps):
@@ -34,6 +46,11 @@ def load_candidate():
  raw=CANDIDATE.read_bytes()
  if blob(raw)!=CANDIDATE_BLOB:raise CandidateError('immutable reviewed candidate blob drift')
  return json_bytes(raw)
+def json_exact(actual,expected):
+ return json.dumps(actual,sort_keys=True,separators=(',',':'))==json.dumps(expected,sort_keys=True,separators=(',',':'))
+def validate_adoption_index(index):
+ if not json_exact(index.get('r7_meta_current_main_governance_direct_adoption'),EXPECTED_R7_ADOPTION_INDEX):
+  raise CandidateError('R7 adoption index drift')
 def report_module():
  p=ROOT/'tools/audit/verify_report.py'; spec=importlib.util.spec_from_file_location('r7_report',p);m=importlib.util.module_from_spec(spec);assert spec.loader;spec.loader.exec_module(m);return m
 def entries(doc):return [x for k in ('previous_direct_modified','previous_unverified_modified','new_active_governance') for x in doc['candidate'][k]]
@@ -74,8 +91,7 @@ def validate():
   if not r or r['disposition']!='DIRECT' or r['object_sha']!=x['blob_sha']:raise CandidateError('R7 candidate disposition/blob drift')
  hist=[r for r in ledger if r['repository_id']=='meta' and r['path'].startswith(HIST)]
  if len(hist)!=26 or any(r['disposition']!='UNVERIFIED' for r in hist):raise CandidateError('historical packet leaves must remain exactly 26 UNVERIFIED')
- idx=json_bytes((E/'verification-index.json').read_bytes()).get('r7_meta_current_main_governance_direct_adoption')
- if not isinstance(idx,dict) or idx.get('candidate_git_blob')!=CANDIDATE_BLOB or idx.get('adoption_overlay_sha256')!=OVERLAY_SHA or idx.get('ledger_sha256')!=LEDGER_SHA or idx.get('path_count')!=14 or idx.get('refreshed_existing_direct_paths')!=5 or idx.get('product_readiness_claimed') is not False or idx.get('organization_audit_completion_claimed') is not False:raise CandidateError('R7 adoption index drift')
+ validate_adoption_index(json_bytes((E/'verification-index.json').read_bytes()))
  rep=json_bytes(report.read_bytes())
  if rep.get('audit_completion')!='NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial' or rep.get('production_readiness_claimed') is not False:raise CandidateError('R7 completion/readiness drift')
  return {'result':'META_CURRENT_MAIN_GOVERNANCE_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS','source_leaves':4361,'direct':308,'grouped':113,'unverified':3940,'semantically_classified':421,'meta':{'leaves':210,'direct':95,'grouped':0,'unverified':115},'ledger_sha256':LEDGER_SHA,'refreshed_existing_direct':5,'newly_direct':14,'historical_packet_paths_unverified':26,'residual_obligations':14,'meta_aud_05':'P2_PARTIALLY_REPAIRED','product_readiness_claimed':False,'organization_audit_completion_claimed':False}
