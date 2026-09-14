@@ -138,11 +138,11 @@ def assertion_strings(value: object, path: tuple[str, ...] = ()):
         yield value.lower()
     elif isinstance(value, dict):
         for key, item in value.items():
-            normalized_key = key.lower().replace("_", " ")
+            normalized_key = normalize_key(key)
+            next_path = (*path, normalized_key)
             if isinstance(item, (str, bool, int, float)):
-                normalized_path = " ".join((*path, normalized_key))
-                yield f"{normalized_path} {str(item).lower()}"
-            yield from assertion_strings(item, (*path, normalized_key))
+                yield f"{' '.join(next_path)} {str(item).lower()}"
+            yield from assertion_strings(item, next_path)
     elif isinstance(value, list):
         for item in value:
             yield from assertion_strings(item, path)
@@ -162,18 +162,20 @@ def duplicated_governed_claim_keys(value: object) -> set[str]:
     return found
 
 
-def unexpected_governed_assertion_keys(value: object) -> set[str]:
-    """Reject new machine-readable assertion fields that can shadow governed negative claims."""
+def unexpected_governed_assertion_keys(value: object, path: tuple[str, ...] = ()) -> set[str]:
+    """Reject machine-readable assertion fields whose complete normalized key path shadows governed claims."""
     found: set[str] = set()
     if isinstance(value, dict):
         for key, item in value.items():
             normalized = normalize_key(key)
-            if any(stem in normalized for stem in GOVERNED_ASSERTION_KEY_STEMS):
-                found.add(str(key))
-            found.update(unexpected_governed_assertion_keys(item))
+            next_path = (*path, normalized)
+            joined_path = "_".join(part for part in next_path if part)
+            if any(stem in joined_path for stem in GOVERNED_ASSERTION_KEY_STEMS):
+                found.add(".".join(str(part) for part in next_path))
+            found.update(unexpected_governed_assertion_keys(item, next_path))
     elif isinstance(value, list):
         for item in value:
-            found.update(unexpected_governed_assertion_keys(item))
+            found.update(unexpected_governed_assertion_keys(item, path))
     return found
 
 
@@ -195,11 +197,18 @@ def validate(path: Path = CANDIDATE) -> dict:
         "Game compare truncation must fail closed",
     )
     require(boundaries == EXPECTED_BOUNDARIES, "source boundary provenance drift")
-    inputs = {x["path"]: (x["git_blob"], x["sha256"]) for x in data.get("provenance", {}).get("canonical_inputs", [])}
+
+    canonical_inputs = data.get("provenance", {}).get("canonical_inputs", [])
+    require(isinstance(canonical_inputs, list), "canonical input manifest must be a list")
+    require(len(canonical_inputs) == len(EXPECTED_INPUTS), "canonical input manifest cardinality drift")
+    paths = [item.get("path") for item in canonical_inputs if isinstance(item, dict)]
+    require(len(paths) == len(canonical_inputs) and len(set(paths)) == len(paths), "duplicate canonical input entry")
+    inputs = {item["path"]: (item.get("git_blob"), item.get("sha256")) for item in canonical_inputs}
     require(inputs == EXPECTED_INPUTS, "canonical input manifest drift")
     for rel, expected in EXPECTED_INPUTS.items():
         raw_input = (ROOT / rel).read_bytes()
         require((git_blob(ROOT / rel), hashlib.sha256(raw_input).hexdigest()) == expected, f"canonical input bytes drift: {rel}")
+
     with (ROOT / "docs/evidence/organization-audit-20260907/finding-register.tsv").open(encoding="utf-8") as stream:
         register = list(csv.DictReader(stream, delimiter="\t"))
     expected_ids = {r["id"] for r in register if r["state"] in REQUIRED_STATES}
@@ -210,7 +219,7 @@ def validate(path: Path = CANDIDATE) -> dict:
     outside_claims = {key: value for key, value in data.items() if key != "claims"}
     require(not duplicated_governed_claim_keys(outside_claims), "governed claim key duplicated outside claims")
     unexpected = unexpected_governed_assertion_keys(outside_claims)
-    require(not unexpected, f"unexpected governed assertion key: {sorted(unexpected)[0] if unexpected else ''}")
+    require(not unexpected, f"unexpected governed assertion key path: {sorted(unexpected)[0] if unexpected else ''}")
     prose = "\n".join(assertion_strings(outside_claims))
     contradictory = (
         r"history[- ]revalidation (?:is |has been )?closed",
