@@ -124,6 +124,14 @@ GAME_CARRY_FORWARD_RULE = (
     "Reject source carry-forward when affected paths, dependent contracts or consumer paths are not exhaustively "
     "compared by blob identity; an API-truncated changed-file list is insufficient."
 )
+EXPECTED_STALE_EVIDENCE_REJECTION_RULES = [
+    "Reject a current claim when its source commit is not the freshly resolved applicable main commit, unless the claim is explicitly and only historical.",
+    GAME_CARRY_FORWARD_RULE,
+    "Reject a current runtime, security, admin, recovery, CI or remediation claim supported only by source review, a historical run, a PR body, an issue label, a digest without retrievable bytes, or repository metadata.",
+    "Reject historical artifact-unavailability or restored-confidentiality claims until deletion or expiry is independently verified; public disclosure remains disclosed.",
+    "Reject any conversion of DIRECT or GROUPED coverage into product, runtime, security, organization-completion or independent-score PASS.",
+    "Reject closure of HISTORY-REVALIDATION unless every canonical REQUIRES_REVALIDATION, REQUIRES_LIVE_REVALIDATION, UNKNOWN_LIVE, OPEN_INHERITED and other explicitly open historical row is individually rebound or truthfully dispositioned by its owner route.",
+]
 REQUIRED_STATES = {
     "PARTIALLY_REPAIRED", "UNKNOWN_LIVE", "REQUIRES_REVALIDATION",
     "REQUIRES_LIVE_REVALIDATION", "OPEN_QUALIFICATION", "OPEN_INHERITED",
@@ -235,6 +243,7 @@ def validate(path: Path = CANDIDATE) -> dict:
     require([x.get("id") for x in boundaries] == [x["id"] for x in EXPECTED_BOUNDARIES], "source boundary set/order")
     game = boundaries[1]
     stale_rules = data.get("stale_evidence_rejection_rules", [])
+    require(isinstance(stale_rules, list) and stale_rules == EXPECTED_STALE_EVIDENCE_REJECTION_RULES, "stale-evidence rule set drift")
     require(
         game.get("compare_file_list_complete") is False
         and game.get("compare_limitation") == EXPECTED_BOUNDARIES[1]["compare_limitation"]
@@ -278,17 +287,15 @@ def validate(path: Path = CANDIDATE) -> dict:
     require(not unexpected, f"unexpected governed assertion key path: {sorted(unexpected)[0] if unexpected else ''}")
     prose = "\n".join(assertion_strings(outside_claims))
     contradictory = (
-        r"history[- ]revalidation (?:is |has been )?closed",
-        r"(?:product|runtime) readiness (?:is |has been )?(?:claimed|established|proven)",
-        r"security remediation (?:is |has been )?(?:claimed|complete|established|proven)",
+        r"history[- ]revalidation (?:is |has been )?(?:closed|complete|completed)",
+        r"(?:product|runtime) readiness (?:is |has been )?(?:claimed|established|proven|complete|completed)",
+        r"security remediation (?:is |has been )?(?:claimed|complete|completed|established|proven)",
         r"organization(?:-wide)? audit (?:is |has been )?(?:complete|completed|closed)",
         r"game compare (?:is |was )?(?:complete|exhaustive)",
         r"game (?:file|changed-path|path)(?: list| inventory)? (?:is |was )?(?:complete|exhaustive)",
         r"(?:history revalidation|product readiness|runtime readiness|security remediation|organization(?: wide)? audit(?: completion)?|game compare) true\b",
     )
     require(not any(re.search(pattern, prose) for pattern in contradictory), "contradictory positive assertion")
-    stale = " ".join(stale_rules).lower()
-    require("digest without retrievable bytes" in stale and "public disclosure remains disclosed" in stale, "stale-evidence rules weakened")
     limits = " ".join(data.get("limitations", [])).lower()
     require("does not close history-revalidation" in limits and "no provider code execution" in limits, "limitations weakened")
     return {"result": "HISTORY_REVALIDATION_HANDOFF_VALID_OBLIGATION_OPEN", "revalidation_findings": len(actual_ids), "source_boundaries": len(boundaries)}
