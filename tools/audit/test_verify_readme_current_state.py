@@ -131,6 +131,17 @@ class ReadmeCurrentStateTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'bounded audit-proof workflow still present'):
                 readme_contract.validate_terminal_workflow_state(root)
 
+    def test_terminal_workflow_state_rejects_yaml_extension(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            workflow_dir = root / readme_contract.WORKFLOW_DIR
+            workflow_dir.mkdir(parents=True)
+            (workflow_dir / 'organization-audit-unexpected.yaml').write_text(
+                'name: unexpected\n', encoding='utf-8'
+            )
+            with self.assertRaisesRegex(ValueError, 'bounded audit-proof workflow still present'):
+                readme_contract.validate_terminal_workflow_state(root)
+
     def test_validate_rejects_reintroduced_r7_workflow(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

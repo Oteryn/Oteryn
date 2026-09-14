@@ -41,6 +41,11 @@ EXPECTED_EXECUTION_EVIDENCE = {
         if path == 'app/Announcements/Queries/ActiveAnnouncementQuery.php' else '')
     for path in EXPECTED_LINE_RANGES
 }
+EXPECTED_OVERLAY_HEADER = [
+    'repository', 'path', 'blob_sha', 'depth', 'line_ranges', 'scope',
+    'source_reference', 'historical_batch', 'historical_ledger_binding',
+    'execution_evidence', 'limitations',
+]
 
 
 def require(condition: bool, message: str) -> None:
@@ -52,11 +57,14 @@ def git_blob_sha(raw: bytes) -> str:
     return hashlib.sha1(b'blob ' + str(len(raw)).encode('ascii') + b'\0' + raw).hexdigest()
 
 
-def read_tsv(path: Path) -> list[dict[str,str]]:
-    with path.open(encoding='utf-8',newline='') as handle:
-        reader=csv.DictReader(handle,delimiter='\t')
-        require(reader.fieldnames is not None and len(reader.fieldnames)==len(set(reader.fieldnames)),'Announcements overlay header drift')
-        rows=list(reader)
+def parse_tsv_bytes(raw: bytes) -> list[dict[str, str]]:
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('Announcements overlay is not valid UTF-8') from exc
+    reader = csv.DictReader(text.splitlines(), delimiter='\t', strict=True)
+    require(reader.fieldnames == EXPECTED_OVERLAY_HEADER, 'Announcements overlay header drift')
+    rows = list(reader)
     require(rows and all(None not in row and None not in row.values() for row in rows),'Announcements overlay row drift')
     return rows
 
@@ -72,7 +80,7 @@ def validate_adopted_docs(candidate: dict, audit_root: Path) -> None:
     raw=overlay_path.read_bytes()
     require(git_blob_sha(raw)==ANNOUNCEMENTS_OVERLAY_BLOB,'Announcements evidence overlay Git blob drift')
     require(hashlib.sha256(raw).hexdigest()==ANNOUNCEMENTS_OVERLAY_SHA256,'Announcements evidence overlay SHA-256 drift')
-    ann_rows=read_tsv(overlay_path)
+    ann_rows=parse_tsv_bytes(raw)
     require(len(ann_rows)==10,'Announcements evidence overlay must contain exactly ten rows')
     candidate_by_path={row['path']:row for row in candidate['paths']}
     require([row['path'] for row in ann_rows]==list(candidate_by_path),'Announcements overlay path order/set drift')

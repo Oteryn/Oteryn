@@ -125,7 +125,11 @@ def validate_terminal_workflow_state(root: Path = ROOT) -> list[str]:
     require(workflow_dir.is_dir() and not workflow_dir.is_symlink(), 'workflow directory missing or not a regular directory')
     retired = root / RETIRED_R7_WORKFLOW
     require(not retired.exists() and not retired.is_symlink(), 'retired R7 qualification workflow still present')
-    remaining = sorted(path.name for path in workflow_dir.glob('organization-audit-*.yml'))
+    remaining = sorted(
+        path.name
+        for pattern in ('organization-audit-*.yml', 'organization-audit-*.yaml')
+        for path in workflow_dir.glob(pattern)
+    )
     require(not remaining, f'bounded audit-proof workflow still present: {remaining}')
     return remaining
 
