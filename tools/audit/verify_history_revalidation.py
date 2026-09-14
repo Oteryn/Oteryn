@@ -100,9 +100,20 @@ EXPECTED_INPUTS = {
     "docs/evidence/organization-audit-20260907/finding-register.tsv": ("0d8a3b61dabb71f75d5ad3bde102ba953eb8d47b", "c5402f1618cfe4cd03d2ad50cd0946ec86f19e834b02128199b31b808cc64e94"),
 }
 
+
 def require(ok: bool, message: str) -> None:
     if not ok:
         raise ValueError(message)
+
+
+def reject_duplicate_json_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Materialize a JSON object only when every member name is unique."""
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON member: {key}")
+        result[key] = value
+    return result
 
 
 def git_blob(path: Path) -> str:
@@ -140,7 +151,8 @@ def duplicated_governed_claim_keys(value: object) -> set[str]:
 
 
 def validate(path: Path = CANDIDATE) -> dict:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    raw = path.read_text(encoding="utf-8")
+    data = json.loads(raw, object_pairs_hook=reject_duplicate_json_members)
     require(data.get("schema_version") == 1 and data.get("obligation") == "HISTORY-REVALIDATION", "candidate identity")
     require(data.get("disposition") == "HANDOFF_COMPLETE_OBLIGATION_REMAINS_OPEN", "obligation must remain open")
     require(data.get("observed_at") == EXPECTED_OBSERVED_AT, "observation provenance drift")
@@ -159,8 +171,8 @@ def validate(path: Path = CANDIDATE) -> dict:
     inputs = {x["path"]: (x["git_blob"], x["sha256"]) for x in data.get("provenance", {}).get("canonical_inputs", [])}
     require(inputs == EXPECTED_INPUTS, "canonical input manifest drift")
     for rel, expected in EXPECTED_INPUTS.items():
-        raw = (ROOT / rel).read_bytes()
-        require((git_blob(ROOT / rel), hashlib.sha256(raw).hexdigest()) == expected, f"canonical input bytes drift: {rel}")
+        raw_input = (ROOT / rel).read_bytes()
+        require((git_blob(ROOT / rel), hashlib.sha256(raw_input).hexdigest()) == expected, f"canonical input bytes drift: {rel}")
     with (ROOT / "docs/evidence/organization-audit-20260907/finding-register.tsv").open(encoding="utf-8") as stream:
         register = list(csv.DictReader(stream, delimiter="\t"))
     expected_ids = {r["id"] for r in register if r["state"] in REQUIRED_STATES}
@@ -187,12 +199,14 @@ def validate(path: Path = CANDIDATE) -> dict:
     require("does not close history-revalidation" in limits and "no provider code execution" in limits, "limitations weakened")
     return {"result": "HISTORY_REVALIDATION_HANDOFF_VALID_OBLIGATION_OPEN", "revalidation_findings": len(actual_ids), "source_boundaries": len(boundaries)}
 
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--candidate", type=Path, default=CANDIDATE)
     args = parser.parse_args()
     print(json.dumps(validate(args.candidate), sort_keys=True))
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
