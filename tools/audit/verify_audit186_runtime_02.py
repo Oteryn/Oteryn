@@ -25,6 +25,32 @@ EXPECTED_SOURCE_COORDINATES = {
     "Oteryn/Oteryn-Platform": "84d504c98acc8134eb4c9545711010b74c987974",
     "Oteryn/Oteryn-Atlas": "be09b84ad96d7e67571a460b55d9546b59bc89a7",
 }
+EXPECTED_OBSERVATIONS = {
+    "route": "Authenticated GitHub REST repository metadata only",
+    "repositories": {
+        "Oteryn/Oteryn": {"environment_count": 0, "deployment_records_observed": 0, "release_records_observed": 0},
+        "Oteryn/Oteryn-Game": {"environment_count": 0, "deployment_records_observed": 0, "release_records_observed": 0},
+        "Oteryn/Oteryn-Atlas": {"environment_count": 0, "deployment_records_observed": 0, "release_records_observed": 0},
+        "Oteryn/Oteryn-Platform": {
+            "environment_count": 3,
+            "release_records_observed": 0,
+            "environment_names": ["production", "production-cloudflare", "synology-staging"],
+            "latest_deployments": [
+                {"environment": "production", "deployment_id": 5577006747, "source_sha": "7a8def78f86f5fc128448e3e7c11d191a1ebe595", "created_at": "2026-07-23T17:35:36Z", "latest_status": "failure", "status_time": "2026-07-23T17:35:52Z"},
+                {"environment": "production-cloudflare", "deployment_id": 6338740997, "source_sha": "ba5f8ca3c9f99b7947b8aee24883aa304314076b", "created_at": "2026-09-08T22:50:59Z", "latest_status": "waiting", "status_time": "2026-09-08T22:51:00Z"},
+                {"environment": "synology-staging", "deployment_id": 6414573336, "source_sha": "224e5f0719114652a42f60ad63e28ce7559097c5", "created_at": "2026-09-12T21:26:46Z", "latest_status": "success", "status_time": "2026-09-12T21:44:06Z"},
+            ],
+        },
+    },
+    "redaction": "No secret values, environment variables, URLs, logs, host identifiers, service payloads, or private configuration were requested or retained.",
+}
+EXPECTED_DISPOSITION = {
+    "source": {"state": "PROVEN_BOUNDED", "claim": "The exact canonical obligation and current repository source heads are identified."},
+    "deployment_metadata": {"state": "PROVEN_BOUNDED", "claim": "GitHub records the listed environments and historical deployment statuses at the observation time."},
+    "configuration_health_snapshot": {"state": "UNKNOWN_BLOCKED", "claim": "No authorized readable evidence exposed a redacted private runtime configuration and health snapshot bound to an exact deployed release."},
+    "infra_state_closure": "UNKNOWN_BLOCKED",
+    "product_or_deployment_readiness": "NOT_ESTABLISHED",
+}
 FORBIDDEN_KEY_FRAGMENTS = (
     "secret",
     "token",
@@ -34,13 +60,20 @@ FORBIDDEN_KEY_FRAGMENTS = (
     "api_key",
     "environment_url",
     "log_url",
+    "cookie",
+    "connection_string",
+    "connectionstring",
 )
+
+
+def _normalize_key(key: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(key).lower()).strip("_")
 
 
 def _iter_keys(value: object):
     if isinstance(value, dict):
         for key, child in value.items():
-            yield str(key).lower()
+            yield _normalize_key(key)
             yield from _iter_keys(child)
     elif isinstance(value, list):
         for child in value:
@@ -66,6 +99,8 @@ def validate(packet: dict[str, object]) -> list[str]:
     expected_closure = "Authorized read-only configuration/health snapshot with redaction and exact release."
     if not isinstance(canonical, dict) or canonical.get("closure_condition") != expected_closure:
         errors.append("canonical closure condition drifted")
+    if not isinstance(disposition, dict) or disposition != EXPECTED_DISPOSITION:
+        errors.append("INFRA disposition drifted from the bounded open state")
     if not isinstance(disposition, dict) or disposition.get("infra_state_closure") != "UNKNOWN_BLOCKED":
         errors.append("INFRA-STATE must remain UNKNOWN_BLOCKED")
     if not isinstance(disposition, dict) or disposition.get("product_or_deployment_readiness") != "NOT_ESTABLISHED":
@@ -79,10 +114,11 @@ def validate(packet: dict[str, object]) -> list[str]:
     ):
         errors.append("source coordinates drifted from the exact observed repository heads")
 
-    if not isinstance(observations, dict) or observations.get("route") != "Authenticated GitHub REST repository metadata only":
-        errors.append("observation route must remain bounded to GitHub metadata")
+    if not isinstance(observations, dict) or observations != EXPECTED_OBSERVATIONS:
+        errors.append("authorized read-only observations drifted from the exact recorded payload")
     for key in _iter_keys(packet):
-        if any(fragment in key for fragment in FORBIDDEN_KEY_FRAGMENTS):
+        compact = key.replace("_", "")
+        if any(fragment in key or fragment.replace("_", "") in compact for fragment in FORBIDDEN_KEY_FRAGMENTS):
             errors.append(f"packet contains forbidden sensitive key: {key}")
 
     limitations = packet.get("limitations", [])
