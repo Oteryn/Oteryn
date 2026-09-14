@@ -390,6 +390,20 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.base/'verification-index.json',lambda d:d.update(routing_product_verdict='PASS'));self.reject()
     def test_unbound_execution_source_rejected(self):
         self.mutate(self.base/'verification-index.json',lambda d:d['results'][0].update(source_commit='0'*40));self.reject()
+    def test_missing_verification_result_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['results'].pop());self.reject()
+    def test_failed_verification_result_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['results'][0].update(exit_code=1));self.reject()
+    def test_duplicate_and_extra_verification_results_rejected(self):
+        for mutation in (
+            lambda rows: rows.append(dict(rows[0])),
+            lambda rows: rows.append({**rows[0], 'id': 'unexpected-extra-check'}),
+        ):
+            with self.subTest(mutation=mutation):
+                shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/'verification-index.json',
+                             self.base/'verification-index.json')
+                self.mutate(self.base/'verification-index.json',lambda d:mutation(d['results']))
+                self.reject()
     def test_path_escape_rejected(self):
         self.mutate(self.path,lambda d:d.update(evidence_directory='../other'));self.reject()
     def test_duplicate_json_key_rejected(self):

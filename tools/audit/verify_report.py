@@ -46,6 +46,17 @@ META_R7_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-
 AUDIT186_SEMANTIC_03_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-audit186-semantic-03-direct-additions.tsv'
 AUDIT186_SEMANTIC_03_CANDIDATE_SHA256 = '4f9eb30d596da45a95f8cadf37dfee4ae4bb89a2846683098021574613d9676c'
 AUDIT186_SEMANTIC_03_OVERLAY_SHA256 = '76881b1eace7559a9d84b060c82ccf9bf86ae5627e670535a7680ccb32285de5'
+VERIFICATION_RESULTS_SHA256 = '221f0fed6cc79c2fc3fcab5945d075fb98d6cdd319d746700207b7237b3181b1'
+VERIFICATION_RESULT_KEYS = ('id', 'source_commit', 'command', 'exit_code', 'log_sha256')
+VERIFICATION_RESULT_IDS = (
+    'atlas-focused-node', 'atlas-output-safety', 'game-semantic-dispatch',
+    'meta-central_agent_policy.py', 'meta-test_agent_continuation_policy.py',
+    'meta-test_agent_continuation_review_repairs.py', 'meta-test_agent_execution_routing.py',
+    'meta-test_bounded_execution_guard.py', 'meta-test_central_agent_policy.py',
+    'meta-test_merge_queue_workflow_contract.py', 'meta-test_remote_desktop_action_gate.py',
+    'meta-validate_release_manifests.py', 'platform-test_classify_changes',
+    'platform-test_required_test_gate',
+)
 EXPECTED_UNRESOLVED_IDS = {
     'SEMANTIC-COVERAGE', 'HISTORY-REVALIDATION', 'ADMIN-STATE', 'INFRA-STATE', 'RECOVERY',
     'COST-CI', 'COST-AGENTS', 'SUPPLY-CHAIN', 'NATIVE-G1', 'UI-343', 'PORTABILITY',
@@ -459,6 +470,23 @@ R3_REVIEW = {
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def validate_verification_results(results):
+    require(type(results) is list, 'verification results must be a list')
+    require(
+        len(results) == len(VERIFICATION_RESULT_IDS)
+        and tuple(row.get('id') for row in results if type(row) is dict) == VERIFICATION_RESULT_IDS,
+        'verification result identity/order drift',
+    )
+    for row in results:
+        require(type(row) is dict and tuple(row) == VERIFICATION_RESULT_KEYS,
+                'verification result key/order drift')
+        require(type(row['exit_code']) is int and row['exit_code'] == 0,
+                'verification result did not succeed')
+    encoded=json.dumps(results,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode('utf-8')
+    require(hashlib.sha256(encoded).hexdigest()==VERIFICATION_RESULTS_SHA256,
+            'verification result content drift')
 
 
 def json_exact(left, right):
@@ -911,9 +939,10 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
  'runtime_or_provider_claimed': False,
  'audit_completion_claimed': False}),'AUDIT186 Semantic 03 adoption index drift')
     require(proof['routing_product_verdict']=='FAIL_FOR_TWO_CASES' and proof['routing_false_negatives']==2,'reproduction misrepresented as product PASS')
+    validate_verification_results(proof.get('results'))
     for c in proof['results']:
         require(c['source_commit'] in ({r['commit_sha'] for r in repo.values()} | {'1a01c5b3e08666a82245b1cac78da3736c65e785'}),'unbound execution source')
-        require(type(c['exit_code']) is int and len(c['log_sha256'])==64,'invalid check record')
+        require(len(c['log_sha256'])==64,'invalid check record')
     if inventory_dir is not None:
         raw,grouped_counts=build_ledger(doc,review,groups,inventory_dir)
         require(grouped_counts=={key:coverage['per_repository'][key]['grouped'] for key in repo},'inventory grouped count mismatch')
