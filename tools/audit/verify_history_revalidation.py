@@ -162,6 +162,7 @@ def validate(path: Path = CANDIDATE) -> dict:
         r"organization(?:-wide)? audit (?:is |has been )?(?:complete|completed|closed)",
         r"game compare (?:is |was )?(?:complete|exhaustive)",
         r"game (?:file|changed-path|path)(?: list| inventory)? (?:is |was )?(?:complete|exhaustive)",
+        r"(?:history revalidation|product readiness|runtime readiness|security remediation|organization(?: wide)? audit(?: completion)?|game compare) true\b",
     )
     require(not any(re.search(pattern, prose) for pattern in contradictory), "contradictory positive assertion")
     stale = " ".join(stale_rules).lower()
