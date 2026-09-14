@@ -84,6 +84,22 @@ def test_rejects_limitations_drift() -> None:
     assert "limitations drifted from the exact fail-closed list" in verifier.validate(candidate)
 
 
+def test_rejects_unobserved_runtime_access_claims() -> None:
+    unsupported_claims = (
+        "No provider-owner release-to-runtime attestation was readable.",
+        "Provider-owner runtime evidence was unavailable.",
+        "A private-runtime access blocker was observed.",
+    )
+    for claim in unsupported_claims:
+        candidate = packet()
+        candidate["limitations"][3] = claim
+        assert "limitations drifted from the exact fail-closed list" in verifier.validate(candidate), claim
+
+        candidate = packet()
+        candidate["handoff"] = claim
+        assert "handoff must preserve the exact fail-closed open disposition" in verifier.validate(candidate), claim
+
+
 def test_rejects_sensitive_payload_keys() -> None:
     keys = (
         "api_token", "cookie", "session-cookie", "connection_string", "connection-string",

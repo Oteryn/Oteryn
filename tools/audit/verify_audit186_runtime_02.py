@@ -61,7 +61,7 @@ EXPECTED_LIMITATIONS = [
     "Recorded repository source-coordinate values are explicitly unverified because no independently revalidatable sanitized default-branch or ref observation coordinates and no immutable response identity were retained.",
     "REST-derived environment, deployment, release, and latest-deployment facts are explicitly unverified because no independently revalidatable sanitized response coordinates or immutable response digests were retained.",
     "Unverified GitHub orchestration metadata does not establish an external deployment, an exact release, present runtime health, production health, or deployment readiness.",
-    "No provider-owner release-to-runtime attestation was readable.",
+    "No provider-owner release-to-runtime attestation was retained or observed; readability is unverified because no exact private-runtime route or action was identified, inspected, or attempted.",
     "No production, provider, administrative, DNS, database, deployment, runner, environment, secret, or host mutation was authorized or performed.",
 ]
 EXPECTED_ADDITIONAL_OBSERVATION = {
@@ -78,7 +78,7 @@ EXPECTED_ADDITIONAL_OBSERVATION = {
     "current_readability": "UNKNOWN",
 }
 EXPECTED_RECHECK_TRIGGER = "AUDIT186-LEAD receives independently revalidatable sanitized default-branch or ref observation coordinates with immutable response identity before reassessing source-coordinate truth, and receives an immutable, dated, redacted provider-owner snapshot containing every required field or identifies and separately authorizes an exact read-only runtime route and records its observed result before reassessing INFRA-STATE."
-EXPECTED_HANDOFF = "Keep INFRA-STATE open as UNKNOWN. Recorded source-coordinate values and REST-derived deployment facts are unverified, runtime readability is unknown, readiness remains NOT_ESTABLISHED, and this packet proposes no canonical audit-accounting mutation."
+EXPECTED_HANDOFF = "Keep INFRA-STATE open as UNKNOWN. Recorded source-coordinate values and REST-derived deployment facts are unverified; no provider-owner release-to-runtime attestation was retained or observed, and runtime readability remains unknown because no exact private-runtime route or action was identified, inspected, or attempted. Readiness remains NOT_ESTABLISHED, and this packet proposes no canonical audit-accounting mutation."
 EXPECTED_TOP_LEVEL_KEYS = {
     "schema_version",
     "packet_id",
