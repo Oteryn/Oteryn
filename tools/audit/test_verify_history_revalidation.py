@@ -73,9 +73,46 @@ class HistoryRevalidationTests(unittest.TestCase):
             with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "observation provenance drift"):
                 self.validate_mutation(mutate)
 
+    def test_rebound_baseline_observation_and_current_sources_are_exact(self):
+        self.assertEqual(self.base["observed_at"], verify.EXPECTED_OBSERVED_AT)
+        self.assertEqual(
+            self.base["baseline"],
+            verify.EXPECTED_BASELINE,
+        )
+        current_sources = {
+            boundary["id"]: (boundary["current_main_commit"], boundary["current_main_tree"])
+            for boundary in self.base["source_boundaries"]
+        }
+        self.assertEqual(
+            current_sources,
+            {
+                "meta": (
+                    "d9419b05eb98c81279297563c11fc90e4fe708ac",
+                    "cb7e49e772321dbf89fed74e2bc2ac3f28ab37e7",
+                ),
+                "game": (
+                    "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+                    "bddef2afcb7cf50c5a4c21dfd0c0c8069fbf5936",
+                ),
+                "platform": (
+                    "84d504c98acc8134eb4c9545711010b74c987974",
+                    "8abbc5e1051710c695205214d4c779291dcfb697",
+                ),
+                "atlas": (
+                    "0d22a8d4378e66441502482ce715e226d487248e",
+                    "659b3765de64771da73a851219f01dad95553b49",
+                ),
+                "migration_archive": (
+                    "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+                    "dbf8349a21e432df47d1475b8431939bbe94d6e1",
+                ),
+            },
+        )
+
     def test_lifecycle_baseline_is_exactly_bound(self):
         mutations = (
             lambda d: d["baseline"].update(canonical_audit_head="0" * 40),
+            lambda d: d["baseline"].update(canonical_audit_tree="0" * 40),
             lambda d: d["baseline"].update(programme_head="0" * 40),
             lambda d: d["baseline"].update(release_comment_id=1),
             lambda d: d["baseline"].pop("canonical_audit_pr"),

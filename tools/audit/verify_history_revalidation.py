@@ -48,11 +48,11 @@ EXPECTED_BOUNDARIES = [
         "id": "atlas", "repository": "Oteryn/Oteryn-Atlas",
         "historical_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
         "historical_tree": "a1009378f8d3950a5ee62fb3ee65041f7d53a1e0",
-        "current_main_commit": "be09b84ad96d7e67571a460b55d9546b59bc89a7",
-        "current_main_tree": "8666e7ad688ec4ec3063c17e6817843a6e37be55",
-        "compare_status": "ahead", "ahead_by": 96, "changed_files_reported": 201,
+        "current_main_commit": "0d22a8d4378e66441502482ce715e226d487248e",
+        "current_main_tree": "659b3765de64771da73a851219f01dad95553b49",
+        "compare_status": "ahead", "ahead_by": 99, "changed_files_reported": 201,
         "compare_file_list_complete": True,
-        "compare_path_blob_status_sha256": "b72b86675870469ac5e8dee1b61e472cb26126544109460374b95f06919554af",
+        "compare_path_blob_status_sha256": "c50a23545ae921e7882fca7cd76cb877f11683487cdf588caefcdf81f842fe79",
     },
     {
         "id": "migration_archive", "repository": "Oteryn/Oteryn-Platform-Migration-Backup-20260818",
@@ -93,11 +93,12 @@ EXPECTED_GITHUB_ENDPOINTS = [
     "GET /repos/Oteryn/Oteryn/pulls/{number}",
     "GET /repos/Oteryn/Oteryn/issues/comments/5666964258",
 ]
-EXPECTED_OBSERVED_AT = "2026-09-14T16:23:00Z"
+EXPECTED_OBSERVED_AT = "2026-09-14T21:02:48Z"
 EXPECTED_BASELINE = {
     "repository": "Oteryn/Oteryn",
     "canonical_audit_pr": 185,
-    "canonical_audit_head": "2d877271afa8f177983f3c6147472372adca0ed1",
+    "canonical_audit_head": "1008886c0aec2db6b8588a3131a83829eff06e67",
+    "canonical_audit_tree": "9f32fb6a2debb09483bab478e1ec2d5a05cbf9db",
     "worker_pr": 206,
     "worker_seed_head": "c5a410873124adde191514bc86a79ed50583b918",
     "programme_pr": 203,
