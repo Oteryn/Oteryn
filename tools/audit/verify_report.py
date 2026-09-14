@@ -186,6 +186,19 @@ SEMANTIC_COVERAGE_UNKNOWN = {'id': 'SEMANTIC-COVERAGE',
  'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review '
                       'changed/uncovered authored families, and retain justified grouping/N/A.'}
 EXPECTED_AUDIT_COMPLETION = 'NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial'
+EXPECTED_REPORT_SEMANTIC_COVERAGE = 'PARTIAL_EXPLICIT_NOT_ALL_LINE'
+EXPECTED_FINDING_STATES_SHA256 = '741b78d1abc5553fc745916b47fccf13e7617a37d5f20666cfcef0713ded0ee4'
+EXPECTED_META_AUD_05 = {
+    'id': 'META-AUD-05',
+    'priority': 'P2',
+    'repository': 'meta',
+    'state': 'PARTIALLY_REPAIRED',
+    'scope': 'governance',
+    'title': 'Historical authority and merge-up conflict',
+    'evidence': 'META-153 | Current access policy separates MQ candidate refresh from source-head churn. Historical/open PR authority liveness is not exhaustively revalidated.',
+    'owner_route': 'Oteryn/Oteryn#153; evidence continuation #186',
+    'closure_condition': 'Classify remaining operative-looking documents/PRs against current v3 authority without deleting historical evidence.',
+}
 META_R4_CANDIDATE_BINDING = 'organization-audit-20260907/r3-meta-r4-direct-candidate.json'
 EXPECTED_COVERAGE_SUMMARY = {'schema_version': 1,
  'source_leaf_total': 4361,
@@ -702,10 +715,16 @@ def build_ledger(doc, review, groups, inventory_dir):
         inv=read_json(inventory_dir/(key+'.json'));r=repo[key]
         require(inv['commit_sha']==r['commit_sha'] and inv['tree_sha']==r['tree_sha'],'inventory coordinate mismatch')
         require(len(inv['entries'])==r['leaf_count'] and tree_sha(inv['entries'])==r['tree_sha'],'inventory tree/count mismatch')
-        paths={x['path'] for x in inv['entries']}
+        inventory_by_path={x['path']:x for x in inv['entries']}
+        paths=set(inventory_by_path)
         require(all(path in paths for rep,path in mapping if rep==key),'review path absent')
         grouped={}
         for group in [g for g in groups if g['repository']==key]:
+            for path, oid in group['current_revalidation']['current_blobs'].items():
+                current_entry=inventory_by_path.get(path)
+                require(current_entry is not None,'coverage current blob path absent from inventory')
+                require(current_entry['mode']=='100644','coverage current blob is not a regular source leaf')
+                require(current_entry['object_sha']==oid,'coverage current blob OID mismatch')
             matched=[x for x in inv['entries'] if x['path'].startswith(group['path_prefix'])]
             require(len(matched)==group['expected_count'],'coverage group inventory count mismatch')
             for x in matched:
@@ -746,6 +765,8 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     doc=read_json(report_path)
     require(type(doc.get('schema_version')) is int and doc['schema_version']==2,'schema_version')
     require(doc['production_readiness_claimed'] is False,'production claim forbidden')
+    require(doc.get('semantic_coverage') == EXPECTED_REPORT_SEMANTIC_COVERAGE,
+            'report semantic coverage status drift')
     require(doc['independent_score'] is None,'independent score not established')
     require(doc['severity_counts_exhaustive'] is False,'exhaustive severity claim unsupported')
     require(doc['status']=='QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE','unsupported completion status')
@@ -782,6 +803,13 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
         require(row['repository'] in repo,'unknown finding repository')
         require(row['priority'] in {'P0','P1','P2','P3','NOTE','UNRATED'},'invalid priority')
         require(all(row[k].strip() for k in ['title','evidence','owner_route','closure_condition']),'missing finding evidence/closure')
+    finding_states={row['id']:row['state'] for row in findings}
+    finding_states_raw=json.dumps(finding_states,sort_keys=True,separators=(',',':')).encode('utf-8')
+    require(hashlib.sha256(finding_states_raw).hexdigest()==EXPECTED_FINDING_STATES_SHA256,
+            'canonical finding state transition drift')
+    meta_aud_05=[row for row in findings if row['id']=='META-AUD-05']
+    require(len(meta_aud_05)==1 and json_exact(meta_aud_05[0],EXPECTED_META_AUD_05),
+            'META-AUD-05 canonical finding drift')
     p1=[r['id'] for r in findings if r['priority']=='P1' and r['scope']=='source_snapshot' and r['state'] in {'CONFIRMED_SOURCE','REPRODUCED'}]
     require(p1==doc['known_source_snapshot_p1_ids'] and len(p1)==doc['known_source_snapshot_p1_count'],'source-snapshot P1 mismatch')
     domains=read_tsv(base/'domain-matrix.tsv');unique(domains,lambda r:r['domain'],'domain')

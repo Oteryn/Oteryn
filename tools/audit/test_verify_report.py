@@ -275,6 +275,8 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.path,lambda d:d.update(severity_counts_exhaustive=True));self.reject()
     def test_unqualified_completion_rejected(self):
         self.mutate(self.path,lambda d:d.update(status='COMPLETE'));self.reject()
+    def test_report_semantic_coverage_complete_rejected(self):
+        self.mutate(self.path,lambda d:d.update(semantic_coverage='COMPLETE'));self.reject()
     def test_audit_completion_complete_rejected(self):
         self.mutate(self.path,lambda d:d.update(audit_completion='COMPLETE'));self.reject()
     def test_audit_completion_equivalent_false_claim_rejected(self):
@@ -290,6 +292,43 @@ class AuditValidationTest(unittest.TestCase):
 
     def test_duplicate_finding_rejected(self):
         p=self.base/'finding-register.tsv';lines=p.read_text().splitlines();p.write_text('\n'.join(lines+[lines[1]])+'\n');self.reject()
+    def test_meta_aud_05_transition_state_drift_rejected(self):
+        p=self.base/'finding-register.tsv'
+        p.write_text(p.read_text().replace('META-AUD-05\tP2\tmeta\tPARTIALLY_REPAIRED\t',
+                                           'META-AUD-05\tP2\tmeta\tSOURCE_REPAIRED\t',1))
+        self.reject()
+    def test_other_canonical_finding_state_drift_rejected(self):
+        p=self.base/'finding-register.tsv'
+        text=p.read_text()
+        self.assertIn('META-AUD-09\tP2\tmeta\tUNKNOWN_LIVE\t',text)
+        p.write_text(text.replace('META-AUD-09\tP2\tmeta\tUNKNOWN_LIVE\t',
+                                  'META-AUD-09\tP2\tmeta\tSOURCE_REPAIRED\t',1))
+        self.reject()
+    def test_meta_aud_05_complete_row_drift_rejected(self):
+        p=self.base/'finding-register.tsv'
+        lines=p.read_text().splitlines()
+        header=lines[0].split('\t')
+        rows=[dict(zip(header,line.split('\t'),strict=True)) for line in lines[1:]]
+        next(row for row in rows if row['id']=='META-AUD-05')['owner_route']='resolved; no further action required'
+        p.write_text('\n'.join(['\t'.join(header)]+['\t'.join(row[key] for key in header) for row in rows])+'\n')
+        self.reject()
+
+    def test_group_current_blob_oid_must_match_authoritative_inventory(self):
+        entries=[
+            {'path':'app/Family/File.php','mode':'100644','object_sha':'1'*40},
+            {'path':'config/family.php','mode':'100644','object_sha':'2'*40},
+        ]
+        tree=audit.tree_sha(entries)
+        doc={'repositories':{'platform':{'commit_sha':'3'*40,'tree_sha':tree,'leaf_count':2}}}
+        groups=[{'repository':'platform','path_prefix':'app/Family/','expected_count':1,
+                 'depth':'GROUPED_REVALIDATED','scope':'bounded',
+                 'current_revalidation':{'current_blobs':{'config/family.php':'9'*40}}}]
+        inventory=self.root/'inventories';inventory.mkdir()
+        (inventory/'platform.json').write_text(json.dumps({
+            'commit_sha':'3'*40,'tree_sha':tree,'entries':entries,
+        }))
+        with self.assertRaisesRegex(ValueError,'coverage current blob OID mismatch'):
+            audit.build_ledger(doc,[],groups,inventory)
     def test_missing_domain_rejected(self):
         p=self.base/'domain-matrix.tsv';p.write_text('\n'.join(p.read_text().splitlines()[:-1])+'\n');self.reject()
     def test_historical_candidate_counted_as_snapshot_rejected(self):
