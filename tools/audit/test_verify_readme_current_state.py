@@ -65,16 +65,26 @@ class ReadmeCurrentStateTest(unittest.TestCase):
     def test_current_readme_passes(self):
         result = readme_contract.validate(self.current)
         self.assertEqual(result['result'], 'README_CURRENT_STATE_VALIDATED_NOT_PRODUCT_PASS')
-        self.assertEqual(result['direct_paths'], 308)
+        self.assertEqual(result['direct_paths'], 335)
         self.assertEqual(result['grouped_paths'], 113)
-        self.assertEqual(result['unverified_paths'], 3940)
-        self.assertEqual(result['semantically_classified_paths'], 421)
+        self.assertEqual(result['unverified_paths'], 3913)
+        self.assertEqual(result['semantically_classified_paths'], 448)
         self.assertEqual(
             result['remaining_bounded_proof_workflows'],
             [],
         )
         self.assertFalse(result['product_readiness_claimed'])
         self.assertFalse(result['audit_completion_claimed'])
+
+    def test_semantic_01_old_current_truth_alternative_rejected(self):
+        self.reject(self.current.replace(
+            'remain inert provenance, leave all 14 residual items open, and do not establish current truth',
+            'remain inert provenance and leave all 14 residual items open or establish current truth',
+            1,
+        ))
+
+    def test_semantic_01_negative_current_truth_clause_required(self):
+        self.reject(self.current.replace(', and do not establish current truth', '', 1))
 
     def test_required_meta_gate_runs_terminal_state_contract(self):
         validate_terminal_gate_step(CI_WORKFLOW.read_text(encoding='utf-8'))
@@ -131,6 +141,17 @@ class ReadmeCurrentStateTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'bounded audit-proof workflow still present'):
                 readme_contract.validate_terminal_workflow_state(root)
 
+    def test_terminal_workflow_state_rejects_yaml_extension(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            workflow_dir = root / readme_contract.WORKFLOW_DIR
+            workflow_dir.mkdir(parents=True)
+            (workflow_dir / 'organization-audit-unexpected.yaml').write_text(
+                'name: unexpected\n', encoding='utf-8'
+            )
+            with self.assertRaisesRegex(ValueError, 'bounded audit-proof workflow still present'):
+                readme_contract.validate_terminal_workflow_state(root)
+
     def test_validate_rejects_reintroduced_r7_workflow(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -142,7 +163,7 @@ class ReadmeCurrentStateTest(unittest.TestCase):
                 readme_contract.validate(self.current, root)
 
     def test_old_accounting_transition_rejected(self):
-        mutated = self.current.replace('308 DIRECT scoped path reviews', '258 DIRECT scoped path reviews', 1)
+        mutated = self.current.replace('335 DIRECT scoped path reviews', '258 DIRECT scoped path reviews', 1)
         mutated = mutated.replace('3918 retain UNVERIFIED semantics', '3954 retain UNVERIFIED semantics', 1)
         self.reject(mutated)
 
@@ -269,7 +290,7 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         self.reject(mutated)
 
     def test_truncated_current_accounting_paragraph_rejected(self):
-        mutated = self.current.replace(' and 3940 retain UNVERIFIED semantics.', '.', 1)
+        mutated = self.current.replace(' and 3913 retain UNVERIFIED semantics.', '.', 1)
         self.reject(mutated)
 
 

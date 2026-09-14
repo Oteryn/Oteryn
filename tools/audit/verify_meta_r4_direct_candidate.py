@@ -17,7 +17,7 @@ INDEX_REL=Path('docs/evidence/organization-audit-20260907/verification-index.jso
 OVERLAY_SHA256='70e5f14056e539f59a0be0783acb83c8e38c7cde5ff9e6cfde01672bfcf35598'
 LIVE_MAIN='3b39e0be05aef008f1bd442821daefa898a201dd'
 SOURCE='1a01c5b3e08666a82245b1cac78da3736c65e785'; SOURCE_TREE='f084e824ec5e14d5909c9750d906d91d51425fd5'
-LEDGER_SHA='8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94'
+LEDGER_SHA='d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b'
 INVENTORY_IDS={'meta','game','platform','atlas','migration_archive'}
 EXPECTED_META_AUD_05={
     'id':'META-AUD-05',
@@ -137,7 +137,7 @@ def validate_accounting(root,candidate,inventory_dir=None):
         if temporary: temporary.cleanup()
     require(result.get('tree_and_ledger_verified') is True,'canonical ledger was not rebuilt')
     require(hashlib.sha256(ledger).hexdigest()==LEDGER_SHA,'canonical ledger SHA drift')
-    expected={'source_leaves':4361,'scoped_review_paths':308,'grouped_revalidated_paths':113,'unverified_semantics':3940,'semantically_classified_paths':421}
+    expected={'source_leaves':4361,'scoped_review_paths':335,'grouped_revalidated_paths':113,'unverified_semantics':3913,'semantically_classified_paths':448}
     for k,v in expected.items(): require(type(result.get(k)) is int and result[k]==v,'canonical accounting drift: '+k)
     rows=list(csv.DictReader(io.StringIO(ledger.decode('utf-8')))); wanted={r['path'] for r in candidate['paths']}
     selected=[r for r in rows if r.get('repository_id')=='meta' and r.get('path') in wanted]
@@ -150,5 +150,5 @@ def validate_accounting(root,candidate,inventory_dir=None):
 def main():
     p=argparse.ArgumentParser(); p.add_argument('--audit-root',type=Path,default=ROOT); a=p.parse_args()
     candidate=expected_candidate(a.audit_root); validate_candidate(candidate,candidate); validate_source(a.audit_root,candidate); validate_finding(a.audit_root,candidate); validate_adoption(a.audit_root,candidate); validate_accounting(a.audit_root,candidate)
-    print(json.dumps({'result':'META_R4_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS','candidate_paths':25,'coverage_adopted':True,'current_disposition':'DIRECT','source_rows':4361,'direct_paths':308,'grouped_paths':113,'unverified_paths':3940,'semantically_classified_paths':421,'ledger_sha256':LEDGER_SHA,'meta_aud_05_status':'PARTIALLY_REPAIRED','product_readiness_claimed':False,'audit_completion_claimed':False,'live_state_claimed':False},sort_keys=True)); return 0
+    print(json.dumps({'result':'META_R4_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS','candidate_paths':25,'coverage_adopted':True,'current_disposition':'DIRECT','source_rows':4361,'direct_paths':335,'grouped_paths':113,'unverified_paths':3913,'semantically_classified_paths':448,'ledger_sha256':LEDGER_SHA,'meta_aud_05_status':'PARTIALLY_REPAIRED','product_readiness_claimed':False,'audit_completion_claimed':False,'live_state_claimed':False},sort_keys=True)); return 0
 if __name__=='__main__': raise SystemExit(main())

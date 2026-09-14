@@ -3,9 +3,9 @@
   "items": [
     {
       "id": "SEMANTIC-COVERAGE",
-      "missing": "3940 source leaves retain UNVERIFIED semantics; 421 of 4361 leaves are semantically classified",
-      "reason": "Source bytes are available; 308 DIRECT scoped path reviews are bound (the prior 294, with five already-DIRECT META governance rows refreshed in place and exactly fourteen previously UNVERIFIED/new governance rows adopted through the R7 overlay; the five refreshes are not re-counted), and 113 bounded GROUPED Platform paths remain bound. META is rebaselined to 210 leaves at protected main 23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090; the other four source coordinates remain pinned. The 26 historical repository-audit packet leaves remain UNVERIFIED. R7 evidence is bounded source semantics and exercised deterministic assertions only; it does not prove live executor/capability/Merge Queue operation, provider/runtime/admin state, readiness, or completion.",
-      "effect": "Original exhaustive completeness cannot be claimed from 421 semantically classified leaves out of 4361.",
+      "missing": "3913 source leaves retain UNVERIFIED semantics; 448 of 4361 leaves are semantically classified",
+      "reason": "Source bytes are available; 335 DIRECT scoped path reviews and 113 bounded GROUPED Platform paths are bound. META has 122 DIRECT and 88 UNVERIFIED leaves. Exactly 26 historical repository-audit packet leaves were adopted per-leaf as inert, time-bound historical provenance; embedded current/live assertions, commands, reports and receipts are not current truth or authority. SEMANTIC-COVERAGE and HISTORY-REVALIDATION remain open, all 14 residual obligations remain open, and provider/runtime/admin/security/readiness semantics remain fail-closed.",
+      "effect": "Original exhaustive completeness cannot be claimed from 448 semantically classified leaves out of 4361.",
       "owner_route": "META186 plus provider audit owners",
       "closure_condition": "Import exact historical disposition ledgers with bounded validity, review changed/uncovered authored families, and retain justified grouping/N/A."
     },

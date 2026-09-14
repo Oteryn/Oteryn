@@ -2,6 +2,7 @@
 """Regression tests for canonical Announcements DIRECT adoption."""
 from pathlib import Path
 import copy
+import hashlib
 import unittest
 from unittest.mock import patch
 
@@ -33,6 +34,36 @@ class AnnouncementsAdoptedVerifierTest(unittest.TestCase):
         raw=(ROOT/adopted.ANNOUNCEMENTS_OVERLAY_REL).read_bytes()
         self.assertEqual(adopted.git_blob_sha(raw),adopted.ANNOUNCEMENTS_OVERLAY_BLOB)
         self.assertEqual(__import__('hashlib').sha256(raw).hexdigest(),adopted.ANNOUNCEMENTS_OVERLAY_SHA256)
+
+    def test_overlay_parses_authenticated_bytes_without_reopening_path(self):
+        overlay = ROOT / adopted.ANNOUNCEMENTS_OVERLAY_REL
+        raw = overlay.read_bytes()
+        replacement = raw.replace(b'bounded evidence only.', b'product readiness and audit completion.', 1)
+        original_read_bytes = Path.read_bytes
+        reads = 0
+
+        def replace_after_read(path):
+            nonlocal reads
+            data = original_read_bytes(path)
+            if path == overlay:
+                reads += 1
+                overlay.write_bytes(replacement)
+            return data
+
+        try:
+            with patch.object(Path, 'read_bytes', replace_after_read):
+                adopted.validate_adopted_docs(copy.deepcopy(self.candidate), ROOT)
+        finally:
+            overlay.write_bytes(raw)
+        self.assertEqual(reads, 1)
+        self.assertEqual(hashlib.sha256(overlay.read_bytes()).hexdigest(), adopted.ANNOUNCEMENTS_OVERLAY_SHA256)
+
+    def test_overlay_parser_rejects_header_drift_and_invalid_utf8(self):
+        raw = (ROOT / adopted.ANNOUNCEMENTS_OVERLAY_REL).read_bytes()
+        with self.assertRaisesRegex(ValueError, 'header drift'):
+            adopted.parse_tsv_bytes(raw.replace(b'limitations', b'path', 1))
+        with self.assertRaisesRegex(ValueError, 'valid UTF-8'):
+            adopted.parse_tsv_bytes(b'\xff')
 
     def test_line_range_contract_covers_exact_ten_paths(self):
         self.assertEqual(set(adopted.EXPECTED_LINE_RANGES),{row['path'] for row in self.candidate['paths']})

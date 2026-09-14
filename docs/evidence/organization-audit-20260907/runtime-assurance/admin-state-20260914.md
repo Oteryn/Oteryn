@@ -6,14 +6,14 @@ This is the first bounded `AUDIT186-RUNTIME` obligation packet. It is a handoff 
 
 | Coordinate | Verified fact |
 | --- | --- |
-| Canonical audit | `Oteryn/Oteryn#185`, exact released baseline `2d877271afa8f177983f3c6147472372adca0ed1`; read back OPEN/DRAFT at that head on 2026-09-14 |
+| Current canonical source | `Oteryn/Oteryn#185@2f78fafbacc12723516bb7dd00376812c31385ef`, tree `44c64c60f9e71bde27ff86e7d19c77476cc07ade`; adoption checkpoint Issue #186 comment `5671661917` |
 | Programme authority | `Oteryn/Oteryn#203@82bc113797ecdc70d79aee628d339136b816e15d`; the immutable programme assigns `ADMIN-STATE` to `AUDIT186-RUNTIME` and prohibits administrative mutation |
 | Release authority | `Oteryn/Oteryn#186` comment `5666964258`, created `2026-09-14T16:08:07Z`, token `AUDIT186_PARALLEL_RELEASE_READY` |
-| Worker authority | `docs/agents/workers/AUDIT186-RUNTIME-01.md` at worker parent `efd89ee948886f52df9e5557ea8ae4dea0a4c600` |
-| Canonical obligation | `docs/evidence/organization-audit-20260907/unknowns.json` at baseline `2d877271afa8f177983f3c6147472372adca0ed1`, item `ADMIN-STATE` |
+| Worker authority | `docs/agents/workers/AUDIT186-RUNTIME-01.md` in this worker candidate; its earlier seed coordinate remains `efd89ee948886f52df9e5557ea8ae4dea0a4c600` |
+| Canonical obligation | `docs/evidence/organization-audit-20260907/unknowns.json` at `#185@2f78fafbacc12723516bb7dd00376812c31385ef`, item `ADMIN-STATE` |
 | Organization identity | GitHub REST `GET /orgs/Oteryn` returned HTTP 200 on 2026-09-14 and identified organization login `Oteryn`, database ID `318116449`, node ID `O_kgDOEvYSYQ` |
 
-The release checkpoint also records exact-head META CI run `34860587490` as SUCCESS. That is a **CI fact only**. It does not attest organization administrative settings.
+The earlier release checkpoint records exact-head META CI run `34860587490` as SUCCESS. That is a **CI fact only**. It does not attest organization administrative settings. Fresh source coordinates re-read for this rebind are META `d9419b05eb98c81279297563c11fc90e4fe708ac`, Game `775a09091743af395ecb8f1e440cb9c286bc0dd2`, Platform `84d504c98acc8134eb4c9545711010b74c987974`, and Atlas `0d22a8d4378e66441502482ce715e226d487248e`; they likewise prove source identity only, not administrative or runtime readiness.
 
 ## Canonical closure condition
 
@@ -21,7 +21,7 @@ The exact canonical closure condition is:
 
 > Provide dated nonsecret exported settings and authorized verification; never secret values.
 
-The canonical missing fact is “Current organization/admin security settings”; its stated effect is “No current private reporting/scanning/member/privilege attestation.”
+The canonical missing fact is “Current organization/admin security settings”; its stated effect is “No current private reporting/scanning/member/privilege attestation.” At current canonical source `#185@2f78fafbacc12723516bb7dd00376812c31385ef`, this wording was re-read unchanged. The current finding register was also re-read there: `META-AUD-08` remains `UNKNOWN_LIVE` pending a dated current private-reporting setting plus a verified private reporting channel, and `META-AUD-09` remains `UNKNOWN_LIVE` pending current scan capability, scope, excluded languages, findings, and triage evidence.
 
 ## Read-only observation
 
@@ -41,8 +41,8 @@ HTTP 403 proves only that this credential/session could not read those endpoints
 
 | Evidence class | Disposition | What is established |
 | --- | --- | --- |
-| Source | **PROVEN (bounded)** | The canonical obligation, owner route, effect, and closure wording exist at the exact audit baseline. Source text does not establish live settings. |
-| CI | **PROVEN (bounded)** | Release authority reports META CI run `34860587490` successful on the canonical baseline. CI does not establish live organization settings. |
+| Source | **PROVEN (bounded)** | The canonical obligation, owner route, effect, and closure wording exist at the current canonical audit source. Source text does not establish live settings. |
+| CI | **PROVEN (bounded)** | Release authority reports META CI run `34860587490` successful on the earlier released baseline. CI does not establish live organization settings. |
 | Admin | **PROVEN (identity/readability only)** | The dated read identifies the organization and proves the general organization record was readable while the listed privileged observations were not readable in this session. |
 | Runtime / telemetry / recovery | **NOT APPLICABLE to this packet** | No claim is made from these evidence classes. |
 | `ADMIN-STATE` closure | **UNKNOWN / BLOCKED** | Current private-reporting, scanning, membership, and privilege configuration is not attested. Closure is blocked on a privileged, sanitized observation rather than on an implementation defect. |
