@@ -19,6 +19,14 @@ EXPECTED_AUTHORITY = {
     "release_checkpoint": "Oteryn/Oteryn#186-comment-5666964258",
     "worker_seed": "Oteryn/Oteryn#208@75ee8b09dc6caac7bfc2a5bdddf3cfbab02c462e",
 }
+EXPECTED_CANONICAL_OBLIGATION = {
+    "source": "docs/evidence/organization-audit-20260907/unknowns.json@2d877271afa8f177983f3c6147472372adca0ed1",
+    "missing": "Private production runtime configuration",
+    "reason": "No host exception or production access used.",
+    "effect": "No infrastructure health or deployment readiness conclusion.",
+    "owner_route": "Provider operations owners",
+    "closure_condition": "Authorized read-only configuration/health snapshot with redaction and exact release.",
+}
 EXPECTED_SOURCE_COORDINATES = {
     "Oteryn/Oteryn": "d9419b05eb98c81279297563c11fc90e4fe708ac",
     "Oteryn/Oteryn-Game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
@@ -105,9 +113,8 @@ def validate(packet: dict[str, object]) -> list[str]:
     if packet.get("authority") != EXPECTED_AUTHORITY:
         errors.append("authority coordinates drifted")
 
-    expected_closure = "Authorized read-only configuration/health snapshot with redaction and exact release."
-    if not isinstance(canonical, dict) or canonical.get("closure_condition") != expected_closure:
-        errors.append("canonical closure condition drifted")
+    if not isinstance(canonical, dict) or canonical != EXPECTED_CANONICAL_OBLIGATION:
+        errors.append("canonical obligation drifted from the exact fail-closed claim")
     if not isinstance(disposition, dict) or disposition != EXPECTED_DISPOSITION:
         errors.append("INFRA disposition drifted from the bounded open state")
     if not isinstance(disposition, dict) or disposition.get("infra_state_closure") != "UNKNOWN_BLOCKED":

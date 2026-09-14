@@ -45,7 +45,13 @@ def test_rejects_nested_health_promotion() -> None:
 def test_rejects_closure_condition_drift() -> None:
     candidate = packet()
     candidate["canonical_obligation"]["closure_condition"] = "green deployment"
-    assert "canonical closure condition drifted" in verifier.validate(candidate)
+    assert "canonical obligation drifted from the exact fail-closed claim" in verifier.validate(candidate)
+
+
+def test_rejects_canonical_obligation_health_promotion() -> None:
+    candidate = packet()
+    candidate["canonical_obligation"]["effect"] = "Infrastructure health and deployment readiness are established."
+    assert "canonical obligation drifted from the exact fail-closed claim" in verifier.validate(candidate)
 
 
 def test_rejects_missing_release_or_direct_health_requirement() -> None:
