@@ -497,5 +497,42 @@
     "product_readiness_claimed": false,
     "organization_audit_completion_claimed": false,
     "live_operational_capability_claimed": false
+  },
+  "audit186_semantic_03_ci_contract_direct_adoption": {
+    "state": "ADOPTED_BOUNDED_SOURCE_SEMANTICS_NOT_PRODUCT_PASS",
+    "worker_pull_request": 209,
+    "worker_head": "9ad2942ba0dedb5b94e437c32b85161c6c59885a",
+    "candidate": "audit186-semantic-03-ci-contract-candidate.json",
+    "candidate_sha256": "4f9eb30d596da45a95f8cadf37dfee4ae4bb89a2846683098021574613d9676c",
+    "adoption_overlay": "coverage-review-audit186-semantic-03-direct-additions.tsv",
+    "adoption_overlay_sha256": "76881b1eace7559a9d84b060c82ccf9bf86ae5627e670535a7680ccb32285de5",
+    "source_commit": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+    "source_tree": "b8ebb8e50bce14a736fa65590ac121655c52fd12",
+    "path": "docs/ci/CI_CONTRACT.md",
+    "blob_sha": "3c6d36cd58cd81f332382db7f2eda78261788caa",
+    "depth": "SCOPED_SEMANTIC_REVIEW",
+    "coverage_delta": {
+      "direct": 1,
+      "unverified": -1,
+      "semantically_classified": 1
+    },
+    "canonical_counts": {
+      "source_leaves": 4361,
+      "direct": 309,
+      "grouped": 113,
+      "unverified": 3939,
+      "semantically_classified": 422
+    },
+    "meta_counts": {
+      "source_leaves": 210,
+      "direct": 96,
+      "unverified": 114
+    },
+    "pr_204_adopted": false,
+    "pr_207_included": false,
+    "residual_obligations": 14,
+    "product_readiness_claimed": false,
+    "runtime_or_provider_claimed": false,
+    "audit_completion_claimed": false
   }
 }

@@ -26,7 +26,7 @@ OVERLAY_BLOB = '9b5c1afc0d1ac39641077510fb4d6c20222e04d5'
 CANONICAL_OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/coverage-review-canonical-additions.tsv')
 SOURCE_COMMIT = 'de917b3477a1de0667531380de3660e8b2ab59aa'
 SOURCE_TREE = 'ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e'
-CURRENT_LEDGER_SHA = '8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94'
+CURRENT_LEDGER_SHA = 'bf51139f97683659f752a54e643c1d342791476d64a0f78237b5c5d3ba3a310a'
 REVIEW_PROVENANCE = 'External mutable PR #185 metadata: reviewed implementation 3eb62ef72c1e13412fa45d5b25d597d112d9ae7d; review comment 5609072309. Not self-certified evidence.'
 SHA = re.compile(r'[0-9a-f]{40}\Z')
 OVERLAY_HEADER = (
@@ -141,16 +141,16 @@ def validate_adopted_docs(candidate: dict, audit_root: Path) -> None:
     require(report.get('revision')=='R7-META-CURRENT-MAIN-GOVERNANCE-DIRECT-ADOPTED','current report revision drift')
     require(report.get('coverage_review_additions')==vr.DIRECT_ADDITIONS_BINDING,'current canonical overlay binding drift')
     require(report.get('coverage_review_recorder_additions')==str(OVERLAY_REL).removeprefix('docs/evidence/'),'recorder evidence binding drift')
-    require(report.get('scoped_review_paths')==308 and report.get('grouped_revalidated_paths')==113 and report.get('semantically_classified_paths')==421,'current report accounting drift')
+    require(report.get('scoped_review_paths')==309 and report.get('grouped_revalidated_paths')==113 and report.get('semantically_classified_paths')==422,'current report accounting drift')
     summary=vr.read_json(audit_root/'docs/evidence/organization-audit-20260907/coverage-summary.json')
     require(summary.get('ledger_sha256')==CURRENT_LEDGER_SHA,'current ledger digest drift')
-    require(summary.get('scoped_review_paths')==308 and summary.get('grouped_revalidated_paths')==113 and summary.get('unverified_semantics_total')==3940 and summary.get('semantically_classified_paths')==421,'current summary accounting drift')
+    require(summary.get('scoped_review_paths')==309 and summary.get('grouped_revalidated_paths')==113 and summary.get('unverified_semantics_total')==3939 and summary.get('semantically_classified_paths')==422,'current summary accounting drift')
     platform=summary['per_repository']['platform']
     require(platform=={'leaves':2165,'direct_scoped':168,'unverified_semantics':1884,'grouped':113,'not_applicable':0},'current Platform accounting drift')
 
     base=report_path.parent/report['evidence_directory']
     review=vr.load_review(base,report)
-    require(len(review)==308,'current composed DIRECT count drift')
+    require(len(review)==309,'current composed DIRECT count drift')
     by_path={(row['repository'],row['path']):row for row in review}
     old_by_path={(row['repository'],row['path']):row for row in old_rows}
     for key, expected in old_by_path.items():

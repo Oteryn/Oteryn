@@ -5,7 +5,7 @@ from unittest import mock
 P=Path(__file__).with_name('verify_meta_current_main_governance_direct_candidate.py');S=importlib.util.spec_from_file_location('r7',P);m=importlib.util.module_from_spec(S);S.loader.exec_module(m)
 class R7(unittest.TestCase):
  def test_adopted_state(self):
-  r=m.validate();self.assertEqual((r['source_leaves'],r['direct'],r['grouped'],r['unverified'],r['semantically_classified']),(4361,308,113,3940,421))
+  r=m.validate();self.assertEqual((r['source_leaves'],r['direct'],r['grouped'],r['unverified'],r['semantically_classified']),(4361,309,113,3939,422))
  def test_candidate_blob_drift(self):
   with self.assertRaises(m.CandidateError):m.json_bytes(b'{"x":1,"x":2}')
  def test_overlay_exact_count_and_shape(self):
