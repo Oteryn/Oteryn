@@ -304,6 +304,15 @@ class AuditValidationTest(unittest.TestCase):
         p.write_text(text.replace('META-AUD-09\tP2\tmeta\tUNKNOWN_LIVE\t',
                                   'META-AUD-09\tP2\tmeta\tSOURCE_REPAIRED\t',1))
         self.reject()
+    def test_non_meta_finding_reprioritized_to_p0_rejected(self):
+        p=self.base/'finding-register.tsv'
+        text=p.read_text()
+        self.assertIn('GAME-F01\tP1\tgame\t',text)
+        p.write_text(text.replace('GAME-F01\tP1\tgame\t','GAME-F01\tP0\tgame\t',1))
+        self.reject()
+    def test_report_confirmed_p0_count_drift_rejected(self):
+        self.mutate(self.path,lambda d:d.update(confirmed_p0_in_scoped_review=1))
+        self.reject()
     def test_meta_aud_05_complete_row_drift_rejected(self):
         p=self.base/'finding-register.tsv'
         lines=p.read_text().splitlines()
@@ -360,6 +369,18 @@ class AuditValidationTest(unittest.TestCase):
         self.assertNotEqual(groups[0]['current_revalidation']['required_checks'],['NOT_EXECUTED'])
     def test_missing_domain_rejected(self):
         p=self.base/'domain-matrix.tsv';p.write_text('\n'.join(p.read_text().splitlines()[:-1])+'\n');self.reject()
+    def test_all_domain_pass_report_false_mismatch_rejected(self):
+        domains=audit.read_tsv(self.base/'domain-matrix.tsv')
+        for row in domains:
+            row['opinion']='PASS';row['remaining_limit']='NONE'
+        with self.assertRaisesRegex(ValueError,'all-pass boundary mismatch'):
+            audit.validate_domain_report_boundary(domains,False)
+    def test_report_true_with_open_domain_matrix_rejected(self):
+        domains=audit.read_tsv(self.base/'domain-matrix.tsv')
+        self.assertTrue(any(row['opinion']!='PASS' or row['remaining_limit']!='NONE'
+                            for row in domains))
+        with self.assertRaisesRegex(ValueError,'all-pass boundary mismatch'):
+            audit.validate_domain_report_boundary(domains,True)
     def test_historical_candidate_counted_as_snapshot_rejected(self):
         self.mutate(self.path,lambda d:d['known_source_snapshot_p1_ids'].append('GAME-CANDIDATE-361'));self.reject()
     def test_hidden_unverified_paths_rejected(self):

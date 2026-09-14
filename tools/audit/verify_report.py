@@ -21,6 +21,12 @@ import re
 
 SHA = re.compile(r'[0-9a-f]{40}\Z')
 COVERAGE_GROUPS_BLOB_SHA = 'b3313b4a0831b9fcc528665dca25bdccdb9dab59'
+FINDING_REGISTER_SHA256 = 'c5402f1618cfe4cd03d2ad50cd0946ec86f19e834b02128199b31b808cc64e94'
+DOMAIN_MATRIX_SHA256 = '34e46372880cbb932b2ed26d89cf71448d360fecd0a90f562ee693698ca10ac4'
+FINDING_REGISTER_FIELDS = ('id', 'priority', 'repository', 'state', 'scope', 'title',
+                           'evidence', 'owner_route', 'closure_condition')
+DOMAIN_MATRIX_FIELDS = ('domain', 'name', 'acceptance_criterion', 'method_and_evidence',
+                        'opinion', 'remaining_limit', 'references')
 STATES = {'SOURCE_REPAIRED_TESTED','PARTIALLY_REPAIRED','RETIRED_SOURCE','SOURCE_REPAIRED',
           'UNKNOWN_LIVE','REQUIRES_REVALIDATION','REQUIRES_LIVE_REVALIDATION',
           'SOURCE_REPAIRED_RECORDED_CI','OPEN_QUALIFICATION','HISTORICAL_NOTE','CONFIRMED_SOURCE',
@@ -620,6 +626,43 @@ def read_tsv(path):
     return rows
 
 
+def parse_tsv_bytes(raw: bytes, expected_fields: tuple[str, ...], label: str):
+    """Parse the same complete TSV snapshot whose bytes were authenticated."""
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError(label + ' must be valid UTF-8') from exc
+    reader = csv.DictReader(io.StringIO(text, newline=''), delimiter='\t')
+    require(tuple(reader.fieldnames or ()) == expected_fields, label + ' header drift')
+    rows = list(reader)
+    require(rows and all(None not in row and None not in row.values() for row in rows),
+            'invalid ' + label)
+    return rows
+
+
+def load_authenticated_tsv(path: Path, expected_sha256: str,
+                           expected_fields: tuple[str, ...], label: str):
+    raw = path.read_bytes()
+    require(hashlib.sha256(raw).hexdigest() == expected_sha256,
+            label + ' canonical snapshot drift')
+    return parse_tsv_bytes(raw, expected_fields, label)
+
+
+def validate_finding_report_boundary(findings, confirmed_p0):
+    require(type(confirmed_p0) is int, 'confirmed P0 count must be an integer')
+    scoped_p0 = sum(row['priority'] == 'P0' for row in findings)
+    require(scoped_p0 == confirmed_p0, 'confirmed scoped P0 count mismatch')
+
+
+def validate_domain_report_boundary(domains, report_all_pass):
+    require(type(report_all_pass) is bool, 'audit domain all-pass flag must be Boolean')
+    matrix_all_pass = all(
+        row['opinion'] == 'PASS' and row['remaining_limit'] == 'NONE'
+        for row in domains
+    )
+    require(report_all_pass == matrix_all_pass, 'audit domain all-pass boundary mismatch')
+
+
 def unique(rows, key, label):
     values=[key(row) for row in rows]
     require(len(values)==len(set(values)), 'duplicate '+label)
@@ -842,7 +885,9 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(doc.get('r7_meta_current_main_governance_direct_adoption_overlay')==META_R7_DIRECT_ADDITIONS_BINDING,'META R7 adoption overlay provenance binding drift')
     require(json_exact(doc.get('r3_review'),R3_REVIEW),'R3 review lifecycle drift')
     base=report_path.parent/doc['evidence_directory']
-    findings=read_tsv(base/'finding-register.tsv');unique(findings,lambda r:r['id'],'finding id')
+    findings=load_authenticated_tsv(base/'finding-register.tsv', FINDING_REGISTER_SHA256,
+                                    FINDING_REGISTER_FIELDS, 'finding register')
+    unique(findings,lambda r:r['id'],'finding id')
     require(len(findings)==doc['reconciled_register_rows'],'finding count mismatch')
     for row in findings:
         require(row['state'] in STATES,'unknown finding state')
@@ -856,12 +901,16 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     meta_aud_05=[row for row in findings if row['id']=='META-AUD-05']
     require(len(meta_aud_05)==1 and json_exact(meta_aud_05[0],EXPECTED_META_AUD_05),
             'META-AUD-05 canonical finding drift')
+    validate_finding_report_boundary(findings, doc.get('confirmed_p0_in_scoped_review'))
     p1=[r['id'] for r in findings if r['priority']=='P1' and r['scope']=='source_snapshot' and r['state'] in {'CONFIRMED_SOURCE','REPRODUCED'}]
     require(p1==doc['known_source_snapshot_p1_ids'] and len(p1)==doc['known_source_snapshot_p1_count'],'source-snapshot P1 mismatch')
-    domains=read_tsv(base/'domain-matrix.tsv');unique(domains,lambda r:r['domain'],'domain')
+    domains=load_authenticated_tsv(base/'domain-matrix.tsv', DOMAIN_MATRIX_SHA256,
+                                   DOMAIN_MATRIX_FIELDS, 'domain matrix')
+    unique(domains,lambda r:r['domain'],'domain')
     require({r['domain'] for r in domains}==set('ABCDEFGHIJKLMNOPQRSTUVW'),'A-W matrix incomplete')
     require(len(domains)==doc['audit_domains_accounted'],'domain count')
     require(all(all(r[k].strip() for k in ['acceptance_criterion','method_and_evidence','opinion','remaining_limit','references']) for r in domains),'empty domain evidence')
+    validate_domain_report_boundary(domains, doc.get('audit_domains_all_pass'))
     unknowns=read_json(base/'unknowns.json')['items'];unique(unknowns,lambda r:r['id'],'unknown id')
     require(type(doc.get('unresolved_unknowns')) is int and doc['unresolved_unknowns']==14,'report unresolved unknown count must be exactly 14')
     require(len(unknowns)==14,'unresolved unknown count must be exactly 14')
