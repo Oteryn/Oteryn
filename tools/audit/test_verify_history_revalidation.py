@@ -32,12 +32,37 @@ class HistoryRevalidationTests(unittest.TestCase):
         self.assertEqual(result["revalidation_findings"], 30)
 
     def test_current_and_historical_coordinates_cannot_be_conflated(self):
-        with self.assertRaisesRegex(ValueError, "moved boundary"):
+        with self.assertRaisesRegex(ValueError, "source boundary provenance drift"):
             self.validate_mutation(lambda d: d["source_boundaries"][1].update(current_main_commit=d["source_boundaries"][1]["historical_commit"]))
+
+    def test_each_boundary_coordinate_and_compare_value_is_exactly_bound(self):
+        mutations = (
+            lambda d: d["source_boundaries"][0].update(historical_tree="0" * 40),
+            lambda d: d["source_boundaries"][1].update(compare_path_blob_status_sha256="0" * 64),
+            lambda d: d["source_boundaries"][2].update(changed_files_reported=143),
+            lambda d: d["source_boundaries"][3].update(ahead_by=95),
+            lambda d: d["source_boundaries"][4].pop("compare_path_blob_status_sha256"),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "source boundary provenance drift"):
+                self.validate_mutation(mutate)
 
     def test_truncated_game_compare_cannot_be_promoted_to_complete(self):
         with self.assertRaisesRegex(ValueError, "Game compare truncation"):
             self.validate_mutation(lambda d: d["source_boundaries"][1].update(compare_file_list_complete=True))
+
+    def test_truncated_game_compare_requires_exact_limitation_and_carry_forward_rule(self):
+        mutations = (
+            lambda d: d["source_boundaries"][1].update(compare_limitation="GitHub returned 300-file results."),
+            lambda d: d.update(stale_evidence_rejection_rules=[x for x in d["stale_evidence_rejection_rules"] if x != verify.GAME_CARRY_FORWARD_RULE]),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "Game compare truncation"):
+                self.validate_mutation(mutate)
+
+    def test_contradictory_game_completeness_prose_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
+            self.validate_mutation(lambda d: d["limitations"].append("The Game changed-path inventory is complete."))
 
     def test_open_finding_cannot_be_silently_omitted(self):
         with self.assertRaisesRegex(ValueError, "revalidation finding set drift"):
@@ -45,8 +70,29 @@ class HistoryRevalidationTests(unittest.TestCase):
 
     def test_historical_packet_cannot_claim_closure_or_readiness(self):
         for claim in self.base["claims"]:
-            with self.subTest(claim=claim), self.assertRaisesRegex(ValueError, "must all be false"):
+            with self.subTest(claim=claim), self.assertRaisesRegex(ValueError, "exact keys and all be false"):
                 self.validate_mutation(lambda d, claim=claim: d["claims"].update({claim: True}))
+
+    def test_negative_claim_keys_cannot_be_omitted_or_extended(self):
+        mutations = (
+            lambda d: d["claims"].pop("runtime_readiness_claimed"),
+            lambda d: d["claims"].update(unrelated=False),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "exact keys and all be false"):
+                self.validate_mutation(mutate)
+
+    def test_contradictory_positive_readiness_prose_is_rejected(self):
+        assertions = (
+            "HISTORY-REVALIDATION is closed.",
+            "Product readiness is established.",
+            "Runtime readiness has been proven.",
+            "Security remediation is complete.",
+            "The organization-wide audit is complete.",
+        )
+        for assertion in assertions:
+            with self.subTest(assertion=assertion), self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
+                self.validate_mutation(lambda d, assertion=assertion: d["limitations"].append(assertion))
 
     def test_disclosure_and_digest_rejection_rules_are_mandatory(self):
         for phrase in ("digest without retrievable bytes", "public disclosure remains disclosed"):

@@ -12,7 +12,71 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CANDIDATE = ROOT / "docs/evidence/organization-audit-20260907/history-revalidation-candidate.json"
-SHA40 = re.compile(r"^[0-9a-f]{40}$")
+EXPECTED_BOUNDARIES = [
+    {
+        "id": "meta", "repository": "Oteryn/Oteryn",
+        "historical_commit": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+        "historical_tree": "b8ebb8e50bce14a736fa65590ac121655c52fd12",
+        "current_main_commit": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+        "current_main_tree": "cb7e49e772321dbf89fed74e2bc2ac3f28ab37e7",
+        "compare_status": "ahead", "ahead_by": 2, "changed_files_reported": 2,
+        "compare_file_list_complete": True,
+        "compare_path_blob_status_sha256": "039f9e2758bc006149971ccec0e7c7324668af95d65171e1e46e88fc976d3864",
+    },
+    {
+        "id": "game", "repository": "Oteryn/Oteryn-Game",
+        "historical_commit": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+        "historical_tree": "49cabfccf7d4876e5bc9276fc5963caa33dab8a5",
+        "current_main_commit": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+        "current_main_tree": "bddef2afcb7cf50c5a4c21dfd0c0c8069fbf5936",
+        "compare_status": "ahead", "ahead_by": 131, "changed_files_reported": 300,
+        "compare_file_list_complete": False,
+        "compare_limitation": "GitHub compare returned its 300-file cap; this digest is not a complete changed-path inventory.",
+        "compare_path_blob_status_sha256": "e444a9053dac983f0767603fa07037b027e5fb2d6768e6ce777491f2ad34fc93",
+    },
+    {
+        "id": "platform", "repository": "Oteryn/Oteryn-Platform",
+        "historical_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "historical_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "current_main_commit": "84d504c98acc8134eb4c9545711010b74c987974",
+        "current_main_tree": "8abbc5e1051710c695205214d4c779291dcfb697",
+        "compare_status": "ahead", "ahead_by": 50, "changed_files_reported": 144,
+        "compare_file_list_complete": True,
+        "compare_path_blob_status_sha256": "050b6effa9d2cf24354602ffe8739eb6394c5f59ad2d2c75000d500b234cc351",
+    },
+    {
+        "id": "atlas", "repository": "Oteryn/Oteryn-Atlas",
+        "historical_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+        "historical_tree": "a1009378f8d3950a5ee62fb3ee65041f7d53a1e0",
+        "current_main_commit": "be09b84ad96d7e67571a460b55d9546b59bc89a7",
+        "current_main_tree": "8666e7ad688ec4ec3063c17e6817843a6e37be55",
+        "compare_status": "ahead", "ahead_by": 96, "changed_files_reported": 201,
+        "compare_file_list_complete": True,
+        "compare_path_blob_status_sha256": "b72b86675870469ac5e8dee1b61e472cb26126544109460374b95f06919554af",
+    },
+    {
+        "id": "migration_archive", "repository": "Oteryn/Oteryn-Platform-Migration-Backup-20260818",
+        "historical_commit": "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+        "historical_tree": "dbf8349a21e432df47d1475b8431939bbe94d6e1",
+        "current_main_commit": "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+        "current_main_tree": "dbf8349a21e432df47d1475b8431939bbe94d6e1",
+        "compare_status": "identical", "ahead_by": 0, "changed_files_reported": 0,
+        "compare_file_list_complete": True,
+        "compare_path_blob_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "repository_archived": True,
+    },
+]
+EXPECTED_CLAIMS = {
+    "history_revalidation_closed": False,
+    "product_readiness_claimed": False,
+    "runtime_readiness_claimed": False,
+    "security_remediation_claimed": False,
+    "organization_audit_completion_claimed": False,
+}
+GAME_CARRY_FORWARD_RULE = (
+    "Reject source carry-forward when affected paths, dependent contracts or consumer paths are not exhaustively "
+    "compared by blob identity; an API-truncated changed-file list is insufficient."
+)
 REQUIRED_STATES = {
     "PARTIALLY_REPAIRED", "UNKNOWN_LIVE", "REQUIRES_REVALIDATION",
     "REQUIRES_LIVE_REVALIDATION", "OPEN_QUALIFICATION", "OPEN_INHERITED",
@@ -29,22 +93,38 @@ def require(ok: bool, message: str) -> None:
     if not ok:
         raise ValueError(message)
 
+
 def git_blob(path: Path) -> str:
     return subprocess.check_output(["git", "hash-object", str(path)], cwd=ROOT, text=True).strip()
+
+
+def strings(value: object):
+    """Yield all prose so contradictory assertions cannot hide in another field."""
+    if isinstance(value, str):
+        yield value.lower()
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from strings(item)
+
 
 def validate(path: Path = CANDIDATE) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     require(data.get("schema_version") == 1 and data.get("obligation") == "HISTORY-REVALIDATION", "candidate identity")
     require(data.get("disposition") == "HANDOFF_COMPLETE_OBLIGATION_REMAINS_OPEN", "obligation must remain open")
     boundaries = data.get("source_boundaries", [])
-    require([x.get("id") for x in boundaries] == ["meta", "game", "platform", "atlas", "migration_archive"], "source boundary set/order")
-    for item in boundaries:
-        for field in ("historical_commit", "historical_tree", "current_main_commit", "current_main_tree"):
-            require(isinstance(item.get(field), str) and SHA40.fullmatch(item[field]) is not None, f"{item.get('id')} {field}")
-        if item["id"] != "migration_archive":
-            require(item["historical_commit"] != item["current_main_commit"] and item["compare_status"] == "ahead" and item["ahead_by"] > 0, f"{item['id']} moved boundary")
-    game = next(x for x in boundaries if x["id"] == "game")
-    require(game.get("compare_file_list_complete") is False and "300-file" in game.get("compare_limitation", ""), "Game compare truncation must fail closed")
+    require([x.get("id") for x in boundaries] == [x["id"] for x in EXPECTED_BOUNDARIES], "source boundary set/order")
+    game = boundaries[1]
+    stale_rules = data.get("stale_evidence_rejection_rules", [])
+    require(
+        game.get("compare_file_list_complete") is False
+        and game.get("compare_limitation") == EXPECTED_BOUNDARIES[1]["compare_limitation"]
+        and GAME_CARRY_FORWARD_RULE in stale_rules,
+        "Game compare truncation must fail closed",
+    )
+    require(boundaries == EXPECTED_BOUNDARIES, "source boundary provenance drift")
     inputs = {x["path"]: (x["git_blob"], x["sha256"]) for x in data.get("provenance", {}).get("canonical_inputs", [])}
     require(inputs == EXPECTED_INPUTS, "canonical input manifest drift")
     for rel, expected in EXPECTED_INPUTS.items():
@@ -56,8 +136,18 @@ def validate(path: Path = CANDIDATE) -> dict:
     actual_ids = set(data.get("claims_requiring_rebind_or_revalidation", {}).get("finding_ids", []))
     require(actual_ids == expected_ids, "revalidation finding set drift")
     claims = data.get("claims", {})
-    require(claims and all(value is False for value in claims.values()), "readiness/closure claims must all be false")
-    stale = " ".join(data.get("stale_evidence_rejection_rules", [])).lower()
+    require(claims == EXPECTED_CLAIMS, "readiness/closure claims must have exact keys and all be false")
+    prose = "\n".join(strings({key: value for key, value in data.items() if key != "claims"}))
+    contradictory = (
+        r"history[- ]revalidation (?:is |has been )?closed",
+        r"(?:product|runtime) readiness (?:is |has been )?(?:claimed|established|proven)",
+        r"security remediation (?:is |has been )?(?:claimed|complete|established|proven)",
+        r"organization(?:-wide)? audit (?:is |has been )?(?:complete|completed|closed)",
+        r"game compare (?:is |was )?(?:complete|exhaustive)",
+        r"game (?:file|changed-path|path)(?: list| inventory)? (?:is |was )?(?:complete|exhaustive)",
+    )
+    require(not any(re.search(pattern, prose) for pattern in contradictory), "contradictory positive assertion")
+    stale = " ".join(stale_rules).lower()
     require("digest without retrievable bytes" in stale and "public disclosure remains disclosed" in stale, "stale-evidence rules weakened")
     limits = " ".join(data.get("limitations", [])).lower()
     require("does not close history-revalidation" in limits and "no provider code execution" in limits, "limitations weakened")
