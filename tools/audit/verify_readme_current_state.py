@@ -14,12 +14,12 @@ RETIRED_R7_WORKFLOW = WORKFLOW_DIR / 'organization-audit-meta-current-main-gover
 EXPECTED_TITLE = '# Organization audit R3 evidence'
 EXPECTED_LOCAL_HEADING = '## Local checks'
 EXPECTED_EVIDENCE_HEADING = '## Evidence map and durability'
-EXPECTED_README_SHA256 = 'fe02bf2edb42e7b42e73016defc0b55753c66738c87672ddf1c77e8289f00e87'
+EXPECTED_README_SHA256 = '4218b0ee339926f4858bcbddb43352c0e1b2d7a95f3df3469086075c2478e5a7'
 EXPECTED_INTRO = (
     'Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; '
     'this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 14 residual '
-    'obligations, 308 DIRECT scoped path reviews and 113 bounded GROUPED Platform paths out of 4361 immutable '
-    'leaves. In total, 421 leaves are semantically classified and 3940 retain UNVERIFIED semantics. Full-file, '
+    'obligations, 309 DIRECT scoped path reviews and 113 bounded GROUPED Platform paths out of 4361 immutable '
+    'leaves. In total, 422 leaves are semantically classified and 3939 retain UNVERIFIED semantics. Full-file, '
     'control-field, translation-range and GROUPED carry-forward evidence are intentionally distinguished.'
 )
 EXPECTED_REVIEW_CLOSEOUT = (
@@ -110,10 +110,10 @@ def validate_text(text: str) -> dict[str, object]:
         require(normalize(marker) not in compact, f'README stale marker present: {marker}')
     return {
         'result': 'README_CURRENT_STATE_VALIDATED_NOT_PRODUCT_PASS',
-        'direct_paths': 308,
+        'direct_paths': 309,
         'grouped_paths': 113,
-        'unverified_paths': 3940,
-        'semantically_classified_paths': 421,
+        'unverified_paths': 3939,
+        'semantically_classified_paths': 422,
         'remaining_bounded_proof_workflows': [],
         'product_readiness_claimed': False,
         'audit_completion_claimed': False,
@@ -125,7 +125,11 @@ def validate_terminal_workflow_state(root: Path = ROOT) -> list[str]:
     require(workflow_dir.is_dir() and not workflow_dir.is_symlink(), 'workflow directory missing or not a regular directory')
     retired = root / RETIRED_R7_WORKFLOW
     require(not retired.exists() and not retired.is_symlink(), 'retired R7 qualification workflow still present')
-    remaining = sorted(path.name for path in workflow_dir.glob('organization-audit-*.yml'))
+    remaining = sorted(
+        path.name
+        for pattern in ('organization-audit-*.yml', 'organization-audit-*.yaml')
+        for path in workflow_dir.glob(pattern)
+    )
     require(not remaining, f'bounded audit-proof workflow still present: {remaining}')
     return remaining
 

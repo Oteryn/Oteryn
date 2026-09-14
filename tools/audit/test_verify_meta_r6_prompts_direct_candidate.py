@@ -3,7 +3,7 @@
 from copy import deepcopy
 from pathlib import Path
 from unittest import mock
-import csv, json, shutil, tempfile, unittest
+import csv, io, json, shutil, tempfile, unittest
 import verify_meta_r6_prompts_direct_candidate as v
 
 class MetaR6PromptsCandidateTest(unittest.TestCase):
@@ -25,6 +25,16 @@ class MetaR6PromptsCandidateTest(unittest.TestCase):
         v.validate_candidate(deepcopy(self.candidate)); v.validate_source(v.ROOT, self.candidate)
         v.validate_finding(v.ROOT, self.candidate); v.validate_accounting(v.ROOT, self.candidate, self.inventory)
         v.validate_adoption(v.ROOT, self.candidate)
+    def test_main_emits_current_meta_accounting(self):
+        with mock.patch.object(v, 'expected_candidate', return_value=self.candidate), \
+             mock.patch.object(v, 'validate_candidate'), mock.patch.object(v, 'validate_source'), \
+             mock.patch.object(v, 'validate_finding'), mock.patch.object(v, 'validate_adoption'), \
+             mock.patch.object(v, 'validate_accounting'), mock.patch('sys.argv', ['verify_meta_r6_prompts_direct_candidate.py']), \
+             mock.patch('sys.stdout', new_callable=io.StringIO) as output:
+            self.assertEqual(v.main(), 0)
+        result = json.loads(output.getvalue())
+        self.assertEqual(result['meta_direct_paths'], 96)
+        self.assertEqual(result['meta_unverified_paths'], 114)
     def test_expected_candidate_parses_the_authenticated_bytes(self):
         temp, root = self.copied_evidence()
         try:

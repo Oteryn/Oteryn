@@ -15,7 +15,7 @@ ANNOUNCEMENTS_OVERLAY_REL = Path('docs/evidence/organization-audit-20260907/cove
 ANNOUNCEMENTS_OVERLAY_BLOB = '7822ad14cb7c9311267fd7bbf52490ca320762e9'
 ANNOUNCEMENTS_OVERLAY_SHA256 = '5e9b4832b886cf9049f49be00fa32b76abab5b896e63a1711688c47fb5addcb2'
 ANNOUNCEMENTS_LEDGER_SHA = '73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9'
-CANONICAL_LEDGER_SHA = '8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94'
+CANONICAL_LEDGER_SHA = 'bf51139f97683659f752a54e643c1d342791476d64a0f78237b5c5d3ba3a310a'
 LIFECYCLE_RESULT = 'ANNOUNCEMENTS_DIRECT_CANONICAL_ADOPTION_VALID_REVIEW_OBSERVED_IN_EXTERNAL_PR_METADATA'
 REVIEW_PROVENANCE = 'External mutable PR #185 metadata: reviewed implementation 3eb62ef72c1e13412fa45d5b25d597d112d9ae7d; review comment 5609072309. Not self-certified evidence.'
 EXPECTED_LINE_RANGES = {
@@ -41,6 +41,11 @@ EXPECTED_EXECUTION_EVIDENCE = {
         if path == 'app/Announcements/Queries/ActiveAnnouncementQuery.php' else '')
     for path in EXPECTED_LINE_RANGES
 }
+EXPECTED_OVERLAY_HEADER = [
+    'repository', 'path', 'blob_sha', 'depth', 'line_ranges', 'scope',
+    'source_reference', 'historical_batch', 'historical_ledger_binding',
+    'execution_evidence', 'limitations',
+]
 
 
 def require(condition: bool, message: str) -> None:
@@ -52,11 +57,14 @@ def git_blob_sha(raw: bytes) -> str:
     return hashlib.sha1(b'blob ' + str(len(raw)).encode('ascii') + b'\0' + raw).hexdigest()
 
 
-def read_tsv(path: Path) -> list[dict[str,str]]:
-    with path.open(encoding='utf-8',newline='') as handle:
-        reader=csv.DictReader(handle,delimiter='\t')
-        require(reader.fieldnames is not None and len(reader.fieldnames)==len(set(reader.fieldnames)),'Announcements overlay header drift')
-        rows=list(reader)
+def parse_tsv_bytes(raw: bytes) -> list[dict[str, str]]:
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('Announcements overlay is not valid UTF-8') from exc
+    reader = csv.DictReader(text.splitlines(), delimiter='\t', strict=True)
+    require(reader.fieldnames == EXPECTED_OVERLAY_HEADER, 'Announcements overlay header drift')
+    rows = list(reader)
     require(rows and all(None not in row and None not in row.values() for row in rows),'Announcements overlay row drift')
     return rows
 
@@ -72,7 +80,7 @@ def validate_adopted_docs(candidate: dict, audit_root: Path) -> None:
     raw=overlay_path.read_bytes()
     require(git_blob_sha(raw)==ANNOUNCEMENTS_OVERLAY_BLOB,'Announcements evidence overlay Git blob drift')
     require(hashlib.sha256(raw).hexdigest()==ANNOUNCEMENTS_OVERLAY_SHA256,'Announcements evidence overlay SHA-256 drift')
-    ann_rows=read_tsv(overlay_path)
+    ann_rows=parse_tsv_bytes(raw)
     require(len(ann_rows)==10,'Announcements evidence overlay must contain exactly ten rows')
     candidate_by_path={row['path']:row for row in candidate['paths']}
     require([row['path'] for row in ann_rows]==list(candidate_by_path),'Announcements overlay path order/set drift')
@@ -92,16 +100,16 @@ def validate_adopted_docs(candidate: dict, audit_root: Path) -> None:
     require(report.get('coverage_review_additions')==vr.DIRECT_ADDITIONS_BINDING,'canonical additions binding drift')
     require(report.get('coverage_review_announcements_additions')==vr.ANNOUNCEMENTS_ADDITIONS_BINDING,'Announcements evidence binding drift')
     require(report.get('r3_platform_announcements_direct_candidate')=='organization-audit-20260907/r3-platform-announcements-direct-candidate.json','Announcements candidate binding drift')
-    require(report.get('scoped_review_paths')==308 and report.get('grouped_revalidated_paths')==113 and report.get('semantically_classified_paths')==421,'report accounting drift')
+    require(report.get('scoped_review_paths')==309 and report.get('grouped_revalidated_paths')==113 and report.get('semantically_classified_paths')==422,'report accounting drift')
 
     summary=vr.read_json(audit_root/'docs/evidence/organization-audit-20260907/coverage-summary.json')
     require(summary.get('ledger_sha256')==CANONICAL_LEDGER_SHA,'canonical ledger digest drift')
-    require(summary.get('scoped_review_paths')==308 and summary.get('grouped_revalidated_paths')==113 and summary.get('unverified_semantics_total')==3940 and summary.get('semantically_classified_paths')==421,'summary accounting drift')
+    require(summary.get('scoped_review_paths')==309 and summary.get('grouped_revalidated_paths')==113 and summary.get('unverified_semantics_total')==3939 and summary.get('semantically_classified_paths')==422,'summary accounting drift')
     require(summary['per_repository']['platform']=={'leaves':2165,'direct_scoped':168,'unverified_semantics':1884,'grouped':113,'not_applicable':0},'Platform summary drift')
 
     base=report_path.parent/report['evidence_directory']
     review=vr.load_review(base,report)
-    require(len(review)==308,'canonical DIRECT count drift')
+    require(len(review)==309,'canonical DIRECT count drift')
     canonical={(row['repository'],row['path']):row for row in review}
     for row in ann_rows:
         current=canonical.get(('platform',row['path']))
@@ -125,10 +133,10 @@ def main() -> int:
         'result':LIFECYCLE_RESULT,
         'source_commit':pre.SOURCE_COMMIT,
         'adopted_paths':10,
-        'direct_paths':308,
+        'direct_paths':309,
         'grouped_paths':113,
-        'unverified_paths':3940,
-        'semantically_classified_paths':421,
+        'unverified_paths':3939,
+        'semantically_classified_paths':422,
         'ledger_sha256':CANONICAL_LEDGER_SHA,
         'primary_cases':4,
         'primary_assertions':20,
