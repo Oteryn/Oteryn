@@ -125,6 +125,20 @@ def assertion_strings(value: object, path: tuple[str, ...] = ()):
             yield from assertion_strings(item, path)
 
 
+def duplicated_governed_claim_keys(value: object) -> set[str]:
+    """Return canonical claim keys found anywhere outside the canonical claims object."""
+    found: set[str] = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in EXPECTED_CLAIMS:
+                found.add(key)
+            found.update(duplicated_governed_claim_keys(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.update(duplicated_governed_claim_keys(item))
+    return found
+
+
 def validate(path: Path = CANDIDATE) -> dict:
     data = json.loads(path.read_text(encoding="utf-8"))
     require(data.get("schema_version") == 1 and data.get("obligation") == "HISTORY-REVALIDATION", "candidate identity")
@@ -154,7 +168,9 @@ def validate(path: Path = CANDIDATE) -> dict:
     require(actual_ids == expected_ids, "revalidation finding set drift")
     claims = data.get("claims", {})
     require(claims == EXPECTED_CLAIMS, "readiness/closure claims must have exact keys and all be false")
-    prose = "\n".join(assertion_strings({key: value for key, value in data.items() if key != "claims"}))
+    outside_claims = {key: value for key, value in data.items() if key != "claims"}
+    require(not duplicated_governed_claim_keys(outside_claims), "governed claim key duplicated outside claims")
+    prose = "\n".join(assertion_strings(outside_claims))
     contradictory = (
         r"history[- ]revalidation (?:is |has been )?closed",
         r"(?:product|runtime) readiness (?:is |has been )?(?:claimed|established|proven)",
