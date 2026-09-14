@@ -17,8 +17,8 @@ CANDIDATE = (
     "audit186-semantic-01-historical-candidate.json"
 )
 PREFIX = "docs/evidence/repository-audit-2026-09-06/"
-BASELINE = "2d877271afa8f177983f3c6147472372adca0ed1"
-BASELINE_TREE = "206b56085bbe12f9471be3dcfdbaa48947da7d5d"
+BASELINE = "1008886c0aec2db6b8588a3131a83829eff06e67"
+BASELINE_TREE = "9f32fb6a2debb09483bab478e1ec2d5a05cbf9db"
 FAMILY_TREE = "1609dfc49cc95b174a8efd0ccf8e342c22dd2173"
 KNOWN_MANIFEST_MISMATCH = {
     "path": "OTERYN-REPOSITORY-AUDIT-R4-CURRENT-MAIN-DELTA-CLOSEOUT-20260907.md",
@@ -40,14 +40,34 @@ EXPECTED_PROJECTION = {
     "delta": {"direct": 26, "grouped": 0, "unverified": -26, "semantically_classified": 26},
     "result": {
         "source_leaves": 4361,
-        "direct": 334,
+        "direct": 335,
         "grouped": 113,
-        "unverified": 3914,
-        "semantically_classified": 447,
-        "meta": {"leaves": 210, "direct": 121, "grouped": 0, "unverified": 89},
+        "unverified": 3913,
+        "semantically_classified": 448,
+        "meta": {"leaves": 210, "direct": 122, "grouped": 0, "unverified": 88},
     },
 }
-EXPECTED_CANDIDATE_DIGEST = "97b20b6d7c0aee80eab487bc59c7662acd1851bd86cb6a9643d9a007fd007b4b"
+EXPECTED_CURRENT_HEADS = {
+    "meta": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+    "game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+    "platform": "84d504c98acc8134eb4c9545711010b74c987974",
+    "atlas": "bf57f1ca5193112dc8d1951638c300e167032010",
+}
+EXPECTED_CANONICAL_ACCOUNTING = {
+    "source_leaves": 4361,
+    "direct": 309,
+    "grouped": 113,
+    "unverified": 3939,
+    "semantically_classified": 422,
+    "meta": {"leaves": 210, "direct": 96, "grouped": 0, "unverified": 114},
+}
+EXPECTED_OVERLAP_GUARD = {
+    "later_semantic_03_overlay_paths": ["meta\tdocs/ci/CI_CONTRACT.md"],
+    "candidate_historical_family_overlap": [],
+    "candidate_historical_paths_current_disposition": "UNVERIFIED",
+    "candidate_historical_paths_current_unverified_count": 26,
+}
+EXPECTED_CANDIDATE_DIGEST = "5e538c84f0cc3f4459328e5a2ffc21a1f2e1fee61d67036b17822e8eed43a8dd"
 ALLOWED_CHANGED_PATHS = {
     "docs/agents/workers/AUDIT186-SEMANTIC-01.md",
     "docs/evidence/organization-audit-20260907/audit186-semantic-01-historical-candidate.json",
@@ -120,12 +140,18 @@ def validate_document(doc: dict[str, Any]) -> list[dict[str, Any]]:
         raise CandidateError("current/readiness/completion/provider claim drift")
     if doc.get("projection_if_adopted") != EXPECTED_PROJECTION:
         raise CandidateError("PROJECTION_ONLY accounting drift")
+    if doc.get("canonical_accounting_before_candidate") != EXPECTED_CANONICAL_ACCOUNTING:
+        raise CandidateError("current canonical accounting drift")
+    if doc.get("canonical_overlap_guard") != EXPECTED_OVERLAP_GUARD:
+        raise CandidateError("canonical overlap/adoption guard drift")
 
     source = doc.get("source_coordinates")
     if not isinstance(source, dict) or (
         source.get("repository"), source.get("baseline_head"), source.get("baseline_tree"), source.get("family_tree")
     ) != ("Oteryn/Oteryn", BASELINE, BASELINE_TREE, FAMILY_TREE):
         raise CandidateError("baseline/source coordinate drift")
+    if source.get("release_observed_current_heads") != EXPECTED_CURRENT_HEADS:
+        raise CandidateError("current default-branch coordinate drift")
 
     family = doc.get("family")
     if not isinstance(family, dict):

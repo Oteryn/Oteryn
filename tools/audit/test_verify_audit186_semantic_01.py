@@ -94,6 +94,45 @@ class Audit186Semantic01Tests(unittest.TestCase):
         with self.assertRaisesRegex(verifier.CandidateError, "coordinate drift"):
             verifier.validate_document(doc)
 
+    def test_current_coordinates_and_canonical_accounting_drift_are_rejected(self):
+        mutations = (
+            lambda doc: doc["source_coordinates"]["release_observed_current_heads"].__setitem__(
+                "atlas", "0" * 40
+            ),
+            lambda doc: doc["canonical_accounting_before_candidate"].__setitem__(
+                "direct", 308
+            ),
+            lambda doc: doc["projection_if_adopted"]["result"].__setitem__("direct", 334),
+        )
+        for mutate in mutations:
+            with self.subTest(mutation=mutate):
+                doc = self.candidate()
+                mutate(doc)
+                with self.assertRaises(verifier.CandidateError):
+                    verifier.validate_document(doc)
+
+    def test_semantic_03_overlap_or_readoption_is_rejected(self):
+        mutations = (
+            lambda doc: doc["canonical_overlap_guard"][
+                "later_semantic_03_overlay_paths"
+            ].append("meta\tdocs/evidence/repository-audit-2026-09-06/README.md"),
+            lambda doc: doc["canonical_overlap_guard"][
+                "candidate_historical_family_overlap"
+            ].append("docs/evidence/repository-audit-2026-09-06/README.md"),
+            lambda doc: doc["canonical_overlap_guard"].__setitem__(
+                "candidate_historical_paths_current_disposition", "DIRECT"
+            ),
+            lambda doc: doc["canonical_overlap_guard"].__setitem__(
+                "candidate_historical_paths_current_unverified_count", 25
+            ),
+        )
+        for mutate in mutations:
+            with self.subTest(mutation=mutate):
+                doc = self.candidate()
+                mutate(doc)
+                with self.assertRaisesRegex(verifier.CandidateError, "overlap/adoption"):
+                    verifier.validate_document(doc)
+
     def test_blob_and_byte_drift_are_rejected(self):
         doc = self.candidate()
         doc["family"]["paths"][0]["blob_sha"] = "0" * 40

@@ -10,14 +10,14 @@
   },
   "source_coordinates": {
     "repository": "Oteryn/Oteryn",
-    "baseline_head": "2d877271afa8f177983f3c6147472372adca0ed1",
-    "baseline_tree": "206b56085bbe12f9471be3dcfdbaa48947da7d5d",
+    "baseline_head": "1008886c0aec2db6b8588a3131a83829eff06e67",
+    "baseline_tree": "9f32fb6a2debb09483bab478e1ec2d5a05cbf9db",
     "family_tree": "1609dfc49cc95b174a8efd0ccf8e342c22dd2173",
     "release_observed_current_heads": {
       "meta": "d9419b05eb98c81279297563c11fc90e4fe708ac",
       "game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
       "platform": "84d504c98acc8134eb4c9545711010b74c987974",
-      "atlas": "be09b84ad96d7e67571a460b55d9546b59bc89a7"
+      "atlas": "bf57f1ca5193112dc8d1951638c300e167032010"
     },
     "historical_provider_source_cuts": {
       "game": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
@@ -333,15 +333,15 @@
     },
     "result": {
       "source_leaves": 4361,
-      "direct": 334,
+      "direct": 335,
       "grouped": 113,
-      "unverified": 3914,
-      "semantically_classified": 447,
+      "unverified": 3913,
+      "semantically_classified": 448,
       "meta": {
         "leaves": 210,
-        "direct": 121,
+        "direct": 122,
         "grouped": 0,
-        "unverified": 89
+        "unverified": 88
       }
     }
   },
@@ -362,5 +362,26 @@
     "organization_audit_completion": false,
     "package_wide_digest_integrity": false,
     "provider_mutation": false
+  },
+  "canonical_accounting_before_candidate": {
+    "source_leaves": 4361,
+    "direct": 309,
+    "grouped": 113,
+    "unverified": 3939,
+    "semantically_classified": 422,
+    "meta": {
+      "leaves": 210,
+      "direct": 96,
+      "grouped": 0,
+      "unverified": 114
+    }
+  },
+  "canonical_overlap_guard": {
+    "later_semantic_03_overlay_paths": [
+      "meta\tdocs/ci/CI_CONTRACT.md"
+    ],
+    "candidate_historical_family_overlap": [],
+    "candidate_historical_paths_current_disposition": "UNVERIFIED",
+    "candidate_historical_paths_current_unverified_count": 26
   }
 }
