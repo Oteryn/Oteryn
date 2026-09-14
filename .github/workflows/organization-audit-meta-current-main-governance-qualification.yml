@@ -1,4 +1,4 @@
-name: Organization Audit META Current-Main Governance Qualification
+name: Organization Audit META R7 Adopted Qualification
 
 on:
   pull_request:
@@ -6,43 +6,45 @@ on:
     paths:
       - '.github/workflows/organization-audit-meta-current-main-governance-qualification.yml'
       - 'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json'
+      - 'docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.md'
+      - 'docs/evidence/organization-audit-20260907/README.md'
       - 'docs/evidence/organization-audit-20260907/r7-meta-current-main-governance-direct-candidate.json'
       - 'docs/evidence/organization-audit-20260907/coverage-review*.tsv'
       - 'docs/evidence/organization-audit-20260907/coverage-groups.json'
       - 'docs/evidence/organization-audit-20260907/coverage-summary.json'
+      - 'docs/evidence/organization-audit-20260907/unknowns.json'
       - 'docs/evidence/organization-audit-20260907/verification-index.json'
       - 'docs/evidence/organization-audit-20260907/collection-plan.json'
+      - 'docs/evidence/organization-audit-20260907/workflow-inventory.tsv'
+      - 'tools/audit/organization_audit.py'
+      - 'tools/audit/verify_report.py'
+      - 'tools/audit/verify_readme_current_state.py'
       - 'tools/audit/verify_meta_current_main_governance_direct_candidate.py'
       - 'tools/audit/test_verify_meta_current_main_governance_direct_candidate.py'
-
 permissions:
   contents: read
-
 jobs:
   qualify:
-    name: Qualify current-main governance candidate
+    name: Qualify R7 adopted state
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Checkout exact PR candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-
-      - name: Candidate regressions
-        env:
-          PYTHONDONTWRITEBYTECODE: '1'
+      - name: R7 adopted verifier tests
+        env: {PYTHONDONTWRITEBYTECODE: '1'}
         run: python3 tools/audit/test_verify_meta_current_main_governance_direct_candidate.py
-
-      - name: Verify exact current-main candidate
-        env:
-          PYTHONDONTWRITEBYTECODE: '1'
-        run: python3 tools/audit/verify_meta_current_main_governance_direct_candidate.py
-
-      - name: Assert candidate remains non-adopted
-        shell: bash
+      - name: Rebuild inventories and canonical ledger
+        env: {PYTHONDONTWRITEBYTECODE: '1'}
         run: |
-          set -euo pipefail
-          test ! -e docs/evidence/organization-audit-20260907/coverage-review-meta-current-main-governance-direct-additions.tsv
+          python3 tools/audit/organization_audit.py --plan docs/evidence/organization-audit-20260907/collection-plan.json --output /tmp/r7-inventory
+          python3 tools/audit/verify_report.py --report docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json --inventory-dir /tmp/r7-inventory/inventories --ledger-output /tmp/r7-ledger.csv
+          test "$(sha256sum /tmp/r7-ledger.csv | cut -d' ' -f1)" = "8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94"
+      - name: Verify adopted records and current README
+        env: {PYTHONDONTWRITEBYTECODE: '1'}
+        run: |
+          python3 tools/audit/verify_meta_current_main_governance_direct_candidate.py
+          python3 tools/audit/verify_readme_current_state.py

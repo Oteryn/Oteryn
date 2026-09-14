@@ -1,6 +1,7 @@
 repository	path	blob_sha	name	events	job_count	parse_result
-meta	.github/workflows/ci.yml	ee7d5dee4b7aafb2601a25fbbe5d789ab4627687	META CI	pull_request,merge_group,push,workflow_dispatch	1	PASS
+meta	.github/workflows/ci.yml	9a4e944d322b682a1cf61fa0110e69e69c8bb4ba	META CI	pull_request,merge_group,push,workflow_dispatch	1	PASS
 meta	.github/workflows/terminal-branch-lifecycle.yml	c10bf3b2abc239015cd3e132e6370ac354031207	Terminal Branch Lifecycle	pull_request,pull_request_target,push,schedule,workflow_dispatch	3	PASS
+meta	.github/workflows/governed-merge-queue-executor.yml	00247bc74b1a123ad96f8b9d219eb018581c6f1d	Governed Merge Queue Executor	issue_comment	1	PASS
 game	.github/workflows/agent-governance.yml	10a4f282b7ee70ac2d5df81002e226ad598d997c	Agent governance	pull_request,push,workflow_dispatch	1	PASS
 game	.github/workflows/architecture-semantic-audit.yml	44f79456e85e682a4b710b51394330302a97526f	Architecture semantic audit	pull_request	1	PASS
 game	.github/workflows/codeql.yml	0dfff11a789ea1a2b49b518311cd8064aa4d7a7a	CodeQL	push,schedule,workflow_dispatch	1	PASS

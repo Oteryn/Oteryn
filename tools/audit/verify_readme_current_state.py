@@ -11,12 +11,12 @@ import re
 EXPECTED_TITLE = '# Organization audit R3 evidence'
 EXPECTED_LOCAL_HEADING = '## Local checks'
 EXPECTED_EVIDENCE_HEADING = '## Evidence map and durability'
-EXPECTED_README_SHA256 = '91f0bc3b629f77c0e0c7ce4bfe980640e1c750b7c321c91a8b9811fd22f3b943'
+EXPECTED_README_SHA256 = '8730039d22ac6bfd487dcbe9cd7e8808e729ae0ee40369618d19be2c083a9de7'
 EXPECTED_INTRO = (
     'Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; '
     'this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 14 residual '
-    'obligations, 294 DIRECT scoped path reviews and 113 bounded GROUPED Platform paths out of 4325 immutable '
-    'leaves. In total, 407 leaves are semantically classified and 3918 retain UNVERIFIED semantics. Full-file, '
+    'obligations, 308 DIRECT scoped path reviews and 113 bounded GROUPED Platform paths out of 4361 immutable '
+    'leaves. In total, 421 leaves are semantically classified and 3940 retain UNVERIFIED semantics. Full-file, '
     'control-field, translation-range and GROUPED carry-forward evidence are intentionally distinguished.'
 )
 EXPECTED_REVIEW_CLOSEOUT = (
@@ -103,10 +103,10 @@ def validate_text(text: str) -> dict[str, object]:
         require(normalize(marker) not in compact, f'README stale marker present: {marker}')
     return {
         'result': 'README_CURRENT_STATE_VALIDATED_NOT_PRODUCT_PASS',
-        'direct_paths': 294,
+        'direct_paths': 308,
         'grouped_paths': 113,
-        'unverified_paths': 3918,
-        'semantically_classified_paths': 407,
+        'unverified_paths': 3940,
+        'semantically_classified_paths': 421,
         'remaining_bounded_proof_workflows': [],
         'product_readiness_claimed': False,
         'audit_completion_claimed': False,

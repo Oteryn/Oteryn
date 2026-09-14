@@ -465,5 +465,37 @@
     "audit_completion_claimed": false,
     "live_state_claimed": false,
     "standing_authority_claimed": false
+  },
+  "r7_meta_current_main_governance_direct_adoption": {
+    "state": "ADOPTED_BOUNDED_SOURCE_SEMANTICS_NOT_PRODUCT_PASS",
+    "candidate": "r7-meta-current-main-governance-direct-candidate.json",
+    "candidate_git_blob": "6a3e98ad65f52015a43a84e39a8940f64b31dc65",
+    "adoption_overlay": "coverage-review-meta-current-main-governance-direct-additions.tsv",
+    "adoption_overlay_sha256": "8c9064552ea9592d7c5b51852333add3f58cdb4963f4316c2dd6bcbd21b44e16",
+    "source_commit": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+    "source_tree": "b8ebb8e50bce14a736fa65590ac121655c52fd12",
+    "path_count": 14,
+    "refreshed_existing_direct_paths": 5,
+    "depth": "SCOPED_SEMANTIC_REVIEW",
+    "line_ranges": [],
+    "ledger_sha256": "8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94",
+    "counts": {
+      "source_leaves": 4361,
+      "direct": 308,
+      "grouped": 113,
+      "unverified": 3940,
+      "semantically_classified": 421
+    },
+    "meta": {
+      "leaves": 210,
+      "direct": 95,
+      "grouped": 0,
+      "unverified": 115
+    },
+    "historical_packet_paths_remaining_unverified": 26,
+    "meta_aud_05": "P2_PARTIALLY_REPAIRED",
+    "product_readiness_claimed": false,
+    "organization_audit_completion_claimed": false,
+    "live_operational_capability_claimed": false
   }
 }

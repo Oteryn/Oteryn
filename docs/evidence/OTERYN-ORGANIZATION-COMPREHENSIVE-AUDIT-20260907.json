@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "report_id": "OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907",
-  "revision": "R3-NATIVE-EVIDENCE-POST-REVIEW-PLATFORM-SEMANTIC-CARRYFORWARD-113-DIRECT-294",
+  "revision": "R7-META-CURRENT-MAIN-GOVERNANCE-DIRECT-ADOPTED",
   "status": "QUALIFIED_AUDIT_WITH_EXPLICIT_OPEN_SCOPE",
   "governing_issue": "Oteryn/Oteryn#186",
   "pull_request": "Oteryn/Oteryn#185",
@@ -9,9 +9,9 @@
   "repositories": {
     "meta": {
       "repository": "Oteryn/Oteryn",
-      "commit_sha": "1a01c5b3e08666a82245b1cac78da3736c65e785",
-      "tree_sha": "f084e824ec5e14d5909c9750d906d91d51425fd5",
-      "leaf_count": 174
+      "commit_sha": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+      "tree_sha": "b8ebb8e50bce14a736fa65590ac121655c52fd12",
+      "leaf_count": 210
     },
     "game": {
       "repository": "Oteryn/Oteryn-Game",
@@ -41,11 +41,11 @@
   "source_identity_validation": {
     "active_repositories": 4,
     "archive_repositories": 1,
-    "active_leaf_count": 4324,
-    "including_archive_leaf_count": 4325,
+    "active_leaf_count": 4360,
+    "including_archive_leaf_count": 4361,
     "historical_supporting_snapshots": 3,
     "all_collected_root_trees_verified": 8,
-    "unique_blobs_verified": 4641
+    "unique_blobs_verified": 4651
   },
   "semantic_coverage": "PARTIAL_EXPLICIT_NOT_ALL_LINE",
   "production_readiness_claimed": false,
@@ -60,8 +60,8 @@
   "audit_domains_all_pass": false,
   "workflow_census": {
     "meta": {
-      "workflows": 2,
-      "jobs": 4,
+      "workflows": 3,
+      "jobs": 5,
       "merge_group_workflows": 1
     },
     "game": {
@@ -79,8 +79,8 @@
       "jobs": 5,
       "merge_group_workflows": 2
     },
-    "total_workflows": 77,
-    "total_declared_jobs": 150,
+    "total_workflows": 78,
+    "total_declared_jobs": 151,
     "matrix_expanded": false,
     "semantic_qualification_claimed": false
   },
@@ -121,9 +121,9 @@
   "historical_candidate_p1_ids_not_counted_as_source_snapshot": [
     "GAME-CANDIDATE-361"
   ],
-  "scoped_review_paths": 294,
+  "scoped_review_paths": 308,
   "grouped_revalidated_paths": 113,
-  "semantically_classified_paths": 407,
+  "semantically_classified_paths": 421,
   "r3_native_results": "organization-audit-20260907/r3-native-results.json",
   "r3_source_review": "organization-audit-20260907/r3-source-review.md",
   "r3_visual_review": "organization-audit-20260907/r3-visual-review.json",
@@ -162,7 +162,7 @@
     }
   },
   "audit_completion": "NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial",
-  "source_cut_policy": "Immutable original pinned generations are retained. Later lifecycle observations are separate evidence; this is not an all-repositories current-main acceptance snapshot.",
+  "source_cut_policy": "META is rebaselined to protected main 23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090 / tree b8ebb8e50bce14a736fa65590ac121655c52fd12 with 210 leaves; Game, Platform, Atlas and migration archive retain their prior pinned source coordinates. This is a META-only source rebaseline, not an all-repositories current-main acceptance snapshot or live provider/admin/runtime proof.",
   "rejected_group_candidates": 1,
   "atlas_grouped_revalidation": "organization-audit-20260907/r3-atlas-grouped-revalidation.json",
   "r3_platform_gameauth_candidate": "organization-audit-20260907/r3-platform-gameauth-candidate.json",
@@ -179,5 +179,8 @@
   "r3_meta_r5_instruction_efficiency_direct_adoption_overlay": "organization-audit-20260907/coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv",
   "coverage_review_meta_r6_prompts_direct_additions": "organization-audit-20260907/coverage-review-meta-r6-prompts-direct-additions.tsv",
   "r3_meta_r6_prompts_direct_candidate": "organization-audit-20260907/r3-meta-r6-prompts-direct-candidate.json",
-  "r3_meta_r6_prompts_direct_adoption_overlay": "organization-audit-20260907/coverage-review-meta-r6-prompts-direct-additions.tsv"
+  "r3_meta_r6_prompts_direct_adoption_overlay": "organization-audit-20260907/coverage-review-meta-r6-prompts-direct-additions.tsv",
+  "coverage_review_meta_current_main_governance_direct_additions": "organization-audit-20260907/coverage-review-meta-current-main-governance-direct-additions.tsv",
+  "r7_meta_current_main_governance_direct_candidate": "organization-audit-20260907/r7-meta-current-main-governance-direct-candidate.json",
+  "r7_meta_current_main_governance_direct_adoption_overlay": "organization-audit-20260907/coverage-review-meta-current-main-governance-direct-additions.tsv"
 }

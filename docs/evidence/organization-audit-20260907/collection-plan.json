@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "scope": "Verified immutable source snapshots. The original PR185 Game coordinate could not be resolved; its replacement is not silent evidence carry-forward. Prior audit publications are historical evidence, not current provider authority. No provider code is executed.",
+  "scope": "Verified immutable source snapshots. META is rebaselined to protected main 23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090; the other four pinned repository/archive sources remain unchanged. This is not an all-repositories current-main acceptance snapshot. Historical evidence is not current provider authority; no provider code is executed.",
   "snapshots": [
     {
       "id": "meta",
       "repository": "Oteryn/Oteryn",
-      "commit_sha": "1a01c5b3e08666a82245b1cac78da3736c65e785",
-      "expected_tree_sha": "f084e824ec5e14d5909c9750d906d91d51425fd5",
+      "commit_sha": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+      "expected_tree_sha": "b8ebb8e50bce14a736fa65590ac121655c52fd12",
       "role": "audited_source"
     },
     {
