@@ -33,12 +33,45 @@ class CostCiVerifierTests(unittest.TestCase):
 
     def test_rejects_timing_rewrite(self) -> None:
         data = self.load()
-        data["runs"][0]["queue_seconds"] = 0
+        data["runs"][0]["created_to_start_delay_seconds"] = 0
         self.expect_rejected(data)
+
+    def test_rejects_raw_provenance_drift(self) -> None:
+        mutations = (
+            lambda d: d["runs"][0].update(head_branch="other-branch"),
+            lambda d: d["runs"][0].update(runner_id=999999999),
+            lambda d: d["runs"][0].update(job_created_at="2026-09-14T16:00:36Z", job_started_at="2026-09-14T16:00:38Z"),
+            lambda d: d["runs"][0].update(run_created_at="2026-09-14T16:00:35Z", run_updated_at="2026-09-14T16:00:51Z"),
+        )
+        for mutate in mutations:
+            data = self.load()
+            mutate(data)
+            self.expect_rejected(data)
 
     def test_rejects_retry_rewrite(self) -> None:
         data = self.load()
         data["runs"][0]["run_attempt"] = 2
+        self.expect_rejected(data)
+
+    def test_rejects_retry_rate_overclaim(self) -> None:
+        data = self.load()
+        data["unknown_or_blocked"]["retry_rate"] = "PROVEN: retry rate is zero."
+        self.expect_rejected(data)
+
+    def test_rejects_useful_yield_overclaim(self) -> None:
+        data = self.load()
+        data["unknown_or_blocked"]["useful_verification_yield"] = "PROVEN: useful verification yield is high."
+        self.expect_rejected(data)
+
+    def test_rejects_pure_queue_time_promotion(self) -> None:
+        data = self.load()
+        data["unknown_or_blocked"]["pure_queue_time"] = "PROVEN: pure queue time is 2-3 seconds."
+        self.expect_rejected(data)
+
+    def test_rejects_created_to_start_relabelled_as_queue(self) -> None:
+        data = self.load()
+        value = data["proven"].pop("observed_created_to_start_delay")
+        data["proven"]["observed_job_queue"] = value.replace("created-to-start delay", "job queue")
         self.expect_rejected(data)
 
     def test_rejects_capacity_claim(self) -> None:
