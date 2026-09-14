@@ -98,6 +98,21 @@ class HistoryRevalidationTests(unittest.TestCase):
             ):
                 self.validate_mutation(mutate)
 
+    def test_top_level_and_nested_packet_schemas_are_exactly_bound(self):
+        mutations = (
+            lambda d: d.update(obligation_status="CLOSED"),
+            lambda d: d["provenance"].update(obligation_status="CLOSED"),
+            lambda d: d["provenance"]["canonical_inputs"][0].update(obligation_status="CLOSED"),
+        )
+        messages = (
+            "top-level packet schema drift",
+            "provenance schema drift",
+            "canonical input entry schema drift",
+        )
+        for mutate, message in zip(mutations, messages):
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                self.validate_mutation(mutate)
+
     def test_current_and_historical_coordinates_cannot_be_conflated(self):
         with self.assertRaisesRegex(ValueError, "source boundary provenance drift"):
             self.validate_mutation(lambda d: d["source_boundaries"][1].update(current_main_commit=d["source_boundaries"][1]["historical_commit"]))
@@ -141,6 +156,35 @@ class HistoryRevalidationTests(unittest.TestCase):
     def test_open_finding_cannot_be_silently_omitted(self):
         with self.assertRaisesRegex(ValueError, "revalidation finding set drift"):
             self.validate_mutation(lambda d: d["claims_requiring_rebind_or_revalidation"]["finding_ids"].pop())
+
+    def test_finding_ids_require_a_unique_string_array(self):
+        finding_ids = self.base["claims_requiring_rebind_or_revalidation"]["finding_ids"]
+        mutations = (
+            lambda d: d["claims_requiring_rebind_or_revalidation"].update(
+                finding_ids={item: False for item in finding_ids}
+            ),
+            lambda d: d["claims_requiring_rebind_or_revalidation"]["finding_ids"].append(finding_ids[0]),
+            lambda d: d["claims_requiring_rebind_or_revalidation"]["finding_ids"].__setitem__(0, 123),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "list of unique strings"):
+                self.validate_mutation(mutate)
+
+    def test_frozen_handoff_lists_are_exactly_bound(self):
+        fields_and_messages = (
+            ("claims_remaining_valid_as_historical_facts", "historical-fact claim list drift"),
+            ("limitations", "limitations drift"),
+            ("exact_recheck_triggers", "exact recheck trigger list drift"),
+        )
+        for field, message in fields_and_messages:
+            mutations = (
+                lambda d, field=field: d.pop(field),
+                lambda d, field=field: d[field].__setitem__(0, "Rewritten."),
+                lambda d, field=field: d[field].append("Unexpected extra entry."),
+            )
+            for mutate in mutations:
+                with self.subTest(field=field, mutate=mutate), self.assertRaisesRegex(ValueError, message):
+                    self.validate_mutation(mutate)
 
     def test_revalidation_rule_and_scopes_are_exactly_bound(self):
         mutations = (

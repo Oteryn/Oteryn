@@ -104,6 +104,43 @@ EXPECTED_BASELINE = {
     "programme_head": "82bc113797ecdc70d79aee628d339136b816e15d",
     "release_comment_id": 5666964258,
 }
+EXPECTED_TOP_LEVEL_KEYS = {
+    "schema_version",
+    "obligation",
+    "disposition",
+    "observed_at",
+    "baseline",
+    "source_boundaries",
+    "provenance",
+    "claims_remaining_valid_as_historical_facts",
+    "claims_requiring_rebind_or_revalidation",
+    "stale_evidence_rejection_rules",
+    "limitations",
+    "exact_recheck_triggers",
+    "claims",
+}
+EXPECTED_PROVENANCE_KEYS = {"method", "github_endpoints", "canonical_inputs"}
+EXPECTED_CANONICAL_INPUT_KEYS = {"path", "git_blob", "sha256"}
+EXPECTED_HISTORICAL_FACTS = [
+    "The immutable commits and trees named as historical source cuts remain exact historical coordinates; provider-main movement does not rewrite those objects.",
+    "DIRECT and GROUPED dispositions remain bounded descriptions of review or qualification at their recorded source/evidence coordinates, not current-main or product-readiness claims.",
+    "The original Game coordinate 3327db49c0c3e2d90afe6a74954c579a36aba2a5 was unresolvable during collection and was fail-closed replaced by the recorded Game source cut; no cause is inferred.",
+    "The rejected Atlas 508-leaf carry-forward remains a historical rejection at the pinned Atlas source; it does not establish the outcome on current Atlas main.",
+    "Platform characterization mechanism details were present in public ancestor history and public Actions artifacts. This historical disclosure is not reversed by removal from a later tree.",
+]
+EXPECTED_LIMITATIONS = [
+    "This packet performs no provider code execution, runtime observation, privileged administrative read, vulnerability assessment or provider mutation.",
+    "GitHub compare for Game reached the 300-file response cap, so its returned file-list digest is provenance for a partial listing only and cannot support exhaustive path-level carry-forward.",
+    "Fresh coordinates prove identity and ancestry movement only; they do not prove that a historical defect persists, was repaired, is reachable, or is exploitable.",
+    "This worker does not mutate canonical audit accounting and does not close HISTORY-REVALIDATION; AUDIT186-LEAD owns any canonical transition.",
+]
+EXPECTED_RECHECK_TRIGGERS = [
+    "Any applicable default-branch SHA changes before lead adoption or use of a current claim.",
+    "A current claim is proposed for any listed finding or for a DIRECT/GROUPED provider family.",
+    "A provider publishes exact remediation/qualification evidence or an owner disposition for a listed row.",
+    "Historical Actions artifact availability, deletion or expiry is asserted to have changed.",
+    "Canonical PR #185 head, collection-plan source coordinates, finding-register states or HISTORY-REVALIDATION closure wording changes.",
+]
 EXPECTED_REVALIDATION_SCOPE = {
     "rule": (
         "Every provider current-main source, runtime, security, remediation, lifecycle, CI, admin or "
@@ -235,6 +272,7 @@ def _is_ordered_subsequence(needle: tuple[str, ...], haystack: list[str]) -> boo
 def validate(path: Path = CANDIDATE) -> dict:
     raw = path.read_text(encoding="utf-8")
     data = json.loads(raw, object_pairs_hook=reject_duplicate_json_members)
+    require(isinstance(data, dict), "candidate must be an object")
     require(data.get("schema_version") == 1 and data.get("obligation") == "HISTORY-REVALIDATION", "candidate identity")
     require(data.get("disposition") == "HANDOFF_COMPLETE_OBLIGATION_REMAINS_OPEN", "obligation must remain open")
     require(data.get("observed_at") == EXPECTED_OBSERVED_AT, "observation provenance drift")
@@ -259,10 +297,15 @@ def validate(path: Path = CANDIDATE) -> dict:
     canonical_inputs = provenance.get("canonical_inputs", [])
     require(isinstance(canonical_inputs, list), "canonical input manifest must be a list")
     require(len(canonical_inputs) == len(EXPECTED_INPUTS), "canonical input manifest cardinality drift")
+    require(
+        all(isinstance(item, dict) and set(item) == EXPECTED_CANONICAL_INPUT_KEYS for item in canonical_inputs),
+        "canonical input entry schema drift",
+    )
     paths = [item.get("path") for item in canonical_inputs if isinstance(item, dict)]
     require(len(paths) == len(canonical_inputs) and len(set(paths)) == len(paths), "duplicate canonical input entry")
     inputs = {item["path"]: (item.get("git_blob"), item.get("sha256")) for item in canonical_inputs}
     require(inputs == EXPECTED_INPUTS, "canonical input manifest drift")
+    require(set(provenance) == EXPECTED_PROVENANCE_KEYS, "provenance schema drift")
     for rel, expected in EXPECTED_INPUTS.items():
         raw_input = (ROOT / rel).read_bytes()
         require((git_blob(ROOT / rel), hashlib.sha256(raw_input).hexdigest()) == expected, f"canonical input bytes drift: {rel}")
@@ -277,7 +320,14 @@ def validate(path: Path = CANDIDATE) -> dict:
         and set(revalidation) == {*EXPECTED_REVALIDATION_SCOPE, "finding_ids"},
         "revalidation rule/scope drift",
     )
-    actual_ids = set(revalidation.get("finding_ids", []))
+    finding_ids = revalidation.get("finding_ids")
+    require(
+        isinstance(finding_ids, list)
+        and all(isinstance(item, str) for item in finding_ids)
+        and len(finding_ids) == len(set(finding_ids)),
+        "revalidation finding_ids must be a list of unique strings",
+    )
+    actual_ids = set(finding_ids)
     require(actual_ids == expected_ids, "revalidation finding set drift")
     claims = data.get("claims", {})
     require(claims == EXPECTED_CLAIMS, "readiness/closure claims must have exact keys and all be false")
@@ -296,8 +346,13 @@ def validate(path: Path = CANDIDATE) -> dict:
         r"(?:history revalidation|product readiness|runtime readiness|security remediation|organization(?: wide)? audit(?: completion)?|game compare) true\b",
     )
     require(not any(re.search(pattern, prose) for pattern in contradictory), "contradictory positive assertion")
-    limits = " ".join(data.get("limitations", [])).lower()
-    require("does not close history-revalidation" in limits and "no provider code execution" in limits, "limitations weakened")
+    require(
+        data.get("claims_remaining_valid_as_historical_facts") == EXPECTED_HISTORICAL_FACTS,
+        "historical-fact claim list drift",
+    )
+    require(data.get("limitations") == EXPECTED_LIMITATIONS, "limitations drift")
+    require(data.get("exact_recheck_triggers") == EXPECTED_RECHECK_TRIGGERS, "exact recheck trigger list drift")
+    require(set(data) == EXPECTED_TOP_LEVEL_KEYS, "top-level packet schema drift")
     return {"result": "HISTORY_REVALIDATION_HANDOFF_VALID_OBLIGATION_OPEN", "revalidation_findings": len(actual_ids), "source_boundaries": len(boundaries)}
 
 
