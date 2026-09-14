@@ -40,25 +40,29 @@ class HistoryRevalidationTests(unittest.TestCase):
 
     def test_duplicate_top_level_claims_object_is_rejected_before_materialization(self):
         marker = '  "claims": {'
-        raw = self.raw.replace(
-            marker,
-            '  "claims": {"history_revalidation_closed": true},\n' + marker,
-            1,
-        )
+        raw = self.raw.replace(marker, '  "claims": {"history_revalidation_closed": true},\n' + marker, 1)
         self.assertNotEqual(raw, self.raw)
         with self.assertRaisesRegex(ValueError, "duplicate JSON member: claims"):
             self.validate_raw(raw)
 
     def test_duplicate_governed_claim_member_is_rejected_before_materialization(self):
         marker = '    "history_revalidation_closed": false'
-        raw = self.raw.replace(
-            marker,
-            '    "history_revalidation_closed": true,\n' + marker,
-            1,
-        )
+        raw = self.raw.replace(marker, '    "history_revalidation_closed": true,\n' + marker, 1)
         self.assertNotEqual(raw, self.raw)
         with self.assertRaisesRegex(ValueError, "duplicate JSON member: history_revalidation_closed"):
             self.validate_raw(raw)
+
+    def test_duplicate_canonical_input_entry_is_rejected(self):
+        data = copy.deepcopy(self.base)
+        duplicate = copy.deepcopy(data["provenance"]["canonical_inputs"][0])
+        duplicate["git_blob"] = "0" * 40
+        duplicate["sha256"] = "0" * 64
+        data["provenance"]["canonical_inputs"].insert(0, duplicate)
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "candidate.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "canonical input manifest cardinality drift|duplicate canonical input entry"):
+                verify.validate(path)
 
     def test_observation_time_is_exactly_bound(self):
         mutations = (
@@ -146,8 +150,21 @@ class HistoryRevalidationTests(unittest.TestCase):
             ("game_compare_status", "complete"),
         )
         for key, value in assertions:
-            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key"):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
                 self.validate_mutation(lambda d, key=key, value=value: d.update({key: value}))
+
+    def test_split_path_governed_assertion_keys_are_rejected(self):
+        mutations = (
+            lambda d: d.update(history={"revalidation_status": "closed"}),
+            lambda d: d.update(product={"readiness_status": "proven"}),
+            lambda d: d.update(runtime={"readiness": {"status": "ready"}}),
+            lambda d: d.update(security={"remediation_status": "complete"}),
+            lambda d: d.update(organization={"audit_status": "complete"}),
+            lambda d: d.update(game={"compare_status": "complete"}),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
+                self.validate_mutation(mutate)
 
     def test_contradictory_positive_readiness_prose_is_rejected(self):
         assertions = (
@@ -168,12 +185,12 @@ class HistoryRevalidationTests(unittest.TestCase):
             ("game_compare", "complete"),
         )
         for key, value in assertions:
-            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key"):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
                 self.validate_mutation(lambda d, key=key, value=value: d.update({key: value}))
 
     def test_boolean_positive_machine_readable_assertion_fields_are_rejected(self):
         for key in ("product_readiness", "history_revalidation", "game_compare"):
-            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key"):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
                 self.validate_mutation(lambda d, key=key: d.update({key: True}))
 
     def test_disclosure_and_digest_rejection_rules_are_mandatory(self):
