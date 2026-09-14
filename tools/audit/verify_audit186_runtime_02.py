@@ -11,7 +11,40 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PACKET = ROOT / "docs/evidence/organization-audit-20260907/runtime-assurance/infra-state-20260914.json"
 SHA = re.compile(r"^[0-9a-f]{40}$")
-FORBIDDEN_KEYS = {"secret", "token", "password", "credential", "environment_url", "log_url"}
+EXPECTED_PACKET_ID = "AUDIT186-RUNTIME-02-INFRA-STATE-20260914"
+EXPECTED_OBSERVATION_TIME = "2026-09-14T17:27:23Z"
+EXPECTED_AUTHORITY = {
+    "canonical_audit": "Oteryn/Oteryn#185@2d877271afa8f177983f3c6147472372adca0ed1",
+    "programme": "Oteryn/Oteryn#203@82bc113797ecdc70d79aee628d339136b816e15d",
+    "release_checkpoint": "Oteryn/Oteryn#186-comment-5666964258",
+    "worker_seed": "Oteryn/Oteryn#208@75ee8b09dc6caac7bfc2a5bdddf3cfbab02c462e",
+}
+EXPECTED_SOURCE_COORDINATES = {
+    "Oteryn/Oteryn": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+    "Oteryn/Oteryn-Game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+    "Oteryn/Oteryn-Platform": "84d504c98acc8134eb4c9545711010b74c987974",
+    "Oteryn/Oteryn-Atlas": "be09b84ad96d7e67571a460b55d9546b59bc89a7",
+}
+FORBIDDEN_KEY_FRAGMENTS = (
+    "secret",
+    "token",
+    "password",
+    "credential",
+    "private_key",
+    "api_key",
+    "environment_url",
+    "log_url",
+)
+
+
+def _iter_keys(value: object):
+    if isinstance(value, dict):
+        for key, child in value.items():
+            yield str(key).lower()
+            yield from _iter_keys(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _iter_keys(child)
 
 
 def validate(packet: dict[str, object]) -> list[str]:
@@ -21,8 +54,15 @@ def validate(packet: dict[str, object]) -> list[str]:
     observations = packet.get("authorized_read_only_observations", {})
     additional = packet.get("smallest_additional_observation", {})
 
+    if packet.get("schema_version") != 1 or packet.get("packet_id") != EXPECTED_PACKET_ID:
+        errors.append("packet identity or schema drifted")
     if packet.get("obligation") != "INFRA-STATE":
         errors.append("packet must cover only INFRA-STATE")
+    if packet.get("observation_time") != EXPECTED_OBSERVATION_TIME:
+        errors.append("observation time drifted from the recorded read")
+    if packet.get("authority") != EXPECTED_AUTHORITY:
+        errors.append("authority coordinates drifted")
+
     expected_closure = "Authorized read-only configuration/health snapshot with redaction and exact release."
     if not isinstance(canonical, dict) or canonical.get("closure_condition") != expected_closure:
         errors.append("canonical closure condition drifted")
@@ -32,16 +72,17 @@ def validate(packet: dict[str, object]) -> list[str]:
         errors.append("readiness must remain NOT_ESTABLISHED")
 
     coordinates = packet.get("source_coordinates", {})
-    if not isinstance(coordinates, dict) or set(coordinates) != {
-        "Oteryn/Oteryn", "Oteryn/Oteryn-Game", "Oteryn/Oteryn-Platform", "Oteryn/Oteryn-Atlas"
-    } or any(not isinstance(value, str) or not SHA.fullmatch(value) for value in coordinates.values()):
-        errors.append("source coordinates must contain exactly four full commit SHAs")
+    if (
+        not isinstance(coordinates, dict)
+        or coordinates != EXPECTED_SOURCE_COORDINATES
+        or any(not isinstance(value, str) or not SHA.fullmatch(value) for value in coordinates.values())
+    ):
+        errors.append("source coordinates drifted from the exact observed repository heads")
 
     if not isinstance(observations, dict) or observations.get("route") != "Authenticated GitHub REST repository metadata only":
         errors.append("observation route must remain bounded to GitHub metadata")
-    serialized = json.dumps(packet, sort_keys=True).lower()
-    for key in FORBIDDEN_KEYS:
-        if f'"{key}"' in serialized:
+    for key in _iter_keys(packet):
+        if any(fragment in key for fragment in FORBIDDEN_KEY_FRAGMENTS):
             errors.append(f"packet contains forbidden sensitive key: {key}")
 
     limitations = packet.get("limitations", [])
