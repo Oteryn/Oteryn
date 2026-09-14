@@ -35,18 +35,70 @@ EXPECTED_WORKFLOW = {
     "concurrency_group": "meta-ci-${{ github.event.pull_request.number || github.ref }}",
     "cancel_in_progress_pull_request_only": True,
 }
+EXPECTED_RUNS = [
+    {
+        "event": "pull_request", "run_id": 34865871915, "workflow_id": 336924336, "pr_number": 203,
+        "head_sha": "82bc113797ecdc70d79aee628d339136b816e15d", "head_branch": "docs/20260914-audit186-parallel-execution",
+        "run_created_at": "2026-09-14T16:00:36Z", "run_updated_at": "2026-09-14T16:00:52Z", "run_attempt": 1, "run_conclusion": "success",
+        "job_id": 104049450869, "job_name": "meta-gate", "job_created_at": "2026-09-14T16:00:37Z", "job_started_at": "2026-09-14T16:00:39Z", "job_completed_at": "2026-09-14T16:00:51Z",
+        "runner_label": "ubuntu-latest", "runner_id": 1000080667, "verification_steps_success": 5,
+        "created_to_start_delay_seconds": 2, "execution_seconds": 12, "run_wall_seconds": 16,
+    },
+    {
+        "event": "pull_request", "run_id": 34860587490, "workflow_id": 336924336, "pr_number": 185,
+        "head_sha": "2d877271afa8f177983f3c6147472372adca0ed1", "head_branch": "docs/20260907-org-comprehensive-audit",
+        "run_created_at": "2026-09-14T15:12:03Z", "run_updated_at": "2026-09-14T15:12:25Z", "run_attempt": 1, "run_conclusion": "success",
+        "job_id": 104031444663, "job_name": "meta-gate", "job_created_at": "2026-09-14T15:12:04Z", "job_started_at": "2026-09-14T15:12:07Z", "job_completed_at": "2026-09-14T15:12:17Z",
+        "runner_label": "ubuntu-latest", "runner_id": 1000080596, "verification_steps_success": 6,
+        "created_to_start_delay_seconds": 3, "execution_seconds": 10, "run_wall_seconds": 22,
+    },
+    {
+        "event": "merge_group", "run_id": 34832322263, "workflow_id": 336924336, "pr_number": 202,
+        "head_sha": "d9419b05eb98c81279297563c11fc90e4fe708ac", "head_branch": "gh-readonly-queue/main/pr-202-dcb71a131293128bf0a69959d78ae6390a0341fd",
+        "run_created_at": "2026-09-14T10:16:08Z", "run_updated_at": "2026-09-14T10:16:23Z", "run_attempt": 1, "run_conclusion": "success",
+        "job_id": 103938251501, "job_name": "meta-gate", "job_created_at": "2026-09-14T10:16:09Z", "job_started_at": "2026-09-14T10:16:11Z", "job_completed_at": "2026-09-14T10:16:22Z",
+        "runner_label": "ubuntu-latest", "runner_id": 1000080178, "verification_steps_success": 6,
+        "created_to_start_delay_seconds": 2, "execution_seconds": 11, "run_wall_seconds": 15,
+    },
+    {
+        "event": "merge_group", "run_id": 34831302624, "workflow_id": 336924336, "pr_number": 201,
+        "head_sha": "dcb71a131293128bf0a69959d78ae6390a0341fd", "head_branch": "gh-readonly-queue/main/pr-201-23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+        "run_created_at": "2026-09-14T10:04:42Z", "run_updated_at": "2026-09-14T10:04:58Z", "run_attempt": 1, "run_conclusion": "success",
+        "job_id": 103935028872, "job_name": "meta-gate", "job_created_at": "2026-09-14T10:04:43Z", "job_started_at": "2026-09-14T10:04:45Z", "job_completed_at": "2026-09-14T10:04:58Z",
+        "runner_label": "ubuntu-latest", "runner_id": 1000080165, "verification_steps_success": 6,
+        "created_to_start_delay_seconds": 2, "execution_seconds": 13, "run_wall_seconds": 16,
+    },
+    {
+        "event": "push", "run_id": 34832368949, "workflow_id": 336924336, "pr_number": 202,
+        "head_sha": "d9419b05eb98c81279297563c11fc90e4fe708ac", "head_branch": "main",
+        "run_created_at": "2026-09-14T10:16:43Z", "run_updated_at": "2026-09-14T10:16:58Z", "run_attempt": 1, "run_conclusion": "success",
+        "job_id": 103938405941, "job_name": "meta-gate", "job_created_at": "2026-09-14T10:16:43Z", "job_started_at": "2026-09-14T10:16:45Z", "job_completed_at": "2026-09-14T10:16:57Z",
+        "runner_label": "ubuntu-latest", "runner_id": 1000080179, "verification_steps_success": 5,
+        "created_to_start_delay_seconds": 2, "execution_seconds": 12, "run_wall_seconds": 15,
+    },
+    {
+        "event": "push", "run_id": 34831352610, "workflow_id": 336924336, "pr_number": 201,
+        "head_sha": "dcb71a131293128bf0a69959d78ae6390a0341fd", "head_branch": "main",
+        "run_created_at": "2026-09-14T10:05:16Z", "run_updated_at": "2026-09-14T10:05:31Z", "run_attempt": 1, "run_conclusion": "success",
+        "job_id": 103935182740, "job_name": "meta-gate", "job_created_at": "2026-09-14T10:05:16Z", "job_started_at": "2026-09-14T10:05:18Z", "job_completed_at": "2026-09-14T10:05:30Z",
+        "runner_label": "ubuntu-latest", "runner_id": 1000080166, "verification_steps_success": 5,
+        "created_to_start_delay_seconds": 2, "execution_seconds": 12, "run_wall_seconds": 15,
+    },
+]
 EXPECTED_RUN_IDS = {
     "pull_request": [34865871915, 34860587490],
     "merge_group": [34832322263, 34831302624],
     "push": [34832368949, 34831352610],
 }
-EXPECTED_ROWS = {
-    34865871915: ("pull_request", 203, "82bc113797ecdc70d79aee628d339136b816e15d", 104049450869, 2, 12, 16, 5),
-    34860587490: ("pull_request", 185, "2d877271afa8f177983f3c6147472372adca0ed1", 104031444663, 3, 10, 22, 6),
-    34832322263: ("merge_group", 202, "d9419b05eb98c81279297563c11fc90e4fe708ac", 103938251501, 2, 11, 15, 6),
-    34831302624: ("merge_group", 201, "dcb71a131293128bf0a69959d78ae6390a0341fd", 103935028872, 2, 13, 16, 6),
-    34832368949: ("push", 202, "d9419b05eb98c81279297563c11fc90e4fe708ac", 103938405941, 2, 12, 15, 5),
-    34831352610: ("push", 201, "dcb71a131293128bf0a69959d78ae6390a0341fd", 103935182740, 2, 12, 15, 5),
+EXPECTED_UNKNOWN = {
+    "billing_cost": "UNKNOWN: collected run/job metadata does not include authoritative billed minutes, spend or marginal cost.",
+    "runner_capacity": "UNKNOWN: short created-to-start delays and distinct runner IDs do not expose available fleet capacity, saturation or concurrency headroom.",
+    "cache_efficiency": "UNKNOWN: no authoritative cache hit/miss, transferred-byte or cache-time telemetry was collected.",
+    "flake_rate": "UNKNOWN: six recent successful runs are too small and too short a window to establish a long-term flake rate.",
+    "retry_rate": "UNKNOWN beyond the sampled run IDs: each sampled run is attempt 1, but this cohort does not establish organization-wide retry frequency.",
+    "cost_savings": "UNKNOWN: no baseline-vs-current billable usage or spend dataset is available.",
+    "useful_verification_yield": "PARTIAL: named successful validation steps are observable, but prevented defects, redundant work and value per billed minute are not.",
+    "pure_queue_time": "UNKNOWN: job created-to-start delay does not identify when the job became runnable or when a runner was assigned, so pure queue time is not measured.",
 }
 EXPECTED_CLAIMS = {
     "cost_ci_closed": False,
@@ -83,36 +135,24 @@ def validate(path: Path = CANDIDATE) -> dict:
     require("not a statistically representative long-term workload sample" in sampling.get("scope", ""), "scope limitation missing")
 
     runs = data.get("runs", [])
-    require(len(runs) == 6, "six sampled runs required")
+    require(runs == EXPECTED_RUNS, "sample raw provenance drift")
     actual_by_event: dict[str, list[int]] = {}
     for row in runs:
-        run_id = row.get("run_id")
-        event = row.get("event")
+        run_id = row["run_id"]
+        event = row["event"]
         actual_by_event.setdefault(event, []).append(run_id)
-        require(run_id in EXPECTED_ROWS, "unexpected run id")
-        require(row.get("workflow_id") == 336924336, "unexpected workflow id")
-        require(row.get("job_name") == "meta-gate", "unexpected job")
-        require(row.get("runner_label") == "ubuntu-latest", "runner label drift")
-        require(row.get("run_attempt") == 1 and row.get("run_conclusion") == "success", "sample outcome/attempt drift")
-        require(row.get("queue_seconds") == int((ts(row["job_started_at"]) - ts(row["job_created_at"])).total_seconds()), "queue timing mismatch")
-        require(row.get("execution_seconds") == int((ts(row["job_completed_at"]) - ts(row["job_started_at"])).total_seconds()), "execution timing mismatch")
-        require(row.get("run_wall_seconds") == int((ts(row["run_updated_at"]) - ts(row["run_created_at"])).total_seconds()), "run wall timing mismatch")
-        expected = EXPECTED_ROWS[run_id]
-        actual = (
-            event, row.get("pr_number"), row.get("head_sha"), row.get("job_id"),
-            row.get("queue_seconds"), row.get("execution_seconds"), row.get("run_wall_seconds"),
-            row.get("verification_steps_success"),
-        )
-        require(actual == expected, f"sample provenance drift: {run_id}")
+        require(row["created_to_start_delay_seconds"] == int((ts(row["job_started_at"]) - ts(row["job_created_at"])).total_seconds()), "created-to-start timing mismatch")
+        require(row["execution_seconds"] == int((ts(row["job_completed_at"]) - ts(row["job_started_at"])).total_seconds()), "execution timing mismatch")
+        require(row["run_wall_seconds"] == int((ts(row["run_updated_at"]) - ts(row["run_created_at"])).total_seconds()), "run wall timing mismatch")
     require(actual_by_event == EXPECTED_RUN_IDS, "sample identities/order drift")
 
-    queues = [r["queue_seconds"] for r in runs]
+    delays = [r["created_to_start_delay_seconds"] for r in runs]
     executions = [r["execution_seconds"] for r in runs]
     walls = [r["run_wall_seconds"] for r in runs]
     expected_aggregates = {
         "successful_gate_runs": 6,
         "sampled_run_attempt_one": 6,
-        "queue_seconds": {"min": min(queues), "median": statistics.median(queues), "max": max(queues)},
+        "created_to_start_delay_seconds": {"min": min(delays), "median": statistics.median(delays), "max": max(delays)},
         "execution_seconds": {"min": min(executions), "median": statistics.median(executions), "max": max(executions)},
         "run_wall_seconds": {"min": min(walls), "median": statistics.median(walls), "max": max(walls)},
         "distinct_runner_ids": len({r["runner_id"] for r in runs}),
@@ -121,20 +161,20 @@ def validate(path: Path = CANDIDATE) -> dict:
     require(data.get("aggregates") == expected_aggregates, "aggregate drift")
 
     proven = data.get("proven", {})
+    require("observed_job_queue" not in proven, "created-to-start delay must not be labelled as queue time")
+    delay_claim = proven.get("observed_created_to_start_delay", "")
+    require("created-to-start delay" in delay_claim and "not pure queue time" in delay_claim, "created-to-start delay semantics drift")
     require("not fleet capacity" in proven.get("runner_allocation", ""), "capacity overclaim")
     require("does not expose cache hit/miss" in proven.get("workflow_cache_configuration", ""), "cache overclaim")
     require("not proof of defect-detection value or economic efficiency" in proven.get("verification_yield_proxy", ""), "yield overclaim")
 
-    unknown = data.get("unknown_or_blocked", {})
-    required_unknown = {"billing_cost", "runner_capacity", "cache_efficiency", "flake_rate", "retry_rate", "cost_savings", "useful_verification_yield"}
-    require(set(unknown) == required_unknown, "unknown/blocked surface drift")
-    for key in ("billing_cost", "runner_capacity", "cache_efficiency", "flake_rate", "cost_savings"):
-        require(unknown[key].startswith("UNKNOWN:"), f"{key} must remain unknown")
+    require(data.get("unknown_or_blocked") == EXPECTED_UNKNOWN, "unknown/blocked surface drift")
 
     limits = " ".join(data.get("limitations", [])).lower()
     for phrase in (
         "not a statistically representative long-term workload sample",
         "not authoritative billing cost",
+        "not pure queue time",
         "does not prove that no runner-level",
         "cost-ci remains open",
     ):
