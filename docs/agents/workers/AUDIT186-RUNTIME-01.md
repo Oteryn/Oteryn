@@ -11,6 +11,10 @@ Lane: `AUDIT186-RUNTIME`
 ## Owned obligations
 `ADMIN-STATE`, `INFRA-STATE`, `RECOVERY`, `LIVE-TELEMETRY`, `NATIVE-G1`, `UI-343`, `PORTABILITY`.
 
+## Sequential batch state
+- Batch 1, `ADMIN-STATE`, is frozen at the clean handoff checkpoint Issue #186 comment `5671807221`; its packet and `UNKNOWN / BLOCKED` disposition are unchanged.
+- Batch 2, `INFRA-STATE`, is the active bounded batch. It may add only `docs/evidence/organization-audit-20260907/runtime-assurance/infra-state-20260914.md` and must not promote public source or CI evidence into live production truth.
+
 ## Mission
 Determine what runtime, administrative and operational assurance can actually be proven from authorized evidence. Distinguish source/CI evidence from runtime/admin/telemetry/recovery truth. Preserve UNKNOWN/OPEN when live evidence is absent; do not manufacture PASS by mutating providers or production.
 
