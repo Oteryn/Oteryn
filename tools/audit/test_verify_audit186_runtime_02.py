@@ -136,17 +136,30 @@ def test_rejects_recheck_trigger_promotion() -> None:
 
 def test_rejects_partial_or_unbound_source_coordinates() -> None:
     candidate = packet()
-    candidate["source_coordinates"].pop("Oteryn/Oteryn-Atlas")
-    assert "source coordinates drifted from the exact observed repository heads" in verifier.validate(candidate)
+    candidate["source_coordinates"]["recorded_values"].pop("Oteryn/Oteryn-Atlas")
+    assert "source coordinates drifted from the exact unverified recorded values" in verifier.validate(candidate)
     candidate = packet()
-    candidate["source_coordinates"]["Oteryn/Oteryn-Platform"] = "84d504c"
-    assert "source coordinates drifted from the exact observed repository heads" in verifier.validate(candidate)
+    candidate["source_coordinates"]["recorded_values"]["Oteryn/Oteryn-Platform"] = "84d504c"
+    assert "source coordinates drifted from the exact unverified recorded values" in verifier.validate(candidate)
 
 
 def test_rejects_same_shape_wrong_source_coordinate() -> None:
     candidate = packet()
-    candidate["source_coordinates"]["Oteryn/Oteryn-Platform"] = "0" * 40
-    assert "source coordinates drifted from the exact observed repository heads" in verifier.validate(candidate)
+    candidate["source_coordinates"]["recorded_values"]["Oteryn/Oteryn-Platform"] = "0" * 40
+    assert "source coordinates drifted from the exact unverified recorded values" in verifier.validate(candidate)
+
+
+def test_rejects_source_coordinate_promotion_without_retained_evidence() -> None:
+    candidate = packet()
+    candidate["source_coordinates"]["verification_state"] = "PROVEN_BOUNDED"
+    assert "source coordinates drifted from the exact unverified recorded values" in verifier.validate(candidate)
+
+    candidate = packet()
+    candidate["disposition"]["source"] = {
+        "state": "PROVEN_BOUNDED",
+        "claim": "The recorded values are current repository heads.",
+    }
+    assert "INFRA disposition drifted from the bounded open state" in verifier.validate(candidate)
 
 
 def test_rejects_authority_or_observation_drift() -> None:
