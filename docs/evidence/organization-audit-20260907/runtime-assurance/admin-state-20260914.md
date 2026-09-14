@@ -51,12 +51,19 @@ The obligation must remain open. Neither source presence, a green CI run, null f
 
 ## Smallest additional observation and recheck trigger
 
-The smallest sufficient addition is one organization-owner-produced, dated, nonsecret export (or equivalently complete authorized read-only verification) bound to organization ID `318116449` that covers the canonical four categories: private reporting, security scanning, membership, and privilege settings. It must state the observation time and verifier, expose settings/status only, redact secret values and personal/private records, and be checked against the approved expected configuration by an authorized verifier.
+The smallest sufficient addition is one organization-owner-produced, dated, nonsecret evidence export (or equivalently complete authorized read-only verification) bound to organization ID `318116449` that satisfies the canonical `ADMIN-STATE` obligation **and** the ADMIN-backed finding-specific closure conditions. It must include all of the following without exposing secrets or personal/private records:
 
-That observation was **not readable with the current session credential** and administrative mutation is **not authorized**. No broader access or mutation should be requested merely to convert the obligation to PASS.
+- the dated current private-reporting setting **and a verified private reporting channel** (`META-AUD-08`);
+- current code-scanning capability, scan scope, explicitly excluded languages, current findings, and triage evidence, with no zero-CVE inference (`META-AUD-09`);
+- the relevant membership and privilege settings needed to attest the remaining ADMIN-STATE categories;
+- observation time, verifier identity/role, exact organization identity, and an immutable evidence coordinate or digest suitable for authorized verification.
 
-Exact recheck trigger: `AUDIT186-LEAD` records either (a) the dated sanitized owner export and its immutable evidence coordinate, or (b) separately authorized read-only visibility for the missing administrative categories. On that event, rerun the bounded comparison, bind the result to organization ID `318116449` plus observation time/evidence digest, and reassess `ADMIN-STATE`. Ordinary source changes, CI success, or another HTTP 403 are not recheck triggers.
+A settings/status-only export that does not establish the verified private-reporting channel or the scan capability/scope/exclusions/findings/triage evidence is **insufficient** and must not close `ADMIN-STATE`. All retained evidence must remain sanitized and nonsecret.
+
+That complete observation was **not readable with the current session credential** and administrative mutation is **not authorized**. No broader access or mutation should be requested merely to convert the obligation to PASS.
+
+Exact recheck trigger: `AUDIT186-LEAD` records either (a) the dated sanitized owner evidence and its immutable coordinate covering every requirement above, or (b) separately authorized read-only visibility sufficient to verify every requirement above. On that event, rerun the bounded comparison, bind the result to organization ID `318116449` plus observation time/evidence digest, verify `META-AUD-08` and `META-AUD-09` closure conditions explicitly, and only then reassess `ADMIN-STATE`. Ordinary source changes, CI success, a settings-only export, or another HTTP 403 are not recheck triggers.
 
 ## Lead handoff
 
-`AUDIT186-LEAD` should preserve `ADMIN-STATE` as open/unknown. This packet proposes no canonical ledger, report, README, coverage, unknowns, verification-index, or collection-plan edit. The only admissible future closure input is the sanitized, dated, authorized administrative observation described above.
+`AUDIT186-LEAD` should preserve `ADMIN-STATE` as open/unknown. This packet proposes no canonical ledger, report, README, coverage, unknowns, verification-index, or collection-plan edit. The only admissible future closure input is the sanitized, dated, authorized administrative evidence described above, including the finding-specific private-reporting and scanning proof rather than settings/status alone.
