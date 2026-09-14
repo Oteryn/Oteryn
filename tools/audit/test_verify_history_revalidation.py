@@ -136,6 +136,19 @@ class HistoryRevalidationTests(unittest.TestCase):
             with self.subTest(key=key), self.assertRaisesRegex(ValueError, "governed claim key duplicated outside claims"):
                 self.validate_mutation(lambda d, key=key: d.update({key: True}))
 
+    def test_wrapped_governed_assertion_keys_are_rejected(self):
+        assertions = (
+            ("history_revalidation_status", "closed"),
+            ("product_readiness_status", "proven"),
+            ("runtime_readiness_state", "ready"),
+            ("security_remediation_status", "complete"),
+            ("organization_audit_status", "complete"),
+            ("game_compare_status", "complete"),
+        )
+        for key, value in assertions:
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key"):
+                self.validate_mutation(lambda d, key=key, value=value: d.update({key: value}))
+
     def test_contradictory_positive_readiness_prose_is_rejected(self):
         assertions = (
             "HISTORY-REVALIDATION is closed.",
@@ -155,12 +168,12 @@ class HistoryRevalidationTests(unittest.TestCase):
             ("game_compare", "complete"),
         )
         for key, value in assertions:
-            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key"):
                 self.validate_mutation(lambda d, key=key, value=value: d.update({key: value}))
 
     def test_boolean_positive_machine_readable_assertion_fields_are_rejected(self):
         for key in ("product_readiness", "history_revalidation", "game_compare"):
-            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key"):
                 self.validate_mutation(lambda d, key=key: d.update({key: True}))
 
     def test_disclosure_and_digest_rejection_rules_are_mandatory(self):
