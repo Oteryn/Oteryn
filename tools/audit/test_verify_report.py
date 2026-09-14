@@ -409,6 +409,18 @@ class AuditValidationTest(unittest.TestCase):
         self.assertNotIn(rejected[0]['id'],{row['id'] for row in data['groups']})
     def test_reproduction_called_pass_rejected(self):
         self.mutate(self.base/'verification-index.json',lambda d:d.update(routing_product_verdict='PASS'));self.reject()
+    def test_semantic_01_adoption_index_state_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption'].update(state='ADOPTED_PRODUCT_PASS'));self.reject()
+    def test_semantic_01_adoption_index_worker_head_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption'].update(worker_head='0'*40));self.reject()
+    def test_semantic_01_adoption_index_coverage_delta_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption']['coverage_delta'].update(direct=25));self.reject()
+    def test_semantic_01_adoption_index_ledger_digest_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption'].update(canonical_ledger_sha256='0'*64));self.reject()
+    def test_semantic_01_adoption_index_missing_key_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption'].pop('current_truth_claimed'));self.reject()
+    def test_semantic_01_adoption_index_extra_key_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption'].update(current_truth_established=True));self.reject()
     def test_unbound_execution_source_rejected(self):
         self.mutate(self.base/'verification-index.json',lambda d:d['results'][0].update(source_commit='0'*40));self.reject()
     def test_missing_verification_result_rejected(self):

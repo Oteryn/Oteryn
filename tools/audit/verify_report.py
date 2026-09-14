@@ -58,6 +58,35 @@ AUDIT186_SEMANTIC_03_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/cov
 AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-audit186-semantic-01-historical-direct-additions.tsv'
 AUDIT186_SEMANTIC_01_CANDIDATE_SHA256 = 'c160a9f7a198de30df34e2e1dd93341088488a073b8e36f9e1d538a86c5d23ae'
 AUDIT186_SEMANTIC_01_OVERLAY_SHA256 = 'd0967fd5a9c16ab81a1a00d9a71b2d0ade8ce14cba56ffd60d8c16fd1bcf21b0'
+EXPECTED_AUDIT186_SEMANTIC_01_ADOPTION = {
+    'state': 'ADOPTED_INERT_HISTORICAL_PROVENANCE_NOT_CURRENT_TRUTH',
+    'worker_pull_request': 204,
+    'worker_head': 'b7c8f6f37441b4e80ffb2214fe837105686bf979',
+    'candidate': 'audit186-semantic-01-historical-candidate.json',
+    'candidate_sha256': AUDIT186_SEMANTIC_01_CANDIDATE_SHA256,
+    'adoption_overlay': AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS,
+    'adoption_overlay_sha256': AUDIT186_SEMANTIC_01_OVERLAY_SHA256,
+    'baseline_head': '1008886c0aec2db6b8588a3131a83829eff06e67',
+    'family_tree': '1609dfc49cc95b174a8efd0ccf8e342c22dd2173',
+    'path_count': 26,
+    'depth': 'SCOPED_SEMANTIC_REVIEW',
+    'review_depth': 'FULL_FILE_HISTORICAL_PROVENANCE_REVIEW',
+    'line_ranges': [],
+    'coverage_delta': {'direct': 26, 'grouped': 0, 'unverified': -26,
+                       'semantically_classified': 26},
+    'canonical_counts': {'source_leaves': 4361, 'direct': 335, 'grouped': 113,
+                         'unverified': 3913, 'semantically_classified': 448},
+    'meta_counts': {'source_leaves': 210, 'direct': 122, 'grouped': 0,
+                    'unverified': 88},
+    'semantic_03_overlap': False,
+    'residual_obligations': 14,
+    'semantic_coverage_complete': False,
+    'history_revalidation_closed': False,
+    'current_truth_claimed': False,
+    'product_readiness_claimed': False,
+    'audit_completion_claimed': False,
+    'canonical_ledger_sha256': 'd93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b',
+}
 AUDIT186_SEMANTIC_03_CANDIDATE_SHA256 = '4f9eb30d596da45a95f8cadf37dfee4ae4bb89a2846683098021574613d9676c'
 AUDIT186_SEMANTIC_03_OVERLAY_SHA256 = '76881b1eace7559a9d84b060c82ccf9bf86ae5627e670535a7680ccb32285de5'
 VERIFICATION_RESULTS_SHA256 = '221f0fed6cc79c2fc3fcab5945d075fb98d6cdd319d746700207b7237b3181b1'
@@ -1064,6 +1093,9 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(hashlib.sha256((base/'audit186-semantic-01-historical-candidate.json').read_bytes()).hexdigest()==AUDIT186_SEMANTIC_01_CANDIDATE_SHA256,'AUDIT186 Semantic 01 candidate digest drift')
     require(hashlib.sha256((base/AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS).read_bytes()).hexdigest()==AUDIT186_SEMANTIC_01_OVERLAY_SHA256,'AUDIT186 Semantic 01 overlay digest drift')
     proof=read_json(base/'verification-index.json')
+    require(json_exact(proof.get('audit186_semantic_01_historical_direct_adoption'),
+                       EXPECTED_AUDIT186_SEMANTIC_01_ADOPTION),
+            'AUDIT186 Semantic 01 adoption index drift')
     require(json_exact(proof.get('audit186_semantic_03_ci_contract_direct_adoption'), {'state': 'ADOPTED_BOUNDED_SOURCE_SEMANTICS_NOT_PRODUCT_PASS',
  'worker_pull_request': 209,
  'worker_head': '9ad2942ba0dedb5b94e437c32b85161c6c59885a',

@@ -76,6 +76,16 @@ class ReadmeCurrentStateTest(unittest.TestCase):
         self.assertFalse(result['product_readiness_claimed'])
         self.assertFalse(result['audit_completion_claimed'])
 
+    def test_semantic_01_old_current_truth_alternative_rejected(self):
+        self.reject(self.current.replace(
+            'remain inert provenance, leave all 14 residual items open, and do not establish current truth',
+            'remain inert provenance and leave all 14 residual items open or establish current truth',
+            1,
+        ))
+
+    def test_semantic_01_negative_current_truth_clause_required(self):
+        self.reject(self.current.replace(', and do not establish current truth', '', 1))
+
     def test_required_meta_gate_runs_terminal_state_contract(self):
         validate_terminal_gate_step(CI_WORKFLOW.read_text(encoding='utf-8'))
 
