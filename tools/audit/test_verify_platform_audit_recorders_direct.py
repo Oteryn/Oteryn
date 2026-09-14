@@ -89,7 +89,7 @@ class AuditRecorderDirectVerifierTests(unittest.TestCase):
         result = json.loads(output.getvalue())
         self.assertEqual(
             {key: result[key] for key in ('current_direct_paths', 'current_grouped_paths', 'current_unverified_paths', 'current_semantically_classified_paths')},
-            {'current_direct_paths': 309, 'current_grouped_paths': 113, 'current_unverified_paths': 3939, 'current_semantically_classified_paths': 422},
+            {'current_direct_paths': 335, 'current_grouped_paths': 113, 'current_unverified_paths': 3913, 'current_semantically_classified_paths': 448},
         )
 
     def test_source_coordinate_drift_fails_closed(self):

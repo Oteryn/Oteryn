@@ -534,5 +534,47 @@
     "product_readiness_claimed": false,
     "runtime_or_provider_claimed": false,
     "audit_completion_claimed": false
+  },
+  "audit186_semantic_01_historical_direct_adoption": {
+    "state": "ADOPTED_INERT_HISTORICAL_PROVENANCE_NOT_CURRENT_TRUTH",
+    "worker_pull_request": 204,
+    "worker_head": "b7c8f6f37441b4e80ffb2214fe837105686bf979",
+    "candidate": "audit186-semantic-01-historical-candidate.json",
+    "candidate_sha256": "c160a9f7a198de30df34e2e1dd93341088488a073b8e36f9e1d538a86c5d23ae",
+    "adoption_overlay": "coverage-review-audit186-semantic-01-historical-direct-additions.tsv",
+    "adoption_overlay_sha256": "d0967fd5a9c16ab81a1a00d9a71b2d0ade8ce14cba56ffd60d8c16fd1bcf21b0",
+    "baseline_head": "1008886c0aec2db6b8588a3131a83829eff06e67",
+    "family_tree": "1609dfc49cc95b174a8efd0ccf8e342c22dd2173",
+    "path_count": 26,
+    "depth": "SCOPED_SEMANTIC_REVIEW",
+    "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+    "line_ranges": [],
+    "coverage_delta": {
+      "direct": 26,
+      "grouped": 0,
+      "unverified": -26,
+      "semantically_classified": 26
+    },
+    "canonical_counts": {
+      "source_leaves": 4361,
+      "direct": 335,
+      "grouped": 113,
+      "unverified": 3913,
+      "semantically_classified": 448
+    },
+    "meta_counts": {
+      "source_leaves": 210,
+      "direct": 122,
+      "grouped": 0,
+      "unverified": 88
+    },
+    "semantic_03_overlap": false,
+    "residual_obligations": 14,
+    "semantic_coverage_complete": false,
+    "history_revalidation_closed": false,
+    "current_truth_claimed": false,
+    "product_readiness_claimed": false,
+    "audit_completion_claimed": false,
+    "canonical_ledger_sha256": "d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b"
   }
 }

@@ -121,9 +121,9 @@
   "historical_candidate_p1_ids_not_counted_as_source_snapshot": [
     "GAME-CANDIDATE-361"
   ],
-  "scoped_review_paths": 309,
+  "scoped_review_paths": 335,
   "grouped_revalidated_paths": 113,
-  "semantically_classified_paths": 422,
+  "semantically_classified_paths": 448,
   "r3_native_results": "organization-audit-20260907/r3-native-results.json",
   "r3_source_review": "organization-audit-20260907/r3-source-review.md",
   "r3_visual_review": "organization-audit-20260907/r3-visual-review.json",
@@ -184,5 +184,8 @@
   "r7_meta_current_main_governance_direct_candidate": "organization-audit-20260907/r7-meta-current-main-governance-direct-candidate.json",
   "r7_meta_current_main_governance_direct_adoption_overlay": "organization-audit-20260907/coverage-review-meta-current-main-governance-direct-additions.tsv",
   "coverage_review_audit186_semantic_03_direct_additions": "organization-audit-20260907/coverage-review-audit186-semantic-03-direct-additions.tsv",
-  "audit186_semantic_03_candidate": "organization-audit-20260907/audit186-semantic-03-ci-contract-candidate.json"
+  "audit186_semantic_03_candidate": "organization-audit-20260907/audit186-semantic-03-ci-contract-candidate.json",
+  "unverified_semantics": 3913,
+  "coverage_review_audit186_semantic_01_historical_direct_additions": "organization-audit-20260907/coverage-review-audit186-semantic-01-historical-direct-additions.tsv",
+  "audit186_semantic_01_historical_candidate": "organization-audit-20260907/audit186-semantic-01-historical-candidate.json"
 }

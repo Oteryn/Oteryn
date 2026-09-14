@@ -22,7 +22,7 @@ class AuditValidationTest(unittest.TestCase):
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-review-meta-current-main-governance-direct-additions.tsv','coverage-review-audit186-semantic-03-direct-additions.tsv','audit186-semantic-03-ci-contract-candidate.json','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-review-meta-current-main-governance-direct-additions.tsv','coverage-review-audit186-semantic-03-direct-additions.tsv','audit186-semantic-03-ci-contract-candidate.json','coverage-review-audit186-semantic-01-historical-direct-additions.tsv','audit186-semantic-01-historical-candidate.json','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
     def mutate(self,path,func):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
@@ -47,14 +47,14 @@ class AuditValidationTest(unittest.TestCase):
         self.assertEqual(result['unverified_semantics'],summary['source_leaf_total']-direct-grouped)
         self.assertFalse(result['tree_and_ledger_verified'])
     def test_current_coverage_table_meta_drift_rejected(self):
-        self.mutate_companion('| meta | 210 | 96 | 0 | 114 |','| meta | 174 | 45 | 0 | 129 |')
+        self.mutate_companion('| meta | 210 | 122 | 0 | 88 |','| meta | 174 | 45 | 0 | 129 |')
         self.reject()
     def test_current_coverage_table_total_drift_rejected(self):
-        self.mutate_companion('| **Total** | **4361** | **309** | **113** | **3939** |',
+        self.mutate_companion('| **Total** | **4361** | **335** | **113** | **3913** |',
                               '| **Total** | **4325** | **258** | **113** | **3954** |')
         self.reject()
     def test_current_history_annotation_present_count_drift_rejected(self):
-        self.mutate_companion('present canonical 309-path state','present canonical 258-path state')
+        self.mutate_companion('present canonical 335-path state','present canonical 258-path state')
         self.reject()
     def test_current_r5_paragraph_deletion_or_mutation_rejected(self):
         for replacement in ('', audit.CURRENT_R5_ADOPTION_PARAGRAPH.replace('all 14','all 13')):
@@ -493,7 +493,7 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.base/'unknowns.json',mutate)
     def test_stale_semantic_coverage_transition_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('309 DIRECT', '258 DIRECT')
+            reason=row['reason'].replace('335 DIRECT', '258 DIRECT')
                                 .replace('3940 source leaves', '3954 source leaves')))
         self.reject()
     def test_changed_semantic_coverage_total_rejected(self):
@@ -510,11 +510,11 @@ class AuditValidationTest(unittest.TestCase):
         self.reject()
     def test_missing_recorder_provenance_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('five already-DIRECT META governance rows refreshed in place', 'META governance rows refreshed')))
+            reason=row['reason'].replace('META has 122 DIRECT and 88 UNVERIFIED leaves', 'META accounting omitted')))
         self.reject()
     def test_missing_announcements_provenance_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('exactly fourteen previously UNVERIFIED/new governance rows', 'governance rows')))
+            reason=row['reason'].replace('Exactly 26 historical repository-audit packet leaves were adopted per-leaf', 'Historical packet adopted')))
         self.reject()
     def test_semantic_coverage_extra_key_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(semantic_pass=False))

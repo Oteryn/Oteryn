@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 ROOT=Path(__file__).resolve().parents[2]; E=ROOT/'docs/evidence/organization-audit-20260907'
 CANDIDATE=E/'r7-meta-current-main-governance-direct-candidate.json'; OVERLAY=E/'coverage-review-meta-current-main-governance-direct-additions.tsv'
-CANDIDATE_BLOB='6a3e98ad65f52015a43a84e39a8940f64b31dc65'; OVERLAY_SHA='8c9064552ea9592d7c5b51852333add3f58cdb4963f4316c2dd6bcbd21b44e16'; LEDGER_SHA='bf51139f97683659f752a54e643c1d342791476d64a0f78237b5c5d3ba3a310a'
+CANDIDATE_BLOB='6a3e98ad65f52015a43a84e39a8940f64b31dc65'; OVERLAY_SHA='8c9064552ea9592d7c5b51852333add3f58cdb4963f4316c2dd6bcbd21b44e16'; LEDGER_SHA='d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b'
 R7_LEDGER_SHA='8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94'
 SOURCE='23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090'; TREE='b8ebb8e50bce14a736fa65590ac121655c52fd12'; HIST='docs/evidence/repository-audit-2026-09-06/'
 BASE_REVIEW_BLOB='9f24e951b7012d6bdbfafb19c8f2470c22a01467'
@@ -98,7 +98,7 @@ def validate():
   with contextlib.redirect_stdout(io.StringIO()):co.collect(json.loads((E/'collection-plan.json').read_text()),out,False)
   result=vr.validate(report,out/'inventories'); raw,groups=vr.rebuild_ledger(report,out/'inventories')
  if hashlib.sha256(raw).hexdigest()!=LEDGER_SHA:raise CandidateError('authoritative R7 ledger digest drift')
- expected=(4361,309,113,3939,422)
+ expected=(4361,335,113,3913,448)
  got=(result['source_leaves'],result['scoped_review_paths'],result['grouped_revalidated_paths'],result['unverified_semantics'],result['semantically_classified_paths'])
  if got!=expected:raise CandidateError('R7 accounting drift')
  ledger=list(csv.DictReader(io.StringIO(raw.decode())))
@@ -107,12 +107,12 @@ def validate():
   r=by.get(('meta',x['path']))
   if not r or r['disposition']!='DIRECT' or r['object_sha']!=x['blob_sha']:raise CandidateError('R7 candidate disposition/blob drift')
  hist=[r for r in ledger if r['repository_id']=='meta' and r['path'].startswith(HIST)]
- if len(hist)!=26 or any(r['disposition']!='UNVERIFIED' for r in hist):raise CandidateError('historical packet leaves must remain exactly 26 UNVERIFIED')
+ if len(hist)!=26 or any(r['disposition']!='DIRECT' for r in hist):raise CandidateError('historical packet leaves must be exactly 26 DIRECT after the separately bounded Semantic-01 adoption')
  validate_adoption_index(json_bytes((E/'verification-index.json').read_bytes()))
  rep=json_bytes(report.read_bytes())
  if rep.get('audit_completion')!='NOT_ESTABLISHED; source inventory complete, semantic scope and independent acceptance remain partial' or rep.get('production_readiness_claimed') is not False:raise CandidateError('R7 completion/readiness drift')
  validate_base_review_unchanged(base_raw)
- return {'result':'META_CURRENT_MAIN_GOVERNANCE_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS','source_leaves':4361,'direct':309,'grouped':113,'unverified':3939,'semantically_classified':422,'meta':{'leaves':210,'direct':96,'grouped':0,'unverified':114},'ledger_sha256':LEDGER_SHA,'refreshed_existing_direct':5,'newly_direct':14,'historical_packet_paths_unverified':26,'residual_obligations':14,'meta_aud_05':'P2_PARTIALLY_REPAIRED','product_readiness_claimed':False,'organization_audit_completion_claimed':False}
+ return {'result':'META_CURRENT_MAIN_GOVERNANCE_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS','source_leaves':4361,'direct':335,'grouped':113,'unverified':3913,'semantically_classified':448,'meta':{'leaves':210,'direct':122,'grouped':0,'unverified':88},'ledger_sha256':LEDGER_SHA,'refreshed_existing_direct':5,'newly_direct':14,'historical_packet_paths_unverified':0,'residual_obligations':14,'meta_aud_05':'P2_PARTIALLY_REPAIRED','product_readiness_claimed':False,'organization_audit_completion_claimed':False}
 def main():
  try:print(json.dumps(validate(),sort_keys=True));return 0
  except (CandidateError,ValueError,OSError,subprocess.CalledProcessError) as e:print(json.dumps({'result':'INVALID','error':str(e)},sort_keys=True));return 1
