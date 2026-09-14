@@ -20,7 +20,7 @@ SOURCE_TREE = 'f084e824ec5e14d5909c9750d906d91d51425fd5'
 SUBTREE = 'docs/agents/prompts'
 SUBTREE_TREE = '0b825e18cde3cd928dfe569acf9ce6c0dc71cfe5'
 DATED_MAIN = '3b39e0be05aef008f1bd442821daefa898a201dd'
-LEDGER_SHA = '8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94'
+LEDGER_SHA = 'bf51139f97683659f752a54e643c1d342791476d64a0f78237b5c5d3ba3a310a'
 INVENTORY_IDS = {'meta', 'game', 'platform', 'atlas', 'migration_archive'}
 EXPECTED_META_AUD_05 = {'id':'META-AUD-05','priority':'P2','repository':'meta','state':'PARTIALLY_REPAIRED','scope':'governance','title':'Historical authority and merge-up conflict','evidence':'META-153 | Current access policy separates MQ candidate refresh from source-head churn. Historical/open PR authority liveness is not exhaustively revalidated.','owner_route':'Oteryn/Oteryn#153; evidence continuation #186','closure_condition':'Classify remaining operative-looking documents/PRs against current v3 authority without deleting historical evidence.'}
 
@@ -133,7 +133,7 @@ def validate_accounting(root, candidate, inventory_dir=None):
         if temp: temp.cleanup()
     require(result.get('tree_and_ledger_verified') is True, 'authoritative ledger not rebuilt')
     require(hashlib.sha256(ledger).hexdigest() == LEDGER_SHA, 'canonical ledger SHA drift')
-    expected = {'source_leaves':4361,'scoped_review_paths':308,'grouped_revalidated_paths':113,'unverified_semantics':3940,'semantically_classified_paths':421}
+    expected = {'source_leaves':4361,'scoped_review_paths':309,'grouped_revalidated_paths':113,'unverified_semantics':3939,'semantically_classified_paths':422}
     for key, value in expected.items(): require(type(result.get(key)) is int and result[key] == value, 'canonical accounting drift: ' + key)
     rows = list(csv.DictReader(io.StringIO(ledger.decode())))
     wanted = {row['path']: row['blob_sha'] for row in candidate['paths']}
@@ -147,7 +147,7 @@ def validate_accounting(root, candidate, inventory_dir=None):
     excluded_rows = [row for row in rows if row['repository_id'] == 'meta' and row['path'] in excluded]
     require(len(excluded_rows) == 2 and all(row['object_sha'] == excluded[row['path']] and row['disposition'] == 'DIRECT' for row in excluded_rows), 'R4 exclusions are not exact already-DIRECT rows')
     meta_rows = [row for row in rows if row['repository_id'] == 'meta']
-    require(len(meta_rows) == 210 and sum(row['disposition'] == 'DIRECT' for row in meta_rows) == 95 and sum(row['disposition'] == 'UNVERIFIED' for row in meta_rows) == 115, 'META accounting drift')
+    require(len(meta_rows) == 210 and sum(row['disposition'] == 'DIRECT' for row in meta_rows) == 96 and sum(row['disposition'] == 'UNVERIFIED' for row in meta_rows) == 114, 'META accounting drift')
     require(sum(grouped.values()) == 113, 'GROUPED accounting drift')
     return result
 
@@ -155,7 +155,7 @@ def main():
     parser = argparse.ArgumentParser(); parser.add_argument('--audit-root', type=Path, default=ROOT); args = parser.parse_args()
     candidate = expected_candidate(args.audit_root)
     validate_candidate(candidate, candidate); validate_source(args.audit_root, candidate); validate_finding(args.audit_root, candidate); validate_adoption(args.audit_root, candidate); validate_accounting(args.audit_root, candidate)
-    print(json.dumps({'result':'META_R6_PROMPTS_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS','family':candidate['family'],'candidate_paths':11,'candidate_sha256':CANDIDATE_SHA256,'coverage_delta':11,'coverage_adopted':True,'adoption_performed':True,'current_disposition':'DIRECT','direct_paths':308,'grouped_paths':113,'unverified_paths':3940,'semantically_classified_paths':421,'ledger_sha256':LEDGER_SHA,'meta_direct_paths':81,'meta_unverified_paths':93,'excluded_r4_paths_readopted':False,'meta_aud_05_status':'PARTIALLY_REPAIRED','residual_obligations':14,'product_readiness_claimed':False,'audit_completion_claimed':False,'live_state_claimed':False,'standing_authority_claimed':False}, sort_keys=True))
+    print(json.dumps({'result':'META_R6_PROMPTS_DIRECT_ADOPTION_VALID_NOT_PRODUCT_PASS','family':candidate['family'],'candidate_paths':11,'candidate_sha256':CANDIDATE_SHA256,'coverage_delta':11,'coverage_adopted':True,'adoption_performed':True,'current_disposition':'DIRECT','direct_paths':309,'grouped_paths':113,'unverified_paths':3939,'semantically_classified_paths':422,'ledger_sha256':LEDGER_SHA,'meta_direct_paths':96,'meta_unverified_paths':114,'excluded_r4_paths_readopted':False,'meta_aud_05_status':'PARTIALLY_REPAIRED','residual_obligations':14,'product_readiness_claimed':False,'audit_completion_claimed':False,'live_state_claimed':False,'standing_authority_claimed':False}, sort_keys=True))
     return 0
 
 if __name__ == '__main__': raise SystemExit(main())

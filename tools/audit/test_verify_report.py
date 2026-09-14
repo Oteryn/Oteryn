@@ -22,7 +22,7 @@ class AuditValidationTest(unittest.TestCase):
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-review-meta-current-main-governance-direct-additions.tsv','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-review-meta-current-main-governance-direct-additions.tsv','coverage-review-audit186-semantic-03-direct-additions.tsv','audit186-semantic-03-ci-contract-candidate.json','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
     def mutate(self,path,func):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
@@ -47,14 +47,14 @@ class AuditValidationTest(unittest.TestCase):
         self.assertEqual(result['unverified_semantics'],summary['source_leaf_total']-direct-grouped)
         self.assertFalse(result['tree_and_ledger_verified'])
     def test_current_coverage_table_meta_drift_rejected(self):
-        self.mutate_companion('| meta | 210 | 95 | 0 | 115 |','| meta | 174 | 45 | 0 | 129 |')
+        self.mutate_companion('| meta | 210 | 96 | 0 | 114 |','| meta | 174 | 45 | 0 | 129 |')
         self.reject()
     def test_current_coverage_table_total_drift_rejected(self):
-        self.mutate_companion('| **Total** | **4361** | **308** | **113** | **3940** |',
+        self.mutate_companion('| **Total** | **4361** | **309** | **113** | **3939** |',
                               '| **Total** | **4325** | **258** | **113** | **3954** |')
         self.reject()
     def test_current_history_annotation_present_count_drift_rejected(self):
-        self.mutate_companion('present canonical 308-path state','present canonical 258-path state')
+        self.mutate_companion('present canonical 309-path state','present canonical 258-path state')
         self.reject()
     def test_current_r5_paragraph_deletion_or_mutation_rejected(self):
         for replacement in ('', audit.CURRENT_R5_ADOPTION_PARAGRAPH.replace('all 14','all 13')):
@@ -87,7 +87,7 @@ class AuditValidationTest(unittest.TestCase):
                 self.mutate_companion(audit.CURRENT_HISTORY_ANNOTATION,replacement)
                 self.reject()
     def test_current_ledger_digest_drift_rejected(self):
-        self.mutate_companion('27654f5f724d9857912e69fd036712dd00d63882ebf8e9c1411c26c66eaeef41','0'*64)
+        self.mutate_companion('bf51139f97683659f752a54e643c1d342791476d64a0f78237b5c5d3ba3a310a','0'*64)
         self.reject()
     def test_historical_223_snapshot_remains_accepted(self):
         text=self.path.with_suffix('.md').read_text(encoding='utf-8')
@@ -275,6 +275,8 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.path,lambda d:d.update(severity_counts_exhaustive=True));self.reject()
     def test_unqualified_completion_rejected(self):
         self.mutate(self.path,lambda d:d.update(status='COMPLETE'));self.reject()
+    def test_report_semantic_coverage_complete_rejected(self):
+        self.mutate(self.path,lambda d:d.update(semantic_coverage='COMPLETE'));self.reject()
     def test_audit_completion_complete_rejected(self):
         self.mutate(self.path,lambda d:d.update(audit_completion='COMPLETE'));self.reject()
     def test_audit_completion_equivalent_false_claim_rejected(self):
@@ -290,8 +292,95 @@ class AuditValidationTest(unittest.TestCase):
 
     def test_duplicate_finding_rejected(self):
         p=self.base/'finding-register.tsv';lines=p.read_text().splitlines();p.write_text('\n'.join(lines+[lines[1]])+'\n');self.reject()
+    def test_meta_aud_05_transition_state_drift_rejected(self):
+        p=self.base/'finding-register.tsv'
+        p.write_text(p.read_text().replace('META-AUD-05\tP2\tmeta\tPARTIALLY_REPAIRED\t',
+                                           'META-AUD-05\tP2\tmeta\tSOURCE_REPAIRED\t',1))
+        self.reject()
+    def test_other_canonical_finding_state_drift_rejected(self):
+        p=self.base/'finding-register.tsv'
+        text=p.read_text()
+        self.assertIn('META-AUD-09\tP2\tmeta\tUNKNOWN_LIVE\t',text)
+        p.write_text(text.replace('META-AUD-09\tP2\tmeta\tUNKNOWN_LIVE\t',
+                                  'META-AUD-09\tP2\tmeta\tSOURCE_REPAIRED\t',1))
+        self.reject()
+    def test_non_meta_finding_reprioritized_to_p0_rejected(self):
+        p=self.base/'finding-register.tsv'
+        text=p.read_text()
+        self.assertIn('GAME-F01\tP1\tgame\t',text)
+        p.write_text(text.replace('GAME-F01\tP1\tgame\t','GAME-F01\tP0\tgame\t',1))
+        self.reject()
+    def test_report_confirmed_p0_count_drift_rejected(self):
+        self.mutate(self.path,lambda d:d.update(confirmed_p0_in_scoped_review=1))
+        self.reject()
+    def test_meta_aud_05_complete_row_drift_rejected(self):
+        p=self.base/'finding-register.tsv'
+        lines=p.read_text().splitlines()
+        header=lines[0].split('\t')
+        rows=[dict(zip(header,line.split('\t'),strict=True)) for line in lines[1:]]
+        next(row for row in rows if row['id']=='META-AUD-05')['owner_route']='resolved; no further action required'
+        p.write_text('\n'.join(['\t'.join(header)]+['\t'.join(row[key] for key in header) for row in rows])+'\n')
+        self.reject()
+
+    def test_group_current_blob_oid_must_match_authoritative_inventory(self):
+        entries=[
+            {'path':'app/Family/File.php','mode':'100644','object_sha':'1'*40},
+            {'path':'config/family.php','mode':'100644','object_sha':'2'*40},
+        ]
+        tree=audit.tree_sha(entries)
+        doc={'repositories':{'platform':{'commit_sha':'3'*40,'tree_sha':tree,'leaf_count':2}}}
+        groups=[{'repository':'platform','path_prefix':'app/Family/','expected_count':1,
+                 'depth':'GROUPED_REVALIDATED','scope':'bounded',
+                 'current_revalidation':{'current_blobs':{'config/family.php':'9'*40}}}]
+        inventory=self.root/'inventories';inventory.mkdir()
+        (inventory/'platform.json').write_text(json.dumps({
+            'commit_sha':'3'*40,'tree_sha':tree,'entries':entries,
+        }))
+        with self.assertRaisesRegex(ValueError,'coverage current blob OID mismatch'):
+            audit.build_ledger(doc,[],groups,inventory)
+    def test_group_required_checks_drift_rejected_by_canonical_blob(self):
+        self.mutate(self.base/'coverage-groups.json',lambda d:
+                    d['groups'][0]['current_revalidation'].update(required_checks=['NOT_EXECUTED']))
+        with self.assertRaisesRegex(ValueError,'coverage groups canonical blob drift'):
+            audit.validate(self.path)
+    def test_group_qualification_basis_drift_rejected_by_canonical_blob(self):
+        self.mutate(self.base/'coverage-groups.json',lambda d:
+                    d['groups'][0]['historical_evidence'].update(basis='unsupported replacement evidence'))
+        with self.assertRaisesRegex(ValueError,'coverage groups canonical blob drift'):
+            audit.validate(self.path)
+    def test_group_snapshot_is_parsed_once_from_authenticated_bytes(self):
+        path=self.base/'coverage-groups.json'
+        canonical=path.read_bytes()
+        replacement=json.loads(canonical)
+        replacement['groups'][0]['current_revalidation']['required_checks']=['NOT_EXECUTED']
+        reads=0
+        original_read_bytes=Path.read_bytes
+        def replace_after_read(current):
+            nonlocal reads
+            raw=original_read_bytes(current)
+            if current == path:
+                reads+=1
+                path.write_text(json.dumps(replacement),encoding='utf-8')
+            return raw
+        report=audit.read_json(self.path)
+        with mock.patch.object(Path,'read_bytes',autospec=True,side_effect=replace_after_read):
+            groups=audit.load_groups(self.base,report['repositories'])
+        self.assertEqual(reads,1)
+        self.assertNotEqual(groups[0]['current_revalidation']['required_checks'],['NOT_EXECUTED'])
     def test_missing_domain_rejected(self):
         p=self.base/'domain-matrix.tsv';p.write_text('\n'.join(p.read_text().splitlines()[:-1])+'\n');self.reject()
+    def test_all_domain_pass_report_false_mismatch_rejected(self):
+        domains=audit.read_tsv(self.base/'domain-matrix.tsv')
+        for row in domains:
+            row['opinion']='PASS';row['remaining_limit']='NONE'
+        with self.assertRaisesRegex(ValueError,'all-pass boundary mismatch'):
+            audit.validate_domain_report_boundary(domains,False)
+    def test_report_true_with_open_domain_matrix_rejected(self):
+        domains=audit.read_tsv(self.base/'domain-matrix.tsv')
+        self.assertTrue(any(row['opinion']!='PASS' or row['remaining_limit']!='NONE'
+                            for row in domains))
+        with self.assertRaisesRegex(ValueError,'all-pass boundary mismatch'):
+            audit.validate_domain_report_boundary(domains,True)
     def test_historical_candidate_counted_as_snapshot_rejected(self):
         self.mutate(self.path,lambda d:d['known_source_snapshot_p1_ids'].append('GAME-CANDIDATE-361'));self.reject()
     def test_hidden_unverified_paths_rejected(self):
@@ -322,6 +411,20 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.base/'verification-index.json',lambda d:d.update(routing_product_verdict='PASS'));self.reject()
     def test_unbound_execution_source_rejected(self):
         self.mutate(self.base/'verification-index.json',lambda d:d['results'][0].update(source_commit='0'*40));self.reject()
+    def test_missing_verification_result_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['results'].pop());self.reject()
+    def test_failed_verification_result_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['results'][0].update(exit_code=1));self.reject()
+    def test_duplicate_and_extra_verification_results_rejected(self):
+        for mutation in (
+            lambda rows: rows.append(dict(rows[0])),
+            lambda rows: rows.append({**rows[0], 'id': 'unexpected-extra-check'}),
+        ):
+            with self.subTest(mutation=mutation):
+                shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/'verification-index.json',
+                             self.base/'verification-index.json')
+                self.mutate(self.base/'verification-index.json',lambda d:mutation(d['results']))
+                self.reject()
     def test_path_escape_rejected(self):
         self.mutate(self.path,lambda d:d.update(evidence_directory='../other'));self.reject()
     def test_duplicate_json_key_rejected(self):
@@ -390,7 +493,7 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.base/'unknowns.json',mutate)
     def test_stale_semantic_coverage_transition_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('308 DIRECT', '258 DIRECT')
+            reason=row['reason'].replace('309 DIRECT', '258 DIRECT')
                                 .replace('3940 source leaves', '3954 source leaves')))
         self.reject()
     def test_changed_semantic_coverage_total_rejected(self):
@@ -471,6 +574,53 @@ class AuditValidationTest(unittest.TestCase):
         self.reject()
     def test_workflow_count_inflation_rejected(self):
         self.mutate(self.path,lambda d:d['workflow_census'].update(total_workflows=77));self.reject()
+    def test_workflow_inventory_blob_event_and_parse_drift_rejected(self):
+        path=self.base/'workflow-inventory.tsv'
+        rows=path.read_text(encoding='utf-8').splitlines()
+        fields=rows[1].split('\t')
+        fields[2]='0'*40
+        fields[4]=','.join(event for event in fields[4].split(',') if event!='merge_group')
+        fields[6]='FAIL'
+        rows[1]='\t'.join(fields)
+        path.write_text('\n'.join(rows)+'\n',encoding='utf-8')
+        self.reject()
+    def test_workflow_inventory_report_binding_drift_rejected(self):
+        for binding in ('organization-audit-20260907/alternate-workflow-inventory.tsv',
+                        'organization-audit-20260907/missing-workflow-inventory.tsv'):
+            with self.subTest(binding=binding):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
+                self.mutate(self.path,lambda d, value=binding:d.update(workflow_inventory=value))
+                self.reject()
+    def test_workflow_merge_group_report_count_drift_rejected(self):
+        self.mutate(self.path,lambda d:d['workflow_census']['meta'].update(merge_group_workflows=0))
+        self.reject()
+    def test_workflow_inventory_missing_extra_and_duplicate_rows_rejected(self):
+        path=self.base/'workflow-inventory.tsv'
+        original=path.read_text(encoding='utf-8').splitlines()
+        variants=(original[:-1], original+[original[1]], original+[original[-1].replace('atlas\t','meta\t',1)])
+        for rows in variants:
+            with self.subTest(rows=len(rows)):
+                path.write_text('\n'.join(rows)+'\n',encoding='utf-8')
+                self.reject()
+                shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/'workflow-inventory.tsv',path)
+    def test_workflow_inventory_source_blob_and_complete_path_set_bound(self):
+        inventory=self.root/'inventories';inventory.mkdir()
+        report=audit.read_json(self.path)
+        workflow_rows=audit.read_tsv(self.base/'workflow-inventory.tsv')
+        for repository in ('meta','game','platform','atlas'):
+            entries=[{'path':row['path'],'mode':'100644','object_sha':row['blob_sha']}
+                     for row in workflow_rows if row['repository']==repository]
+            (inventory/(repository+'.json')).write_text(json.dumps({
+                'commit_sha':report['repositories'][repository]['commit_sha'],
+                'tree_sha':report['repositories'][repository]['tree_sha'],
+                'entries':entries,
+            }),encoding='utf-8')
+        audit.validate_workflow_inventory(self.base,report,inventory)
+        data=audit.read_json(inventory/'meta.json')
+        data['entries'][0]['object_sha']='0'*40
+        (inventory/'meta.json').write_text(json.dumps(data),encoding='utf-8')
+        with self.assertRaises(ValueError):
+            audit.validate_workflow_inventory(self.base,report,inventory)
     def test_direct_additions_binding_drift_rejected(self):
         self.mutate(self.path,lambda d:d.update(coverage_review_additions='organization-audit-20260907/other.tsv'));self.reject()
     def test_recorder_evidence_binding_drift_rejected(self):
