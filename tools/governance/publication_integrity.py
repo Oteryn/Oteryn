@@ -269,8 +269,50 @@ def _reject_hidden_index_entries(cwd: Path, hooks_dir: str) -> None:
             )
 
 
+def _gitlink_paths(cwd: Path, hooks_dir: str) -> list[str]:
+    result = _run_git(
+        cwd,
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        f"core.hooksPath={hooks_dir}",
+        "ls-files",
+        "--stage",
+        "-z",
+    )
+    paths: list[str] = []
+    for record in result.stdout.split("\0"):
+        if not record:
+            continue
+        metadata, separator, path = record.partition("\t")
+        if not separator:
+            raise PublicationError("unable to parse tracked Git index entry")
+        mode = metadata.split(" ", 1)[0]
+        if mode == "160000":
+            paths.append(path)
+    return paths
+
+
+def _reject_present_submodule_worktrees(cwd: Path, hooks_dir: str) -> None:
+    for relative in _gitlink_paths(cwd, hooks_dir):
+        path = cwd / relative
+        try:
+            if path.is_symlink() or path.is_file():
+                raise PublicationError(
+                    "publication requires tracked submodule worktrees to be deinitialized/absent"
+                )
+            if path.is_dir() and any(path.iterdir()):
+                raise PublicationError(
+                    "publication requires tracked submodule worktrees to be deinitialized/empty"
+                )
+        except OSError as exc:
+            raise PublicationError("unable to verify tracked submodule worktree state") from exc
+
+
 def _require_clean_worktree(cwd: Path) -> None:
     with tempfile.TemporaryDirectory(prefix="oteryn-publication-no-hooks-") as hooks_dir:
+        _reject_present_submodule_worktrees(cwd, hooks_dir)
         _reject_active_executable_filters(cwd, hooks_dir)
         _reject_hidden_index_entries(cwd, hooks_dir)
         status = _run_git(
@@ -283,6 +325,7 @@ def _require_clean_worktree(cwd: Path) -> None:
             "status",
             "--porcelain=v1",
             "--untracked-files=all",
+            "--ignore-submodules=all",
         ).stdout
     if status.strip():
         raise PublicationError(
@@ -443,6 +486,8 @@ def publish(
         "push",
         "--no-verify",
         "--porcelain",
+        "--recurse-submodules=no",
+        "--no-follow-tags",
         f"--force-with-lease={ref}:{expected_remote_head}",
         endpoint,
         f"{candidate}:{ref}",
