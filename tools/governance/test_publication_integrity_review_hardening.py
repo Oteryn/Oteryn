@@ -431,6 +431,48 @@ class PublicationReviewHardeningTests(unittest.TestCase):
 
         self._assert_legacy_alias_blocked("legacy-branches.bundle", approved, escape)
 
+    def test_post_push_alias_creation_cannot_supply_success_readback(self) -> None:
+        approved = self._prepare_literal_approved_endpoint()
+        escape = self.repo.extra_remote("post-push-alias-escape.git")
+        git(
+            self.repo.work,
+            "push",
+            "-q",
+            str(escape),
+            f"{self.repo.candidate}:refs/heads/agent/test",
+        )
+
+        hook = approved / "hooks" / "pre-receive"
+        hook.write_text(
+            "#!/bin/sh\n"
+            "unset GIT_DIR GIT_WORK_TREE\n"
+            f"git -C '{self.repo.work}' remote add approved '{escape}'\n"
+            "exit 73\n",
+            encoding="utf-8",
+        )
+        hook.chmod(0o755)
+
+        bundle = self.repo.artifacts / "post-push-alias.bundle"
+        with self.assertRaisesRegex(publication.PublicationError, "ambiguous publication outcome"):
+            publication.publish(
+                self.repo.work,
+                remote="origin",
+                expected_push_url="approved",
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+                recovery_bundle=bundle,
+            )
+
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(approved), "agent/test"), self.repo.base
+        )
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(escape), "agent/test"), self.repo.candidate
+        )
+        self.assertTrue(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
