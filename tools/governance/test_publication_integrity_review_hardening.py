@@ -659,6 +659,67 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         self.assertTrue(bundle.exists())
         self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
 
+    def test_linked_worktree_commondir_swap_cannot_supply_success_readback(self) -> None:
+        primary = self.repo.root / "approved-primary"
+        approved = self.repo.root / "approved-linked"
+        git(self.repo.root, "clone", "-q", "--no-checkout", str(self.repo.remote), str(primary))
+        git(primary, "worktree", "add", "-q", "-b", "agent/test", str(approved), "origin/agent/test")
+        git(self.repo.work, "remote", "set-url", "origin", str(approved))
+
+        escape = self.repo.extra_remote("commondir-escape.git")
+        git(
+            self.repo.work,
+            "push",
+            "-q",
+            str(escape),
+            f"{self.repo.candidate}:refs/heads/agent/test",
+        )
+        gitfile = (approved / ".git").read_text(encoding="utf-8").strip()
+        self.assertTrue(gitfile.startswith("gitdir: "))
+        admin = Path(gitfile[8:])
+        if not admin.is_absolute():
+            admin = approved / admin
+        admin = admin.resolve()
+        commondir = admin / "commondir"
+        common = (admin / commondir.read_text(encoding="utf-8").strip()).resolve()
+        bundle = self.repo.artifacts / "linked-worktree-commondir.bundle"
+        real_run_git = publication._run_git
+        replaced = False
+
+        def replace_commondir_at_readback(cwd: Path, *args: str, **kwargs):
+            nonlocal replaced
+            if (
+                not replaced
+                and args
+                and args[0] == "ls-remote"
+                and any(value.startswith("/proc/self/fd/") for value in args)
+            ):
+                commondir.write_text(f"{escape}\n", encoding="utf-8")
+                replaced = True
+            return real_run_git(cwd, *args, **kwargs)
+
+        with mock.patch.object(publication, "_run_git", side_effect=replace_commondir_at_readback):
+            with self.assertRaisesRegex(publication.PublicationError, "ambiguous publication outcome"):
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url=str(approved),
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        self.assertTrue(replaced)
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(common), "agent/test"), self.repo.base
+        )
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(escape), "agent/test"), self.repo.candidate
+        )
+        self.assertTrue(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -46,6 +46,12 @@ class FilesystemEndpointIdentity:
     git_directory_path: str
     git_directory_device: int
     git_directory_inode: int
+    common_git_directory_path: str
+    common_git_directory_device: int
+    common_git_directory_inode: int
+    commondir_path: str | None
+    commondir_device: int | None
+    commondir_inode: int | None
 
 
 def _run_git(
@@ -184,6 +190,37 @@ def _filesystem_endpoint_identity(cwd: Path, endpoint: str) -> FilesystemEndpoin
         if git_directory.is_symlink() or not git_directory.is_dir():
             raise PublicationError("local filesystem publication Git directory is not stable")
         git_metadata = git_directory.stat()
+
+        # Linked worktrees store refs and objects through an administrative
+        # directory's `commondir` indirection.  Pinning only that administrative
+        # directory would allow the indirection to be swapped while its inode
+        # remains unchanged.  Bind the indirection file and its effective common
+        # Git directory as separate filesystem objects.
+        commondir = git_directory / "commondir"
+        linked_worktree_admin = (git_directory / "gitdir").exists()
+        if commondir.is_symlink():
+            raise PublicationError("local filesystem publication commondir must not be a symlink")
+        if commondir.exists():
+            if not commondir.is_file():
+                raise PublicationError("local filesystem publication commondir is not stable")
+            common_marker = commondir.read_text(encoding="utf-8").strip()
+            if not common_marker:
+                raise PublicationError("local filesystem publication commondir is missing")
+            common_git_directory = Path(common_marker)
+            if not common_git_directory.is_absolute():
+                common_git_directory = git_directory / common_git_directory
+            common_git_directory = common_git_directory.resolve(strict=True)
+            if common_git_directory.is_symlink() or not common_git_directory.is_dir():
+                raise PublicationError(
+                    "local filesystem publication common Git directory is not stable"
+                )
+            commondir_metadata = commondir.stat()
+        elif linked_worktree_admin:
+            raise PublicationError("local filesystem publication commondir is missing")
+        else:
+            common_git_directory = git_directory
+            commondir_metadata = None
+        common_git_metadata = common_git_directory.stat()
     except PublicationError:
         raise
     except OSError as exc:
@@ -195,6 +232,12 @@ def _filesystem_endpoint_identity(cwd: Path, endpoint: str) -> FilesystemEndpoin
         str(git_directory),
         git_metadata.st_dev,
         git_metadata.st_ino,
+        str(common_git_directory),
+        common_git_metadata.st_dev,
+        common_git_metadata.st_ino,
+        str(commondir) if commondir_metadata is not None else None,
+        commondir_metadata.st_dev if commondir_metadata is not None else None,
+        commondir_metadata.st_ino if commondir_metadata is not None else None,
     )
 
 
@@ -598,20 +641,32 @@ def _stable_local_remote_head(
     identity: FilesystemEndpointIdentity,
     branch: str,
 ) -> str:
-    """Read a local endpoint through its actual open Git directory."""
+    """Read a local endpoint through its effective open common Git directory."""
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    git_descriptor: int | None = None
+    common_descriptor: int | None = None
     try:
-        descriptor = os.open(identity.git_directory_path, flags)
+        git_descriptor = os.open(identity.git_directory_path, flags)
+        common_descriptor = os.open(identity.common_git_directory_path, flags)
     except OSError as exc:
+        if git_descriptor is not None:
+            os.close(git_descriptor)
         raise PublicationError("unable to open a stable local publication endpoint") from exc
+    assert git_descriptor is not None and common_descriptor is not None
     try:
-        metadata = os.fstat(descriptor)
+        metadata = os.fstat(git_descriptor)
         if (metadata.st_dev, metadata.st_ino) != (
             identity.git_directory_device,
             identity.git_directory_inode,
         ):
             raise PublicationError("approved local filesystem Git directory identity changed")
-        proc_endpoint = f"/proc/self/fd/{descriptor}"
+        common_metadata = os.fstat(common_descriptor)
+        if (common_metadata.st_dev, common_metadata.st_ino) != (
+            identity.common_git_directory_device,
+            identity.common_git_directory_inode,
+        ):
+            raise PublicationError("approved local filesystem common Git directory identity changed")
+        proc_endpoint = f"/proc/self/fd/{common_descriptor}"
         if not Path(proc_endpoint).exists():
             raise PublicationError("stable local filesystem endpoint handles are unavailable")
 
@@ -624,16 +679,22 @@ def _stable_local_remote_head(
             proc_endpoint,
             branch_ref,
             check=False,
-            pass_fds=(descriptor,),
+            pass_fds=(git_descriptor, common_descriptor),
         )
         if result.returncode != 0:
             raise PublicationError("remote head readback is unavailable")
-        metadata = os.fstat(descriptor)
+        metadata = os.fstat(git_descriptor)
         if (metadata.st_dev, metadata.st_ino) != (
             identity.git_directory_device,
             identity.git_directory_inode,
         ):
             raise PublicationError("approved local filesystem Git directory identity changed")
+        common_metadata = os.fstat(common_descriptor)
+        if (common_metadata.st_dev, common_metadata.st_ino) != (
+            identity.common_git_directory_device,
+            identity.common_git_directory_inode,
+        ):
+            raise PublicationError("approved local filesystem common Git directory identity changed")
         current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
         if current != identity:
             raise PublicationError("approved local filesystem endpoint identity changed")
@@ -643,7 +704,8 @@ def _stable_local_remote_head(
             raise PublicationError("remote branch is missing or ambiguous")
         return _sha(rows[0][0], "remote head")
     finally:
-        os.close(descriptor)
+        os.close(common_descriptor)
+        os.close(git_descriptor)
 
 
 def classify_remote_state(remote: str, expected: str, candidate: str) -> str:
