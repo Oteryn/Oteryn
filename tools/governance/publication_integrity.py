@@ -7,6 +7,7 @@ import hashlib
 import os
 import re
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -161,17 +162,22 @@ def _is_ancestor(cwd: Path, ancestor: str, descendant: str) -> bool:
 
 
 def _require_clean_worktree(cwd: Path) -> None:
-    # Repository-local core.fsmonitor may name an executable hook. Disable it for
-    # the guarded status probe so the clean check cannot execute repository code
-    # or perform an out-of-band publication side effect.
-    status = _run_git(
-        cwd,
-        "-c",
-        "core.fsmonitor=false",
-        "status",
-        "--porcelain=v1",
-        "--untracked-files=all",
-    ).stdout
+    # Git status can execute core.fsmonitor and can refresh/write the index,
+    # which in turn can invoke post-index-change. Suppress optional index writes,
+    # disable fsmonitor, and point hooksPath at a fresh trusted empty directory so
+    # the clean probe cannot execute repository-controlled code or side-publish.
+    with tempfile.TemporaryDirectory(prefix="oteryn-publication-no-hooks-") as hooks_dir:
+        status = _run_git(
+            cwd,
+            "--no-optional-locks",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            f"core.hooksPath={hooks_dir}",
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ).stdout
     if status.strip():
         raise PublicationError(
             "publication requires a clean isolated worktree so the recovery artifact matches all intended work"
@@ -324,11 +330,6 @@ def publish(
         bundle_path=recovery_bundle,
     )
 
-    # Re-resolve and revalidate exactly one push endpoint after bundle creation.
-    # URL rewrite rules fail closed, so the approved endpoint cannot be redirected
-    # by insteadOf/pushInsteadOf between validation, mutation and readback. The
-    # expected-old-value lease fences the ref at mutation time, while ancestry
-    # independently guarantees fast-forward history.
     endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
     ref = f"refs/heads/{branch}"
     push = _run_git(
