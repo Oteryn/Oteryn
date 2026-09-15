@@ -1,7 +1,7 @@
 # Oteryn Organization Agent Policy
 
 Policy ID: `OTERYN_ORGANIZATION_AGENT_POLICY`
-Policy version: `3.2.0`
+Policy version: `3.1.0`
 
 Effective after reviewed integration to protected META `main` and explicit provider adoption. The principle is **one rule, one authority**: META owns shared semantics; providers own product knowledge and implementation; prompts add only task-specific requirements.
 
