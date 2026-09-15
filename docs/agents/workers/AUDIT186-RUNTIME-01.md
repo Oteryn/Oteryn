@@ -2,8 +2,8 @@
 
 Governing Issue: Oteryn/Oteryn#186
 Canonical audit PR: Oteryn/Oteryn#185
-Current canonical audit source: `Oteryn/Oteryn#185@2f78fafbacc12723516bb7dd00376812c31385ef` (tree `44c64c60f9e71bde27ff86e7d19c77476cc07ade`)
-Canonical adoption checkpoint: Issue #186 comment `5671661917`
+Current canonical audit source: `Oteryn/Oteryn#185@e98943eee6f86c9ba160ea2e02683d2be8e764e4`
+Canonical adoption checkpoint: Issue #186 comment `5676034212`
 Programme authority: `Oteryn/Oteryn#203@82bc113797ecdc70d79aee628d339136b816e15d`
 Release checkpoint: Issue #186 comment `5666964258` (`AUDIT186_PARALLEL_RELEASE_READY`)
 Lane: `AUDIT186-RUNTIME`
@@ -13,7 +13,8 @@ Lane: `AUDIT186-RUNTIME`
 
 ## Sequential batch state
 - Batch 1, `ADMIN-STATE`, is frozen at the clean handoff checkpoint Issue #186 comment `5671807221`; its packet and `UNKNOWN / BLOCKED` disposition are unchanged.
-- Batch 2, `INFRA-STATE`, is the active bounded batch. It may add only `docs/evidence/organization-audit-20260907/runtime-assurance/infra-state-20260914.md` and must not promote public source or CI evidence into live production truth.
+- Batch 2, `INFRA-STATE`, is frozen with Batch 1 at worker head `58574f6057713cfb9c7f0756d5c561df949b52b1`; canonical adoption is recorded by Issue #186 comment `5676034212`. Both packets and their `UNKNOWN / BLOCKED` dispositions are unchanged.
+- Batch 3, `RECOVERY`, is the active bounded batch. It may add only `docs/evidence/organization-audit-20260907/runtime-assurance/recovery-20260915.md` and must not promote source, test or CI evidence into current-data restore execution or measured RPO/RTO.
 
 ## Mission
 Determine what runtime, administrative and operational assurance can actually be proven from authorized evidence. Distinguish source/CI evidence from runtime/admin/telemetry/recovery truth. Preserve UNKNOWN/OPEN when live evidence is absent; do not manufacture PASS by mutating providers or production.
