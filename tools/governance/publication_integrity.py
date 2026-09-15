@@ -22,6 +22,7 @@ HTTP_ROUTING_TRUST_RE = (
     r"(proxy|curloptresolve|extraheader|sslverify|sslcainfo|sslcapath|"
     r"proxysslverify|proxysslcainfo|proxysslcapath)$"
 )
+NATIVE_PUSH_URL_SCHEMES = frozenset({"ssh", "git", "http", "https", "file"})
 
 
 class PublicationError(RuntimeError):
@@ -108,6 +109,8 @@ def _credential_free_url(value: str, label: str) -> str:
         raise PublicationError(f"{label} must not use explicit Git remote-helper syntax")
     if "://" in value:
         parsed = urlsplit(value)
+        if parsed.scheme.lower() not in NATIVE_PUSH_URL_SCHEMES:
+            raise PublicationError(f"{label} must use a supported native Git push URL scheme")
         if parsed.username is not None or parsed.password is not None:
             raise PublicationError(f"{label} must not embed credentials")
     return value
