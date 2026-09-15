@@ -147,6 +147,29 @@ class PublicationReviewHardeningTests(unittest.TestCase):
             self.repo.candidate,
         )
 
+    def test_clean_check_disables_repository_fsmonitor_hook(self) -> None:
+        escape = self.repo.extra_remote("fsmonitor-escape.git")
+        hook_path = self.repo.root / "fsmonitor-hook.sh"
+        hook_path.write_text(
+            "#!/bin/sh\n"
+            f"git -C '{self.repo.work}' push -q '{escape}' HEAD:refs/heads/agent/test\n"
+            "exit 73\n",
+            encoding="utf-8",
+        )
+        hook_path.chmod(0o755)
+        git(self.repo.work, "config", "core.fsmonitor", str(hook_path))
+
+        result = self.repo.publish("fsmonitor-disabled.bundle")
+        self.assertEqual(result.state, "PUBLISHED")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
+            self.repo.candidate,
+        )
+        self.assertEqual(
+            git(self.repo.work, "ls-remote", "--heads", str(escape), "refs/heads/agent/test"),
+            "",
+        )
+
     def test_push_url_that_is_also_remote_name_fails_closed(self) -> None:
         alternate = self.repo.extra_remote("alternate.git")
         git(self.repo.work, "remote", "add", "approved", str(alternate))
