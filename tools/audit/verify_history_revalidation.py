@@ -1,0 +1,369 @@
+#!/usr/bin/env python3
+"""Fail-closed verifier for the bounded HISTORY-REVALIDATION handoff packet."""
+from __future__ import annotations
+
+import argparse
+import csv
+import hashlib
+import json
+import re
+import subprocess
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+CANDIDATE = ROOT / "docs/evidence/organization-audit-20260907/history-revalidation-candidate.json"
+EXPECTED_BOUNDARIES = [
+    {
+        "id": "meta", "repository": "Oteryn/Oteryn",
+        "historical_commit": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+        "historical_tree": "b8ebb8e50bce14a736fa65590ac121655c52fd12",
+        "current_main_commit": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+        "current_main_tree": "cb7e49e772321dbf89fed74e2bc2ac3f28ab37e7",
+        "compare_status": "ahead", "ahead_by": 2, "changed_files_reported": 2,
+        "compare_file_list_complete": True,
+        "compare_path_blob_status_sha256": "039f9e2758bc006149971ccec0e7c7324668af95d65171e1e46e88fc976d3864",
+    },
+    {
+        "id": "game", "repository": "Oteryn/Oteryn-Game",
+        "historical_commit": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+        "historical_tree": "49cabfccf7d4876e5bc9276fc5963caa33dab8a5",
+        "current_main_commit": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+        "current_main_tree": "bddef2afcb7cf50c5a4c21dfd0c0c8069fbf5936",
+        "compare_status": "ahead", "ahead_by": 131, "changed_files_reported": 300,
+        "compare_file_list_complete": False,
+        "compare_limitation": "GitHub compare returned its 300-file cap; this digest is not a complete changed-path inventory.",
+        "compare_path_blob_status_sha256": "e444a9053dac983f0767603fa07037b027e5fb2d6768e6ce777491f2ad34fc93",
+    },
+    {
+        "id": "platform", "repository": "Oteryn/Oteryn-Platform",
+        "historical_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+        "historical_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+        "current_main_commit": "84d504c98acc8134eb4c9545711010b74c987974",
+        "current_main_tree": "8abbc5e1051710c695205214d4c779291dcfb697",
+        "compare_status": "ahead", "ahead_by": 50, "changed_files_reported": 144,
+        "compare_file_list_complete": True,
+        "compare_path_blob_status_sha256": "050b6effa9d2cf24354602ffe8739eb6394c5f59ad2d2c75000d500b234cc351",
+    },
+    {
+        "id": "atlas", "repository": "Oteryn/Oteryn-Atlas",
+        "historical_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+        "historical_tree": "a1009378f8d3950a5ee62fb3ee65041f7d53a1e0",
+        "current_main_commit": "0d22a8d4378e66441502482ce715e226d487248e",
+        "current_main_tree": "659b3765de64771da73a851219f01dad95553b49",
+        "compare_status": "ahead", "ahead_by": 99, "changed_files_reported": 201,
+        "compare_file_list_complete": True,
+        "compare_path_blob_status_sha256": "c50a23545ae921e7882fca7cd76cb877f11683487cdf588caefcdf81f842fe79",
+    },
+    {
+        "id": "migration_archive", "repository": "Oteryn/Oteryn-Platform-Migration-Backup-20260818",
+        "historical_commit": "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+        "historical_tree": "dbf8349a21e432df47d1475b8431939bbe94d6e1",
+        "current_main_commit": "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+        "current_main_tree": "dbf8349a21e432df47d1475b8431939bbe94d6e1",
+        "compare_status": "identical", "ahead_by": 0, "changed_files_reported": 0,
+        "compare_file_list_complete": True,
+        "compare_path_blob_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "repository_archived": True,
+    },
+]
+EXPECTED_CLAIMS = {
+    "history_revalidation_closed": False,
+    "product_readiness_claimed": False,
+    "runtime_readiness_claimed": False,
+    "security_remediation_claimed": False,
+    "organization_audit_completion_claimed": False,
+}
+GOVERNED_ASSERTION_KEY_COMPONENTS = (
+    ("history", "revalidation"),
+    ("product", "readiness"),
+    ("runtime", "readiness"),
+    ("security", "remediation"),
+    ("organization", "audit"),
+    ("game", "compare"),
+)
+EXPECTED_PROVENANCE_METHOD = (
+    "Read-only GitHub REST default-branch, Git commit/tree, compare, PR and issue-comment reads; local immutable "
+    "audit inputs are bound below by Git blob and SHA-256."
+)
+EXPECTED_GITHUB_ENDPOINTS = [
+    "GET /repos/{owner}/{repo}",
+    "GET /repos/{owner}/{repo}/branches/main",
+    "GET /repos/{owner}/{repo}/git/commits/{sha}",
+    "GET /repos/{owner}/{repo}/compare/{historical}...{current}",
+    "GET /repos/Oteryn/Oteryn/pulls/{number}",
+    "GET /repos/Oteryn/Oteryn/issues/comments/5666964258",
+]
+EXPECTED_OBSERVED_AT = "2026-09-14T21:02:48Z"
+EXPECTED_BASELINE = {
+    "repository": "Oteryn/Oteryn",
+    "canonical_audit_pr": 185,
+    "canonical_audit_head": "1008886c0aec2db6b8588a3131a83829eff06e67",
+    "canonical_audit_tree": "9f32fb6a2debb09483bab478e1ec2d5a05cbf9db",
+    "worker_pr": 206,
+    "worker_seed_head": "c5a410873124adde191514bc86a79ed50583b918",
+    "programme_pr": 203,
+    "programme_head": "82bc113797ecdc70d79aee628d339136b816e15d",
+    "release_comment_id": 5666964258,
+}
+EXPECTED_TOP_LEVEL_KEYS = {
+    "schema_version",
+    "obligation",
+    "disposition",
+    "observed_at",
+    "baseline",
+    "source_boundaries",
+    "provenance",
+    "claims_remaining_valid_as_historical_facts",
+    "claims_requiring_rebind_or_revalidation",
+    "stale_evidence_rejection_rules",
+    "limitations",
+    "exact_recheck_triggers",
+    "claims",
+}
+EXPECTED_PROVENANCE_KEYS = {"method", "github_endpoints", "canonical_inputs"}
+EXPECTED_CANONICAL_INPUT_KEYS = {"path", "git_blob", "sha256"}
+EXPECTED_HISTORICAL_FACTS = [
+    "The immutable commits and trees named as historical source cuts remain exact historical coordinates; provider-main movement does not rewrite those objects.",
+    "DIRECT and GROUPED dispositions remain bounded descriptions of review or qualification at their recorded source/evidence coordinates, not current-main or product-readiness claims.",
+    "The original Game coordinate 3327db49c0c3e2d90afe6a74954c579a36aba2a5 was unresolvable during collection and was fail-closed replaced by the recorded Game source cut; no cause is inferred.",
+    "The rejected Atlas 508-leaf carry-forward remains a historical rejection at the pinned Atlas source; it does not establish the outcome on current Atlas main.",
+    "Platform characterization mechanism details were present in public ancestor history and public Actions artifacts. This historical disclosure is not reversed by removal from a later tree.",
+]
+EXPECTED_LIMITATIONS = [
+    "This packet performs no provider code execution, runtime observation, privileged administrative read, vulnerability assessment or provider mutation.",
+    "GitHub compare for Game reached the 300-file response cap, so its returned file-list digest is provenance for a partial listing only and cannot support exhaustive path-level carry-forward.",
+    "Fresh coordinates prove identity and ancestry movement only; they do not prove that a historical defect persists, was repaired, is reachable, or is exploitable.",
+    "This worker does not mutate canonical audit accounting and does not close HISTORY-REVALIDATION; AUDIT186-LEAD owns any canonical transition.",
+]
+EXPECTED_RECHECK_TRIGGERS = [
+    "Any applicable default-branch SHA changes before lead adoption or use of a current claim.",
+    "A current claim is proposed for any listed finding or for a DIRECT/GROUPED provider family.",
+    "A provider publishes exact remediation/qualification evidence or an owner disposition for a listed row.",
+    "Historical Actions artifact availability, deletion or expiry is asserted to have changed.",
+    "Canonical PR #185 head, collection-plan source coordinates, finding-register states or HISTORY-REVALIDATION closure wording changes.",
+]
+EXPECTED_REVALIDATION_SCOPE = {
+    "rule": (
+        "Every provider current-main source, runtime, security, remediation, lifecycle, CI, admin or "
+        "product-outcome statement requires evidence bound to the applicable current commit and observation time; "
+        "historical disposition labels alone cannot satisfy it."
+    ),
+    "provider_scope": (
+        "All provider-source conclusions asserted against current main require path/blob impact analysis and "
+        "applicable current qualification because Game, Platform and Atlas main are ahead of their audit cuts."
+    ),
+    "live_scope": (
+        "Runtime, production, admin, telemetry, recovery, artifact availability/deletion, private-advisory "
+        "submission and remediation remain mutable external facts and require fresh authoritative observation "
+        "even when source bytes are unchanged."
+    ),
+}
+GAME_CARRY_FORWARD_RULE = (
+    "Reject source carry-forward when affected paths, dependent contracts or consumer paths are not exhaustively "
+    "compared by blob identity; an API-truncated changed-file list is insufficient."
+)
+EXPECTED_STALE_EVIDENCE_REJECTION_RULES = [
+    "Reject a current claim when its source commit is not the freshly resolved applicable main commit, unless the claim is explicitly and only historical.",
+    GAME_CARRY_FORWARD_RULE,
+    "Reject a current runtime, security, admin, recovery, CI or remediation claim supported only by source review, a historical run, a PR body, an issue label, a digest without retrievable bytes, or repository metadata.",
+    "Reject historical artifact-unavailability or restored-confidentiality claims until deletion or expiry is independently verified; public disclosure remains disclosed.",
+    "Reject any conversion of DIRECT or GROUPED coverage into product, runtime, security, organization-completion or independent-score PASS.",
+    "Reject closure of HISTORY-REVALIDATION unless every canonical REQUIRES_REVALIDATION, REQUIRES_LIVE_REVALIDATION, UNKNOWN_LIVE, OPEN_INHERITED and other explicitly open historical row is individually rebound or truthfully dispositioned by its owner route.",
+]
+REQUIRED_STATES = {
+    "PARTIALLY_REPAIRED", "UNKNOWN_LIVE", "REQUIRES_REVALIDATION",
+    "REQUIRES_LIVE_REVALIDATION", "OPEN_QUALIFICATION", "OPEN_INHERITED",
+    "REPORTED_OPEN", "OWNER_DECISION_PENDING", "REPORTED_IMPLEMENTED_NOT_REQUALIFIED",
+}
+EXPECTED_INPUTS = {
+    "docs/evidence/organization-audit-20260907/collection-plan.json": ("ad376433710e78591978d4e399e28f8d9eda4b23", "dc67249cc0a20f8e39f6e82c50123938044b4d14ada31926516691511ddca269"),
+    "docs/evidence/organization-audit-20260907/r3-native-manifest.json": ("75facd26f0dfa482ad34e2eb410dc32e8ab5ea07", "68518689cd7b9a4b4430f15d4b843757695b73d12b670137f29d8d429d743364"),
+    "docs/evidence/organization-audit-20260907/r3-independent-review-corrections.json": ("5a369290e4c438ae1d053cc2cf3511fe03f9ca65", "08b36445baf85ffcbc60896882b7dd9aacb8f250c49d97d65792e9a264954d78"),
+    "docs/evidence/organization-audit-20260907/finding-register.tsv": ("0d8a3b61dabb71f75d5ad3bde102ba953eb8d47b", "c5402f1618cfe4cd03d2ad50cd0946ec86f19e834b02128199b31b808cc64e94"),
+}
+
+
+def require(ok: bool, message: str) -> None:
+    if not ok:
+        raise ValueError(message)
+
+
+def normalize_key(key: object) -> str:
+    text = str(key)
+    text = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", text)
+    text = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", "_", text)
+    return re.sub(r"[^a-z0-9]+", "_", text.lower()).strip("_")
+
+
+def reject_duplicate_json_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Materialize a JSON object only when every member name is unique."""
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON member: {key}")
+        result[key] = value
+    return result
+
+
+def git_blob(path: Path) -> str:
+    return subprocess.check_output(["git", "hash-object", str(path)], cwd=ROOT, text=True).strip()
+
+
+def assertion_strings(value: object, path: tuple[str, ...] = ()):
+    """Yield prose and normalized field/value assertions from outside ``claims``."""
+    if isinstance(value, str):
+        yield value.lower()
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            normalized_key = normalize_key(key)
+            next_path = (*path, normalized_key)
+            if isinstance(item, (str, bool, int, float)):
+                yield f"{' '.join(next_path)} {str(item).lower()}"
+            yield from assertion_strings(item, next_path)
+    elif isinstance(value, list):
+        for item in value:
+            yield from assertion_strings(item, path)
+
+
+def duplicated_governed_claim_keys(value: object) -> set[str]:
+    """Return canonical claim keys found anywhere outside the canonical claims object."""
+    found: set[str] = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in EXPECTED_CLAIMS:
+                found.add(key)
+            found.update(duplicated_governed_claim_keys(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.update(duplicated_governed_claim_keys(item))
+    return found
+
+
+def unexpected_governed_assertion_keys(value: object, path: tuple[str, ...] = ()) -> set[str]:
+    """Reject machine-readable assertion fields whose complete normalized key path shadows governed claims."""
+    found: set[str] = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            normalized = normalize_key(key)
+            next_path = (*path, normalized)
+            path_components = [component for part in next_path for component in part.split("_") if component]
+            if any(
+                _is_ordered_subsequence(components, path_components)
+                for components in GOVERNED_ASSERTION_KEY_COMPONENTS
+            ):
+                found.add(".".join(str(part) for part in next_path))
+            found.update(unexpected_governed_assertion_keys(item, next_path))
+    elif isinstance(value, list):
+        for item in value:
+            found.update(unexpected_governed_assertion_keys(item, path))
+    return found
+
+
+def _is_ordered_subsequence(needle: tuple[str, ...], haystack: list[str]) -> bool:
+    """Return whether semantic key components occur in order, wrappers notwithstanding."""
+    position = 0
+    for component in haystack:
+        if component == needle[position]:
+            position += 1
+            if position == len(needle):
+                return True
+    return False
+
+
+def validate(path: Path = CANDIDATE) -> dict:
+    raw = path.read_text(encoding="utf-8")
+    data = json.loads(raw, object_pairs_hook=reject_duplicate_json_members)
+    require(isinstance(data, dict), "candidate must be an object")
+    require(data.get("schema_version") == 1 and data.get("obligation") == "HISTORY-REVALIDATION", "candidate identity")
+    require(data.get("disposition") == "HANDOFF_COMPLETE_OBLIGATION_REMAINS_OPEN", "obligation must remain open")
+    require(data.get("observed_at") == EXPECTED_OBSERVED_AT, "observation provenance drift")
+    require(data.get("baseline") == EXPECTED_BASELINE, "lifecycle baseline provenance drift")
+    boundaries = data.get("source_boundaries", [])
+    require([x.get("id") for x in boundaries] == [x["id"] for x in EXPECTED_BOUNDARIES], "source boundary set/order")
+    game = boundaries[1]
+    stale_rules = data.get("stale_evidence_rejection_rules", [])
+    require(isinstance(stale_rules, list) and stale_rules == EXPECTED_STALE_EVIDENCE_REJECTION_RULES, "stale-evidence rule set drift")
+    require(
+        game.get("compare_file_list_complete") is False
+        and game.get("compare_limitation") == EXPECTED_BOUNDARIES[1]["compare_limitation"]
+        and GAME_CARRY_FORWARD_RULE in stale_rules,
+        "Game compare truncation must fail closed",
+    )
+    require(boundaries == EXPECTED_BOUNDARIES, "source boundary provenance drift")
+
+    provenance = data.get("provenance", {})
+    require(isinstance(provenance, dict), "provenance must be an object")
+    require(provenance.get("method") == EXPECTED_PROVENANCE_METHOD, "provenance method drift")
+    require(provenance.get("github_endpoints") == EXPECTED_GITHUB_ENDPOINTS, "provenance endpoint inventory drift")
+    canonical_inputs = provenance.get("canonical_inputs", [])
+    require(isinstance(canonical_inputs, list), "canonical input manifest must be a list")
+    require(len(canonical_inputs) == len(EXPECTED_INPUTS), "canonical input manifest cardinality drift")
+    require(
+        all(isinstance(item, dict) and set(item) == EXPECTED_CANONICAL_INPUT_KEYS for item in canonical_inputs),
+        "canonical input entry schema drift",
+    )
+    paths = [item.get("path") for item in canonical_inputs if isinstance(item, dict)]
+    require(len(paths) == len(canonical_inputs) and len(set(paths)) == len(paths), "duplicate canonical input entry")
+    inputs = {item["path"]: (item.get("git_blob"), item.get("sha256")) for item in canonical_inputs}
+    require(inputs == EXPECTED_INPUTS, "canonical input manifest drift")
+    require(set(provenance) == EXPECTED_PROVENANCE_KEYS, "provenance schema drift")
+    for rel, expected in EXPECTED_INPUTS.items():
+        raw_input = (ROOT / rel).read_bytes()
+        require((git_blob(ROOT / rel), hashlib.sha256(raw_input).hexdigest()) == expected, f"canonical input bytes drift: {rel}")
+
+    with (ROOT / "docs/evidence/organization-audit-20260907/finding-register.tsv").open(encoding="utf-8") as stream:
+        register = list(csv.DictReader(stream, delimiter="\t"))
+    expected_ids = {r["id"] for r in register if r["state"] in REQUIRED_STATES}
+    revalidation = data.get("claims_requiring_rebind_or_revalidation", {})
+    require(isinstance(revalidation, dict), "revalidation scope must be an object")
+    require(
+        {key: revalidation.get(key) for key in EXPECTED_REVALIDATION_SCOPE} == EXPECTED_REVALIDATION_SCOPE
+        and set(revalidation) == {*EXPECTED_REVALIDATION_SCOPE, "finding_ids"},
+        "revalidation rule/scope drift",
+    )
+    finding_ids = revalidation.get("finding_ids")
+    require(
+        isinstance(finding_ids, list)
+        and all(isinstance(item, str) for item in finding_ids)
+        and len(finding_ids) == len(set(finding_ids)),
+        "revalidation finding_ids must be a list of unique strings",
+    )
+    actual_ids = set(finding_ids)
+    require(actual_ids == expected_ids, "revalidation finding set drift")
+    claims = data.get("claims", {})
+    require(claims == EXPECTED_CLAIMS, "readiness/closure claims must have exact keys and all be false")
+    outside_claims = {key: value for key, value in data.items() if key != "claims"}
+    require(not duplicated_governed_claim_keys(outside_claims), "governed claim key duplicated outside claims")
+    unexpected = unexpected_governed_assertion_keys(outside_claims)
+    require(not unexpected, f"unexpected governed assertion key path: {sorted(unexpected)[0] if unexpected else ''}")
+    prose = "\n".join(assertion_strings(outside_claims))
+    contradictory = (
+        r"history[- ]revalidation (?:is |has been )?(?:closed|complete|completed)",
+        r"(?:product|runtime) readiness (?:is |has been )?(?:claimed|established|proven|complete|completed)",
+        r"security remediation (?:is |has been )?(?:claimed|complete|completed|established|proven)",
+        r"organization(?:-wide)? audit (?:is |has been )?(?:complete|completed|closed)",
+        r"game compare (?:is |was )?(?:complete|exhaustive)",
+        r"game (?:file|changed-path|path)(?: list| inventory)? (?:is |was )?(?:complete|exhaustive)",
+        r"(?:history revalidation|product readiness|runtime readiness|security remediation|organization(?: wide)? audit(?: completion)?|game compare) true\b",
+    )
+    require(not any(re.search(pattern, prose) for pattern in contradictory), "contradictory positive assertion")
+    require(
+        data.get("claims_remaining_valid_as_historical_facts") == EXPECTED_HISTORICAL_FACTS,
+        "historical-fact claim list drift",
+    )
+    require(data.get("limitations") == EXPECTED_LIMITATIONS, "limitations drift")
+    require(data.get("exact_recheck_triggers") == EXPECTED_RECHECK_TRIGGERS, "exact recheck trigger list drift")
+    require(set(data) == EXPECTED_TOP_LEVEL_KEYS, "top-level packet schema drift")
+    return {"result": "HISTORY_REVALIDATION_HANDOFF_VALID_OBLIGATION_OPEN", "revalidation_findings": len(actual_ids), "source_boundaries": len(boundaries)}
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--candidate", type=Path, default=CANDIDATE)
+    args = parser.parse_args()
+    print(json.dumps(validate(args.candidate), sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

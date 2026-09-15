@@ -1,0 +1,345 @@
+from __future__ import annotations
+
+import copy
+import importlib.util
+import json
+import tempfile
+import unittest
+from pathlib import Path
+
+MODULE = Path(__file__).with_name("verify_history_revalidation.py")
+SPEC = importlib.util.spec_from_file_location("verify_history_revalidation", MODULE)
+assert SPEC and SPEC.loader
+verify = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(verify)
+
+class HistoryRevalidationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.base = json.loads(verify.CANDIDATE.read_text(encoding="utf-8"))
+        cls.raw = verify.CANDIDATE.read_text(encoding="utf-8")
+
+    def validate_mutation(self, mutate):
+        data = copy.deepcopy(self.base)
+        mutate(data)
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "candidate.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            return verify.validate(path)
+
+    def validate_raw(self, raw: str):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "candidate.json"
+            path.write_text(raw, encoding="utf-8")
+            return verify.validate(path)
+
+    def test_candidate_is_valid_but_obligation_stays_open(self):
+        result = verify.validate()
+        self.assertEqual(result["result"], "HISTORY_REVALIDATION_HANDOFF_VALID_OBLIGATION_OPEN")
+        self.assertEqual(result["revalidation_findings"], 30)
+
+    def test_duplicate_top_level_claims_object_is_rejected_before_materialization(self):
+        marker = '  "claims": {'
+        raw = self.raw.replace(marker, '  "claims": {"history_revalidation_closed": true},\n' + marker, 1)
+        self.assertNotEqual(raw, self.raw)
+        with self.assertRaisesRegex(ValueError, "duplicate JSON member: claims"):
+            self.validate_raw(raw)
+
+    def test_duplicate_governed_claim_member_is_rejected_before_materialization(self):
+        marker = '    "history_revalidation_closed": false'
+        raw = self.raw.replace(marker, '    "history_revalidation_closed": true,\n' + marker, 1)
+        self.assertNotEqual(raw, self.raw)
+        with self.assertRaisesRegex(ValueError, "duplicate JSON member: history_revalidation_closed"):
+            self.validate_raw(raw)
+
+    def test_duplicate_canonical_input_entry_is_rejected(self):
+        data = copy.deepcopy(self.base)
+        duplicate = copy.deepcopy(data["provenance"]["canonical_inputs"][0])
+        duplicate["git_blob"] = "0" * 40
+        duplicate["sha256"] = "0" * 64
+        data["provenance"]["canonical_inputs"].insert(0, duplicate)
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "candidate.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "canonical input manifest cardinality drift|duplicate canonical input entry"):
+                verify.validate(path)
+
+    def test_observation_time_is_exactly_bound(self):
+        mutations = (
+            lambda d: d.pop("observed_at"),
+            lambda d: d.update(observed_at="2026-09-14T16:24:00Z"),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "observation provenance drift"):
+                self.validate_mutation(mutate)
+
+    def test_rebound_baseline_observation_and_current_sources_are_exact(self):
+        self.assertEqual(self.base["observed_at"], verify.EXPECTED_OBSERVED_AT)
+        self.assertEqual(
+            self.base["baseline"],
+            verify.EXPECTED_BASELINE,
+        )
+        current_sources = {
+            boundary["id"]: (boundary["current_main_commit"], boundary["current_main_tree"])
+            for boundary in self.base["source_boundaries"]
+        }
+        self.assertEqual(
+            current_sources,
+            {
+                "meta": (
+                    "d9419b05eb98c81279297563c11fc90e4fe708ac",
+                    "cb7e49e772321dbf89fed74e2bc2ac3f28ab37e7",
+                ),
+                "game": (
+                    "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+                    "bddef2afcb7cf50c5a4c21dfd0c0c8069fbf5936",
+                ),
+                "platform": (
+                    "84d504c98acc8134eb4c9545711010b74c987974",
+                    "8abbc5e1051710c695205214d4c779291dcfb697",
+                ),
+                "atlas": (
+                    "0d22a8d4378e66441502482ce715e226d487248e",
+                    "659b3765de64771da73a851219f01dad95553b49",
+                ),
+                "migration_archive": (
+                    "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+                    "dbf8349a21e432df47d1475b8431939bbe94d6e1",
+                ),
+            },
+        )
+
+    def test_lifecycle_baseline_is_exactly_bound(self):
+        mutations = (
+            lambda d: d["baseline"].update(canonical_audit_head="0" * 40),
+            lambda d: d["baseline"].update(canonical_audit_tree="0" * 40),
+            lambda d: d["baseline"].update(programme_head="0" * 40),
+            lambda d: d["baseline"].update(release_comment_id=1),
+            lambda d: d["baseline"].pop("canonical_audit_pr"),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "lifecycle baseline provenance drift"):
+                self.validate_mutation(mutate)
+
+    def test_declared_provenance_method_and_endpoints_are_exactly_bound(self):
+        mutations = (
+            lambda d: d["provenance"].pop("method"),
+            lambda d: d["provenance"].update(method="Unspecified observation method."),
+            lambda d: d["provenance"].pop("github_endpoints"),
+            lambda d: d["provenance"]["github_endpoints"].pop(),
+            lambda d: d["provenance"]["github_endpoints"].append("GET /unbound/source"),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(
+                ValueError, "provenance (?:method|endpoint inventory) drift"
+            ):
+                self.validate_mutation(mutate)
+
+    def test_top_level_and_nested_packet_schemas_are_exactly_bound(self):
+        mutations = (
+            lambda d: d.update(obligation_status="CLOSED"),
+            lambda d: d["provenance"].update(obligation_status="CLOSED"),
+            lambda d: d["provenance"]["canonical_inputs"][0].update(obligation_status="CLOSED"),
+        )
+        messages = (
+            "top-level packet schema drift",
+            "provenance schema drift",
+            "canonical input entry schema drift",
+        )
+        for mutate, message in zip(mutations, messages):
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                self.validate_mutation(mutate)
+
+    def test_current_and_historical_coordinates_cannot_be_conflated(self):
+        with self.assertRaisesRegex(ValueError, "source boundary provenance drift"):
+            self.validate_mutation(lambda d: d["source_boundaries"][1].update(current_main_commit=d["source_boundaries"][1]["historical_commit"]))
+
+    def test_each_boundary_coordinate_and_compare_value_is_exactly_bound(self):
+        mutations = (
+            lambda d: d["source_boundaries"][0].update(historical_tree="0" * 40),
+            lambda d: d["source_boundaries"][1].update(compare_path_blob_status_sha256="0" * 64),
+            lambda d: d["source_boundaries"][2].update(changed_files_reported=143),
+            lambda d: d["source_boundaries"][3].update(ahead_by=95),
+            lambda d: d["source_boundaries"][4].pop("compare_path_blob_status_sha256"),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "source boundary provenance drift"):
+                self.validate_mutation(mutate)
+
+    def test_truncated_game_compare_cannot_be_promoted_to_complete(self):
+        with self.assertRaisesRegex(ValueError, "Game compare truncation"):
+            self.validate_mutation(lambda d: d["source_boundaries"][1].update(compare_file_list_complete=True))
+
+    def test_truncated_game_compare_requires_exact_limitation_and_carry_forward_rule(self):
+        mutations = (
+            lambda d: d["source_boundaries"][1].update(compare_limitation="GitHub returned 300-file results."),
+            lambda d: d.update(stale_evidence_rejection_rules=[x for x in d["stale_evidence_rejection_rules"] if x != verify.GAME_CARRY_FORWARD_RULE]),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "Game compare truncation|stale-evidence rule set drift"):
+                self.validate_mutation(mutate)
+
+    def test_complete_stale_evidence_rule_set_is_exactly_bound(self):
+        for index in range(len(self.base["stale_evidence_rejection_rules"])):
+            with self.subTest(index=index), self.assertRaisesRegex(ValueError, "stale-evidence rule set drift"):
+                self.validate_mutation(lambda d, index=index: d["stale_evidence_rejection_rules"].pop(index))
+        with self.assertRaisesRegex(ValueError, "stale-evidence rule set drift"):
+            self.validate_mutation(lambda d: d["stale_evidence_rejection_rules"].append("Unexpected weaker rule."))
+
+    def test_contradictory_game_completeness_prose_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
+            self.validate_mutation(lambda d: d["limitations"].append("The Game changed-path inventory is complete."))
+
+    def test_open_finding_cannot_be_silently_omitted(self):
+        with self.assertRaisesRegex(ValueError, "revalidation finding set drift"):
+            self.validate_mutation(lambda d: d["claims_requiring_rebind_or_revalidation"]["finding_ids"].pop())
+
+    def test_finding_ids_require_a_unique_string_array(self):
+        finding_ids = self.base["claims_requiring_rebind_or_revalidation"]["finding_ids"]
+        mutations = (
+            lambda d: d["claims_requiring_rebind_or_revalidation"].update(
+                finding_ids={item: False for item in finding_ids}
+            ),
+            lambda d: d["claims_requiring_rebind_or_revalidation"]["finding_ids"].append(finding_ids[0]),
+            lambda d: d["claims_requiring_rebind_or_revalidation"]["finding_ids"].__setitem__(0, 123),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "list of unique strings"):
+                self.validate_mutation(mutate)
+
+    def test_frozen_handoff_lists_are_exactly_bound(self):
+        fields_and_messages = (
+            ("claims_remaining_valid_as_historical_facts", "historical-fact claim list drift"),
+            ("limitations", "limitations drift"),
+            ("exact_recheck_triggers", "exact recheck trigger list drift"),
+        )
+        for field, message in fields_and_messages:
+            mutations = (
+                lambda d, field=field: d.pop(field),
+                lambda d, field=field: d[field].__setitem__(0, "Rewritten."),
+                lambda d, field=field: d[field].append("Unexpected extra entry."),
+            )
+            for mutate in mutations:
+                with self.subTest(field=field, mutate=mutate), self.assertRaisesRegex(ValueError, message):
+                    self.validate_mutation(mutate)
+
+    def test_revalidation_rule_and_scopes_are_exactly_bound(self):
+        mutations = (
+            lambda d: d["claims_requiring_rebind_or_revalidation"].pop("rule"),
+            lambda d: d["claims_requiring_rebind_or_revalidation"].update(provider_scope="Unbound."),
+            lambda d: d["claims_requiring_rebind_or_revalidation"].pop("live_scope"),
+            lambda d: d["claims_requiring_rebind_or_revalidation"].update(extra_scope="Unexpected."),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "revalidation rule/scope drift"):
+                self.validate_mutation(mutate)
+
+    def test_historical_packet_cannot_claim_closure_or_readiness(self):
+        for claim in self.base["claims"]:
+            with self.subTest(claim=claim), self.assertRaisesRegex(ValueError, "exact keys and all be false"):
+                self.validate_mutation(lambda d, claim=claim: d["claims"].update({claim: True}))
+
+    def test_negative_claim_keys_cannot_be_omitted_or_extended(self):
+        mutations = (
+            lambda d: d["claims"].pop("runtime_readiness_claimed"),
+            lambda d: d["claims"].update(unrelated=False),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "exact keys and all be false"):
+                self.validate_mutation(mutate)
+
+    def test_governed_claim_keys_cannot_be_duplicated_outside_claims(self):
+        for key in verify.EXPECTED_CLAIMS:
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "governed claim key duplicated outside claims"):
+                self.validate_mutation(lambda d, key=key: d.update({key: True}))
+
+    def test_wrapped_governed_assertion_keys_are_rejected(self):
+        assertions = (
+            ("history_revalidation_status", "closed"),
+            ("product_readiness_status", "proven"),
+            ("runtime_readiness_state", "ready"),
+            ("security_remediation_status", "complete"),
+            ("organization_audit_status", "complete"),
+            ("game_compare_status", "complete"),
+        )
+        for key, value in assertions:
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
+                self.validate_mutation(lambda d, key=key, value=value: d.update({key: value}))
+
+    def test_camel_case_governed_assertion_keys_are_rejected(self):
+        assertions = (
+            ("historyRevalidationStatus", "closed"),
+            ("productReadinessStatus", "proven"),
+            ("runtimeReadiness", True),
+            ("securityRemediationStatus", "complete"),
+            ("organizationAuditStatus", "complete"),
+            ("gameCompareStatus", "complete"),
+        )
+        for key, value in assertions:
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
+                self.validate_mutation(lambda d, key=key, value=value: d.update({key: value}))
+
+    def test_split_path_governed_assertion_keys_are_rejected(self):
+        mutations = (
+            lambda d: d.update(history={"revalidation_status": "closed"}),
+            lambda d: d.update(product={"readiness_status": "proven"}),
+            lambda d: d.update(runtime={"readiness": {"status": "ready"}}),
+            lambda d: d.update(security={"remediation_status": "complete"}),
+            lambda d: d.update(organization={"audit_status": "complete"}),
+            lambda d: d.update(game={"compare_status": "complete"}),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
+                self.validate_mutation(mutate)
+
+    def test_intervening_path_segments_cannot_hide_governed_assertions(self):
+        mutations = (
+            lambda d: d.update(history={"assessment": {"revalidation_status": "closed"}}),
+            lambda d: d.update(product={"current": {"readiness_status": "proven"}}),
+            lambda d: d.update(runtime={"qualification": {"readiness": True}}),
+            lambda d: d.update(security={"external": {"remediation_status": "complete"}}),
+            lambda d: d.update(organization={"current": {"audit_status": "complete"}}),
+            lambda d: d.update(game={"partial": {"compare_status": "complete"}}),
+        )
+        for mutate in mutations:
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
+                self.validate_mutation(mutate)
+
+    def test_contradictory_positive_readiness_prose_is_rejected(self):
+        assertions = (
+            "HISTORY-REVALIDATION is closed.",
+            "HISTORY-REVALIDATION is complete.",
+            "Product readiness is established.",
+            "Product readiness is complete.",
+            "Runtime readiness has been proven.",
+            "Runtime readiness is completed.",
+            "Security remediation is complete.",
+            "Security remediation is completed.",
+            "The organization-wide audit is complete.",
+        )
+        for assertion in assertions:
+            with self.subTest(assertion=assertion), self.assertRaisesRegex(ValueError, "contradictory positive assertion"):
+                self.validate_mutation(lambda d, assertion=assertion: d["limitations"].append(assertion))
+
+    def test_contradictory_machine_readable_assertion_fields_are_rejected(self):
+        assertions = (
+            ("product_readiness", "established"),
+            ("history_revalidation", "closed"),
+            ("game_compare", "complete"),
+        )
+        for key, value in assertions:
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
+                self.validate_mutation(lambda d, key=key, value=value: d.update({key: value}))
+
+    def test_boolean_positive_machine_readable_assertion_fields_are_rejected(self):
+        for key in ("product_readiness", "history_revalidation", "game_compare"):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "unexpected governed assertion key path"):
+                self.validate_mutation(lambda d, key=key: d.update({key: True}))
+
+    def test_disclosure_and_digest_rejection_rules_are_mandatory(self):
+        for phrase in ("digest without retrievable bytes", "public disclosure remains disclosed"):
+            with self.subTest(phrase=phrase), self.assertRaisesRegex(ValueError, "stale-evidence rule set drift"):
+                self.validate_mutation(lambda d, phrase=phrase: d.update(stale_evidence_rejection_rules=[x.replace(phrase, "weakened") for x in d["stale_evidence_rejection_rules"]]))
+
+if __name__ == "__main__":
+    unittest.main()
