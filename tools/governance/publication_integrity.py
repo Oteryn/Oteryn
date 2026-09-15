@@ -677,7 +677,10 @@ def publish(
     )
 
     try:
-        live = remote_head(cwd, endpoint, branch)
+        readback_endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
+        if readback_endpoint != endpoint:
+            raise PublicationError("approved push endpoint changed during publication")
+        live = remote_head(cwd, readback_endpoint, branch)
     except PublicationError as exc:
         raise PublicationError(
             f"ambiguous publication outcome; remote readback unavailable; verified recovery bundle={bundle}"
