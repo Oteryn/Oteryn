@@ -8,6 +8,7 @@ import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
@@ -56,6 +57,17 @@ def _branch(value: str, cwd: Path) -> str:
     return value
 
 
+def _credential_free_url(value: str, label: str) -> str:
+    value = value.strip()
+    if not value:
+        raise PublicationError(f"{label} must be provided")
+    if "://" in value:
+        parsed = urlsplit(value)
+        if parsed.username is not None or parsed.password is not None:
+            raise PublicationError(f"{label} must not embed credentials")
+    return value
+
+
 def _remote(cwd: Path, value: str, expected_push_url: str) -> str:
     value = value.strip()
     if not value or value.startswith("-") or any(char.isspace() for char in value):
@@ -63,11 +75,12 @@ def _remote(cwd: Path, value: str, expected_push_url: str) -> str:
     names = {line.strip() for line in _run_git(cwd, "remote").stdout.splitlines() if line.strip()}
     if value not in names:
         raise PublicationError("remote must be an existing Git remote name")
-    expected_push_url = expected_push_url.strip()
-    if not expected_push_url:
-        raise PublicationError("expected push URL must be provided")
-    actual = _run_git(cwd, "remote", "get-url", "--push", value).stdout.strip()
-    if actual != expected_push_url:
+    expected = _credential_free_url(expected_push_url, "expected push URL")
+    actual = _credential_free_url(
+        _run_git(cwd, "remote", "get-url", "--push", value).stdout,
+        "configured push URL",
+    )
+    if actual != expected:
         raise PublicationError("configured push URL does not match the approved publication target")
     return value
 
@@ -143,6 +156,17 @@ def create_recovery_bundle(
     candidate: str,
     bundle_path: Path,
 ) -> tuple[Path, str]:
+    cwd = cwd.resolve()
+    branch = _branch(branch, cwd)
+    expected_remote_head = _sha(expected_remote_head, "expected remote head")
+    candidate = _sha(candidate, "candidate")
+    if _rev_parse(cwd, branch) != candidate:
+        raise PublicationError("recovery branch does not point to the exact candidate")
+    if _rev_parse(cwd, expected_remote_head) != expected_remote_head:
+        raise PublicationError("recovery predecessor is not available as a local commit")
+    if not _is_ancestor(cwd, expected_remote_head, candidate):
+        raise PublicationError("recovery candidate is not a descendant of the expected predecessor")
+
     _outside_worktree(cwd, bundle_path)
     bundle_path = bundle_path.resolve()
     bundle_path.parent.mkdir(parents=True, exist_ok=True)
@@ -150,7 +174,7 @@ def create_recovery_bundle(
         raise PublicationError("recovery bundle path already exists")
     temporary = bundle_path.with_name(bundle_path.name + ".tmp")
     if temporary.exists():
-        temporary.unlink()
+        raise PublicationError("recovery temporary path already exists")
     try:
         _run_git(cwd, "bundle", "create", str(temporary), branch, f"^{expected_remote_head}")
         _run_git(cwd, "bundle", "verify", str(temporary))
