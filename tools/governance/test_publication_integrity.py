@@ -276,6 +276,42 @@ class PublicationIntegrityTests(unittest.TestCase):
             publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), self.repo.base
         )
 
+    def test_chained_push_instead_of_rewrites_fail_closed_before_mutation(self) -> None:
+        approved = self.repo.new_bare_remote("approved.git")
+        escape = self.repo.new_bare_remote("escape.git")
+        git(
+            self.repo.work,
+            "push",
+            "-q",
+            str(approved),
+            f"{self.repo.base}:refs/heads/agent/test",
+        )
+        git(self.repo.work, "config", f"url.{approved}.pushInsteadOf", self.repo.push_url)
+        git(self.repo.work, "config", f"url.{escape}.pushInsteadOf", str(approved))
+
+        with self.assertRaisesRegex(publication.PublicationError, "URL rewrite rules"):
+            publication.publish(
+                self.repo.work,
+                remote="origin",
+                expected_push_url=str(approved),
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+                recovery_bundle=self.repo.artifacts / "rewrite.bundle",
+            )
+
+        git(self.repo.work, "config", "--unset-all", f"url.{approved}.pushInsteadOf")
+        git(self.repo.work, "config", "--unset-all", f"url.{escape}.pushInsteadOf")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), self.repo.base
+        )
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(approved), "agent/test"), self.repo.base
+        )
+        self.assertEqual(
+            git(self.repo.work, "ls-remote", "--heads", str(escape), "refs/heads/agent/test"), ""
+        )
+
     def test_push_url_mismatch_fails_closed(self) -> None:
         with self.assertRaisesRegex(publication.PublicationError, "approved publication target"):
             publication.preflight(
