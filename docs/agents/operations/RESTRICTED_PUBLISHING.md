@@ -6,11 +6,13 @@ This profile applies only after the repository lifecycle has allocated an approv
 
 ## Existing local candidate publication
 
-Once a material local candidate commit exists and is the intended payload for an allocated task branch, publication MUST preserve that exact candidate commit. The normal route is a non-force Git push of that commit to the approved remote branch after verifying the live remote head is the expected predecessor and that the expected predecessor is an ancestor of the candidate. A separately authorized normal merge-up is compatible with this rule because it produces the candidate before publication; publication itself must not rewrite that candidate.
+Once a material local candidate commit exists and is the intended payload for an allocated task branch, publication MUST preserve that exact candidate commit. The normal route is a fast-forward Git publication of that commit to the approved configured push target after verifying the live remote head is the expected predecessor and that the expected predecessor is an ancestor of the candidate. A separately authorized normal merge-up is compatible with this rule because it produces the candidate before publication; publication itself must not rewrite that candidate.
 
-Use `tools/governance/publication_integrity.py` when an isolated Git workspace is available. It verifies the expected remote-head fence and candidate ancestry, creates and verifies a recoverable Git bundle before mutation, performs one ordinary non-force push of the exact candidate, and reads the remote branch back before reporting success.
+Use `tools/governance/publication_integrity.py` when an isolated Git workspace is available. It verifies the configured push target, expected remote-head fence, candidate ancestry and clean exact-candidate worktree; creates and verifies a recoverable Git bundle before mutation; performs one exact-candidate update guarded by an expected-old-value lease; and reads the remote branch back before reporting success.
 
-If the normal Git publication path is unavailable, do **not** reconstruct an already-prepared material candidate through ad-hoc Git Data blob/tree/commit/ref calls, per-file Contents API writes, a replacement commit, reset, rebase, force-push, or ref rewrite. This is a publication-integrity boundary, not a global ban on repository-native API writes for other authorized operations.
+The helper's explicit `--force-with-lease=<ref>:<expected_sha>` is used only as compare-and-swap protection for the expected predecessor. Candidate ancestry is checked independently first, so this does not authorize a non-fast-forward update or history rewrite. An agent must not use the option without those guard conditions or treat it as a general force-push exception.
+
+If the normal Git publication path is unavailable, do **not** reconstruct an already-prepared material candidate through ad-hoc Git Data blob/tree/commit/ref calls, per-file Contents API writes, a replacement commit, reset, rebase, non-fast-forward push, or ref rewrite. This is a publication-integrity boundary, not a global ban on repository-native API writes for other authorized operations.
 
 ## Ambiguous publication outcome
 
@@ -32,4 +34,4 @@ Recovery preservation does not make local-only work delivered. The approved GitH
 
 For an authorized write to that branch/PR, when `GH_TOKEN` and `GITHUB_TOKEN` are unset but agent-visible `GH` is present, it may be passed transiently as `GH_TOKEN="$GH"` to the exact authorized `gh` command. Environment mapping alone does not authenticate `git push`: verify that the existing remote/credential path can consume the authorized identity without exposing or persisting it. If the normal Git publication path is still unavailable, preserve the candidate/recovery artifact and report the exact limitation rather than inventing a lower-level publication route.
 
-Never embed the token in a remote URL or persist a new credential helper to bypass that boundary. Credential presence expands no repository/path/task/merge/production permission. Do not force-push; verify the remote exact head after publishing.
+Never embed the token in a remote URL or persist a new credential helper to bypass that boundary. Credential presence expands no repository/path/task/merge/production permission. Do not perform a non-fast-forward update; verify the remote exact head after publishing.
