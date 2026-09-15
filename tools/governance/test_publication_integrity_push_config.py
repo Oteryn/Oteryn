@@ -137,6 +137,55 @@ class PublicationPushConfigurationTests(unittest.TestCase):
             f"filter-{driver}.bundle",
         )
 
+    def test_local_http_routing_and_tls_overrides_are_rejected(self) -> None:
+        cases = (
+            ("http.proxy", "http://user:supersecret@proxy.invalid", "proxy"),
+            ("http.https://example.invalid/.curloptResolve", "example.invalid:443:127.0.0.1", "resolve"),
+            ("http.sslVerify", "false", "verify"),
+            ("http.sslCAInfo", str(self.repo.root / "untrusted-ca.pem"), "ca"),
+            ("http.extraHeader", "Host: evil.invalid", "header"),
+            ("remote.origin.proxy", "http://proxy.invalid", "remote-proxy"),
+        )
+        for key, value, name in cases:
+            with self.subTest(key=key):
+                git(self.repo.work, "config", "--local", key, value)
+                try:
+                    bundle = self.repo.artifacts / f"http-{name}.bundle"
+                    with self.assertRaisesRegex(publication.PublicationError, "HTTP routing or TLS-trust") as raised:
+                        self.repo.publish(bundle.name)
+                    self.assertNotIn("supersecret", str(raised.exception))
+                    self.assertEqual(self.repo.raw_remote_head(), self.repo.base)
+                    self.assertEqual(self.repo.raw_escape_head(), "")
+                    self.assertFalse(bundle.exists())
+                    self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+                finally:
+                    git(self.repo.work, "config", "--local", "--unset-all", key)
+
+    def test_included_and_worktree_http_overrides_are_rejected(self) -> None:
+        included = self.repo.root / "repo-http.cfg"
+        included.write_text("[http]\n\textraHeader = Host: evil.invalid\n", encoding="utf-8")
+        git(self.repo.work, "config", "--local", "include.path", str(included))
+        self.assert_blocked_without_publication("HTTP routing or TLS-trust", "included-http.bundle")
+        git(self.repo.work, "config", "--local", "--unset-all", "include.path")
+
+        git(self.repo.work, "config", "extensions.worktreeConfig", "true")
+        git(self.repo.work, "config", "--worktree", "http.sslCAPath", str(self.repo.root))
+        self.assert_blocked_without_publication("HTTP routing or TLS-trust", "worktree-http.bundle")
+
+    def test_system_and_global_http_configuration_is_not_rejected(self) -> None:
+        system_config = self.repo.root / "trusted-system.cfg"
+        global_config = self.repo.root / "trusted-global-http.cfg"
+        system_config.write_text("[http]\n\tproxy = http://system-proxy.invalid\n", encoding="utf-8")
+        global_config.write_text("[http]\n\tsslVerify = false\n", encoding="utf-8")
+        with mock.patch.dict(
+            os.environ,
+            {"GIT_CONFIG_SYSTEM": str(system_config), "GIT_CONFIG_GLOBAL": str(global_config)},
+            clear=False,
+        ):
+            result = self.repo.publish("global-system-http.bundle")
+        self.assertEqual(result.state, "PUBLISHED")
+        self.assertEqual(self.repo.raw_remote_head(), self.repo.candidate)
+
     def test_configured_signed_push_cannot_execute_gpg_side_publish(self) -> None:
         git(self.repo.remote, "config", "receive.certNonceSeed", "publication-integrity-test")
         malicious_gpg = self.repo.malicious_script("malicious-gpg.sh")

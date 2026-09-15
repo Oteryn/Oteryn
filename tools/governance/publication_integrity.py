@@ -17,6 +17,11 @@ URL_REWRITE_RE = r"^url\..*\.(insteadof|pushinsteadof)$"
 CREDENTIAL_HELPER_RE = r"^credential(\..*)?\.helper$"
 REPOSITORY_TRANSPORT_COMMAND_RE = r"^core\.(sshcommand|gitproxy|askpass)$"
 ALTERNATE_REFS_COMMAND_RE = r"^core\.alternaterefscommand$"
+HTTP_ROUTING_TRUST_RE = (
+    r"^http(\..*)?\."
+    r"(proxy|curloptresolve|extraheader|sslverify|sslcainfo|sslcapath|"
+    r"proxysslverify|proxysslcainfo|proxysslcapath)$"
+)
 
 
 class PublicationError(RuntimeError):
@@ -211,6 +216,40 @@ def _reject_repository_alternate_refs_commands(cwd: Path) -> None:
         )
 
 
+def _scope_has_http_routing_trust_overrides(cwd: Path, scope: str, remote: str) -> bool:
+    result = _run_git(
+        cwd, "config", scope, "--includes", "--null", "--get-regexp",
+        HTTP_ROUTING_TRUST_RE, check=False,
+    )
+    if result.returncode not in (0, 1):
+        raise PublicationError(
+            "unable to verify repository/worktree Git HTTP routing/TLS configuration"
+        )
+    if result.stdout:
+        return True
+    result = _run_git(
+        cwd, "config", scope, "--includes", "--null", "--get-all",
+        f"remote.{remote}.proxy", check=False,
+    )
+    if result.returncode == 1 and not result.stdout:
+        return False
+    if result.returncode != 0:
+        raise PublicationError(
+            "unable to verify repository/worktree selected-remote proxy configuration"
+        )
+    return bool(result.stdout)
+
+
+def _reject_repository_http_routing_trust_overrides(cwd: Path, remote: str) -> None:
+    if _scope_has_http_routing_trust_overrides(
+        cwd, "--local", remote
+    ) or _scope_has_http_routing_trust_overrides(cwd, "--worktree", remote):
+        raise PublicationError(
+            "repository/worktree Git HTTP routing or TLS-trust overrides are not permitted "
+            "for exact-candidate publication"
+        )
+
+
 def _active_filter_drivers(cwd: Path, hooks_dir: str) -> set[str]:
     tracked = _run_git(
         cwd,
@@ -306,6 +345,7 @@ def _remote_push_endpoint(cwd: Path, value: str, expected_push_url: str) -> str:
     names = {line.strip() for line in _run_git(cwd, "remote").stdout.splitlines() if line.strip()}
     if value not in names:
         raise PublicationError("remote must be an existing Git remote name")
+    _reject_repository_http_routing_trust_overrides(cwd, value)
 
     expected = _credential_free_url(expected_push_url, "expected push URL")
     configured = [
