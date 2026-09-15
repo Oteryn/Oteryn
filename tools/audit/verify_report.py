@@ -58,6 +58,12 @@ AUDIT186_SEMANTIC_03_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/cov
 AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-audit186-semantic-01-historical-direct-additions.tsv'
 AUDIT186_SEMANTIC_01_CANDIDATE_SHA256 = 'c160a9f7a198de30df34e2e1dd93341088488a073b8e36f9e1d538a86c5d23ae'
 AUDIT186_SEMANTIC_01_OVERLAY_SHA256 = 'd0967fd5a9c16ab81a1a00d9a71b2d0ade8ce14cba56ffd60d8c16fd1bcf21b0'
+RUNTIME_ASSURANCE_ADMIN_BINDING = 'organization-audit-20260907/runtime-assurance/admin-state-20260914.md'
+RUNTIME_ASSURANCE_INFRA_BINDING = 'organization-audit-20260907/runtime-assurance/infra-state-20260914.md'
+RUNTIME_ASSURANCE_CHECKPOINT_BINDING = 'organization-audit-20260907/CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md'
+RUNTIME_ASSURANCE_ADMIN_SHA256 = '17ebeba22a93c7e74ca06cacabca110a385362b75dfa2a0985bb0ba4935b4985'
+RUNTIME_ASSURANCE_INFRA_SHA256 = 'a918f4d8360bc0f15c6dd9a2cae2a923a6a2d67d17b013c09b3fa3ef280bcef9'
+RUNTIME_ASSURANCE_INDEX_SHA256 = 'd64c165d1fb9b871af1b7929b2974e26f08c73a39b1472f30c437065c2743250'
 EXPECTED_AUDIT186_SEMANTIC_01_ADOPTION = {
     'state': 'ADOPTED_INERT_HISTORICAL_PROVENANCE_NOT_CURRENT_TRUTH',
     'worker_pull_request': 204,
@@ -133,7 +139,7 @@ EXPECTED_SECTION_7_PARAGRAPHS = (
 SECTION_1_HEADING = '## 1. Source identity and actual coverage'
 SECTION_2_HEADING = '## 2. Native evidence actually acquired and rechecked'
 EXPECTED_SECTION_1_SHA256 = '9f471de04c501b691f395c52296173a50b86cdd89b2724f501c3a36a6aebc0f8'
-EXPECTED_REPORT_MARKDOWN_SHA256 = 'fd58aecb60a3ecb62c27ce57c83ba8e4afec2d04302e831b5e8ea7cea29c2ef3'
+EXPECTED_REPORT_MARKDOWN_SHA256 = '36f7f07108f8749d6bd12a0684a2280df8424efe51a9c1a5d434cb61259b2acc'
 CURRENT_COVERAGE_TABLE_HEADER = '| Source | Tracked leaves | DIRECT scoped | GROUPED revalidated | UNVERIFIED semantics |'
 CURRENT_R5_ADOPTION_PARAGRAPH = (
     'Exactly 25 META source files under `docs/agents/evals/r5-instruction-efficiency/**` are now separately '
@@ -1092,7 +1098,21 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(hashlib.sha256((base/AUDIT186_SEMANTIC_03_DIRECT_ADDITIONS).read_bytes()).hexdigest()==AUDIT186_SEMANTIC_03_OVERLAY_SHA256,'AUDIT186 Semantic 03 overlay digest drift')
     require(hashlib.sha256((base/'audit186-semantic-01-historical-candidate.json').read_bytes()).hexdigest()==AUDIT186_SEMANTIC_01_CANDIDATE_SHA256,'AUDIT186 Semantic 01 candidate digest drift')
     require(hashlib.sha256((base/AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS).read_bytes()).hexdigest()==AUDIT186_SEMANTIC_01_OVERLAY_SHA256,'AUDIT186 Semantic 01 overlay digest drift')
+    require(doc.get('runtime_assurance_admin_packet')==RUNTIME_ASSURANCE_ADMIN_BINDING,
+            'runtime assurance ADMIN packet binding drift')
+    require(doc.get('runtime_assurance_infra_packet')==RUNTIME_ASSURANCE_INFRA_BINDING,
+            'runtime assurance INFRA packet binding drift')
+    require(doc.get('runtime_assurance_adoption_checkpoint')==RUNTIME_ASSURANCE_CHECKPOINT_BINDING,
+            'runtime assurance checkpoint binding drift')
+    require(hashlib.sha256((base/'runtime-assurance/admin-state-20260914.md').read_bytes()).hexdigest()==RUNTIME_ASSURANCE_ADMIN_SHA256,
+            'runtime assurance ADMIN packet digest drift')
+    require(hashlib.sha256((base/'runtime-assurance/infra-state-20260914.md').read_bytes()).hexdigest()==RUNTIME_ASSURANCE_INFRA_SHA256,
+            'runtime assurance INFRA packet digest drift')
     proof=read_json(base/'verification-index.json')
+    runtime_assurance=proof.get('audit186_runtime_assurance_evidence_adoption')
+    require(type(runtime_assurance) is dict and
+            hashlib.sha256(json.dumps(runtime_assurance,sort_keys=True,separators=(',',':')).encode()).hexdigest()==RUNTIME_ASSURANCE_INDEX_SHA256,
+            'runtime assurance adoption index drift')
     require(json_exact(proof.get('audit186_semantic_01_historical_direct_adoption'),
                        EXPECTED_AUDIT186_SEMANTIC_01_ADOPTION),
             'AUDIT186 Semantic 01 adoption index drift')

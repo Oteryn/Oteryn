@@ -14,7 +14,7 @@ RETIRED_R7_WORKFLOW = WORKFLOW_DIR / 'organization-audit-meta-current-main-gover
 EXPECTED_TITLE = '# Organization audit R3 evidence'
 EXPECTED_LOCAL_HEADING = '## Local checks'
 EXPECTED_EVIDENCE_HEADING = '## Evidence map and durability'
-EXPECTED_README_SHA256 = '3d2209cf7f23198377922600b2a0450c836f6c2b5774d134b5c5d95f641ba95a'
+EXPECTED_README_SHA256 = '2dee86b81f2ab7fee865ba00b310c31957f793993e67a85293688b89286d2dcd'
 EXPECTED_INTRO = (
     'Governing continuation: META#186, existing PR#185. The main report/JSON owns the scoped opinion; '
     'this is not another approval programme. R3 contains 78 finding records, 23 A–W domains, 14 residual '

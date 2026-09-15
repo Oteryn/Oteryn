@@ -102,6 +102,8 @@ Game PR 361 is merged at `3825e9c82ff388923f73548a807718807012f53f`, final candi
 
 Platform 1270 is closed **without merge**, with recorded successor 1304; 1304 is merged at `907546f193e91b0bed2f5f077ab5b874771929ef`. Issue 1267 closure is not inferred. Atlas 376 is closed/completed, but that fact neither restores workflows nor supplies later product acceptance. Provider source/config/consumer changes require scoped revalidation even when an individual inspected blob remains unchanged.
 
+The frozen PR #205 runtime-assurance evidence packets are adopted canonically through `runtime-assurance/admin-state-20260914.md` and `runtime-assurance/infra-state-20260914.md`, with custody recorded in `CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md` and `verification-index.json`. Both `ADMIN-STATE` and `INFRA-STATE` remain OPEN and exactly `UNKNOWN / BLOCKED`; source and workflow evidence is not live administrative or production truth. Closure remains limited to the packets’ dated sanitized, nonsecret, authorized evidence boundaries, including privacy exclusions and a non-personal verifier-role requirement. All 14 residual obligations remain open, accounting and ledger identity are unchanged, and no product/runtime/admin/deployment readiness, current production health, SLO/telemetry, recovery/RPO/RTO, provider remediation, audit completion, or independent score is claimed.
+
 ## 6. Independent review correction pass
 
 Independent review of stable R3 head `9096edd135d42f31da4824f4c4fb50ee187de2c9` completed with four P1 and one P2 audit/evidence findings. They are preserved in `r3-independent-review-corrections.json`; author remediation is not itself independent acceptance.

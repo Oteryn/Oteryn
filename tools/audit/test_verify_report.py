@@ -22,8 +22,9 @@ class AuditValidationTest(unittest.TestCase):
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-review-meta-current-main-governance-direct-additions.tsv','coverage-review-audit186-semantic-03-direct-additions.tsv','audit186-semantic-03-ci-contract-candidate.json','coverage-review-audit186-semantic-01-historical-direct-additions.tsv','audit186-semantic-01-historical-candidate.json','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-review-meta-current-main-governance-direct-additions.tsv','coverage-review-audit186-semantic-03-direct-additions.tsv','audit186-semantic-03-ci-contract-candidate.json','coverage-review-audit186-semantic-01-historical-direct-additions.tsv','audit186-semantic-01-historical-candidate.json','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json','CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
+        shutil.copytree(ROOT/'docs/evidence'/EVIDENCE/'runtime-assurance',self.base/'runtime-assurance')
     def mutate(self,path,func):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
     def reject(self):
@@ -46,6 +47,18 @@ class AuditValidationTest(unittest.TestCase):
         self.assertEqual(result['semantically_classified_paths'],direct+grouped)
         self.assertEqual(result['unverified_semantics'],summary['source_leaf_total']-direct-grouped)
         self.assertFalse(result['tree_and_ledger_verified'])
+    def test_runtime_assurance_bindings_fail_closed(self):
+        for field in ('runtime_assurance_admin_packet','runtime_assurance_infra_packet','runtime_assurance_adoption_checkpoint'):
+            with self.subTest(field=field):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
+                self.mutate(self.path,lambda d,f=field:d.update({f:'wrong'}))
+                self.reject()
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_runtime_assurance_evidence_adoption'].update(residual_obligations_open=13))
+        self.reject()
+    def test_runtime_assurance_packet_digest_drift_rejected(self):
+        path=self.base/'runtime-assurance/admin-state-20260914.md'
+        path.write_text(path.read_text()+'drift\n')
+        self.reject()
     def test_current_coverage_table_meta_drift_rejected(self):
         self.mutate_companion('| meta | 210 | 122 | 0 | 88 |','| meta | 174 | 45 | 0 | 129 |')
         self.reject()

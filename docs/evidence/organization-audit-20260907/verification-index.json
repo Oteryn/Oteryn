@@ -576,5 +576,56 @@
     "product_readiness_claimed": false,
     "audit_completion_claimed": false,
     "canonical_ledger_sha256": "d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b"
+  },
+  "audit186_runtime_assurance_evidence_adoption": {
+    "state": "EVIDENCE_ADOPTED_OBLIGATIONS_OPEN_UNKNOWN_BLOCKED",
+    "worker_pull_request": 205,
+    "worker_head": "58574f6057713cfb9c7f0756d5c561df949b52b1",
+    "worker_tree": "01fb0b69f25a85ebacf40a7efcbc3a43b101b798",
+    "freeze_checkpoint": "issue-186-comment-5675703518",
+    "canonical_source_head": "2f78fafbacc12723516bb7dd00376812c31385ef",
+    "canonical_source_tree": "44c64c60f9e71bde27ff86e7d19c77476cc07ade",
+    "packets": [
+      {
+        "path": "runtime-assurance/admin-state-20260914.md",
+        "blob_sha": "30b36d0ac7c824a562c098d9c51a4ec751c683ea",
+        "sha256": "17ebeba22a93c7e74ca06cacabca110a385362b75dfa2a0985bb0ba4935b4985",
+        "obligation": "ADMIN-STATE",
+        "disposition": "UNKNOWN / BLOCKED"
+      },
+      {
+        "path": "runtime-assurance/infra-state-20260914.md",
+        "blob_sha": "95d587a4b96faa45eb5dcf74c2dbcd2f39945f71",
+        "sha256": "a918f4d8360bc0f15c6dd9a2cae2a923a6a2d67d17b013c09b3fa3ef280bcef9",
+        "obligation": "INFRA-STATE",
+        "disposition": "UNKNOWN / BLOCKED"
+      }
+    ],
+    "source_observations": {
+      "meta": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+      "game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+      "platform": "84d504c98acc8134eb4c9545711010b74c987974",
+      "atlas": "0d22a8d4378e66441502482ce715e226d487248e"
+    },
+    "worker_contract_adopted": false,
+    "source_or_workflow_evidence_is_live_truth": false,
+    "admin_state_open_unknown_blocked": true,
+    "infra_state_open_unknown_blocked": true,
+    "residual_obligations_open": 14,
+    "semantic_accounting_changed": false,
+    "privacy_exclusions": [
+      "secrets",
+      "credentials",
+      "personal identifiers",
+      "raw private logs",
+      "unnecessary private infrastructure identifiers"
+    ],
+    "verifier_role_required_without_personal_identifier": true,
+    "product_or_runtime_readiness_claimed": false,
+    "production_health_or_slo_claimed": false,
+    "recovery_rpo_rto_claimed": false,
+    "provider_remediation_claimed": false,
+    "audit_completion_or_independent_score_claimed": false,
+    "canonical_ledger_sha256": "d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b"
   }
 }

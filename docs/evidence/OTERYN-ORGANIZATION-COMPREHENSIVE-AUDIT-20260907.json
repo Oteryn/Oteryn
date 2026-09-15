@@ -187,5 +187,8 @@
   "audit186_semantic_03_candidate": "organization-audit-20260907/audit186-semantic-03-ci-contract-candidate.json",
   "unverified_semantics": 3913,
   "coverage_review_audit186_semantic_01_historical_direct_additions": "organization-audit-20260907/coverage-review-audit186-semantic-01-historical-direct-additions.tsv",
-  "audit186_semantic_01_historical_candidate": "organization-audit-20260907/audit186-semantic-01-historical-candidate.json"
+  "audit186_semantic_01_historical_candidate": "organization-audit-20260907/audit186-semantic-01-historical-candidate.json",
+  "runtime_assurance_admin_packet": "organization-audit-20260907/runtime-assurance/admin-state-20260914.md",
+  "runtime_assurance_infra_packet": "organization-audit-20260907/runtime-assurance/infra-state-20260914.md",
+  "runtime_assurance_adoption_checkpoint": "organization-audit-20260907/CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md"
 }
