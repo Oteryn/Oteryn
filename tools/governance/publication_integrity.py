@@ -61,6 +61,8 @@ def _credential_free_url(value: str, label: str) -> str:
     value = value.strip()
     if not value:
         raise PublicationError(f"{label} must be provided")
+    if value.startswith("-") or "\n" in value or "\r" in value or "\x00" in value:
+        raise PublicationError(f"{label} is not a safe Git endpoint")
     if "://" in value:
         parsed = urlsplit(value)
         if parsed.username is not None or parsed.password is not None:
@@ -68,21 +70,25 @@ def _credential_free_url(value: str, label: str) -> str:
     return value
 
 
-def _remote(cwd: Path, value: str, expected_push_url: str) -> str:
+def _remote_push_endpoint(cwd: Path, value: str, expected_push_url: str) -> str:
     value = value.strip()
     if not value or value.startswith("-") or any(char.isspace() for char in value):
         raise PublicationError("remote must be an existing Git remote name")
     names = {line.strip() for line in _run_git(cwd, "remote").stdout.splitlines() if line.strip()}
     if value not in names:
         raise PublicationError("remote must be an existing Git remote name")
+
     expected = _credential_free_url(expected_push_url, "expected push URL")
-    actual = _credential_free_url(
-        _run_git(cwd, "remote", "get-url", "--push", value).stdout,
-        "configured push URL",
-    )
-    if actual != expected:
+    configured = [
+        _credential_free_url(line, "configured push URL")
+        for line in _run_git(cwd, "remote", "get-url", "--push", "--all", value).stdout.splitlines()
+        if line.strip()
+    ]
+    if len(configured) != 1:
+        raise PublicationError("remote must resolve to exactly one configured push URL")
+    if configured[0] != expected:
         raise PublicationError("configured push URL does not match the approved publication target")
-    return value
+    return configured[0]
 
 
 def _rev_parse(cwd: Path, revision: str) -> str:
@@ -115,9 +121,10 @@ def _require_clean_worktree(cwd: Path) -> None:
         )
 
 
-def remote_head(cwd: Path, remote: str, branch: str) -> str:
+def remote_head(cwd: Path, endpoint: str, branch: str) -> str:
+    endpoint = _credential_free_url(endpoint, "readback endpoint")
     ref = f"refs/heads/{branch}"
-    result = _run_git(cwd, "ls-remote", "--heads", remote, ref, check=False)
+    result = _run_git(cwd, "ls-remote", "--heads", endpoint, ref, check=False)
     if result.returncode != 0:
         raise PublicationError("remote head readback is unavailable")
     rows = [line.split() for line in result.stdout.splitlines() if line.strip()]
@@ -205,7 +212,7 @@ def preflight(
     candidate: str,
 ) -> str:
     cwd = cwd.resolve()
-    remote = _remote(cwd, remote, expected_push_url)
+    endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
     branch = _branch(branch, cwd)
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
     candidate = _sha(candidate, "candidate")
@@ -220,7 +227,7 @@ def preflight(
     if not _is_ancestor(cwd, expected_remote_head, candidate):
         raise PublicationError("candidate is not a fast-forward descendant of the expected remote head")
 
-    live = remote_head(cwd, remote, branch)
+    live = remote_head(cwd, endpoint, branch)
     state = classify_remote_state(live, expected_remote_head, candidate)
     if state == "REMOTE_HEAD_DRIFT":
         raise PublicationError("remote head moved away from the expected publication fence")
@@ -259,25 +266,24 @@ def publish(
         bundle_path=recovery_bundle,
     )
 
-    # Re-validate the configured push target after bundle creation. The explicit
-    # expected-old-value lease atomically fences the ref at mutation time, while
-    # the ancestry check above independently guarantees the update is fast-forward.
-    # The lease is therefore compare-and-swap protection, not permission to
-    # publish a non-fast-forward history rewrite.
-    remote = _remote(cwd, remote, expected_push_url)
+    # Re-resolve and revalidate exactly one push endpoint after bundle creation.
+    # Push and readback use that same endpoint, so a distinct fetch URL cannot
+    # redirect the evidence plane. The expected-old-value lease atomically fences
+    # the ref at mutation time, while ancestry independently guarantees FF history.
+    endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
     ref = f"refs/heads/{branch}"
     push = _run_git(
         cwd,
         "push",
         "--porcelain",
         f"--force-with-lease={ref}:{expected_remote_head}",
-        remote,
+        endpoint,
         f"{candidate}:{ref}",
         check=False,
     )
 
     try:
-        live = remote_head(cwd, remote, branch)
+        live = remote_head(cwd, endpoint, branch)
     except PublicationError as exc:
         raise PublicationError(
             f"ambiguous publication outcome; remote readback unavailable; verified recovery bundle={bundle}"
@@ -310,7 +316,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--expected-push-url",
         required=True,
-        help="Exact approved push URL already configured for the selected remote",
+        help="Exact sole approved push URL already configured for the selected remote",
     )
     parser.add_argument("--branch", required=True, help="Unqualified canonical task branch name")
     parser.add_argument("--expected-remote-head", required=True, help="Expected current remote branch SHA")
