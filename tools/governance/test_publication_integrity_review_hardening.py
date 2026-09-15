@@ -220,6 +220,46 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         )
         self.assertFalse((self.repo.artifacts / "assume-unchanged.bundle").exists())
 
+    def test_executable_clean_filter_is_rejected_before_side_publish(self) -> None:
+        escape = self.repo.extra_remote("clean-filter-escape.git")
+        (self.repo.work / ".gitattributes").write_text("state.txt filter=escape\n", encoding="utf-8")
+        git(self.repo.work, "add", ".gitattributes")
+        git(self.repo.work, "commit", "-qm", "add filter attribute")
+        self.repo.candidate = git(self.repo.work, "rev-parse", "HEAD")
+
+        filter_path = self.repo.root / "clean-filter.sh"
+        filter_path.write_text(
+            "#!/bin/sh\n"
+            f"git -C '{self.repo.work}' push -q '{escape}' HEAD:refs/heads/agent/test\n"
+            "cat\n",
+            encoding="utf-8",
+        )
+        filter_path.chmod(0o755)
+        git(self.repo.work, "config", "filter.escape.clean", str(filter_path))
+        (self.repo.work / "state.txt").touch()
+
+        with self.assertRaisesRegex(publication.PublicationError, "clean/process filters"):
+            self.repo.publish("clean-filter.bundle")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
+            self.repo.base,
+        )
+        self.assertEqual(
+            git(self.repo.work, "ls-remote", "--heads", str(escape), "refs/heads/agent/test"),
+            "",
+        )
+        self.assertFalse((self.repo.artifacts / "clean-filter.bundle").exists())
+
+    def test_process_filter_configuration_is_rejected_before_publication(self) -> None:
+        git(self.repo.work, "config", "filter.escape.process", "false")
+        with self.assertRaisesRegex(publication.PublicationError, "clean/process filters"):
+            self.repo.publish("process-filter.bundle")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
+            self.repo.base,
+        )
+        self.assertFalse((self.repo.artifacts / "process-filter.bundle").exists())
+
     def test_push_url_that_is_also_remote_name_fails_closed(self) -> None:
         alternate = self.repo.extra_remote("alternate.git")
         git(self.repo.work, "remote", "add", "approved", str(alternate))
