@@ -35,6 +35,7 @@ def _run_git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedP
     completed = subprocess.run(
         ["git", *args],
         cwd=cwd,
+        env={**os.environ, "GIT_NO_LAZY_FETCH": "1"},
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -54,6 +55,7 @@ def _run_git_input(
     completed = subprocess.run(
         ["git", *args],
         cwd=cwd,
+        env={**os.environ, "GIT_NO_LAZY_FETCH": "1"},
         input=input_text,
         text=True,
         stdout=subprocess.PIPE,
