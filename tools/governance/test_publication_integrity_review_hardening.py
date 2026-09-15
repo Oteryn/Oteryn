@@ -367,6 +367,70 @@ class PublicationReviewHardeningTests(unittest.TestCase):
             "",
         )
 
+    def _prepare_literal_approved_endpoint(self) -> Path:
+        approved = self.repo.work / "approved"
+        approved.mkdir()
+        git(approved, "init", "--bare", "-q")
+        git(
+            self.repo.work,
+            "push",
+            "-q",
+            str(approved),
+            f"{self.repo.base}:refs/heads/agent/test",
+        )
+        git(self.repo.work, "remote", "set-url", "--push", "origin", "approved")
+        return approved
+
+    def _assert_legacy_alias_blocked(self, bundle_name: str, approved: Path, escape: Path) -> None:
+        bundle = self.repo.artifacts / bundle_name
+        with self.assertRaisesRegex(publication.PublicationError, "legacy remote alias"):
+            publication.publish(
+                self.repo.work,
+                remote="origin",
+                expected_push_url="approved",
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+                recovery_bundle=bundle,
+            )
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(approved), "agent/test"), self.repo.base
+        )
+        self.assertEqual(
+            git(self.repo.work, "ls-remote", "--heads", str(escape), "refs/heads/agent/test"), ""
+        )
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
+    def test_legacy_remotes_alias_cannot_redirect_approved_endpoint(self) -> None:
+        approved = self._prepare_literal_approved_endpoint()
+        escape = self.repo.extra_remote("legacy-remotes-escape.git")
+        git_dir = Path(git(self.repo.work, "rev-parse", "--git-dir"))
+        if not git_dir.is_absolute():
+            git_dir = self.repo.work / git_dir
+        alias = git_dir / "remotes" / "approved"
+        alias.parent.mkdir(parents=True, exist_ok=True)
+        alias.write_text(
+            f"URL: {escape}\nPush: refs/heads/*:refs/heads/*\n",
+            encoding="utf-8",
+        )
+
+        self._assert_legacy_alias_blocked("legacy-remotes.bundle", approved, escape)
+
+    def test_legacy_branches_alias_symlink_cannot_redirect_approved_endpoint(self) -> None:
+        approved = self._prepare_literal_approved_endpoint()
+        escape = self.repo.extra_remote("legacy-branches-escape.git")
+        git_dir = Path(git(self.repo.work, "rev-parse", "--git-dir"))
+        if not git_dir.is_absolute():
+            git_dir = self.repo.work / git_dir
+        alias_target = self.repo.root / "legacy-branch-alias.txt"
+        alias_target.write_text(f"{escape}#agent/test\n", encoding="utf-8")
+        alias = git_dir / "branches" / "approved"
+        alias.parent.mkdir(parents=True, exist_ok=True)
+        alias.symlink_to(alias_target)
+
+        self._assert_legacy_alias_blocked("legacy-branches.bundle", approved, escape)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
