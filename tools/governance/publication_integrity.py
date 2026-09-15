@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 URL_REWRITE_RE = r"^url\..*\.(insteadof|pushinsteadof)$"
@@ -36,6 +36,13 @@ class PublicationResult:
     remote_head: str
     recovery_bundle: str | None = None
     recovery_sha256: str | None = None
+
+
+@dataclass(frozen=True)
+class FilesystemEndpointIdentity:
+    resolved_path: str
+    device: int
+    inode: int
 
 
 def _run_git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -115,6 +122,39 @@ def _credential_free_url(value: str, label: str) -> str:
         if parsed.username is not None or parsed.password is not None:
             raise PublicationError(f"{label} must not embed credentials")
     return value
+
+
+def _filesystem_endpoint_identity(cwd: Path, endpoint: str) -> FilesystemEndpointIdentity | None:
+    endpoint = _credential_free_url(endpoint, "filesystem endpoint")
+    if "://" in endpoint:
+        parsed = urlsplit(endpoint)
+        if parsed.scheme != "file":
+            return None
+        if parsed.netloc not in ("", "localhost"):
+            return None
+        raw_path = unquote(parsed.path)
+        if not raw_path:
+            raise PublicationError("local file publication endpoint path is missing")
+        path = Path(raw_path)
+    else:
+        windows_drive = re.match(r"^[A-Za-z]:[\\/]", endpoint) is not None
+        scp_like = ":" in endpoint and not endpoint.startswith(("/", "./", "../"))
+        if scp_like and not windows_drive:
+            return None
+        path = Path(endpoint)
+
+    if not path.is_absolute():
+        path = cwd / path
+    try:
+        if path.is_symlink():
+            raise PublicationError("local filesystem publication endpoint must not be a symlink")
+        resolved = path.resolve(strict=True)
+        metadata = resolved.stat()
+    except PublicationError:
+        raise
+    except OSError as exc:
+        raise PublicationError("unable to bind local filesystem publication endpoint identity") from exc
+    return FilesystemEndpointIdentity(str(resolved), metadata.st_dev, metadata.st_ino)
 
 
 def _reject_url_rewrites(cwd: Path) -> None:
@@ -660,6 +700,7 @@ def publish(
     )
 
     endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
+    endpoint_identity = _filesystem_endpoint_identity(cwd, endpoint)
     push = _run_git(
         cwd,
         "-c",
@@ -680,6 +721,9 @@ def publish(
         readback_endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
         if readback_endpoint != endpoint:
             raise PublicationError("approved push endpoint changed during publication")
+        readback_identity = _filesystem_endpoint_identity(cwd, readback_endpoint)
+        if endpoint_identity != readback_identity:
+            raise PublicationError("approved local filesystem endpoint identity changed during publication")
         live = remote_head(cwd, readback_endpoint, branch)
     except PublicationError as exc:
         raise PublicationError(
