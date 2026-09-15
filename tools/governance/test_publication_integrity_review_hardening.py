@@ -368,6 +368,14 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         )
 
     def _prepare_literal_approved_endpoint(self) -> Path:
+        git_dir = Path(git(self.repo.work, "rev-parse", "--git-dir"))
+        if not git_dir.is_absolute():
+            git_dir = self.repo.work / git_dir
+        exclude = git_dir / "info" / "exclude"
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        with exclude.open("a", encoding="utf-8") as handle:
+            handle.write("approved/\n")
+
         approved = self.repo.work / "approved"
         approved.mkdir()
         git(approved, "init", "--bare", "-q")
