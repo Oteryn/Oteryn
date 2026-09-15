@@ -196,6 +196,30 @@ class PublicationReviewHardeningTests(unittest.TestCase):
             "",
         )
 
+    def test_skip_worktree_hidden_change_is_rejected_before_publication(self) -> None:
+        git(self.repo.work, "update-index", "--skip-worktree", "state.txt")
+        (self.repo.work / "state.txt").write_text("hidden local bytes\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(publication.PublicationError, "skip-worktree/assume-unchanged"):
+            self.repo.publish("skip-worktree.bundle")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
+            self.repo.base,
+        )
+        self.assertFalse((self.repo.artifacts / "skip-worktree.bundle").exists())
+
+    def test_assume_unchanged_hidden_change_is_rejected_before_publication(self) -> None:
+        git(self.repo.work, "update-index", "--assume-unchanged", "state.txt")
+        (self.repo.work / "state.txt").write_text("hidden assumed bytes\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(publication.PublicationError, "skip-worktree/assume-unchanged"):
+            self.repo.publish("assume-unchanged.bundle")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
+            self.repo.base,
+        )
+        self.assertFalse((self.repo.artifacts / "assume-unchanged.bundle").exists())
+
     def test_push_url_that_is_also_remote_name_fails_closed(self) -> None:
         alternate = self.repo.extra_remote("alternate.git")
         git(self.repo.work, "remote", "add", "approved", str(alternate))
