@@ -6,9 +6,9 @@ This profile applies only after the repository lifecycle has allocated an approv
 
 ## Existing local candidate publication
 
-Once a material local candidate commit exists and is the intended payload for an allocated task branch, publication MUST preserve that exact candidate commit. The normal route is a fast-forward Git publication of that commit to the approved configured push target after verifying the live remote head is the expected predecessor and that the expected predecessor is an ancestor of the candidate. A separately authorized normal merge-up is compatible with this rule because it produces the candidate before publication; publication itself must not rewrite that candidate.
+Once a material local candidate commit exists and is the intended payload for an allocated task branch, publication MUST preserve that exact candidate commit. The normal route is a fast-forward Git publication of that commit to exactly one approved configured push target after verifying the live head at that push endpoint is the expected predecessor and that the expected predecessor is an ancestor of the candidate. A separately authorized normal merge-up is compatible with this rule because it produces the candidate before publication; publication itself must not rewrite that candidate.
 
-Use `tools/governance/publication_integrity.py` when an isolated Git workspace is available. It verifies the configured push target, expected remote-head fence, candidate ancestry and clean exact-candidate worktree; creates and verifies a recoverable Git bundle before mutation; performs one exact-candidate update guarded by an expected-old-value lease; and reads the remote branch back before reporting success.
+Use `tools/governance/publication_integrity.py` when an isolated Git workspace is available. It requires the selected remote to resolve to exactly one credential-free configured push URL matching the approved target; verifies the expected remote-head fence, candidate ancestry and clean exact-candidate worktree; creates and verifies a recoverable Git bundle before mutation; performs one exact-candidate update guarded by an expected-old-value lease; and reads the branch back through the same push endpoint before reporting success. A separate fetch URL is not publication evidence, and multiple push URLs fail closed before mutation.
 
 The helper's explicit `--force-with-lease=<ref>:<expected_sha>` is used only as compare-and-swap protection for the expected predecessor. Candidate ancestry is checked independently first, so this does not authorize a non-fast-forward update or history rewrite. An agent must not use the option without those guard conditions or treat it as a general force-push exception.
 
@@ -16,7 +16,7 @@ If the normal Git publication path is unavailable, do **not** reconstruct an alr
 
 ## Ambiguous publication outcome
 
-A failed, interrupted, timed-out, or otherwise ambiguous push is not evidence that GitHub rejected the candidate. Read the live remote branch before any retry or recovery action:
+A failed, interrupted, timed-out, or otherwise ambiguous push is not evidence that GitHub rejected the candidate. Read the live canonical branch through the same approved push endpoint before any retry or recovery action:
 
 - if the remote head equals the exact candidate, publication succeeded despite the ambiguous transport result;
 - if the remote head still equals the expected predecessor, retain the candidate and recovery artifact and report the exact publication capability failure;
