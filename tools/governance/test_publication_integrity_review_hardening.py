@@ -84,6 +84,15 @@ class Fixture:
         git(self.work, "commit", "-qm", f"activate {driver} filter")
         self.candidate = git(self.work, "rev-parse", "HEAD")
 
+    def add_nested_candidate(self) -> Path:
+        nested = self.work / "nested"
+        nested.mkdir()
+        (nested / "anchor.txt").write_text("anchor\n", encoding="utf-8")
+        git(self.work, "add", "nested/anchor.txt")
+        git(self.work, "commit", "-qm", "add nested publication cwd")
+        self.candidate = git(self.work, "rev-parse", "HEAD")
+        return nested
+
     def close(self) -> None:
         self.temp.cleanup()
 
@@ -277,6 +286,62 @@ class PublicationReviewHardeningTests(unittest.TestCase):
             publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
             self.repo.candidate,
         )
+
+    def test_subdirectory_cwd_rejects_repo_wide_active_filter_before_side_publish(self) -> None:
+        nested = self.repo.add_nested_candidate()
+        escape = self.repo.extra_remote("subdir-filter-escape.git")
+        self.repo.activate_filter("escape")
+
+        filter_path = self.repo.root / "subdir-clean-filter.sh"
+        filter_path.write_text(
+            "#!/bin/sh\n"
+            f"git -C '{self.repo.work}' push -q '{escape}' HEAD:refs/heads/agent/test\n"
+            "cat\n",
+            encoding="utf-8",
+        )
+        filter_path.chmod(0o755)
+        git(self.repo.work, "config", "filter.escape.clean", str(filter_path))
+        (self.repo.work / "state.txt").touch()
+
+        bundle = self.repo.artifacts / "subdir-filter.bundle"
+        with self.assertRaisesRegex(publication.PublicationError, "clean/process filters"):
+            publication.publish(
+                nested,
+                remote="origin",
+                expected_push_url=self.repo.push_url,
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+                recovery_bundle=bundle,
+            )
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), self.repo.base
+        )
+        self.assertEqual(
+            git(self.repo.work, "ls-remote", "--heads", str(escape), "refs/heads/agent/test"), ""
+        )
+        self.assertFalse(bundle.exists())
+
+    def test_subdirectory_cwd_rejects_repo_wide_hidden_index_state(self) -> None:
+        nested = self.repo.add_nested_candidate()
+        git(self.repo.work, "update-index", "--skip-worktree", "state.txt")
+        (self.repo.work / "state.txt").write_text("hidden sibling bytes\n", encoding="utf-8")
+
+        bundle = self.repo.artifacts / "subdir-hidden-index.bundle"
+        with self.assertRaisesRegex(publication.PublicationError, "skip-worktree/assume-unchanged"):
+            publication.publish(
+                nested,
+                remote="origin",
+                expected_push_url=self.repo.push_url,
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+                recovery_bundle=bundle,
+            )
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), self.repo.base
+        )
+        self.assertFalse(bundle.exists())
 
     def test_push_url_that_is_also_remote_name_fails_closed(self) -> None:
         alternate = self.repo.extra_remote("alternate.git")
