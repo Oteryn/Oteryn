@@ -168,6 +168,68 @@ class PublicationPushConfigurationTests(unittest.TestCase):
         self.assertEqual(observed.read_text(encoding="utf-8").strip(), "0")
         self.assertEqual(self.repo.raw_remote_head(), self.repo.candidate)
 
+    def test_partial_clone_missing_recovery_object_cannot_lazy_fetch_promisor(self) -> None:
+        recovery_only = self.repo.work / "recovery-only.txt"
+        recovery_only.write_text("candidate-history-only\n", encoding="utf-8")
+        git(self.repo.work, "add", "recovery-only.txt")
+        git(self.repo.work, "commit", "-qm", "add recovery-only blob")
+        missing_blob = git(self.repo.work, "rev-parse", "HEAD:recovery-only.txt")
+
+        recovery_only.unlink()
+        (self.repo.work / "state.txt").write_text(
+            "base\ncandidate\nfinal\n",
+            encoding="utf-8",
+        )
+        git(self.repo.work, "add", "-A")
+        git(self.repo.work, "commit", "-qm", "final candidate without recovery-only file")
+        self.repo.candidate = git(self.repo.work, "rev-parse", "HEAD")
+
+        marker = self.repo.root / "promisor-transport-invoked.txt"
+        promisor_script = self.repo.root / "promisor-transport.sh"
+        promisor_script.write_text(
+            "#!/bin/sh\n"
+            f"printf 'invoked\\n' > '{marker}'\n"
+            "exit 73\n",
+            encoding="utf-8",
+        )
+        promisor_script.chmod(0o755)
+
+        git(self.repo.work, "config", "core.repositoryformatversion", "1")
+        git(self.repo.work, "config", "extensions.partialClone", "promisor")
+        git(self.repo.work, "remote", "add", "promisor", f"ext::{promisor_script}")
+        git(self.repo.work, "config", "remote.promisor.promisor", "true")
+        git(self.repo.work, "config", "remote.promisor.partialCloneFilter", "blob:none")
+        git(self.repo.work, "config", "protocol.ext.allow", "always")
+
+        object_path = self.repo.work / ".git" / "objects" / missing_blob[:2] / missing_blob[2:]
+        self.assertTrue(object_path.is_file())
+        object_path.unlink()
+
+        probe_env = os.environ.copy()
+        probe_env.pop("GIT_NO_LAZY_FETCH", None)
+        probe = subprocess.run(
+            ["git", "cat-file", "-e", missing_blob],
+            cwd=self.repo.work,
+            env=probe_env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertNotEqual(probe.returncode, 0)
+        self.assertTrue(marker.is_file(), "control must prove the promisor transport is executable")
+        marker.unlink()
+
+        bundle = self.repo.artifacts / "partial-clone.bundle"
+        with self.assertRaises(publication.PublicationError):
+            self.repo.publish(bundle.name)
+
+        self.assertFalse(marker.exists(), "publisher must not execute the promisor transport")
+        self.assertEqual(self.repo.raw_remote_head(), self.repo.base)
+        self.assertEqual(self.repo.raw_escape_head(), "")
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
     def test_reserved_unspecified_filter_driver_is_rejected_before_side_publish(self) -> None:
         self.assert_reserved_filter_driver_blocked("unspecified")
 
