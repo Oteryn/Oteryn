@@ -139,6 +139,20 @@ class PublicationIntegrityTests(unittest.TestCase):
                 bundle_path=self.repo.work / "candidate.bundle",
             )
 
+    def test_existing_temporary_bundle_path_is_preserved_and_rejected(self) -> None:
+        temporary = self.repo.artifacts / "candidate.bundle.tmp"
+        temporary.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_text("keep-me", encoding="utf-8")
+        with self.assertRaisesRegex(publication.PublicationError, "temporary path already exists"):
+            publication.create_recovery_bundle(
+                self.repo.work,
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+                bundle_path=self.repo.artifacts / "candidate.bundle",
+            )
+        self.assertEqual(temporary.read_text(encoding="utf-8"), "keep-me")
+
     def test_ambiguous_outcome_classification_is_readback_driven(self) -> None:
         self.assertEqual(
             publication.classify_remote_state(self.repo.candidate, self.repo.base, self.repo.candidate),
@@ -190,6 +204,26 @@ class PublicationIntegrityTests(unittest.TestCase):
             publication.remote_head(self.repo.work, "origin", "agent/test"), self.repo.intermediate
         )
 
+    def test_push_capability_failure_preserves_remote_and_verified_bundle(self) -> None:
+        bundle = self.repo.artifacts / "candidate.bundle"
+        real_run_git = publication._run_git
+
+        def fail_only_push(cwd: Path, *args: str, check: bool = True):
+            if args and args[0] == "push":
+                return subprocess.CompletedProcess(["git", *args], 1, "", "simulated push denial")
+            return real_run_git(cwd, *args, check=check)
+
+        with mock.patch.object(publication, "_run_git", side_effect=fail_only_push):
+            with self.assertRaisesRegex(publication.PublicationError, "did not advance"):
+                self.publish()
+
+        self.assertEqual(
+            publication.remote_head(self.repo.work, "origin", "agent/test"), self.repo.base
+        )
+        self.assertTrue(bundle.is_file())
+        listed = git(self.repo.work, "bundle", "list-heads", str(bundle))
+        self.assertIn(f"{self.repo.candidate} refs/heads/agent/test", listed)
+
     def test_push_url_mismatch_fails_closed(self) -> None:
         with self.assertRaisesRegex(publication.PublicationError, "approved publication target"):
             publication.preflight(
@@ -200,6 +234,20 @@ class PublicationIntegrityTests(unittest.TestCase):
                 expected_remote_head=self.repo.base,
                 candidate=self.repo.candidate,
             )
+
+    def test_embedded_url_credentials_are_rejected_without_echoing_them(self) -> None:
+        secret_url = "https://user:secret@example.invalid/Oteryn/Oteryn.git"
+        with self.assertRaises(publication.PublicationError) as context:
+            publication.preflight(
+                self.repo.work,
+                remote="origin",
+                expected_push_url=secret_url,
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+            )
+        self.assertIn("must not embed credentials", str(context.exception))
+        self.assertNotIn("secret", str(context.exception))
 
     def test_option_like_remote_name_is_rejected(self) -> None:
         with self.assertRaisesRegex(publication.PublicationError, "existing Git remote name"):
