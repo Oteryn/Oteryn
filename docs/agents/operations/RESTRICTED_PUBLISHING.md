@@ -1,17 +1,35 @@
 # Restricted publishing-credential compatibility
 
-Load this procedure when an already-authorized GitHub publication needs CLI/Git credential compatibility. Ordinary API-backed documentation work does not require it.
+Load this procedure when an already-authorized GitHub publication needs CLI/Git credential compatibility. Ordinary API-backed documentation work that is not publishing an existing material local candidate does not require it.
 
-This profile applies only after the repository lifecycle has allocated an approved
-task branch and existing PR. It does not grant PR-write permission to a restricted
-publishing credential; PR creation remains a separately authorized control-plane action.
+This profile applies only after the repository lifecycle has allocated an approved task branch and existing PR. It does not grant PR-write permission to a restricted publishing credential; PR creation remains a separately authorized control-plane action.
 
-For an authorized write to that branch/PR, when `GH_TOKEN` and `GITHUB_TOKEN` are
-unset but agent-visible `GH` is present, it may be passed transiently as
-`GH_TOKEN="$GH"` to the exact authorized `gh` command. Environment mapping alone
-does not authenticate `git push`: verify that the existing remote/credential path
-can consume the authorized identity without exposing or persisting it. Otherwise
-use another authorized repository-native write path or report the exact limitation.
-Never embed the token in a remote URL or persist a new credential helper to bypass
-that boundary. Credential presence expands no repository/path/task/merge/production
-permission. Do not force-push; verify the remote exact head after publishing.
+## Existing local candidate publication
+
+Once a material local candidate commit exists and is the intended payload for an allocated task branch, publication MUST preserve that exact candidate commit. The normal route is a non-force Git push of that commit to the approved remote branch after verifying the live remote head is the expected predecessor and that the expected predecessor is an ancestor of the candidate. A separately authorized normal merge-up is compatible with this rule because it produces the candidate before publication; publication itself must not rewrite that candidate.
+
+Use `tools/governance/publication_integrity.py` when an isolated Git workspace is available. It verifies the expected remote-head fence and candidate ancestry, creates and verifies a recoverable Git bundle before mutation, performs one ordinary non-force push of the exact candidate, and reads the remote branch back before reporting success.
+
+If the normal Git publication path is unavailable, do **not** reconstruct an already-prepared material candidate through ad-hoc Git Data blob/tree/commit/ref calls, per-file Contents API writes, a replacement commit, reset, rebase, force-push, or ref rewrite. This is a publication-integrity boundary, not a global ban on repository-native API writes for other authorized operations.
+
+## Ambiguous publication outcome
+
+A failed, interrupted, timed-out, or otherwise ambiguous push is not evidence that GitHub rejected the candidate. Read the live remote branch before any retry or recovery action:
+
+- if the remote head equals the exact candidate, publication succeeded despite the ambiguous transport result;
+- if the remote head still equals the expected predecessor, retain the candidate and recovery artifact and report the exact publication capability failure;
+- if the remote head is any third SHA, stop with remote-head drift and reconcile ownership/state before another mutation.
+
+Do not retry an ambiguous push until that readback has classified the remote state. Never use a force update as automatic cleanup.
+
+## Recovery preservation
+
+Before releasing or disposing of a writer/workspace that contains a material unpublished candidate, preserve a recovery artifact containing the exact Git objects required to recover that candidate. A Git bundle is preferred when Git is available. The artifact is evidence only after verification proves that it advertises the exact candidate head and records any prerequisite commit required for incremental recovery. A patch, prose summary, test log, or remembered edit is not an exact-candidate recovery substitute.
+
+Recovery preservation does not make local-only work delivered. The approved GitHub branch/PR remains lifecycle authority, and exact-head CI/review starts only after the intended candidate is durably present there.
+
+## Credential compatibility
+
+For an authorized write to that branch/PR, when `GH_TOKEN` and `GITHUB_TOKEN` are unset but agent-visible `GH` is present, it may be passed transiently as `GH_TOKEN="$GH"` to the exact authorized `gh` command. Environment mapping alone does not authenticate `git push`: verify that the existing remote/credential path can consume the authorized identity without exposing or persisting it. If the normal Git publication path is still unavailable, preserve the candidate/recovery artifact and report the exact limitation rather than inventing a lower-level publication route.
+
+Never embed the token in a remote URL or persist a new credential helper to bypass that boundary. Credential presence expands no repository/path/task/merge/production permission. Do not force-push; verify the remote exact head after publishing.
