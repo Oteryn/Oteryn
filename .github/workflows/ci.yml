@@ -119,6 +119,7 @@ jobs:
               Path('tools/governance/test_merge_queue_submission_routing.py'),
               Path('tools/governance/test_publication_integrity.py'),
               Path('tools/governance/test_publication_integrity_review_hardening.py'),
+              Path('tools/governance/test_publication_integrity_submodules.py'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
           if missing:
@@ -229,6 +230,7 @@ jobs:
           python3 tools/governance/test_merge_queue_submission_routing.py
           python3 tools/governance/test_publication_integrity.py
           python3 tools/governance/test_publication_integrity_review_hardening.py
+          python3 tools/governance/test_publication_integrity_submodules.py
           python3 tools/governance/test_bounded_execution_guard.py
           python3 tools/governance/test_agent_continuation_policy.py
           python3 tools/governance/test_agent_continuation_review_repairs.py
