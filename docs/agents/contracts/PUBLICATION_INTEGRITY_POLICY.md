@@ -14,12 +14,13 @@ Once a material local commit is selected as the publication candidate, publicati
 
 Before mutation, bind and verify:
 
-- repository and approved remote;
+- repository plus the exact approved configured push target;
 - canonical task branch;
 - exact candidate commit SHA;
 - exact expected current remote branch SHA;
 - checked-out local branch/head when a local Git workspace is used;
-- the expected remote SHA is an ancestor of the candidate, so the update is non-force.
+- a clean isolated worktree, so the recovery artifact contains all intended work;
+- the expected remote SHA is an ancestor of the candidate, so the update is fast-forward.
 
 A separately authorized normal merge-up may create a new candidate before this freeze. It does not authorize rewriting the frozen candidate during publication.
 
@@ -33,9 +34,11 @@ A patch, prose summary, file list, diff excerpt, or test log is evidence but is 
 
 ## Publication route
 
-For a local Git candidate, the selected route is one ordinary non-force Git push of the exact candidate to the canonical task branch, followed by live remote-head readback. `tools/governance/publication_integrity.py` implements the deterministic local guard and transport wrapper when a Git workspace is available.
+For a local Git candidate, the selected route is a single Git ref update of the exact candidate to the canonical task branch followed by live remote-head readback. `tools/governance/publication_integrity.py` implements the deterministic local guard and transport wrapper when a Git workspace is available.
 
-If the normal Git publication path is unavailable, do not use ad-hoc Git Data API blob/tree/commit/ref construction, per-file Contents API reconstruction, reset, rebase, force-push, or manual ref replacement to synthesize a remote substitute for the existing candidate. Preserve the candidate/recovery artifact and classify the lane as blocked by the exact observed publication capability failure.
+The helper uses an explicit expected-old-value `--force-with-lease=<ref>:<expected_sha>` only as compare-and-swap protection against movement between preflight and mutation. It independently requires `expected_sha` to be an ancestor of the exact candidate before the push. Therefore the authorized update remains fast-forward; the lease does **not** authorize a non-fast-forward update, history rewrite, reset, rebase, or ordinary force-push.
+
+If the normal Git publication path is unavailable, do not use ad-hoc Git Data API blob/tree/commit/ref construction, per-file Contents API reconstruction, reset, rebase, non-fast-forward push, or manual ref replacement to synthesize a remote substitute for the existing candidate. Preserve the candidate/recovery artifact and classify the lane as blocked by the exact observed publication capability failure.
 
 This restriction is candidate-specific. It does not prohibit an independently authorized API-native edit whose intended operation is itself the API write and which is not pretending to publish an already-prepared local commit.
 
