@@ -43,6 +43,9 @@ class FilesystemEndpointIdentity:
     resolved_path: str
     device: int
     inode: int
+    git_directory_path: str
+    git_directory_device: int
+    git_directory_inode: int
 
 
 def _run_git(
@@ -157,11 +160,42 @@ def _filesystem_endpoint_identity(cwd: Path, endpoint: str) -> FilesystemEndpoin
             raise PublicationError("local filesystem publication endpoint must not be a symlink")
         resolved = path.resolve(strict=True)
         metadata = resolved.stat()
+
+        # A non-bare repository's worktree is not the object Git opens for
+        # ls-remote: Git follows its .git directory (or gitfile). Bind that
+        # actual repository object independently so replacing .git cannot
+        # redirect readback while leaving the worktree inode unchanged.
+        dot_git = resolved / ".git"
+        if dot_git.is_symlink():
+            raise PublicationError("local filesystem publication Git directory must not be a symlink")
+        if dot_git.is_dir():
+            git_directory = dot_git.resolve(strict=True)
+        elif dot_git.is_file():
+            marker = dot_git.read_text(encoding="utf-8").strip()
+            if not marker.startswith("gitdir: "):
+                raise PublicationError("unable to resolve local filesystem publication Git directory")
+            git_directory = Path(marker[8:])
+            if not git_directory.is_absolute():
+                git_directory = dot_git.parent / git_directory
+            git_directory = git_directory.resolve(strict=True)
+        else:
+            # Bare repositories expose the Git directory at the endpoint.
+            git_directory = resolved
+        if git_directory.is_symlink() or not git_directory.is_dir():
+            raise PublicationError("local filesystem publication Git directory is not stable")
+        git_metadata = git_directory.stat()
     except PublicationError:
         raise
     except OSError as exc:
         raise PublicationError("unable to bind local filesystem publication endpoint identity") from exc
-    return FilesystemEndpointIdentity(str(resolved), metadata.st_dev, metadata.st_ino)
+    return FilesystemEndpointIdentity(
+        str(resolved),
+        metadata.st_dev,
+        metadata.st_ino,
+        str(git_directory),
+        git_metadata.st_dev,
+        git_metadata.st_ino,
+    )
 
 
 def _reject_url_rewrites(cwd: Path) -> None:
@@ -564,16 +598,19 @@ def _stable_local_remote_head(
     identity: FilesystemEndpointIdentity,
     branch: str,
 ) -> str:
-    """Read a local endpoint through an open directory, not its replaceable pathname."""
+    """Read a local endpoint through its actual open Git directory."""
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     try:
-        descriptor = os.open(identity.resolved_path, flags)
+        descriptor = os.open(identity.git_directory_path, flags)
     except OSError as exc:
         raise PublicationError("unable to open a stable local publication endpoint") from exc
     try:
         metadata = os.fstat(descriptor)
-        if (metadata.st_dev, metadata.st_ino) != (identity.device, identity.inode):
-            raise PublicationError("approved local filesystem endpoint identity changed")
+        if (metadata.st_dev, metadata.st_ino) != (
+            identity.git_directory_device,
+            identity.git_directory_inode,
+        ):
+            raise PublicationError("approved local filesystem Git directory identity changed")
         proc_endpoint = f"/proc/self/fd/{descriptor}"
         if not Path(proc_endpoint).exists():
             raise PublicationError("stable local filesystem endpoint handles are unavailable")
@@ -592,8 +629,11 @@ def _stable_local_remote_head(
         if result.returncode != 0:
             raise PublicationError("remote head readback is unavailable")
         metadata = os.fstat(descriptor)
-        if (metadata.st_dev, metadata.st_ino) != (identity.device, identity.inode):
-            raise PublicationError("approved local filesystem endpoint identity changed")
+        if (metadata.st_dev, metadata.st_ino) != (
+            identity.git_directory_device,
+            identity.git_directory_inode,
+        ):
+            raise PublicationError("approved local filesystem Git directory identity changed")
         current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
         if current != identity:
             raise PublicationError("approved local filesystem endpoint identity changed")

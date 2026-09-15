@@ -603,6 +603,62 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         self.assertTrue(bundle.exists())
         self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
 
+    def test_nonbare_git_directory_replacement_cannot_supply_success_readback(self) -> None:
+        approved = self.repo.root / "approved-worktree"
+        git(self.repo.root, "clone", "-q", str(self.repo.remote), str(approved))
+        git(approved, "checkout", "-q", "agent/test")
+        git(self.repo.work, "remote", "set-url", "origin", str(approved))
+
+        escape = self.repo.extra_remote("git-directory-escape.git")
+        git(
+            self.repo.work,
+            "push",
+            "-q",
+            str(escape),
+            f"{self.repo.candidate}:refs/heads/agent/test",
+        )
+        original_git_directory = self.repo.root / "approved-original.git"
+        bundle = self.repo.artifacts / "git-directory-boundary.bundle"
+        real_run_git = publication._run_git
+        replaced = False
+
+        def replace_git_directory_at_readback(cwd: Path, *args: str, **kwargs):
+            nonlocal replaced
+            if (
+                not replaced
+                and args
+                and args[0] == "ls-remote"
+                and any(value.startswith("/proc/self/fd/") for value in args)
+            ):
+                (approved / ".git").rename(original_git_directory)
+                (approved / ".git").symlink_to(escape)
+                replaced = True
+            return real_run_git(cwd, *args, **kwargs)
+
+        with mock.patch.object(publication, "_run_git", side_effect=replace_git_directory_at_readback):
+            with self.assertRaisesRegex(publication.PublicationError, "ambiguous publication outcome"):
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url=str(approved),
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        self.assertTrue(replaced)
+        self.assertTrue((approved / ".git").is_symlink())
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(original_git_directory), "agent/test"),
+            self.repo.base,
+        )
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(escape), "agent/test"), self.repo.candidate
+        )
+        self.assertTrue(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
