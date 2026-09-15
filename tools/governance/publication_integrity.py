@@ -161,12 +161,40 @@ def _is_ancestor(cwd: Path, ancestor: str, descendant: str) -> bool:
     raise PublicationError("unable to determine candidate ancestry")
 
 
+def _reject_hidden_index_entries(cwd: Path, hooks_dir: str) -> None:
+    # `git ls-files -v` reports skip-worktree entries as `S`; with `-v`, an
+    # assume-unchanged entry uses a lowercase tag. Either flag can suppress a
+    # local tracked-file change from the normal status probe, making recovery
+    # incomplete. Fail closed on the flags themselves in the isolated workspace.
+    result = _run_git(
+        cwd,
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        f"core.hooksPath={hooks_dir}",
+        "ls-files",
+        "-v",
+        "-z",
+    )
+    for record in result.stdout.split("\0"):
+        if not record:
+            continue
+        tag = record[0]
+        if tag == "S" or tag.islower():
+            raise PublicationError(
+                "publication rejects tracked skip-worktree/assume-unchanged index flags; "
+                "clear them before exact-candidate clean-worktree verification"
+            )
+
+
 def _require_clean_worktree(cwd: Path) -> None:
     # Git status can execute core.fsmonitor and can refresh/write the index,
     # which in turn can invoke post-index-change. Suppress optional index writes,
     # disable fsmonitor, and point hooksPath at a fresh trusted empty directory so
     # the clean probe cannot execute repository-controlled code or side-publish.
     with tempfile.TemporaryDirectory(prefix="oteryn-publication-no-hooks-") as hooks_dir:
+        _reject_hidden_index_entries(cwd, hooks_dir)
         status = _run_git(
             cwd,
             "--no-optional-locks",
