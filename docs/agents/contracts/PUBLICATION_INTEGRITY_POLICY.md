@@ -15,6 +15,7 @@ Once a material local commit is selected as the publication candidate, publicati
 Before mutation, bind and verify:
 
 - repository plus exactly one configured, credential-free approved push target;
+- no effective Git `url.*.insteadOf` or `url.*.pushInsteadOf` rewrite rule, so the approved endpoint cannot be redirected after validation;
 - canonical task branch;
 - exact candidate commit SHA;
 - exact expected current remote branch SHA;
@@ -36,7 +37,7 @@ A patch, prose summary, file list, diff excerpt, or test log is evidence but is 
 
 For a local Git candidate, the selected route is a single Git ref update of the exact candidate to the canonical task branch followed by live remote-head readback. `tools/governance/publication_integrity.py` implements the deterministic local guard and transport wrapper when a Git workspace is available.
 
-The selected remote must resolve to exactly one configured push URL and that URL must equal the approved publication target. Preflight readback, mutation and post-mutation readback all use that same resolved push endpoint; a distinct fetch URL is not publication evidence, and multiple push URLs fail closed before mutation.
+The selected remote must resolve to exactly one configured push URL and that URL must equal the approved publication target. Effective Git URL rewrite rules are rejected rather than reimplemented or partially interpreted. Preflight readback, mutation and post-mutation readback all use that same resolved push endpoint; a distinct fetch URL is not publication evidence, multiple push URLs fail closed before mutation, and no `insteadOf`/`pushInsteadOf` chain may redirect the endpoint.
 
 The helper uses an explicit expected-old-value `--force-with-lease=<ref>:<expected_sha>` only as compare-and-swap protection against movement between preflight and mutation. It independently requires `expected_sha` to be an ancestor of the exact candidate before the push. Therefore the authorized update remains fast-forward; the lease does **not** authorize a non-fast-forward update, history rewrite, reset, rebase, or ordinary force-push.
 
