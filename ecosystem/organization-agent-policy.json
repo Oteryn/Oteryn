@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "policy_id": "OTERYN_ORGANIZATION_AGENT_POLICY",
-  "policy_version": "3.1.0",
+  "policy_version": "3.2.0",
   "authority_repository": "Oteryn/Oteryn",
   "canonical_human_surfaces": {
     "organization_policy": "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md",
@@ -17,9 +17,12 @@
     "docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md",
     "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md",
     "docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md",
+    "docs/agents/contracts/PUBLICATION_INTEGRITY_POLICY.md",
+    "docs/agents/operations/RESTRICTED_PUBLISHING.md",
     "tools/governance/integration_capability_routing.py",
     "tools/governance/governed_merge_queue_executor.py",
-    "tools/governance/merge_queue_submission_routing.py"
+    "tools/governance/merge_queue_submission_routing.py",
+    "tools/governance/publication_integrity.py"
   ],
   "provider_binding_schema": {
     "schema_version": 1,
