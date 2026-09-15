@@ -219,7 +219,7 @@ class PublicationIntegrityTests(unittest.TestCase):
         real_run_git = publication._run_git
 
         def fail_only_push(cwd: Path, *args: str, check: bool = True):
-            if args and args[0] == "push":
+            if "push" in args:
                 return subprocess.CompletedProcess(["git", *args], 1, "", "simulated push denial")
             return real_run_git(cwd, *args, check=check)
 
