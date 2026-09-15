@@ -4,7 +4,7 @@ Status: active contract after reviewed integration to protected META `main` and 
 
 ## Purpose
 
-This contract governs publication of an already-prepared material local Git candidate to its allocated canonical task branch. It prevents a transport or credential failure from silently changing the candidate, rewriting branch history, or destroying the only recoverable copy of useful work.
+This contract governs publication of an already-prepared material local Git candidate to its allocated canonical task branch. It prevents a transport or credential failure from silently changing the candidate, rewriting branch history, publishing adjacent repositories/refs, or destroying the only recoverable copy of useful work.
 
 It is not a merge authority, does not replace repository CI/review/Merge Queue, and does not globally forbid repository-native API writes for operations that are not publishing an existing material local candidate.
 
@@ -24,6 +24,7 @@ Before mutation, bind and verify:
 - exact expected current remote branch SHA;
 - checked-out local branch/head when a local Git workspace is used;
 - no tracked `skip-worktree` or `assume-unchanged` index flags that could hide local bytes from the clean-worktree probe;
+- tracked gitlinks must not have a populated/initialized submodule worktree in the publisher workspace;
 - a clean isolated worktree, so the recovery artifact contains all intended work;
 - the expected remote SHA is an ancestor of the candidate, so the update is fast-forward.
 
@@ -35,7 +36,7 @@ Before the first publication attempt, create a verified recovery artifact for a 
 
 `git bundle` is the preferred Git-native representation. A bundle stored only inside the disposable worktree is insufficient. The caller/executor remains responsible for placing the verified artifact on an authorized durable surface before it treats workspace disposal or custody release as safe.
 
-A patch, prose summary, file list, diff excerpt, or test log is evidence but is not an exact-candidate recovery substitute.
+A patch, prose summary, file list, diff excerpt, or test log is evidence but is not an exact-candidate recovery substitute. Submodule-local work is separate repository work and is never implicitly published or treated as part of the superproject recovery artifact.
 
 ## Publication route
 
@@ -45,7 +46,9 @@ The selected remote must resolve to exactly one configured push URL and that URL
 
 Candidate ancestry is checked with replacement objects disabled after replacement refs and graft metadata are rejected. The helper uses an explicit expected-old-value `--force-with-lease=<ref>:<expected_sha>` only as compare-and-swap protection against movement between preflight and mutation. It independently requires `expected_sha` to be an ancestor of the exact candidate before the push. Therefore the authorized update remains fast-forward; the lease does **not** authorize a non-fast-forward update, history rewrite, reset, rebase, or ordinary force-push.
 
-The clean-worktree probe resolves the effective `filter` attribute for every tracked path without converting file contents. It rejects only filter drivers that are actually active on tracked paths and have an executable `clean` or `process` command; unrelated global filter configuration such as an unused Git LFS driver does not block publication. The probe also rejects tracked `skip-worktree` and `assume-unchanged` index flags, because either can suppress local bytes that would not exist in the candidate or recovery bundle. It then runs `git status` with optional index locking disabled, `core.fsmonitor=false`, and `core.hooksPath` pointed at a fresh trusted empty directory. This prevents repository-controlled active filters, fsmonitor or index hooks from executing code or publishing elsewhere during the safety check. The guarded push uses `--no-verify` so repository-local `pre-push` hooks or a configured hooks path cannot perform additional, unreviewed publication side effects. Filters, hooks, fsmonitor and sparse/hidden index optimizations may remain useful for ordinary developer workflows, but an active executable clean/process filter or hidden index state is not accepted in the isolated exact-candidate publication workspace.
+The clean-worktree probe resolves the effective `filter` attribute for every tracked path without converting file contents. It rejects only filter drivers that are actually active on tracked paths and have an executable `clean` or `process` command; unrelated global filter configuration such as an unused Git LFS driver does not block publication. The probe rejects tracked `skip-worktree` and `assume-unchanged` index flags. It also requires tracked submodule worktrees to be deinitialized/empty, then runs top-level `git status` with `--ignore-submodules=all`, optional index locking disabled, `core.fsmonitor=false`, and `core.hooksPath` pointed at a fresh trusted empty directory. This prevents repository-controlled active filters, submodule-local filters, fsmonitor or index hooks from executing code or publishing elsewhere during the safety check.
+
+The guarded push uses `--no-verify`, `--recurse-submodules=no` and `--no-follow-tags`. Therefore repository-local `pre-push` hooks cannot run, configured recursive-submodule publication cannot widen the operation to another repository, and `push.followTags=true` cannot add tag refs. The only intended ref update is the exact candidate to the canonical task branch guarded by the expected-old-value lease.
 
 If the normal Git publication path is unavailable, do not use ad-hoc Git Data API blob/tree/commit/ref construction, per-file Contents API reconstruction, reset, rebase, non-fast-forward push, or manual ref replacement to synthesize a remote substitute for the existing candidate. Preserve the candidate/recovery artifact and classify the lane as blocked by the exact observed publication capability failure.
 
