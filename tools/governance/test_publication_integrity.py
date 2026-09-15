@@ -337,6 +337,32 @@ class PublicationIntegrityTests(unittest.TestCase):
         self.assertIn("must not embed credentials", str(context.exception))
         self.assertNotIn("secret", str(context.exception))
 
+    def test_nested_remote_helper_credentials_are_rejected_before_git_execution(self) -> None:
+        secret_url = "http::https://user:supersecret@example.invalid/Oteryn/Oteryn.git"
+        git(self.repo.work, "remote", "set-url", "--push", "origin", secret_url)
+        bundle = self.repo.artifacts / "remote-helper.bundle"
+
+        with mock.patch.object(subprocess, "run") as run:
+            with self.assertRaises(publication.PublicationError) as context:
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url=secret_url,
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        self.assertIn("explicit Git remote-helper syntax", str(context.exception))
+        self.assertNotIn("supersecret", str(context.exception))
+        run.assert_not_called()
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), self.repo.base
+        )
+
     def test_option_like_remote_name_is_rejected(self) -> None:
         with self.assertRaisesRegex(publication.PublicationError, "existing Git remote name"):
             publication.preflight(

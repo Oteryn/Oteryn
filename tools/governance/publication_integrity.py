@@ -99,6 +99,8 @@ def _credential_free_url(value: str, label: str) -> str:
         raise PublicationError(f"{label} must be provided")
     if value.startswith("-") or "\n" in value or "\r" in value or "\x00" in value:
         raise PublicationError(f"{label} is not a safe Git endpoint")
+    if "::" in value:
+        raise PublicationError(f"{label} must not use explicit Git remote-helper syntax")
     if "://" in value:
         parsed = urlsplit(value)
         if parsed.username is not None or parsed.password is not None:
@@ -448,12 +450,12 @@ def _require_clean_worktree(cwd: Path) -> None:
 
 
 def remote_head(cwd: Path, endpoint: str, branch: str) -> str:
+    endpoint = _credential_free_url(endpoint, "readback endpoint")
     cwd = _worktree_root(cwd)
     _reject_url_rewrites(cwd)
     _reject_repository_credential_helpers(cwd)
     _reject_repository_transport_commands(cwd)
     _reject_repository_alternate_refs_commands(cwd)
-    endpoint = _credential_free_url(endpoint, "readback endpoint")
     ref = f"refs/heads/{branch}"
     result = _run_git(cwd, "ls-remote", "--heads", endpoint, ref, check=False)
     if result.returncode != 0:
@@ -545,6 +547,7 @@ def preflight(
     expected_remote_head: str,
     candidate: str,
 ) -> str:
+    expected_push_url = _credential_free_url(expected_push_url, "expected push URL")
     cwd = _worktree_root(cwd)
     endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
     branch = _branch(branch, cwd)
@@ -578,6 +581,7 @@ def publish(
     candidate: str,
     recovery_bundle: Path,
 ) -> PublicationResult:
+    expected_push_url = _credential_free_url(expected_push_url, "expected push URL")
     cwd = _worktree_root(cwd)
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
     candidate = _sha(candidate, "candidate")
