@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+URL_REWRITE_RE = r"^url\..*\.(insteadof|pushinsteadof)$"
 
 
 class PublicationError(RuntimeError):
@@ -70,7 +71,20 @@ def _credential_free_url(value: str, label: str) -> str:
     return value
 
 
+def _reject_url_rewrites(cwd: Path) -> None:
+    result = _run_git(cwd, "config", "--null", "--get-regexp", URL_REWRITE_RE, check=False)
+    if result.returncode == 1 and not result.stdout:
+        return
+    if result.returncode != 0:
+        raise PublicationError("unable to verify effective Git URL rewrite configuration")
+    if result.stdout:
+        raise PublicationError(
+            "Git URL rewrite rules are not permitted for exact-candidate publication"
+        )
+
+
 def _remote_push_endpoint(cwd: Path, value: str, expected_push_url: str) -> str:
+    _reject_url_rewrites(cwd)
     value = value.strip()
     if not value or value.startswith("-") or any(char.isspace() for char in value):
         raise PublicationError("remote must be an existing Git remote name")
@@ -122,6 +136,7 @@ def _require_clean_worktree(cwd: Path) -> None:
 
 
 def remote_head(cwd: Path, endpoint: str, branch: str) -> str:
+    _reject_url_rewrites(cwd)
     endpoint = _credential_free_url(endpoint, "readback endpoint")
     ref = f"refs/heads/{branch}"
     result = _run_git(cwd, "ls-remote", "--heads", endpoint, ref, check=False)
@@ -267,9 +282,10 @@ def publish(
     )
 
     # Re-resolve and revalidate exactly one push endpoint after bundle creation.
-    # Push and readback use that same endpoint, so a distinct fetch URL cannot
-    # redirect the evidence plane. The expected-old-value lease atomically fences
-    # the ref at mutation time, while ancestry independently guarantees FF history.
+    # URL rewrite rules fail closed, so the approved endpoint cannot be redirected
+    # by insteadOf/pushInsteadOf between validation, mutation and readback. The
+    # expected-old-value lease fences the ref at mutation time, while ancestry
+    # independently guarantees fast-forward history.
     endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
     ref = f"refs/heads/{branch}"
     push = _run_git(
