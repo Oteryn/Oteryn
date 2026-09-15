@@ -1,0 +1,9 @@
+# HISTORY-REVALIDATION evidence adoption checkpoint
+
+Canonical adoption records the immutable worker packet from Draft PR #206 at exact head `58a73b77b945b97011fa01ac8bda1732a8a4e6dd`, frozen under Issue #186 comment `5671120887`. The adopted packet is `history-revalidation-candidate.json`, Git blob `f8ded1a4a392e7378090c2cfe02585478a4bcc08`, SHA-256 `73fd0205395af9647a2ca669bcce9e60841daa69d0f390e99b21413546870bf2`. The worker contract is not adopted as authority.
+
+Adoption was admitted from canonical PR #185 head `e98943eee6f86c9ba160ea2e02683d2be8e764e4`, tree `7b1c47a5101a0f20f1f0826940a2a3395fc24600`. Immediately before writing, default branches remained source-bound exactly as the packet records: META `d9419b05eb98c81279297563c11fc90e4fe708ac`, Game `775a09091743af395ecb8f1e440cb9c286bc0dd2`, Platform `84d504c98acc8134eb4c9545711010b74c987974`, and Atlas `0d22a8d4378e66441502482ce715e226d487248e`.
+
+`HISTORY-REVALIDATION` remains **OPEN**. Historical source cuts remain historical facts only. Dated current-source observations are not live readiness, remediation, runtime, administrative, security, recovery, or product attestations. Game comparison remains explicitly incomplete because the GitHub compare listing reached its 300-file cap. Every finding and revalidation-sensitive item, stale-evidence rejection rule, limitation, negative claim, and exact recheck trigger remains exactly as recorded in the byte-authenticated packet.
+
+This evidence adoption is not a source-leaf disposition. Canonical accounting remains exactly 4,361 source leaves, 335 DIRECT, 113 GROUPED, 3,913 UNVERIFIED, 448 classified; META remains 210 leaves / 122 DIRECT / 88 UNVERIFIED; ledger SHA-256 remains `d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b`; semantic coverage remains `PARTIAL_EXPLICIT_NOT_ALL_LINE`; all 14 residual obligations remain OPEN.

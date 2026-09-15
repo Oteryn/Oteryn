@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "candidate_id": "ATLAS-CREATURE-GAMEPLAY-SHARDS",
+  "source_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+  "historical_source": "5ea38a62fe1af8b8068adcb84350e9644905943c",
+  "qualification_run": 34218265762,
+  "qualification_job": 102035087439,
+  "identity_carry_forward": {
+    "result": "PASS",
+    "grouped_candidate_paths": 508,
+    "changed_group_or_manifest_paths": 0,
+    "dependent_blobs_verified": 5
+  },
+  "focused_current_consumer_tests": {
+    "passed": 4,
+    "failed": 1,
+    "failing_test": "gameplay impact routing executes both functional fixture and bounded source-contract coverage",
+    "location": "tests/verification/qualification-gameplay-contract.test.mjs:77",
+    "assertion": "gameplay runtime requires a dedicated impact rule"
+  },
+  "audit_tool_tests": {
+    "python_passed": 103,
+    "node_passed": 37
+  },
+  "decision": "GROUPED_CARRY_FORWARD_REJECTED_AND_508_PATHS_REMAIN_UNVERIFIED",
+  "reason": "Historical grouped identity remained stable, but a current dependent impact-routing contract test failed. Historical consumer-based GROUPED assurance therefore cannot be carried forward to this source cut.",
+  "limitations": "No provider repair, restored Atlas verification, product runtime failure, or later-main regression is inferred. This is exact evidence about the pinned f008 source cut."
+}

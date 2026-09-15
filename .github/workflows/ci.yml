@@ -162,6 +162,13 @@ jobs:
           print(f'Validated {len(json_files)} JSON files and {len(repositories)} repository entries.')
           PY
 
+      - name: Validate audit terminal state
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/test_verify_readme_current_state.py
+          PYTHONDONTWRITEBYTECODE=1 python3 tools/audit/verify_readme_current_state.py
+
       - name: Validate simplified governance desired state
         shell: bash
         run: |

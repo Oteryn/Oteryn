@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "obligation": "HISTORY-REVALIDATION",
+  "disposition": "HANDOFF_COMPLETE_OBLIGATION_REMAINS_OPEN",
+  "observed_at": "2026-09-14T21:02:48Z",
+  "baseline": {
+    "repository": "Oteryn/Oteryn",
+    "canonical_audit_pr": 185,
+    "canonical_audit_head": "1008886c0aec2db6b8588a3131a83829eff06e67",
+    "canonical_audit_tree": "9f32fb6a2debb09483bab478e1ec2d5a05cbf9db",
+    "worker_pr": 206,
+    "worker_seed_head": "c5a410873124adde191514bc86a79ed50583b918",
+    "programme_pr": 203,
+    "programme_head": "82bc113797ecdc70d79aee628d339136b816e15d",
+    "release_comment_id": 5666964258
+  },
+  "source_boundaries": [
+    {
+      "id": "meta",
+      "repository": "Oteryn/Oteryn",
+      "historical_commit": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+      "historical_tree": "b8ebb8e50bce14a736fa65590ac121655c52fd12",
+      "current_main_commit": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+      "current_main_tree": "cb7e49e772321dbf89fed74e2bc2ac3f28ab37e7",
+      "compare_status": "ahead",
+      "ahead_by": 2,
+      "changed_files_reported": 2,
+      "compare_file_list_complete": true,
+      "compare_path_blob_status_sha256": "039f9e2758bc006149971ccec0e7c7324668af95d65171e1e46e88fc976d3864"
+    },
+    {
+      "id": "game",
+      "repository": "Oteryn/Oteryn-Game",
+      "historical_commit": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "historical_tree": "49cabfccf7d4876e5bc9276fc5963caa33dab8a5",
+      "current_main_commit": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+      "current_main_tree": "bddef2afcb7cf50c5a4c21dfd0c0c8069fbf5936",
+      "compare_status": "ahead",
+      "ahead_by": 131,
+      "changed_files_reported": 300,
+      "compare_file_list_complete": false,
+      "compare_limitation": "GitHub compare returned its 300-file cap; this digest is not a complete changed-path inventory.",
+      "compare_path_blob_status_sha256": "e444a9053dac983f0767603fa07037b027e5fb2d6768e6ce777491f2ad34fc93"
+    },
+    {
+      "id": "platform",
+      "repository": "Oteryn/Oteryn-Platform",
+      "historical_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "historical_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+      "current_main_commit": "84d504c98acc8134eb4c9545711010b74c987974",
+      "current_main_tree": "8abbc5e1051710c695205214d4c779291dcfb697",
+      "compare_status": "ahead",
+      "ahead_by": 50,
+      "changed_files_reported": 144,
+      "compare_file_list_complete": true,
+      "compare_path_blob_status_sha256": "050b6effa9d2cf24354602ffe8739eb6394c5f59ad2d2c75000d500b234cc351"
+    },
+    {
+      "id": "atlas",
+      "repository": "Oteryn/Oteryn-Atlas",
+      "historical_commit": "f00815858bb5b031c502ad19fb96a05ff66b4d84",
+      "historical_tree": "a1009378f8d3950a5ee62fb3ee65041f7d53a1e0",
+      "current_main_commit": "0d22a8d4378e66441502482ce715e226d487248e",
+      "current_main_tree": "659b3765de64771da73a851219f01dad95553b49",
+      "compare_status": "ahead",
+      "ahead_by": 99,
+      "changed_files_reported": 201,
+      "compare_file_list_complete": true,
+      "compare_path_blob_status_sha256": "c50a23545ae921e7882fca7cd76cb877f11683487cdf588caefcdf81f842fe79"
+    },
+    {
+      "id": "migration_archive",
+      "repository": "Oteryn/Oteryn-Platform-Migration-Backup-20260818",
+      "historical_commit": "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+      "historical_tree": "dbf8349a21e432df47d1475b8431939bbe94d6e1",
+      "current_main_commit": "6da4f83ef6a35afbab3332f90d7c7f171d23d235",
+      "current_main_tree": "dbf8349a21e432df47d1475b8431939bbe94d6e1",
+      "compare_status": "identical",
+      "ahead_by": 0,
+      "changed_files_reported": 0,
+      "compare_file_list_complete": true,
+      "compare_path_blob_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "repository_archived": true
+    }
+  ],
+  "provenance": {
+    "method": "Read-only GitHub REST default-branch, Git commit/tree, compare, PR and issue-comment reads; local immutable audit inputs are bound below by Git blob and SHA-256.",
+    "github_endpoints": [
+      "GET /repos/{owner}/{repo}",
+      "GET /repos/{owner}/{repo}/branches/main",
+      "GET /repos/{owner}/{repo}/git/commits/{sha}",
+      "GET /repos/{owner}/{repo}/compare/{historical}...{current}",
+      "GET /repos/Oteryn/Oteryn/pulls/{number}",
+      "GET /repos/Oteryn/Oteryn/issues/comments/5666964258"
+    ],
+    "canonical_inputs": [
+      {"path": "docs/evidence/organization-audit-20260907/collection-plan.json", "git_blob": "ad376433710e78591978d4e399e28f8d9eda4b23", "sha256": "dc67249cc0a20f8e39f6e82c50123938044b4d14ada31926516691511ddca269"},
+      {"path": "docs/evidence/organization-audit-20260907/r3-native-manifest.json", "git_blob": "75facd26f0dfa482ad34e2eb410dc32e8ab5ea07", "sha256": "68518689cd7b9a4b4430f15d4b843757695b73d12b670137f29d8d429d743364"},
+      {"path": "docs/evidence/organization-audit-20260907/r3-independent-review-corrections.json", "git_blob": "5a369290e4c438ae1d053cc2cf3511fe03f9ca65", "sha256": "08b36445baf85ffcbc60896882b7dd9aacb8f250c49d97d65792e9a264954d78"},
+      {"path": "docs/evidence/organization-audit-20260907/finding-register.tsv", "git_blob": "0d8a3b61dabb71f75d5ad3bde102ba953eb8d47b", "sha256": "c5402f1618cfe4cd03d2ad50cd0946ec86f19e834b02128199b31b808cc64e94"}
+    ]
+  },
+  "claims_remaining_valid_as_historical_facts": [
+    "The immutable commits and trees named as historical source cuts remain exact historical coordinates; provider-main movement does not rewrite those objects.",
+    "DIRECT and GROUPED dispositions remain bounded descriptions of review or qualification at their recorded source/evidence coordinates, not current-main or product-readiness claims.",
+    "The original Game coordinate 3327db49c0c3e2d90afe6a74954c579a36aba2a5 was unresolvable during collection and was fail-closed replaced by the recorded Game source cut; no cause is inferred.",
+    "The rejected Atlas 508-leaf carry-forward remains a historical rejection at the pinned Atlas source; it does not establish the outcome on current Atlas main.",
+    "Platform characterization mechanism details were present in public ancestor history and public Actions artifacts. This historical disclosure is not reversed by removal from a later tree."
+  ],
+  "claims_requiring_rebind_or_revalidation": {
+    "rule": "Every provider current-main source, runtime, security, remediation, lifecycle, CI, admin or product-outcome statement requires evidence bound to the applicable current commit and observation time; historical disposition labels alone cannot satisfy it.",
+    "finding_ids": [
+      "META-AUD-02", "META-AUD-05", "META-AUD-06", "META-AUD-08", "META-AUD-09", "META-PR145-01", "META-PR151-01",
+      "GAME-F04", "GAME-F07", "GAME-F08", "GAME-F09", "GAME-F10", "GAME-F12", "GAME-F13", "GAME-F15", "GAME-F16", "GAME-F17", "GAME-CANDIDATE-361",
+      "PLATFORM-F04", "PLATFORM-F07", "PLATFORM-F08", "PLATFORM-F10", "PLATFORM-F15", "PLATFORM-H02",
+      "RECOVERY-001", "RECOVERY-002", "RECOVERY-003", "RECOVERY-004", "RECOVERY-005", "RECOVERY-006"
+    ],
+    "provider_scope": "All provider-source conclusions asserted against current main require path/blob impact analysis and applicable current qualification because Game, Platform and Atlas main are ahead of their audit cuts.",
+    "live_scope": "Runtime, production, admin, telemetry, recovery, artifact availability/deletion, private-advisory submission and remediation remain mutable external facts and require fresh authoritative observation even when source bytes are unchanged."
+  },
+  "stale_evidence_rejection_rules": [
+    "Reject a current claim when its source commit is not the freshly resolved applicable main commit, unless the claim is explicitly and only historical.",
+    "Reject source carry-forward when affected paths, dependent contracts or consumer paths are not exhaustively compared by blob identity; an API-truncated changed-file list is insufficient.",
+    "Reject a current runtime, security, admin, recovery, CI or remediation claim supported only by source review, a historical run, a PR body, an issue label, a digest without retrievable bytes, or repository metadata.",
+    "Reject historical artifact-unavailability or restored-confidentiality claims until deletion or expiry is independently verified; public disclosure remains disclosed.",
+    "Reject any conversion of DIRECT or GROUPED coverage into product, runtime, security, organization-completion or independent-score PASS.",
+    "Reject closure of HISTORY-REVALIDATION unless every canonical REQUIRES_REVALIDATION, REQUIRES_LIVE_REVALIDATION, UNKNOWN_LIVE, OPEN_INHERITED and other explicitly open historical row is individually rebound or truthfully dispositioned by its owner route."
+  ],
+  "limitations": [
+    "This packet performs no provider code execution, runtime observation, privileged administrative read, vulnerability assessment or provider mutation.",
+    "GitHub compare for Game reached the 300-file response cap, so its returned file-list digest is provenance for a partial listing only and cannot support exhaustive path-level carry-forward.",
+    "Fresh coordinates prove identity and ancestry movement only; they do not prove that a historical defect persists, was repaired, is reachable, or is exploitable.",
+    "This worker does not mutate canonical audit accounting and does not close HISTORY-REVALIDATION; AUDIT186-LEAD owns any canonical transition."
+  ],
+  "exact_recheck_triggers": [
+    "Any applicable default-branch SHA changes before lead adoption or use of a current claim.",
+    "A current claim is proposed for any listed finding or for a DIRECT/GROUPED provider family.",
+    "A provider publishes exact remediation/qualification evidence or an owner disposition for a listed row.",
+    "Historical Actions artifact availability, deletion or expiry is asserted to have changed.",
+    "Canonical PR #185 head, collection-plan source coordinates, finding-register states or HISTORY-REVALIDATION closure wording changes."
+  ],
+  "claims": {
+    "history_revalidation_closed": false,
+    "product_readiness_claimed": false,
+    "runtime_readiness_claimed": false,
+    "security_remediation_claimed": false,
+    "organization_audit_completion_claimed": false
+  }
+}
