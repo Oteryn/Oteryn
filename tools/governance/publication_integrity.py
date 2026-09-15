@@ -201,7 +201,7 @@ def _active_filter_drivers(cwd: Path, hooks_dir: str) -> set[str]:
         "check-attr",
         "-z",
         "--stdin",
-        "filter",
+        "--all",
     ).stdout.split("\0")
     if attrs and attrs[-1] == "":
         attrs.pop()
@@ -212,8 +212,8 @@ def _active_filter_drivers(cwd: Path, hooks_dir: str) -> set[str]:
     for index in range(0, len(attrs), 3):
         _path, attribute, value = attrs[index : index + 3]
         if attribute != "filter":
-            raise PublicationError("unexpected Git attribute response while checking filters")
-        if value not in {"", "unspecified", "unset"}:
+            continue
+        if value:
             drivers.add(value)
     return drivers
 
@@ -559,6 +559,8 @@ def publish(
     ref = f"refs/heads/{branch}"
     push = _run_git(
         cwd,
+        "-c",
+        "push.pushOption=",
         "push",
         "--no-verify",
         "--porcelain",
