@@ -22,7 +22,7 @@ class AuditValidationTest(unittest.TestCase):
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-review-meta-current-main-governance-direct-additions.tsv','coverage-review-audit186-semantic-03-direct-additions.tsv','audit186-semantic-03-ci-contract-candidate.json','coverage-review-audit186-semantic-01-historical-direct-additions.tsv','audit186-semantic-01-historical-candidate.json','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json','CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-review-meta-current-main-governance-direct-additions.tsv','coverage-review-audit186-semantic-03-direct-additions.tsv','audit186-semantic-03-ci-contract-candidate.json','coverage-review-audit186-semantic-01-historical-direct-additions.tsv','audit186-semantic-01-historical-candidate.json','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json','CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md','history-revalidation-candidate.json','CHECKPOINT-20260915-HISTORY-REVALIDATION-ADOPTION.md']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
         shutil.copytree(ROOT/'docs/evidence'/EVIDENCE/'runtime-assurance',self.base/'runtime-assurance')
     def mutate(self,path,func):
@@ -70,6 +70,21 @@ class AuditValidationTest(unittest.TestCase):
         raw=bytearray(path.read_bytes()); raw[len(raw)//2] ^= 1
         path.write_bytes(raw)
         self.reject()
+    def test_history_revalidation_bindings_fail_closed(self):
+        for field in ('history_revalidation_packet','history_revalidation_adoption_checkpoint'):
+            with self.subTest(field=field):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
+                self.mutate(self.path,lambda d,f=field:d.update({f:'wrong'}))
+                self.reject()
+        shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_history_revalidation_evidence_adoption'].update(history_revalidation_open=False))
+        self.reject()
+    def test_history_revalidation_packet_and_checkpoint_drift_rejected(self):
+        for name in ('history-revalidation-candidate.json','CHECKPOINT-20260915-HISTORY-REVALIDATION-ADOPTION.md'):
+            with self.subTest(name=name):
+                shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
+                path=self.base/name; path.write_bytes(path.read_bytes()+b' drift')
+                self.reject()
     def test_current_coverage_table_meta_drift_rejected(self):
         self.mutate_companion('| meta | 210 | 122 | 0 | 88 |','| meta | 174 | 45 | 0 | 129 |')
         self.reject()

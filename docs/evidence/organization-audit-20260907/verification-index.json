@@ -627,5 +627,46 @@
     "provider_remediation_claimed": false,
     "audit_completion_or_independent_score_claimed": false,
     "canonical_ledger_sha256": "d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b"
+  },
+  "audit186_history_revalidation_evidence_adoption": {
+    "state": "ADOPTED_EVIDENCE_OBLIGATION_REMAINS_OPEN",
+    "worker_pull_request": 206,
+    "worker_head": "58a73b77b945b97011fa01ac8bda1732a8a4e6dd",
+    "issue_freeze_checkpoint": 5671120887,
+    "packet": "history-revalidation-candidate.json",
+    "packet_git_blob": "f8ded1a4a392e7378090c2cfe02585478a4bcc08",
+    "packet_sha256": "73fd0205395af9647a2ca669bcce9e60841daa69d0f390e99b21413546870bf2",
+    "canonical_admission_head": "e98943eee6f86c9ba160ea2e02683d2be8e764e4",
+    "canonical_admission_tree": "7b1c47a5101a0f20f1f0826940a2a3395fc24600",
+    "source_observation_commits": {
+      "meta": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+      "game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+      "platform": "84d504c98acc8134eb4c9545711010b74c987974",
+      "atlas": "0d22a8d4378e66441502482ce715e226d487248e"
+    },
+    "history_revalidation_open": true,
+    "game_compare_complete": false,
+    "current_truth_claimed": false,
+    "product_readiness_claimed": false,
+    "runtime_readiness_claimed": false,
+    "security_remediation_claimed": false,
+    "audit_completion_claimed": false,
+    "source_leaf_disposition_delta": 0,
+    "canonical_counts": {
+      "source_leaves": 4361,
+      "direct": 335,
+      "grouped": 113,
+      "unverified": 3913,
+      "semantically_classified": 448
+    },
+    "meta_counts": {
+      "source_leaves": 210,
+      "direct": 122,
+      "grouped": 0,
+      "unverified": 88
+    },
+    "canonical_ledger_sha256": "d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b",
+    "semantic_coverage": "PARTIAL_EXPLICIT_NOT_ALL_LINE",
+    "residual_obligations_open": 14
   }
 }

@@ -190,5 +190,7 @@
   "audit186_semantic_01_historical_candidate": "organization-audit-20260907/audit186-semantic-01-historical-candidate.json",
   "runtime_assurance_admin_packet": "organization-audit-20260907/runtime-assurance/admin-state-20260914.md",
   "runtime_assurance_infra_packet": "organization-audit-20260907/runtime-assurance/infra-state-20260914.md",
-  "runtime_assurance_adoption_checkpoint": "organization-audit-20260907/CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md"
+  "runtime_assurance_adoption_checkpoint": "organization-audit-20260907/CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md",
+  "history_revalidation_packet": "organization-audit-20260907/history-revalidation-candidate.json",
+  "history_revalidation_adoption_checkpoint": "organization-audit-20260907/CHECKPOINT-20260915-HISTORY-REVALIDATION-ADOPTION.md"
 }

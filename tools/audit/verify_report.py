@@ -66,6 +66,11 @@ RUNTIME_ASSURANCE_CHECKPOINT_SHA256 = '407a8e3dd0626402b02604eb22de5aff86f07c55f
 RUNTIME_ASSURANCE_ADMIN_SHA256 = '17ebeba22a93c7e74ca06cacabca110a385362b75dfa2a0985bb0ba4935b4985'
 RUNTIME_ASSURANCE_INFRA_SHA256 = 'a918f4d8360bc0f15c6dd9a2cae2a923a6a2d67d17b013c09b3fa3ef280bcef9'
 RUNTIME_ASSURANCE_INDEX_SHA256 = 'd64c165d1fb9b871af1b7929b2974e26f08c73a39b1472f30c437065c2743250'
+HISTORY_REVALIDATION_PACKET_BINDING = 'organization-audit-20260907/history-revalidation-candidate.json'
+HISTORY_REVALIDATION_CHECKPOINT_BINDING = 'organization-audit-20260907/CHECKPOINT-20260915-HISTORY-REVALIDATION-ADOPTION.md'
+HISTORY_REVALIDATION_PACKET_SHA256 = '73fd0205395af9647a2ca669bcce9e60841daa69d0f390e99b21413546870bf2'
+HISTORY_REVALIDATION_CHECKPOINT_SHA256 = 'a2eebaedde5adcaf9f6d09bbbf310b735a44e3c742a8aaa58742225f985af2bc'
+HISTORY_REVALIDATION_INDEX_SHA256 = '3d8410253bdc104e3fb1d9766ddb97a164dbe456f6c60df2ad25c41db2cef66d'
 EXPECTED_AUDIT186_SEMANTIC_01_ADOPTION = {
     'state': 'ADOPTED_INERT_HISTORICAL_PROVENANCE_NOT_CURRENT_TRUTH',
     'worker_pull_request': 204,
@@ -1129,6 +1134,18 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(type(runtime_assurance) is dict and
             hashlib.sha256(json.dumps(runtime_assurance,sort_keys=True,separators=(',',':')).encode()).hexdigest()==RUNTIME_ASSURANCE_INDEX_SHA256,
             'runtime assurance adoption index drift')
+    require(doc.get('history_revalidation_packet')==HISTORY_REVALIDATION_PACKET_BINDING,
+            'HISTORY-REVALIDATION packet binding drift')
+    require(doc.get('history_revalidation_adoption_checkpoint')==HISTORY_REVALIDATION_CHECKPOINT_BINDING,
+            'HISTORY-REVALIDATION checkpoint binding drift')
+    require(hashlib.sha256((base/'history-revalidation-candidate.json').read_bytes()).hexdigest()==HISTORY_REVALIDATION_PACKET_SHA256,
+            'HISTORY-REVALIDATION packet digest drift')
+    require(hashlib.sha256((base/'CHECKPOINT-20260915-HISTORY-REVALIDATION-ADOPTION.md').read_bytes()).hexdigest()==HISTORY_REVALIDATION_CHECKPOINT_SHA256,
+            'HISTORY-REVALIDATION checkpoint digest drift')
+    history_adoption=proof.get('audit186_history_revalidation_evidence_adoption')
+    require(type(history_adoption) is dict and
+            hashlib.sha256(json.dumps(history_adoption,sort_keys=True,separators=(',',':')).encode()).hexdigest()==HISTORY_REVALIDATION_INDEX_SHA256,
+            'HISTORY-REVALIDATION adoption index drift')
     require(json_exact(proof.get('audit186_semantic_01_historical_direct_adoption'),
                        EXPECTED_AUDIT186_SEMANTIC_01_ADOPTION),
             'AUDIT186 Semantic 01 adoption index drift')
