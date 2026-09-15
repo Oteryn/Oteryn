@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 MODULE_PATH = Path(__file__).with_name("publication_integrity.py")
 SPEC = importlib.util.spec_from_file_location("publication_integrity_review", MODULE_PATH)
@@ -517,6 +518,82 @@ class PublicationReviewHardeningTests(unittest.TestCase):
             )
 
         self.assertTrue(approved.is_symlink())
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(original), "agent/test"), self.repo.base
+        )
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(escape), "agent/test"), self.repo.candidate
+        )
+        self.assertTrue(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
+    def test_file_url_authority_cannot_bypass_local_identity_binding(self) -> None:
+        approved = self.repo.remote
+        endpoint = f"file://ignored-host{approved}"
+        git(self.repo.work, "remote", "set-url", "origin", endpoint)
+        bundle = self.repo.artifacts / "file-authority.bundle"
+
+        with self.assertRaisesRegex(publication.PublicationError, "file URL authority"):
+            publication.publish(
+                self.repo.work,
+                remote="origin",
+                expected_push_url=endpoint,
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+                recovery_bundle=bundle,
+            )
+
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(approved), "agent/test"), self.repo.base
+        )
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
+    def test_readback_path_replacement_during_ls_remote_is_ambiguous(self) -> None:
+        approved = self._prepare_literal_approved_endpoint()
+        escape = self.repo.extra_remote("readback-boundary-escape.git")
+        git(
+            self.repo.work,
+            "push",
+            "-q",
+            str(escape),
+            f"{self.repo.candidate}:refs/heads/agent/test",
+        )
+        original = self.repo.root / "readback-boundary-original.git"
+        hook = approved / "hooks" / "pre-receive"
+        hook.write_text("#!/bin/sh\nexit 73\n", encoding="utf-8")
+        hook.chmod(0o755)
+        bundle = self.repo.artifacts / "readback-boundary.bundle"
+        real_run_git = publication._run_git
+        replaced = False
+
+        def replace_at_readback(cwd: Path, *args: str, **kwargs):
+            nonlocal replaced
+            if (
+                not replaced
+                and args
+                and args[0] == "ls-remote"
+                and any(value.startswith("/proc/self/fd/") for value in args)
+            ):
+                approved.rename(original)
+                approved.symlink_to(escape)
+                replaced = True
+            return real_run_git(cwd, *args, **kwargs)
+
+        with mock.patch.object(publication, "_run_git", side_effect=replace_at_readback):
+            with self.assertRaisesRegex(publication.PublicationError, "ambiguous publication outcome"):
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url="approved",
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        self.assertTrue(replaced)
         self.assertEqual(
             publication.remote_head(self.repo.work, str(original), "agent/test"), self.repo.base
         )

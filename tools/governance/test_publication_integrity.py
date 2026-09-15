@@ -267,10 +267,10 @@ class PublicationIntegrityTests(unittest.TestCase):
         bundle = self.repo.artifacts / "candidate.bundle"
         real_run_git = publication._run_git
 
-        def fail_only_push(cwd: Path, *args: str, check: bool = True):
+        def fail_only_push(cwd: Path, *args: str, check: bool = True, **kwargs):
             if "push" in args:
                 return subprocess.CompletedProcess(["git", *args], 1, "", "simulated push denial")
-            return real_run_git(cwd, *args, check=check)
+            return real_run_git(cwd, *args, check=check, **kwargs)
 
         with mock.patch.object(publication, "_run_git", side_effect=fail_only_push):
             with self.assertRaisesRegex(publication.PublicationError, "did not advance"):
@@ -462,9 +462,13 @@ class PublicationIntegrityTests(unittest.TestCase):
             )
 
     def test_native_url_schemes_and_local_paths_remain_supported(self) -> None:
-        for scheme in ("ssh", "git", "http", "https", "file"):
+        for scheme in ("ssh", "git", "http", "https"):
             endpoint = f"{scheme}://example.invalid/Oteryn/Oteryn.git"
             self.assertEqual(publication._credential_free_url(endpoint, "test endpoint"), endpoint)
+        file_endpoint = "file:///tmp/Oteryn.git"
+        self.assertEqual(
+            publication._credential_free_url(file_endpoint, "test endpoint"), file_endpoint
+        )
         self.assertEqual(
             publication._credential_free_url(self.repo.push_url, "test endpoint"),
             self.repo.push_url,

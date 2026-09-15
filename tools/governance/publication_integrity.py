@@ -45,7 +45,9 @@ class FilesystemEndpointIdentity:
     inode: int
 
 
-def _run_git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+def _run_git(
+    cwd: Path, *args: str, check: bool = True, pass_fds: tuple[int, ...] = ()
+) -> subprocess.CompletedProcess[str]:
     completed = subprocess.run(
         ["git", *args],
         cwd=cwd,
@@ -53,6 +55,7 @@ def _run_git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedP
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        pass_fds=pass_fds,
         check=False,
     )
     if check and completed.returncode != 0:
@@ -121,6 +124,8 @@ def _credential_free_url(value: str, label: str) -> str:
             raise PublicationError(f"{label} must use a supported native Git push URL scheme")
         if parsed.username is not None or parsed.password is not None:
             raise PublicationError(f"{label} must not embed credentials")
+        if scheme == "file" and parsed.netloc not in ("", "localhost"):
+            raise PublicationError(f"{label} must not use an unsupported file URL authority")
     return value
 
 
@@ -131,7 +136,9 @@ def _filesystem_endpoint_identity(cwd: Path, endpoint: str) -> FilesystemEndpoin
         if parsed.scheme != "file":
             return None
         if parsed.netloc not in ("", "localhost"):
-            return None
+            raise PublicationError(
+                "local file publication endpoint must not contain an unsupported authority"
+            )
         raw_path = unquote(parsed.path)
         if not raw_path:
             raise PublicationError("local file publication endpoint path is missing")
@@ -552,6 +559,53 @@ def remote_head(cwd: Path, endpoint: str, branch: str) -> str:
     return _sha(rows[0][0], "remote head")
 
 
+def _stable_local_remote_head(
+    cwd: Path,
+    identity: FilesystemEndpointIdentity,
+    branch: str,
+) -> str:
+    """Read a local endpoint through an open directory, not its replaceable pathname."""
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(identity.resolved_path, flags)
+    except OSError as exc:
+        raise PublicationError("unable to open a stable local publication endpoint") from exc
+    try:
+        metadata = os.fstat(descriptor)
+        if (metadata.st_dev, metadata.st_ino) != (identity.device, identity.inode):
+            raise PublicationError("approved local filesystem endpoint identity changed")
+        proc_endpoint = f"/proc/self/fd/{descriptor}"
+        if not Path(proc_endpoint).exists():
+            raise PublicationError("stable local filesystem endpoint handles are unavailable")
+
+        branch = _branch(branch, cwd)
+        branch_ref = f"refs/heads/{branch}"
+        result = _run_git(
+            cwd,
+            "ls-remote",
+            "--heads",
+            proc_endpoint,
+            branch_ref,
+            check=False,
+            pass_fds=(descriptor,),
+        )
+        if result.returncode != 0:
+            raise PublicationError("remote head readback is unavailable")
+        metadata = os.fstat(descriptor)
+        if (metadata.st_dev, metadata.st_ino) != (identity.device, identity.inode):
+            raise PublicationError("approved local filesystem endpoint identity changed")
+        current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
+        if current != identity:
+            raise PublicationError("approved local filesystem endpoint identity changed")
+        rows = [line.split() for line in result.stdout.splitlines() if line.strip()]
+        rows = [row for row in rows if len(row) == 2 and row[1] == branch_ref]
+        if len(rows) != 1:
+            raise PublicationError("remote branch is missing or ambiguous")
+        return _sha(rows[0][0], "remote head")
+    finally:
+        os.close(descriptor)
+
+
 def classify_remote_state(remote: str, expected: str, candidate: str) -> str:
     remote = _sha(remote, "remote head")
     expected = _sha(expected, "expected remote head")
@@ -724,7 +778,10 @@ def publish(
         readback_identity = _filesystem_endpoint_identity(cwd, readback_endpoint)
         if endpoint_identity != readback_identity:
             raise PublicationError("approved local filesystem endpoint identity changed during publication")
-        live = remote_head(cwd, readback_endpoint, branch)
+        if endpoint_identity is None:
+            live = remote_head(cwd, readback_endpoint, branch)
+        else:
+            live = _stable_local_remote_head(cwd, endpoint_identity, branch)
     except PublicationError as exc:
         raise PublicationError(
             f"ambiguous publication outcome; remote readback unavailable; verified recovery bundle={bundle}"
