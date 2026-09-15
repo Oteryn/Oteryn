@@ -56,6 +56,22 @@ def _branch(value: str, cwd: Path) -> str:
     return value
 
 
+def _remote(cwd: Path, value: str, expected_push_url: str) -> str:
+    value = value.strip()
+    if not value or value.startswith("-") or any(char.isspace() for char in value):
+        raise PublicationError("remote must be an existing Git remote name")
+    names = {line.strip() for line in _run_git(cwd, "remote").stdout.splitlines() if line.strip()}
+    if value not in names:
+        raise PublicationError("remote must be an existing Git remote name")
+    expected_push_url = expected_push_url.strip()
+    if not expected_push_url:
+        raise PublicationError("expected push URL must be provided")
+    actual = _run_git(cwd, "remote", "get-url", "--push", value).stdout.strip()
+    if actual != expected_push_url:
+        raise PublicationError("configured push URL does not match the approved publication target")
+    return value
+
+
 def _rev_parse(cwd: Path, revision: str) -> str:
     result = _run_git(cwd, "rev-parse", "--verify", f"{revision}^{{commit}}")
     value = result.stdout.strip().lower()
@@ -76,6 +92,14 @@ def _is_ancestor(cwd: Path, ancestor: str, descendant: str) -> bool:
     if result.returncode == 1:
         return False
     raise PublicationError("unable to determine candidate ancestry")
+
+
+def _require_clean_worktree(cwd: Path) -> None:
+    status = _run_git(cwd, "status", "--porcelain=v1", "--untracked-files=all").stdout
+    if status.strip():
+        raise PublicationError(
+            "publication requires a clean isolated worktree so the recovery artifact matches all intended work"
+        )
 
 
 def remote_head(cwd: Path, remote: str, branch: str) -> str:
@@ -151,11 +175,13 @@ def preflight(
     cwd: Path,
     *,
     remote: str,
+    expected_push_url: str,
     branch: str,
     expected_remote_head: str,
     candidate: str,
 ) -> str:
     cwd = cwd.resolve()
+    remote = _remote(cwd, remote, expected_push_url)
     branch = _branch(branch, cwd)
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
     candidate = _sha(candidate, "candidate")
@@ -164,10 +190,11 @@ def preflight(
         raise PublicationError("checked-out local branch does not match the authorized target branch")
     if _rev_parse(cwd, "HEAD") != candidate:
         raise PublicationError("local HEAD does not equal the exact candidate")
+    _require_clean_worktree(cwd)
     if _rev_parse(cwd, expected_remote_head) != expected_remote_head:
         raise PublicationError("expected remote predecessor is not available as a local commit")
     if not _is_ancestor(cwd, expected_remote_head, candidate):
-        raise PublicationError("candidate is not a non-force descendant of the expected remote head")
+        raise PublicationError("candidate is not a fast-forward descendant of the expected remote head")
 
     live = remote_head(cwd, remote, branch)
     state = classify_remote_state(live, expected_remote_head, candidate)
@@ -180,6 +207,7 @@ def publish(
     cwd: Path,
     *,
     remote: str,
+    expected_push_url: str,
     branch: str,
     expected_remote_head: str,
     candidate: str,
@@ -191,6 +219,7 @@ def publish(
     state = preflight(
         cwd,
         remote=remote,
+        expected_push_url=expected_push_url,
         branch=branch,
         expected_remote_head=expected_remote_head,
         candidate=candidate,
@@ -206,12 +235,20 @@ def publish(
         bundle_path=recovery_bundle,
     )
 
+    # Re-validate the configured push target after bundle creation. The explicit
+    # expected-old-value lease atomically fences the ref at mutation time, while
+    # the ancestry check above independently guarantees the update is fast-forward.
+    # The lease is therefore compare-and-swap protection, not permission to
+    # publish a non-fast-forward history rewrite.
+    remote = _remote(cwd, remote, expected_push_url)
+    ref = f"refs/heads/{branch}"
     push = _run_git(
         cwd,
         "push",
         "--porcelain",
+        f"--force-with-lease={ref}:{expected_remote_head}",
         remote,
-        f"{candidate}:refs/heads/{branch}",
+        f"{candidate}:{ref}",
         check=False,
     )
 
@@ -246,6 +283,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cwd", default=".", help="Git worktree containing the exact candidate")
     parser.add_argument("--remote", default="origin", help="Existing approved Git remote name")
+    parser.add_argument(
+        "--expected-push-url",
+        required=True,
+        help="Exact approved push URL already configured for the selected remote",
+    )
     parser.add_argument("--branch", required=True, help="Unqualified canonical task branch name")
     parser.add_argument("--expected-remote-head", required=True, help="Expected current remote branch SHA")
     parser.add_argument("--candidate", required=True, help="Exact local candidate SHA")
@@ -259,6 +301,7 @@ def main() -> int:
         result = publish(
             Path(args.cwd),
             remote=args.remote,
+            expected_push_url=args.expected_push_url,
             branch=args.branch,
             expected_remote_head=args.expected_remote_head,
             candidate=args.candidate,
