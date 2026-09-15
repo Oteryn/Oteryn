@@ -99,9 +99,9 @@ class PublicationPushConfigurationTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.repo.close()
 
-    def assert_credential_helper_blocked(self, bundle_name: str) -> None:
+    def assert_blocked_without_publication(self, pattern: str, bundle_name: str) -> None:
         bundle = self.repo.artifacts / bundle_name
-        with self.assertRaisesRegex(publication.PublicationError, "credential helpers"):
+        with self.assertRaisesRegex(publication.PublicationError, pattern):
             self.repo.publish(bundle_name)
         self.assertEqual(self.repo.raw_remote_head(), self.repo.base)
         self.assertEqual(self.repo.raw_escape_head(), "")
@@ -122,7 +122,7 @@ class PublicationPushConfigurationTests(unittest.TestCase):
     def test_local_shell_credential_helper_is_rejected_before_readback(self) -> None:
         helper = self.repo.malicious_script("credential-helper.sh")
         git(self.repo.work, "config", "--local", "credential.helper", f"!{helper}")
-        self.assert_credential_helper_blocked("local-helper.bundle")
+        self.assert_blocked_without_publication("credential helpers", "local-helper.bundle")
 
     def test_local_include_credential_helper_is_rejected_before_readback(self) -> None:
         helper = self.repo.malicious_script("included-credential-helper.sh")
@@ -133,19 +133,67 @@ class PublicationPushConfigurationTests(unittest.TestCase):
             encoding="utf-8",
         )
         git(self.repo.work, "config", "--local", "include.path", str(included))
-        self.assert_credential_helper_blocked("included-helper.bundle")
+        self.assert_blocked_without_publication("credential helpers", "included-helper.bundle")
 
     def test_worktree_credential_helper_is_rejected_before_readback(self) -> None:
         helper = self.repo.malicious_script("worktree-credential-helper.sh")
         git(self.repo.work, "config", "extensions.worktreeConfig", "true")
         git(self.repo.work, "config", "--worktree", "credential.helper", f"!{helper}")
-        self.assert_credential_helper_blocked("worktree-helper.bundle")
+        self.assert_blocked_without_publication("credential helpers", "worktree-helper.bundle")
 
     def test_global_credential_helper_configuration_is_not_rejected(self) -> None:
         global_config = self.repo.root / "trusted-global.cfg"
         global_config.write_text("[credential]\n\thelper = false\n", encoding="utf-8")
         with mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(global_config)}, clear=False):
             result = self.repo.publish("global-helper.bundle")
+
+        self.assertEqual(result.state, "PUBLISHED")
+        self.assertEqual(self.repo.raw_remote_head(), self.repo.candidate)
+        self.assertEqual(self.repo.raw_escape_head(), "")
+
+    def test_local_ssh_command_is_rejected_before_readback(self) -> None:
+        command = self.repo.malicious_script("local-ssh-command.sh")
+        git(self.repo.work, "config", "--local", "core.sshCommand", str(command))
+        self.assert_blocked_without_publication("transport commands", "local-ssh.bundle")
+
+    def test_local_include_ssh_command_is_rejected_before_readback(self) -> None:
+        command = self.repo.malicious_script("included-ssh-command.sh")
+        included = self.repo.root / "repo-transport.cfg"
+        included.write_text(
+            "[core]\n"
+            f"\tsshCommand = {command}\n",
+            encoding="utf-8",
+        )
+        git(self.repo.work, "config", "--local", "include.path", str(included))
+        self.assert_blocked_without_publication("transport commands", "included-ssh.bundle")
+
+    def test_worktree_ssh_command_is_rejected_before_readback(self) -> None:
+        command = self.repo.malicious_script("worktree-ssh-command.sh")
+        git(self.repo.work, "config", "extensions.worktreeConfig", "true")
+        git(self.repo.work, "config", "--worktree", "core.sshCommand", str(command))
+        self.assert_blocked_without_publication("transport commands", "worktree-ssh.bundle")
+
+    def test_local_git_proxy_is_rejected_before_readback(self) -> None:
+        command = self.repo.malicious_script("local-git-proxy.sh")
+        git(self.repo.work, "config", "--local", "core.gitProxy", str(command))
+        self.assert_blocked_without_publication("transport commands", "local-git-proxy.bundle")
+
+    def test_local_askpass_is_rejected_before_readback(self) -> None:
+        command = self.repo.malicious_script("local-askpass.sh")
+        git(self.repo.work, "config", "--local", "core.askPass", str(command))
+        self.assert_blocked_without_publication("transport commands", "local-askpass.bundle")
+
+    def test_global_transport_command_configuration_is_not_rejected(self) -> None:
+        global_config = self.repo.root / "trusted-global-transport.cfg"
+        global_config.write_text(
+            "[core]\n"
+            "\tsshCommand = false\n"
+            "\tgitProxy = none\n"
+            "\taskPass = false\n",
+            encoding="utf-8",
+        )
+        with mock.patch.dict(os.environ, {"GIT_CONFIG_GLOBAL": str(global_config)}, clear=False):
+            result = self.repo.publish("global-transport.bundle")
 
         self.assertEqual(result.state, "PUBLISHED")
         self.assertEqual(self.repo.raw_remote_head(), self.repo.candidate)
