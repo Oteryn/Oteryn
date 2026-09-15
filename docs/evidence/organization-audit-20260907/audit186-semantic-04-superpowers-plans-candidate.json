@@ -1,0 +1,926 @@
+{
+  "schema_version": 1,
+  "candidate_id": "AUDIT186-SEMANTIC-04",
+  "status": "PROJECTION_ONLY_NOT_ADOPTED",
+  "adoption_performed": false,
+  "coverage_adopted": false,
+  "authority": {
+    "governing_issue": "Oteryn/Oteryn#186",
+    "canonical_pr": "Oteryn/Oteryn#185",
+    "programme_authority": "Oteryn/Oteryn#203@82bc113797ecdc70d79aee628d339136b816e15d",
+    "semantic_01_closeout_comment": 5675631153
+  },
+  "canonical_baseline": {
+    "commit": "139eadba0dd86df07e730626ea2ec27310047b8a",
+    "tree": "57a33ddf71c77dedfe2ce8545e627d61e28f0ee0",
+    "ledger_sha256": "d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b",
+    "meta_source_commit": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+    "meta_source_tree": "b8ebb8e50bce14a736fa65590ac121655c52fd12",
+    "source_leaves": 4361
+  },
+  "freeze": {
+    "composition_method": "Authoritative base coverage-review.tsv plus every effective direct-additions overlay bound and loaded by the canonical report, composed by exact repository/path with duplicate and overlap rejection.",
+    "meta_leaf_count": 210,
+    "meta_direct_count": 122,
+    "meta_grouped_count": 0,
+    "meta_unverified_count": 88,
+    "canonical_counts": {
+      "source_leaves": 4361,
+      "direct": 335,
+      "grouped": 113,
+      "unverified": 3913,
+      "semantically_classified": 448
+    },
+    "adopted_meta_path_blob_digest": "227296c7ee9a071da4f6a388164a666716bffb5f1eaab0f2abba5261257c9da5",
+    "overlays": [
+      {
+        "path": "docs/evidence/organization-audit-20260907/coverage-review.tsv",
+        "sha256": "37a224e512d7055ae869e11d230051bef2514458c2b019665953bd40b974b7fe",
+        "meta_paths": [
+          ".github/dependabot.yml",
+          ".github/workflows/ci.yml",
+          ".github/workflows/terminal-branch-lifecycle.yml",
+          "AGENTS.md",
+          "docs/agents/contracts/AGENT_EXECUTION_ACCESS_AND_CONTINUATION_POLICY.md",
+          "docs/agents/operations/RUNNER_ROUTING.md",
+          "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md",
+          "docs/evidence/OTERYN-R5Q-RESULTS.md",
+          "docs/evidence/agent-optimization-20260907/REPORT.md",
+          "docs/governance/AI_REVIEW_POLICY.md",
+          "ecosystem/agent-execution-routing-policy.json",
+          "tools/governance/agent_execution_routing.py",
+          "tools/governance/governance_drift_audit.py",
+          "tools/governance/test_agent_continuation_policy.py",
+          "tools/governance/test_agent_continuation_review_repairs.py",
+          "tools/governance/test_bounded_execution_guard.py",
+          "tools/governance/test_central_agent_policy.py",
+          "tools/governance/test_merge_queue_workflow_contract.py",
+          "tools/governance/test_remote_desktop_action_gate.py",
+          "tools/governance/validate_release_manifests.py"
+        ]
+      },
+      {
+        "path": "docs/evidence/organization-audit-20260907/coverage-review-canonical-additions.tsv",
+        "sha256": "8671d25d68ead8e6564b6882a46a0eb851cd5d6fb0e0e98af80618a20cd50fd0",
+        "meta_paths": []
+      },
+      {
+        "path": "docs/evidence/organization-audit-20260907/coverage-review-meta-r4-direct-additions.tsv",
+        "sha256": "70e5f14056e539f59a0be0783acb83c8e38c7cde5ff9e6cfde01672bfcf35598",
+        "meta_paths": [
+          ".github/CODEOWNERS",
+          ".github/PULL_REQUEST_TEMPLATE.md",
+          "CONTRIBUTING.md",
+          "README.md",
+          "SECURITY.md",
+          "docs/agents/BRANCH_LIFECYCLE_POLICY.json",
+          "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md",
+          "docs/agents/contracts/SYNOLOGY_MCP_EXECUTION_POLICY.md",
+          "docs/agents/prompts/OTERYN-ORGANIZATION-MERGE-QUEUE-ANTI-LOOP-ROLLOUT.md",
+          "docs/agents/prompts/OTERYN-SOLO-MAINTAINER-GOVERNANCE-V2-ROLLOUT.md",
+          "docs/architecture/adr/0001-ecosystem-topology-authority.md",
+          "docs/architecture/adr/0002-organization-governance-operating-model.md",
+          "docs/architecture/adr/0003-terminal-source-branch-lifecycle.md",
+          "docs/architecture/adr/0004-parallel-agent-git-concurrency.md",
+          "docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md",
+          "docs/evidence/OTERYN-ORG-AUDIT-v3.10-LIVE-CLOSEOUT-20260821.md",
+          "docs/evidence/OTERYN-ORG-AUDIT-v3.9-REMEDIATION-CLOSEOUT-20260824.md",
+          "docs/recovery/organization-recovery-contract.md",
+          "docs/superpowers/specs/2026-09-01-solo-maintainer-governance-v2-simplification-reset-design.md",
+          "docs/testing/ECOSYSTEM_TEST_STRATEGY.md",
+          "ecosystem/bounded-autonomous-execution-policy.json",
+          "ecosystem/governance-desired-state.json",
+          "ecosystem/repositories.json",
+          "tools/governance/bounded_execution_guard.py",
+          "tools/governance/remote_desktop_call_gate.py"
+        ]
+      },
+      {
+        "path": "docs/evidence/organization-audit-20260907/coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv",
+        "sha256": "929b2afdb37263181ea116a4c9616ce25f58e12c26f04d12dd8ed6dd2a60d4ad",
+        "meta_paths": [
+          "docs/agents/evals/r5-instruction-efficiency/README.md",
+          "docs/agents/evals/r5-instruction-efficiency/REVIEWER.md",
+          "docs/agents/evals/r5-instruction-efficiency/TRIAL_PROTOCOL.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/A1A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/A1B.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/A2A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/A2B.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/A3A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/A3B.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/G1A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/G1B.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/G2A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/G2B.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/G3A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/G3B.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/G4A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/G4B.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/P1A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/P1B.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/P2A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/P2B.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/P3A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/P3B.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/P4A.md",
+          "docs/agents/evals/r5-instruction-efficiency/arms/P4B.md"
+        ]
+      },
+      {
+        "path": "docs/evidence/organization-audit-20260907/coverage-review-meta-r6-prompts-direct-additions.tsv",
+        "sha256": "b51111c2e6eeb8d88f392d63007688b3be44128a7756512f8f295eaf7c9aeb8e",
+        "meta_paths": [
+          "docs/agents/prompts/OTERYN-CHAT-FIRST-AUTONOMY-CONTINUATION.md",
+          "docs/agents/prompts/OTERYN-FND04-INDEPENDENT-SECURITY-AUDITOR.md",
+          "docs/agents/prompts/OTERYN-FND04-VERIFIER-WRITER.md",
+          "docs/agents/prompts/OTERYN-INSTRUCTION-DEBT-AUDIT.md",
+          "docs/agents/prompts/OTERYN-NEXT-WAVE-BLOCKERS-FINAL-COORDINATOR.md",
+          "docs/agents/prompts/OTERYN-NEXT-WAVE-CLOSEOUT-AUDITOR.md",
+          "docs/agents/prompts/OTERYN-V310-ATLAS-DOC-IA-CLOSEOUT.md",
+          "docs/agents/prompts/OTERYN-V310-GAME-DOC-IA-AND-GAME-GATE-CLOSEOUT.md",
+          "docs/agents/prompts/OTERYN-V310-ORGANIZATION-RECOVERY-AUTHORIZED-CONTINUATION.md",
+          "docs/agents/prompts/OTERYN-V310-ORGANIZATION-RECOVERY-CLOSEOUT.md",
+          "docs/agents/prompts/OTERYN-V310-PLATFORM-DOC-IA-CLOSEOUT.md"
+        ]
+      },
+      {
+        "path": "docs/evidence/organization-audit-20260907/coverage-review-meta-current-main-governance-direct-additions.tsv",
+        "sha256": "8c9064552ea9592d7c5b51852333add3f58cdb4963f4316c2dd6bcbd21b44e16",
+        "meta_paths": [
+          "docs/agents/policy/PROMPTING_STANDARD.md",
+          "docs/agents/policy/PROMPT_EVAL_STANDARD.md",
+          "ecosystem/organization-agent-policy.json",
+          "tools/governance/central_agent_policy.py",
+          ".github/workflows/governed-merge-queue-executor.yml",
+          "docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md",
+          "docs/agents/operations/MERGE_QUEUE_EXECUTOR.md",
+          "docs/agents/programs/OTERYN_MQ_CAPABILITY_ROUTING_20260910.md",
+          "tools/governance/governed_merge_queue_executor.py",
+          "tools/governance/integration_capability_routing.py",
+          "tools/governance/merge_queue_submission_routing.py",
+          "tools/governance/test_governed_merge_queue_executor.py",
+          "tools/governance/test_integration_capability_routing.py",
+          "tools/governance/test_merge_queue_submission_routing.py"
+        ]
+      },
+      {
+        "path": "docs/evidence/organization-audit-20260907/coverage-review-audit186-semantic-03-direct-additions.tsv",
+        "sha256": "76881b1eace7559a9d84b060c82ccf9bf86ae5627e670535a7680ccb32285de5",
+        "meta_paths": [
+          "docs/ci/CI_CONTRACT.md"
+        ]
+      },
+      {
+        "path": "docs/evidence/organization-audit-20260907/coverage-review-audit186-semantic-01-historical-direct-additions.tsv",
+        "sha256": "d0967fd5a9c16ab81a1a00d9a71b2d0ade8ce14cba56ffd60d8c16fd1bcf21b0",
+        "meta_paths": [
+          "docs/evidence/repository-audit-2026-09-06/AUDIT-PROMPT-ORIGINAL.md",
+          "docs/evidence/repository-audit-2026-09-06/CHANGELOG-R3.md",
+          "docs/evidence/repository-audit-2026-09-06/COVERAGE-LEDGER.md",
+          "docs/evidence/repository-audit-2026-09-06/OTERYN-REPOSITORY-AUDIT-COMPLETED-R2-20260906.md",
+          "docs/evidence/repository-audit-2026-09-06/OTERYN-REPOSITORY-AUDIT-R4-CURRENT-MAIN-DELTA-CLOSEOUT-20260907.md",
+          "docs/evidence/repository-audit-2026-09-06/PROMPT-COMPLIANCE-MATRIX.md",
+          "docs/evidence/repository-audit-2026-09-06/PUBLICATION-RECEIPT.json",
+          "docs/evidence/repository-audit-2026-09-06/README.md",
+          "docs/evidence/repository-audit-2026-09-06/REPRODUCE.md",
+          "docs/evidence/repository-audit-2026-09-06/SHA256SUMS",
+          "docs/evidence/repository-audit-2026-09-06/VERIFICATION-SUMMARY.md",
+          "docs/evidence/repository-audit-2026-09-06/evidence/ci-meta-times-1.csv",
+          "docs/evidence/repository-audit-2026-09-06/evidence/ci-meta-times-2.csv",
+          "docs/evidence/repository-audit-2026-09-06/evidence/ci-meta-times-3.csv",
+          "docs/evidence/repository-audit-2026-09-06/evidence/ci-recalculation.json",
+          "docs/evidence/repository-audit-2026-09-06/evidence/ci-run-index.json",
+          "docs/evidence/repository-audit-2026-09-06/evidence/coverage-reconciliation.json",
+          "docs/evidence/repository-audit-2026-09-06/evidence/current-work.json",
+          "docs/evidence/repository-audit-2026-09-06/evidence/external-references.json",
+          "docs/evidence/repository-audit-2026-09-06/evidence/instruction-sources.json",
+          "docs/evidence/repository-audit-2026-09-06/evidence/live-governance-readback.json",
+          "docs/evidence/repository-audit-2026-09-06/evidence/native-probe-results.json",
+          "docs/evidence/repository-audit-2026-09-06/evidence/prior-linux-bounded.log",
+          "docs/evidence/repository-audit-2026-09-06/evidence/prior-native-verification.json",
+          "docs/evidence/repository-audit-2026-09-06/evidence/revision-provenance.json",
+          "docs/evidence/repository-audit-2026-09-06/evidence/workflow-inventory.json"
+        ]
+      }
+    ],
+    "unverified_paths": [
+      {
+        "path": "docs/agents/AVAILABLE_TOOLS.md",
+        "mode": "100644",
+        "blob_sha": "2759c93d1e97e4c405c3fbab08b2dbbf0708c7c7"
+      },
+      {
+        "path": "docs/agents/CHAT_FIRST_AUTONOMOUS_EXECUTION_HANDOFF.md",
+        "mode": "100644",
+        "blob_sha": "ec63a41b166e9257dd560b5c23b322b2c94862f8"
+      },
+      {
+        "path": "docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md",
+        "mode": "100644",
+        "blob_sha": "66204123a247747b3171433a7b846529c251db38"
+      },
+      {
+        "path": "docs/agents/operations/RESTRICTED_PUBLISHING.md",
+        "mode": "100644",
+        "blob_sha": "006b44e323da7d894d26c74ef0bbd111931630ea"
+      },
+      {
+        "path": "docs/agents/programs/OTERYN_CONTEXT_OVERCONSTRAINT_OPTIMIZATION_20260907.md",
+        "mode": "100644",
+        "blob_sha": "9ad5a7fe9e3e8170ea17a00d32254fe7d7d928cf"
+      },
+      {
+        "path": "docs/evidence/OTERYN-AGENT-INSTRUCTION-OPTIMIZATION-RESEARCH-20260907.md",
+        "mode": "100644",
+        "blob_sha": "9e353fc244eea682d1865bb04d47f0804bb5b17c"
+      },
+      {
+        "path": "docs/evidence/OTERYN-INSTRUCTION-DEBT-AUDIT-20260906.md",
+        "mode": "100644",
+        "blob_sha": "635a410a8a8977b4e13b7dc8c01313029e309d00"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/SHA256SUMS.json",
+        "mode": "100644",
+        "blob_sha": "720329f3c41c5b066a5f86f59619bcaf06c36ec4"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/atlas-ci.json",
+        "mode": "100644",
+        "blob_sha": "6b731ee89ad7b9be15a44486d23914d961ddb9bb"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/binding-readback.json",
+        "mode": "100644",
+        "blob_sha": "8608019dbce2885586da56b612d1a3add004bf3d"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/evaluation.json",
+        "mode": "100644",
+        "blob_sha": "fd3713749bd07cc47ad1e5b9a6a4564212b8fa73"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/execution-metadata.json",
+        "mode": "100644",
+        "blob_sha": "96a387cc34857e74d04c839b9038e2655c9c19ae"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/final-main-readback.json",
+        "mode": "100644",
+        "blob_sha": "e9d5e882f1c2d0d4c5e2a3c7de9b9d0fb20a32a5"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/fixtures/CASES.md",
+        "mode": "100644",
+        "blob_sha": "dfa23119f90ac0952aee4392cd324a273365bcfb"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/fixtures/PLATFORM_DELIVERY.md",
+        "mode": "100644",
+        "blob_sha": "8ee6a0a01782e062d74d2ec0146f51bc07bfd64b"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/fixtures/README.input.md",
+        "mode": "100644",
+        "blob_sha": "0f5e5d4a9fecc41baef3b853c58986e3566d90df"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/fixtures/SAFETY_REPEAT.md",
+        "mode": "100644",
+        "blob_sha": "7496147f88fbe6926099965161357afa15ca0f40"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/fixtures/identifiers.input.py",
+        "mode": "100644",
+        "blob_sha": "3fae2fe6123e8929c36d97856cb251f9678a52bb"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/fixtures/protocol.json",
+        "mode": "100644",
+        "blob_sha": "3501b51c950130c3365171838632c3f74e9d36dd"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/game-comparison.json",
+        "mode": "100644",
+        "blob_sha": "aedce07a2cac99dd61fcb2591565eb005eeeb195"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/game-initial-pr-runs.json",
+        "mode": "100644",
+        "blob_sha": "9f43841da3762889434254d0d438f63fe5cd4d6b"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/game-r5-residue-review.md",
+        "mode": "100644",
+        "blob_sha": "f2cef2fa2c80bdc254543191c559cfabe544512e"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/game365-baseline-ci.json",
+        "mode": "100644",
+        "blob_sha": "a4a3a5fdb81735f330394d0085bb8aabc0529803"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/game378-final-ci.json",
+        "mode": "100644",
+        "blob_sha": "a4cd03fcac34b371532b659692b5b0a142dd6ef0"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/game380-classifier-first-attempt.json",
+        "mode": "100644",
+        "blob_sha": "33c6d911a68d356fe1ec8f05ea57b64114185cb0"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/game380-final-ci.json",
+        "mode": "100644",
+        "blob_sha": "fe812a5fb3a6b364f902c0ba748dbdaef493e2a8"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/instruction-continuity.json",
+        "mode": "100644",
+        "blob_sha": "ba2c59e5c52d314e388dbb57af95623bb85e627a"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/meta-ci-overhead.json",
+        "mode": "100644",
+        "blob_sha": "d91aaaa83475fabc282b3b2c4afd3d8fb7768978"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/meta-template-metrics.json",
+        "mode": "100644",
+        "blob_sha": "a61ffb3f2a8637453f234ca7b4f5aa3718113afc"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/ownership-readback.json",
+        "mode": "100644",
+        "blob_sha": "b7f554b6401c0dc7e346c198775c94206b00ef5f"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/platform-cleanup-apply.json",
+        "mode": "100644",
+        "blob_sha": "85aa92820ac8fe7f5896b69cecd7ef5a6234adcd"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/platform-cleanup-ci.json",
+        "mode": "100644",
+        "blob_sha": "81a03e3284e80dbbf064dc7223c86f5f6c960769"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/platform-cleanup-final-ci.json",
+        "mode": "100644",
+        "blob_sha": "37126eff2bdbbf8ce86350128b38619efcc17735"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/platform-comparison.json",
+        "mode": "100644",
+        "blob_sha": "fd10b2a307e08d3ec9e64ce1fb05080bc0a83ed9"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/platform-initial-ci.json",
+        "mode": "100644",
+        "blob_sha": "2a47cc82daa86d1491cfc92e1ebfe422ab0ae19c"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/platform-r5-residue-review.md",
+        "mode": "100644",
+        "blob_sha": "014260e82615febef0738bf1182cc667e78322e4"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/programme-ci-overhead.json",
+        "mode": "100644",
+        "blob_sha": "350f4306629efbc1e7ca6296d46acb00d43062fe"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/protection-readback.json",
+        "mode": "100644",
+        "blob_sha": "7c9b3e548e0a5f7aef4fd64b69a801612984a109"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/source-inventory.json",
+        "mode": "100644",
+        "blob_sha": "bc31cb87f9ca09aa811cab8aa9cd6e147e4a99a0"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/source-inventory.md",
+        "mode": "100644",
+        "blob_sha": "ca3554a6f8cb4afc409d0900f93f32783ec680a1"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/terminal-file-readback.json",
+        "mode": "100644",
+        "blob_sha": "37b0347154fe8876e63051ef55d8761000833de3"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/game-baseline-safety-repeat/results.txt",
+        "mode": "100644",
+        "blob_sha": "e0a2ce2cd0d707b2d456f012174dcebe5056df3e"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/game-baseline/README.md",
+        "mode": "100644",
+        "blob_sha": "e654f65c01cac200a1e407765b78f8f3415b1712"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/game-baseline/identifiers.py",
+        "mode": "100644",
+        "blob_sha": "d9d348a27bf0745c0b883700e70c4622345b3e62"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/game-baseline/results.txt",
+        "mode": "100644",
+        "blob_sha": "562b44594ce59d7544da7987015851815b3ddff4"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/game-candidate/README.md",
+        "mode": "100644",
+        "blob_sha": "e654f65c01cac200a1e407765b78f8f3415b1712"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/game-candidate/identifiers.py",
+        "mode": "100644",
+        "blob_sha": "d9d348a27bf0745c0b883700e70c4622345b3e62"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/game-candidate/results.txt",
+        "mode": "100644",
+        "blob_sha": "d6126c48435e0dff393a13ba90f269a49d4211b7"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/game-safety-repeat/results.txt",
+        "mode": "100644",
+        "blob_sha": "ded87b21647448cd9bd4603e709327793ac94ab2"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/platform-baseline-safety-repeat/results.txt",
+        "mode": "100644",
+        "blob_sha": "4a9bb48c0a6b39061b11cfc85201f92bf5d5964b"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/platform-baseline/README.md",
+        "mode": "100644",
+        "blob_sha": "e654f65c01cac200a1e407765b78f8f3415b1712"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/platform-baseline/identifiers.py",
+        "mode": "100644",
+        "blob_sha": "d9d348a27bf0745c0b883700e70c4622345b3e62"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/platform-baseline/results.txt",
+        "mode": "100644",
+        "blob_sha": "3eb7f911e0864a47cf6a17128799b3d814946e4f"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/platform-candidate-safety-repeat/results.txt",
+        "mode": "100644",
+        "blob_sha": "17a5e3dd137e0fb633720cc43ff08b23f2de8c1f"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/platform-candidate/README.md",
+        "mode": "100644",
+        "blob_sha": "e654f65c01cac200a1e407765b78f8f3415b1712"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/platform-candidate/identifiers.py",
+        "mode": "100644",
+        "blob_sha": "d9d348a27bf0745c0b883700e70c4622345b3e62"
+      },
+      {
+        "path": "docs/evidence/agent-optimization-20260907/trials/platform-candidate/results.txt",
+        "mode": "100644",
+        "blob_sha": "3f1a07ad8236fe8053d31065e7ae4ae04985aac1"
+      },
+      {
+        "path": "docs/evidence/context-optimization-20260907/behavioral-trials-summary.md",
+        "mode": "100644",
+        "blob_sha": "257d708a23dcb5960775cba274bf2bc49b7755bf"
+      },
+      {
+        "path": "docs/evidence/context-optimization-20260907/behavioral-trials.jsonl",
+        "mode": "100644",
+        "blob_sha": "306fb56f7d4ef90b5c77d27599a5e96b747104ea"
+      },
+      {
+        "path": "docs/evidence/context-routing-adoption-20260907.md",
+        "mode": "100644",
+        "blob_sha": "2ce260c94d3f8a06c304395996b13a3357e19a39"
+      },
+      {
+        "path": "docs/evidence/instruction-debt-r5-reproduction/README.md",
+        "mode": "100644",
+        "blob_sha": "92227aaa43407502a0436f1e29c65ef730ffde6d"
+      },
+      {
+        "path": "docs/evidence/instruction-debt-r5-reproduction/manifest.json",
+        "mode": "100644",
+        "blob_sha": "b02d890b0b249b7c24ee7c5c42934c945d7a769d"
+      },
+      {
+        "path": "docs/evidence/instruction-debt-r5-reproduction/reproduce.py",
+        "mode": "100644",
+        "blob_sha": "62b2ef29be6def566a4eeec05ef1ca7a62343468"
+      },
+      {
+        "path": "docs/evidence/instruction-debt-r5-reproduction/results.json",
+        "mode": "100644",
+        "blob_sha": "11cf0becf3d2134d4ed3a5f56ad102c03587c5c4"
+      },
+      {
+        "path": "docs/release/RELEASE_COORDINATION.md",
+        "mode": "100644",
+        "blob_sha": "ed647eec8c853e4ff7e2e5bef1955badf7a2793e"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-25-parallel-agent-git-concurrency.md",
+        "mode": "100644",
+        "blob_sha": "7b9fcba9559e2baa38ae07a90a11d0dd2c6cb7ad"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-26-remote-desktop-parallel-routing.md",
+        "mode": "100644",
+        "blob_sha": "e81ab18c60b0bfd0510ccfdbb3aaaa5a42fd2f62"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-28-remote-desktop-per-action-enforcement.md",
+        "mode": "100644",
+        "blob_sha": "1807b3945b8e75679e15d4b587c8286ec90e2674"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-29-effort-aware-agent-planning.md",
+        "mode": "100644",
+        "blob_sha": "f426ef07066cefde10eec8d1b09aab0efedc2743"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-30-chat-first-persistent-autonomy-rollout.md",
+        "mode": "100644",
+        "blob_sha": "4235bb5a610cb2dbf3591f40b1065fab25a44b5a"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-30-organization-merge-queue-review-fingerprint-rollout.md",
+        "mode": "100644",
+        "blob_sha": "234034df2b59d1c802788bfbf34840331e90e9c8"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-31-solo-maintainer-governance-v2-safety-addendum.md",
+        "mode": "100644",
+        "blob_sha": "267503b1d8a94c910a1f1d29cb06cd5dcca62a8d"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-31-solo-maintainer-governance-v2.md",
+        "mode": "100644",
+        "blob_sha": "2cc51c5cbacc0d3e18a36e477e00bdbdaea8b91a"
+      },
+      {
+        "path": "docs/superpowers/plans/2026-09-01-solo-maintainer-governance-v2-simplification-reset.md",
+        "mode": "100644",
+        "blob_sha": "868f38e86e25899111c2d69429b37db150a43266"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-08-26-remote-desktop-parallel-routing-design.md",
+        "mode": "100644",
+        "blob_sha": "0ebd6405644200b409a6e6edd0c8722bca72fa65"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-08-28-remote-desktop-per-action-enforcement-design.md",
+        "mode": "100644",
+        "blob_sha": "c807b6b15295973e0ac763dac6c8e6df73106813"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-08-29-effort-aware-agent-planning-design.md",
+        "mode": "100644",
+        "blob_sha": "3db88215641e9a9d871a3e181ca9ace1764ba83f"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-08-30-chat-first-persistent-autonomy-design.md",
+        "mode": "100644",
+        "blob_sha": "dd8961f0395f5c32ce3247065c09bf11655a49bf"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-08-30-organization-merge-queue-review-fingerprint-amendment.md",
+        "mode": "100644",
+        "blob_sha": "0a3e9e41a48c724e1f91f3532fa089c6fa4098da"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-08-30-organization-merge-queue-review-fingerprint-design.md",
+        "mode": "100644",
+        "blob_sha": "f5c23bf4c45a3ee5aa363606cd4c426daed717fd"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-08-31-solo-maintainer-governance-v2-design.md",
+        "mode": "100644",
+        "blob_sha": "77d44e4ed0f5633233d8241cb874bdfc5b10e79c"
+      },
+      {
+        "path": "docs/superpowers/specs/2026-08-31-solo-maintainer-governance-v2-safety-amendment.md",
+        "mode": "100644",
+        "blob_sha": "e7879365b1444f258b1ab19d970e31859d4f1b12"
+      },
+      {
+        "path": "ecosystem/agent-continuation-policy.json",
+        "mode": "100644",
+        "blob_sha": "0a8b15a6e7c596c920ec9bd308efe5beb2fe0c26"
+      },
+      {
+        "path": "ecosystem/compatibility.schema.json",
+        "mode": "100644",
+        "blob_sha": "98056e9be0a39cf4a20f939f9333bd83ce419d17"
+      },
+      {
+        "path": "tools/governance/agent_continuation_policy.py",
+        "mode": "100644",
+        "blob_sha": "74e7f9ee0fb009aee0b3444c8069afabe6d92b02"
+      },
+      {
+        "path": "tools/governance/provider_policy_adoption.py",
+        "mode": "100644",
+        "blob_sha": "2a867ef0df433b6acc464d9d3607117777474fb3"
+      },
+      {
+        "path": "tools/governance/requirements-validation.txt",
+        "mode": "100644",
+        "blob_sha": "7fd7958d8fd81e5c6897c8265c2d1582390a93f1"
+      },
+      {
+        "path": "tools/governance/test_agent_execution_routing.py",
+        "mode": "100644",
+        "blob_sha": "5631d9727ec454ab49a9c9b86979b261a859036a"
+      }
+    ],
+    "direct_or_grouped_overlap": []
+  },
+  "family": {
+    "prefix": "docs/superpowers/plans/",
+    "selected_before_full_review": true,
+    "selected_path_count": 9,
+    "selection_rationale": "This is the largest defensible authored subfamily in the frozen META-UNVERIFIED set: all leaves are implementation plans owned as retired docs/superpowers evidence, share the semantic role of recording proposed/tracked governance rollouts, and can be reviewed under one historical/non-dispatchable rubric.",
+    "review_rubric": [
+      "Read every selected blob completely at the pinned META source cut.",
+      "Accept only the document role, topics, and historical plan/progress content as inert provenance.",
+      "Treat checkboxes, instructions, commands, status language, links, and technical assertions as non-dispatchable and not current truth.",
+      "Use per-leaf DIRECT only; do not infer GROUPED equivalence from directory or filename similarity."
+    ],
+    "excluded_from_family": [
+      {
+        "paths": "docs/superpowers/specs/**",
+        "reason": "Design specifications are a distinct authored artifact type and require their own fixed rubric."
+      },
+      {
+        "paths": "all other frozen META paths",
+        "reason": "Policies, operations, tools, release text, fixtures, trials, research reports, and machine receipts are heterogeneous with implementation plans and remain UNVERIFIED."
+      }
+    ],
+    "grouped_equivalence": {
+      "proposed": false,
+      "reason": "No semantic equivalence is claimed; every leaf received an independent full-file review."
+    },
+    "paths": [
+      {
+        "path": "docs/superpowers/plans/2026-08-25-parallel-agent-git-concurrency.md",
+        "mode": "100644",
+        "blob_sha": "7b9fcba9559e2baa38ae07a90a11d0dd2c6cb7ad",
+        "sha256": "eb70d98f5cf24d49bda339ab3796d87e558a28168d20e3187c5135785b9b83d2",
+        "bytes": 10004,
+        "semantic_role": "Historical implementation plan for organization-wide parallel-agent Git concurrency and non-destructive integration.",
+        "review_depth": "FULL_FILE_SEMANTIC_REVIEW",
+        "proposed_disposition": "DIRECT",
+        "accepted_semantic_scope": "The complete leaf is accepted only as a historical implementation-plan record of proposed or tracked governance work; checkboxes, commands, statuses, requirements, links, and imperative language are inert provenance and are not dispatchable or current authority.",
+        "claims_not_established": [
+          "current policy or authority",
+          "current implementation, workflow, protection, CI, or provider state",
+          "runtime, administrative, security, product, lifecycle, readiness, completion, or merge truth",
+          "continued validity or safety of embedded commands and links"
+        ],
+        "limitations": [
+          "Review establishes the authored plan role and historical/non-dispatchable interpretation only; it does not validate every embedded technical assertion or outcome.",
+          "Current AGENTS.md governs the non-dispatchable interpretation; source-cut text is not independently promoted to authority."
+        ],
+        "recheck_trigger": "Recheck if the source blob changes, current governing authority changes the treatment of docs/superpowers material, or any consumer begins treating this path as dispatchable/current evidence.",
+        "explicit_historical_banner": true
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-26-remote-desktop-parallel-routing.md",
+        "mode": "100644",
+        "blob_sha": "e81ab18c60b0bfd0510ccfdbb3aaaa5a42fd2f62",
+        "sha256": "a1d9bd07c6b01c42fdd47053a7925cb7cec0ada6573c2fa68bd9161d38b781d1",
+        "bytes": 9427,
+        "semantic_role": "Historical implementation plan for GitHub-first routing, Remote Desktop default denial, and parallel lane validation.",
+        "review_depth": "FULL_FILE_SEMANTIC_REVIEW",
+        "proposed_disposition": "DIRECT",
+        "accepted_semantic_scope": "The complete leaf is accepted only as a historical implementation-plan record of proposed or tracked governance work; checkboxes, commands, statuses, requirements, links, and imperative language are inert provenance and are not dispatchable or current authority.",
+        "claims_not_established": [
+          "current policy or authority",
+          "current implementation, workflow, protection, CI, or provider state",
+          "runtime, administrative, security, product, lifecycle, readiness, completion, or merge truth",
+          "continued validity or safety of embedded commands and links"
+        ],
+        "limitations": [
+          "Review establishes the authored plan role and historical/non-dispatchable interpretation only; it does not validate every embedded technical assertion or outcome.",
+          "Current AGENTS.md governs the non-dispatchable interpretation; source-cut text is not independently promoted to authority."
+        ],
+        "recheck_trigger": "Recheck if the source blob changes, current governing authority changes the treatment of docs/superpowers material, or any consumer begins treating this path as dispatchable/current evidence.",
+        "explicit_historical_banner": true
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-28-remote-desktop-per-action-enforcement.md",
+        "mode": "100644",
+        "blob_sha": "1807b3945b8e75679e15d4b587c8286ec90e2674",
+        "sha256": "736a88ebb6e4f02a598fd6632fde0030054f1ef68a1b8dbec9561755ecb855e9",
+        "bytes": 14695,
+        "semantic_role": "Historical implementation plan for exact-call Remote Desktop exception gating and related governance tests.",
+        "review_depth": "FULL_FILE_SEMANTIC_REVIEW",
+        "proposed_disposition": "DIRECT",
+        "accepted_semantic_scope": "The complete leaf is accepted only as a historical implementation-plan record of proposed or tracked governance work; checkboxes, commands, statuses, requirements, links, and imperative language are inert provenance and are not dispatchable or current authority.",
+        "claims_not_established": [
+          "current policy or authority",
+          "current implementation, workflow, protection, CI, or provider state",
+          "runtime, administrative, security, product, lifecycle, readiness, completion, or merge truth",
+          "continued validity or safety of embedded commands and links"
+        ],
+        "limitations": [
+          "Review establishes the authored plan role and historical/non-dispatchable interpretation only; it does not validate every embedded technical assertion or outcome.",
+          "Current AGENTS.md governs the non-dispatchable interpretation; source-cut text is not independently promoted to authority."
+        ],
+        "recheck_trigger": "Recheck if the source blob changes, current governing authority changes the treatment of docs/superpowers material, or any consumer begins treating this path as dispatchable/current evidence.",
+        "explicit_historical_banner": true
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-29-effort-aware-agent-planning.md",
+        "mode": "100644",
+        "blob_sha": "f426ef07066cefde10eec8d1b09aab0efedc2743",
+        "sha256": "aabbde0833d223209884a1143ca569fbc36ab0883a1873cad505e07a6ae7e96e",
+        "bytes": 14055,
+        "semantic_role": "Historical implementation plan for proportional single-agent versus parallel execution routing.",
+        "review_depth": "FULL_FILE_SEMANTIC_REVIEW",
+        "proposed_disposition": "DIRECT",
+        "accepted_semantic_scope": "The complete leaf is accepted only as a historical implementation-plan record of proposed or tracked governance work; checkboxes, commands, statuses, requirements, links, and imperative language are inert provenance and are not dispatchable or current authority.",
+        "claims_not_established": [
+          "current policy or authority",
+          "current implementation, workflow, protection, CI, or provider state",
+          "runtime, administrative, security, product, lifecycle, readiness, completion, or merge truth",
+          "continued validity or safety of embedded commands and links"
+        ],
+        "limitations": [
+          "Review establishes the authored plan role and historical/non-dispatchable interpretation only; it does not validate every embedded technical assertion or outcome.",
+          "Current AGENTS.md governs the non-dispatchable interpretation; source-cut text is not independently promoted to authority."
+        ],
+        "recheck_trigger": "Recheck if the source blob changes, current governing authority changes the treatment of docs/superpowers material, or any consumer begins treating this path as dispatchable/current evidence.",
+        "explicit_historical_banner": true
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-30-chat-first-persistent-autonomy-rollout.md",
+        "mode": "100644",
+        "blob_sha": "4235bb5a610cb2dbf3591f40b1065fab25a44b5a",
+        "sha256": "c2f72d2e38f2dd590f15048d5ac9a584cf3b842bb13f694886bea6013d1220fb",
+        "bytes": 27951,
+        "semantic_role": "Historical rollout plan for bounded chat-first continuation mechanics and provider adoption sequencing.",
+        "review_depth": "FULL_FILE_SEMANTIC_REVIEW",
+        "proposed_disposition": "DIRECT",
+        "accepted_semantic_scope": "The complete leaf is accepted only as a historical implementation-plan record of proposed or tracked governance work; checkboxes, commands, statuses, requirements, links, and imperative language are inert provenance and are not dispatchable or current authority.",
+        "claims_not_established": [
+          "current policy or authority",
+          "current implementation, workflow, protection, CI, or provider state",
+          "runtime, administrative, security, product, lifecycle, readiness, completion, or merge truth",
+          "continued validity or safety of embedded commands and links"
+        ],
+        "limitations": [
+          "Review establishes the authored plan role and historical/non-dispatchable interpretation only; it does not validate every embedded technical assertion or outcome.",
+          "Current AGENTS.md governs the non-dispatchable interpretation; source-cut text is not independently promoted to authority."
+        ],
+        "recheck_trigger": "Recheck if the source blob changes, current governing authority changes the treatment of docs/superpowers material, or any consumer begins treating this path as dispatchable/current evidence.",
+        "explicit_historical_banner": true
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-30-organization-merge-queue-review-fingerprint-rollout.md",
+        "mode": "100644",
+        "blob_sha": "234034df2b59d1c802788bfbf34840331e90e9c8",
+        "sha256": "c0b350479861ac2f18e7c8995febcff0a2900c40102e8d677d49e8bec4d1b3b6",
+        "bytes": 30286,
+        "semantic_role": "Historical rollout plan for the since-retired review-fingerprint model and Merge Queue transition.",
+        "review_depth": "FULL_FILE_SEMANTIC_REVIEW",
+        "proposed_disposition": "DIRECT",
+        "accepted_semantic_scope": "The complete leaf is accepted only as a historical implementation-plan record of proposed or tracked governance work; checkboxes, commands, statuses, requirements, links, and imperative language are inert provenance and are not dispatchable or current authority.",
+        "claims_not_established": [
+          "current policy or authority",
+          "current implementation, workflow, protection, CI, or provider state",
+          "runtime, administrative, security, product, lifecycle, readiness, completion, or merge truth",
+          "continued validity or safety of embedded commands and links"
+        ],
+        "limitations": [
+          "Review establishes the authored plan role and historical/non-dispatchable interpretation only; it does not validate every embedded technical assertion or outcome.",
+          "Current AGENTS.md governs the non-dispatchable interpretation; source-cut text is not independently promoted to authority."
+        ],
+        "recheck_trigger": "Recheck if the source blob changes, current governing authority changes the treatment of docs/superpowers material, or any consumer begins treating this path as dispatchable/current evidence.",
+        "explicit_historical_banner": false
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-31-solo-maintainer-governance-v2-safety-addendum.md",
+        "mode": "100644",
+        "blob_sha": "267503b1d8a94c910a1f1d29cb06cd5dcca62a8d",
+        "sha256": "20f2cc80250e49380c129d9b395027cbf2f9eee14b11eb076f64faf9fd7fb2e5",
+        "bytes": 21379,
+        "semantic_role": "Historical safety addendum plan for aggregate gates, moving-base canaries, bounded transitions, and break-glass tests.",
+        "review_depth": "FULL_FILE_SEMANTIC_REVIEW",
+        "proposed_disposition": "DIRECT",
+        "accepted_semantic_scope": "The complete leaf is accepted only as a historical implementation-plan record of proposed or tracked governance work; checkboxes, commands, statuses, requirements, links, and imperative language are inert provenance and are not dispatchable or current authority.",
+        "claims_not_established": [
+          "current policy or authority",
+          "current implementation, workflow, protection, CI, or provider state",
+          "runtime, administrative, security, product, lifecycle, readiness, completion, or merge truth",
+          "continued validity or safety of embedded commands and links"
+        ],
+        "limitations": [
+          "Review establishes the authored plan role and historical/non-dispatchable interpretation only; it does not validate every embedded technical assertion or outcome.",
+          "Current AGENTS.md governs the non-dispatchable interpretation; source-cut text is not independently promoted to authority."
+        ],
+        "recheck_trigger": "Recheck if the source blob changes, current governing authority changes the treatment of docs/superpowers material, or any consumer begins treating this path as dispatchable/current evidence.",
+        "explicit_historical_banner": false
+      },
+      {
+        "path": "docs/superpowers/plans/2026-08-31-solo-maintainer-governance-v2.md",
+        "mode": "100644",
+        "blob_sha": "2cc51c5cbacc0d3e18a36e477e00bdbdaea8b91a",
+        "sha256": "c62c4d18041fbb3e1b48319da9ba2972cac029a10e29e5fcede6a1893915b2eb",
+        "bytes": 31963,
+        "semantic_role": "Historical implementation plan for an earlier solo-maintainer governance and Merge Queue model.",
+        "review_depth": "FULL_FILE_SEMANTIC_REVIEW",
+        "proposed_disposition": "DIRECT",
+        "accepted_semantic_scope": "The complete leaf is accepted only as a historical implementation-plan record of proposed or tracked governance work; checkboxes, commands, statuses, requirements, links, and imperative language are inert provenance and are not dispatchable or current authority.",
+        "claims_not_established": [
+          "current policy or authority",
+          "current implementation, workflow, protection, CI, or provider state",
+          "runtime, administrative, security, product, lifecycle, readiness, completion, or merge truth",
+          "continued validity or safety of embedded commands and links"
+        ],
+        "limitations": [
+          "Review establishes the authored plan role and historical/non-dispatchable interpretation only; it does not validate every embedded technical assertion or outcome.",
+          "Current AGENTS.md governs the non-dispatchable interpretation; source-cut text is not independently promoted to authority."
+        ],
+        "recheck_trigger": "Recheck if the source blob changes, current governing authority changes the treatment of docs/superpowers material, or any consumer begins treating this path as dispatchable/current evidence.",
+        "explicit_historical_banner": false
+      },
+      {
+        "path": "docs/superpowers/plans/2026-09-01-solo-maintainer-governance-v2-simplification-reset.md",
+        "mode": "100644",
+        "blob_sha": "868f38e86e25899111c2d69429b37db150a43266",
+        "sha256": "0583a03a86181627f30634c43bf2308f31d2e95bfc686b9fc59fbf8a4a884654",
+        "bytes": 5025,
+        "semantic_role": "Historical reset plan replacing over-specified governance with a smaller native-GitHub model.",
+        "review_depth": "FULL_FILE_SEMANTIC_REVIEW",
+        "proposed_disposition": "DIRECT",
+        "accepted_semantic_scope": "The complete leaf is accepted only as a historical implementation-plan record of proposed or tracked governance work; checkboxes, commands, statuses, requirements, links, and imperative language are inert provenance and are not dispatchable or current authority.",
+        "claims_not_established": [
+          "current policy or authority",
+          "current implementation, workflow, protection, CI, or provider state",
+          "runtime, administrative, security, product, lifecycle, readiness, completion, or merge truth",
+          "continued validity or safety of embedded commands and links"
+        ],
+        "limitations": [
+          "Review establishes the authored plan role and historical/non-dispatchable interpretation only; it does not validate every embedded technical assertion or outcome.",
+          "Current AGENTS.md governs the non-dispatchable interpretation; source-cut text is not independently promoted to authority."
+        ],
+        "recheck_trigger": "Recheck if the source blob changes, current governing authority changes the treatment of docs/superpowers material, or any consumer begins treating this path as dispatchable/current evidence.",
+        "explicit_historical_banner": true
+      }
+    ],
+    "intentionally_unverified_selected_paths": []
+  },
+  "claims": {
+    "current_runtime_truth": false,
+    "current_admin_truth": false,
+    "current_security_truth": false,
+    "current_provider_or_product_truth": false,
+    "current_policy_or_authority": false,
+    "workflow_or_protection_state": false,
+    "operational_capability": false,
+    "readiness_or_completion": false,
+    "merge_or_adoption": false
+  },
+  "projection_if_adopted": {
+    "label": "PROJECTION_ONLY",
+    "delta": {
+      "direct": 9,
+      "grouped": 0,
+      "unverified": -9,
+      "semantically_classified": 9
+    },
+    "result": {
+      "source_leaves": 4361,
+      "direct": 344,
+      "grouped": 113,
+      "unverified": 3904,
+      "semantically_classified": 457,
+      "meta": {
+        "leaves": 210,
+        "direct": 131,
+        "grouped": 0,
+        "unverified": 79
+      }
+    }
+  },
+  "recheck_triggers": [
+    "Any selected path or blob changes at a future META source cut.",
+    "The canonical ledger, adopted overlay set, or selected-path disposition changes.",
+    "Applicable AGENTS.md or organization policy changes the non-dispatchable treatment of docs/superpowers material.",
+    "A consumer or tool begins dispatching, executing, or treating a selected plan as current authority or present-state evidence.",
+    "Adoption is proposed, requiring independent exact-head review and canonical lead action."
+  ]
+}
