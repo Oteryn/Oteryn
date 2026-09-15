@@ -16,6 +16,7 @@ SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 URL_REWRITE_RE = r"^url\..*\.(insteadof|pushinsteadof)$"
 CREDENTIAL_HELPER_RE = r"^credential(\..*)?\.helper$"
 REPOSITORY_TRANSPORT_COMMAND_RE = r"^core\.(sshcommand|gitproxy|askpass)$"
+ALTERNATE_REFS_COMMAND_RE = r"^core\.alternaterefscommand$"
 
 
 class PublicationError(RuntimeError):
@@ -178,6 +179,36 @@ def _reject_repository_transport_commands(cwd: Path) -> None:
         )
 
 
+def _scope_has_alternate_refs_command(cwd: Path, scope: str) -> bool:
+    result = _run_git(
+        cwd,
+        "config",
+        scope,
+        "--includes",
+        "--null",
+        "--get-regexp",
+        ALTERNATE_REFS_COMMAND_RE,
+        check=False,
+    )
+    if result.returncode == 1 and not result.stdout:
+        return False
+    if result.returncode != 0:
+        raise PublicationError(
+            "unable to verify repository/worktree Git alternate-ref command configuration"
+        )
+    return bool(result.stdout)
+
+
+def _reject_repository_alternate_refs_commands(cwd: Path) -> None:
+    if _scope_has_alternate_refs_command(cwd, "--local") or _scope_has_alternate_refs_command(
+        cwd, "--worktree"
+    ):
+        raise PublicationError(
+            "repository/worktree core.alternateRefsCommand is not permitted for "
+            "exact-candidate publication"
+        )
+
+
 def _active_filter_drivers(cwd: Path, hooks_dir: str) -> set[str]:
     tracked = _run_git(
         cwd,
@@ -266,6 +297,7 @@ def _remote_push_endpoint(cwd: Path, value: str, expected_push_url: str) -> str:
     _reject_url_rewrites(cwd)
     _reject_repository_credential_helpers(cwd)
     _reject_repository_transport_commands(cwd)
+    _reject_repository_alternate_refs_commands(cwd)
     value = value.strip()
     if not value or value.startswith("-") or any(char.isspace() for char in value):
         raise PublicationError("remote must be an existing Git remote name")
@@ -413,6 +445,7 @@ def remote_head(cwd: Path, endpoint: str, branch: str) -> str:
     _reject_url_rewrites(cwd)
     _reject_repository_credential_helpers(cwd)
     _reject_repository_transport_commands(cwd)
+    _reject_repository_alternate_refs_commands(cwd)
     endpoint = _credential_free_url(endpoint, "readback endpoint")
     ref = f"refs/heads/{branch}"
     result = _run_git(cwd, "ls-remote", "--heads", endpoint, ref, check=False)
@@ -455,6 +488,9 @@ def create_recovery_bundle(
     bundle_path: Path,
 ) -> tuple[Path, str]:
     cwd = _worktree_root(cwd)
+    # Bundle revision walking may enumerate alternate refs by executing this
+    # repository-controlled command, so fence it before any recovery work.
+    _reject_repository_alternate_refs_commands(cwd)
     branch = _branch(branch, cwd)
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
     candidate = _sha(candidate, "candidate")

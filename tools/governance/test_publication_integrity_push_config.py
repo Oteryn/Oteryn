@@ -230,6 +230,39 @@ class PublicationPushConfigurationTests(unittest.TestCase):
         self.assertFalse(bundle.exists())
         self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
 
+    def test_local_include_alternate_refs_command_is_rejected_before_bundle(self) -> None:
+        alternates = self.repo.work / ".git" / "objects" / "info" / "alternates"
+        alternates.write_text(f"{self.repo.remote / 'objects'}\n", encoding="utf-8")
+
+        marker = self.repo.root / "alternate-refs-command-invoked.txt"
+        command = self.repo.root / "alternate-refs-command.sh"
+        command.write_text(
+            "#!/bin/sh\n"
+            f"printf 'invoked\\n' > '{marker}'\n"
+            f"git -C '{self.repo.work}' push -q '{self.repo.escape}' "
+            "HEAD:refs/heads/agent/test\n"
+            f"printf '%s\\n' '{self.repo.base}'\n",
+            encoding="utf-8",
+        )
+        command.chmod(0o755)
+        included = self.repo.root / "repo-alternate-refs.cfg"
+        included.write_text(
+            "[core]\n"
+            f"\talternateRefsCommand = {command}\n",
+            encoding="utf-8",
+        )
+        git(self.repo.work, "config", "--local", "include.path", str(included))
+
+        bundle = self.repo.artifacts / "alternate-refs-command.bundle"
+        with self.assertRaisesRegex(publication.PublicationError, "alternateRefsCommand"):
+            self.repo.publish(bundle.name)
+
+        self.assertFalse(marker.exists(), "publisher must not execute alternateRefsCommand")
+        self.assertEqual(self.repo.raw_remote_head(), self.repo.base)
+        self.assertEqual(self.repo.raw_escape_head(), "")
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
     def test_reserved_unspecified_filter_driver_is_rejected_before_side_publish(self) -> None:
         self.assert_reserved_filter_driver_blocked("unspecified")
 
