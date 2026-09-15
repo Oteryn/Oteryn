@@ -70,6 +70,26 @@ class Fixture:
         script.chmod(0o755)
         return script
 
+    def clean_filter_side_publish_script(self, name: str) -> Path:
+        script = self.root / name
+        script.write_text(
+            "#!/bin/sh\n"
+            f"git -C '{self.work}' push -q '{self.escape}' HEAD:refs/heads/agent/test\n"
+            "cat\n",
+            encoding="utf-8",
+        )
+        script.chmod(0o755)
+        return script
+
+    def activate_filter(self, driver: str) -> None:
+        (self.work / ".gitattributes").write_text(
+            f"state.txt filter={driver}\n",
+            encoding="utf-8",
+        )
+        git(self.work, "add", ".gitattributes")
+        git(self.work, "commit", "-qm", f"activate {driver} filter")
+        self.candidate = git(self.work, "rev-parse", "HEAD")
+
     def publish(self, bundle_name: str) -> publication.PublicationResult:
         return publication.publish(
             self.work,
@@ -107,6 +127,16 @@ class PublicationPushConfigurationTests(unittest.TestCase):
         self.assertEqual(self.repo.raw_escape_head(), "")
         self.assertFalse(bundle.exists())
 
+    def assert_reserved_filter_driver_blocked(self, driver: str) -> None:
+        self.repo.activate_filter(driver)
+        filter_script = self.repo.clean_filter_side_publish_script(f"filter-{driver}.sh")
+        git(self.repo.work, "config", f"filter.{driver}.clean", str(filter_script))
+        (self.repo.work / "state.txt").touch()
+        self.assert_blocked_without_publication(
+            "clean/process filters",
+            f"filter-{driver}.bundle",
+        )
+
     def test_configured_signed_push_cannot_execute_gpg_side_publish(self) -> None:
         git(self.repo.remote, "config", "receive.certNonceSeed", "publication-integrity-test")
         malicious_gpg = self.repo.malicious_script("malicious-gpg.sh")
@@ -118,6 +148,31 @@ class PublicationPushConfigurationTests(unittest.TestCase):
         self.assertEqual(result.state, "PUBLISHED")
         self.assertEqual(self.repo.raw_remote_head(), self.repo.candidate)
         self.assertEqual(self.repo.raw_escape_head(), "")
+
+    def test_configured_push_options_are_cleared_on_guarded_push(self) -> None:
+        git(self.repo.remote, "config", "receive.advertisePushOptions", "true")
+        observed = self.repo.root / "observed-push-option-count.txt"
+        hook = self.repo.remote / "hooks" / "pre-receive"
+        hook.write_text(
+            "#!/bin/sh\n"
+            f"printf '%s\\n' \"${{GIT_PUSH_OPTION_COUNT:-0}}\" > '{observed}'\n"
+            "cat >/dev/null\n",
+            encoding="utf-8",
+        )
+        hook.chmod(0o755)
+        git(self.repo.work, "config", "--local", "push.pushOption", "deploy=production")
+
+        result = self.repo.publish("push-options-cleared.bundle")
+
+        self.assertEqual(result.state, "PUBLISHED")
+        self.assertEqual(observed.read_text(encoding="utf-8").strip(), "0")
+        self.assertEqual(self.repo.raw_remote_head(), self.repo.candidate)
+
+    def test_reserved_unspecified_filter_driver_is_rejected_before_side_publish(self) -> None:
+        self.assert_reserved_filter_driver_blocked("unspecified")
+
+    def test_reserved_unset_filter_driver_is_rejected_before_side_publish(self) -> None:
+        self.assert_reserved_filter_driver_blocked("unset")
 
     def test_local_shell_credential_helper_is_rejected_before_readback(self) -> None:
         helper = self.repo.malicious_script("credential-helper.sh")
