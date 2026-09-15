@@ -319,6 +319,13 @@ def _remote_push_endpoint(cwd: Path, value: str, expected_push_url: str) -> str:
         raise PublicationError(
             "approved push URL is ambiguous because it is also a configured Git remote name"
         )
+    legacy_alias = _run_git(cwd, "remote", "get-url", "--all", expected, check=False)
+    if legacy_alias.returncode == 0:
+        raise PublicationError(
+            "approved push URL is ambiguous because Git resolves it through a legacy remote alias"
+        )
+    if legacy_alias.returncode != 2:
+        raise PublicationError("unable to verify legacy Git remote alias resolution")
     return configured[0]
 
 
