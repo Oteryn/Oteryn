@@ -161,7 +161,17 @@ def _is_ancestor(cwd: Path, ancestor: str, descendant: str) -> bool:
 
 
 def _require_clean_worktree(cwd: Path) -> None:
-    status = _run_git(cwd, "status", "--porcelain=v1", "--untracked-files=all").stdout
+    # Repository-local core.fsmonitor may name an executable hook. Disable it for
+    # the guarded status probe so the clean check cannot execute repository code
+    # or perform an out-of-band publication side effect.
+    status = _run_git(
+        cwd,
+        "-c",
+        "core.fsmonitor=false",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=all",
+    ).stdout
     if status.strip():
         raise PublicationError(
             "publication requires a clean isolated worktree so the recovery artifact matches all intended work"
