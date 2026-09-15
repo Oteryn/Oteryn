@@ -86,8 +86,22 @@ class PublicationReviewHardeningTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.repo.close()
 
-    def test_replace_ref_is_rejected_before_ancestry_can_be_trusted(self) -> None:
-        git(self.repo.work, "replace", self.repo.candidate, self.repo.base)
+    def test_replace_ref_cannot_fake_fast_forward_with_clean_same_tree(self) -> None:
+        tree = git(self.repo.work, "rev-parse", f"{self.repo.candidate}^{{tree}}")
+        orphan = git(self.repo.work, "commit-tree", tree, "-m", "orphan candidate")
+        git(self.repo.work, "reset", "--hard", orphan)
+        forged = git(
+            self.repo.work,
+            "commit-tree",
+            tree,
+            "-p",
+            self.repo.base,
+            "-m",
+            "forged replacement ancestry",
+        )
+        git(self.repo.work, "replace", orphan, forged)
+        self.assertEqual(git(self.repo.work, "status", "--porcelain=v1", "--untracked-files=all"), "")
+
         with self.assertRaisesRegex(publication.PublicationError, "replacement-history"):
             publication.preflight(
                 self.repo.work,
@@ -95,7 +109,7 @@ class PublicationReviewHardeningTests(unittest.TestCase):
                 expected_push_url=self.repo.push_url,
                 branch="agent/test",
                 expected_remote_head=self.repo.base,
-                candidate=self.repo.candidate,
+                candidate=orphan,
             )
         self.assertEqual(
             publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
