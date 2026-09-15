@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 URL_REWRITE_RE = r"^url\..*\.(insteadof|pushinsteadof)$"
+CREDENTIAL_HELPER_RE = r"^credential(\..*)?\.helper$"
 
 
 class PublicationError(RuntimeError):
@@ -113,6 +114,36 @@ def _reject_url_rewrites(cwd: Path) -> None:
         )
 
 
+def _scope_has_credential_helpers(cwd: Path, scope: str) -> bool:
+    result = _run_git(
+        cwd,
+        "config",
+        scope,
+        "--includes",
+        "--null",
+        "--get-regexp",
+        CREDENTIAL_HELPER_RE,
+        check=False,
+    )
+    if result.returncode == 1 and not result.stdout:
+        return False
+    if result.returncode != 0:
+        raise PublicationError(
+            "unable to verify repository/worktree Git credential-helper configuration"
+        )
+    return bool(result.stdout)
+
+
+def _reject_repository_credential_helpers(cwd: Path) -> None:
+    if _scope_has_credential_helpers(cwd, "--local") or _scope_has_credential_helpers(
+        cwd, "--worktree"
+    ):
+        raise PublicationError(
+            "repository/worktree Git credential helpers are not permitted for exact-candidate "
+            "publication; use an authorized system/global credential path instead"
+        )
+
+
 def _active_filter_drivers(cwd: Path, hooks_dir: str) -> set[str]:
     tracked = _run_git(
         cwd,
@@ -199,6 +230,7 @@ def _reject_history_overrides(cwd: Path) -> None:
 
 def _remote_push_endpoint(cwd: Path, value: str, expected_push_url: str) -> str:
     _reject_url_rewrites(cwd)
+    _reject_repository_credential_helpers(cwd)
     value = value.strip()
     if not value or value.startswith("-") or any(char.isspace() for char in value):
         raise PublicationError("remote must be an existing Git remote name")
@@ -342,7 +374,9 @@ def _require_clean_worktree(cwd: Path) -> None:
 
 
 def remote_head(cwd: Path, endpoint: str, branch: str) -> str:
+    cwd = _worktree_root(cwd)
     _reject_url_rewrites(cwd)
+    _reject_repository_credential_helpers(cwd)
     endpoint = _credential_free_url(endpoint, "readback endpoint")
     ref = f"refs/heads/{branch}"
     result = _run_git(cwd, "ls-remote", "--heads", endpoint, ref, check=False)
