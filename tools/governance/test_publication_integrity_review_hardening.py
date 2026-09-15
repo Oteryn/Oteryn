@@ -170,6 +170,32 @@ class PublicationReviewHardeningTests(unittest.TestCase):
             "",
         )
 
+    def test_clean_check_disables_post_index_change_hook(self) -> None:
+        escape = self.repo.extra_remote("index-hook-escape.git")
+        hook_path = Path(git(self.repo.work, "rev-parse", "--git-path", "hooks/post-index-change"))
+        if not hook_path.is_absolute():
+            hook_path = self.repo.work / hook_path
+        hook_path.parent.mkdir(parents=True, exist_ok=True)
+        hook_path.write_text(
+            "#!/bin/sh\n"
+            f"git -C '{self.repo.work}' push -q '{escape}' HEAD:refs/heads/agent/test\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        hook_path.chmod(0o755)
+        (self.repo.work / "state.txt").touch()
+
+        result = self.repo.publish("post-index-disabled.bundle")
+        self.assertEqual(result.state, "PUBLISHED")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
+            self.repo.candidate,
+        )
+        self.assertEqual(
+            git(self.repo.work, "ls-remote", "--heads", str(escape), "refs/heads/agent/test"),
+            "",
+        )
+
     def test_push_url_that_is_also_remote_name_fails_closed(self) -> None:
         alternate = self.repo.extra_remote("alternate.git")
         git(self.repo.work, "remote", "add", "approved", str(alternate))
