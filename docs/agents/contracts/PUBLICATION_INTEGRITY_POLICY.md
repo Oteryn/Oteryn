@@ -22,6 +22,7 @@ Before mutation, bind and verify:
 - exact candidate commit SHA;
 - exact expected current remote branch SHA;
 - checked-out local branch/head when a local Git workspace is used;
+- no tracked `skip-worktree` or `assume-unchanged` index flags that could hide local bytes from the clean-worktree probe;
 - a clean isolated worktree, so the recovery artifact contains all intended work;
 - the expected remote SHA is an ancestor of the candidate, so the update is fast-forward.
 
@@ -43,7 +44,7 @@ The selected remote must resolve to exactly one configured push URL and that URL
 
 Candidate ancestry is checked with replacement objects disabled after replacement refs and graft metadata are rejected. The helper uses an explicit expected-old-value `--force-with-lease=<ref>:<expected_sha>` only as compare-and-swap protection against movement between preflight and mutation. It independently requires `expected_sha` to be an ancestor of the exact candidate before the push. Therefore the authorized update remains fast-forward; the lease does **not** authorize a non-fast-forward update, history rewrite, reset, rebase, or ordinary force-push.
 
-The clean-worktree probe runs `git status` with optional index locking disabled, `core.fsmonitor=false`, and `core.hooksPath` pointed at a fresh trusted empty directory. This prevents a repository-controlled fsmonitor or `post-index-change` hook from executing code or publishing elsewhere during the safety check. The guarded push uses `--no-verify` so repository-local `pre-push` hooks or a configured hooks path cannot perform additional, unreviewed publication side effects. Hooks and fsmonitor may remain useful for ordinary developer workflows, but they are not part of the authorized exact-candidate transport boundary.
+The clean-worktree probe first rejects tracked `skip-worktree` and `assume-unchanged` index flags, because either can suppress local bytes that would not exist in the candidate or recovery bundle. It then runs `git status` with optional index locking disabled, `core.fsmonitor=false`, and `core.hooksPath` pointed at a fresh trusted empty directory. This prevents repository-controlled fsmonitor or index hooks from executing code or publishing elsewhere during the safety check. The guarded push uses `--no-verify` so repository-local `pre-push` hooks or a configured hooks path cannot perform additional, unreviewed publication side effects. Hooks, fsmonitor and sparse/hidden index optimizations may remain useful for ordinary developer workflows, but they are not accepted in the isolated exact-candidate publication workspace when they can hide state or execute code.
 
 If the normal Git publication path is unavailable, do not use ad-hoc Git Data API blob/tree/commit/ref construction, per-file Contents API reconstruction, reset, rebase, non-fast-forward push, or manual ref replacement to synthesize a remote substitute for the existing candidate. Preserve the candidate/recovery artifact and classify the lane as blocked by the exact observed publication capability failure.
 
