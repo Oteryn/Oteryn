@@ -496,6 +496,7 @@ def publish(
         "--porcelain",
         "--recurse-submodules=no",
         "--no-follow-tags",
+        "--no-signed",
         f"--force-with-lease={ref}:{expected_remote_head}",
         endpoint,
         f"{candidate}:{ref}",
