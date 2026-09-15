@@ -156,6 +156,31 @@ class PublicationSubmoduleIsolationTests(unittest.TestCase):
         )
         self.assertEqual(git(self.repo.work, "ls-remote", str(sub_remote), "refs/heads/main").split()[0], _sub_base)
 
+    def test_subdirectory_cwd_still_rejects_initialized_gitlink_worktree(self) -> None:
+        self.repo.add_unpushed_submodule_candidate()
+        nested = self.repo.work / "nested"
+        nested.mkdir()
+        (nested / "anchor.txt").write_text("anchor\n", encoding="utf-8")
+        git(self.repo.work, "add", "nested/anchor.txt")
+        git(self.repo.work, "commit", "-qm", "add nested publication cwd")
+        self.repo.candidate = git(self.repo.work, "rev-parse", "HEAD")
+
+        bundle = self.repo.artifacts / "nested-gitlink.bundle"
+        with self.assertRaisesRegex(publication.PublicationError, "submodule worktrees"):
+            publication.publish(
+                nested,
+                remote="origin",
+                expected_push_url=self.repo.push_url,
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+                recovery_bundle=bundle,
+            )
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), self.repo.base
+        )
+        self.assertFalse(bundle.exists())
+
     def test_recurse_submodules_config_cannot_publish_after_post_preflight_init(self) -> None:
         sub_remote, sub_base, sub_candidate = self.repo.add_unpushed_submodule_candidate()
         git(self.repo.work, "submodule", "deinit", "-q", "-f", "sub")
