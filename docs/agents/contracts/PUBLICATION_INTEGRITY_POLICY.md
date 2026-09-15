@@ -14,7 +14,7 @@ Once a material local commit is selected as the publication candidate, publicati
 
 Before mutation, bind and verify:
 
-- repository plus the exact approved configured push target;
+- repository plus exactly one configured, credential-free approved push target;
 - canonical task branch;
 - exact candidate commit SHA;
 - exact expected current remote branch SHA;
@@ -36,6 +36,8 @@ A patch, prose summary, file list, diff excerpt, or test log is evidence but is 
 
 For a local Git candidate, the selected route is a single Git ref update of the exact candidate to the canonical task branch followed by live remote-head readback. `tools/governance/publication_integrity.py` implements the deterministic local guard and transport wrapper when a Git workspace is available.
 
+The selected remote must resolve to exactly one configured push URL and that URL must equal the approved publication target. Preflight readback, mutation and post-mutation readback all use that same resolved push endpoint; a distinct fetch URL is not publication evidence, and multiple push URLs fail closed before mutation.
+
 The helper uses an explicit expected-old-value `--force-with-lease=<ref>:<expected_sha>` only as compare-and-swap protection against movement between preflight and mutation. It independently requires `expected_sha` to be an ancestor of the exact candidate before the push. Therefore the authorized update remains fast-forward; the lease does **not** authorize a non-fast-forward update, history rewrite, reset, rebase, or ordinary force-push.
 
 If the normal Git publication path is unavailable, do not use ad-hoc Git Data API blob/tree/commit/ref construction, per-file Contents API reconstruction, reset, rebase, non-fast-forward push, or manual ref replacement to synthesize a remote substitute for the existing candidate. Preserve the candidate/recovery artifact and classify the lane as blocked by the exact observed publication capability failure.
@@ -44,7 +46,7 @@ This restriction is candidate-specific. It does not prohibit an independently au
 
 ## Ambiguous outcomes
 
-A nonzero push exit, timeout, interrupted client, or lost response is an ambiguous transport result, not proof that the server rejected the mutation. Before retrying or attempting recovery, read the live canonical branch:
+A nonzero push exit, timeout, interrupted client, or lost response is an ambiguous transport result, not proof that the server rejected the mutation. Before retrying or attempting recovery, read the live canonical branch through the same approved push endpoint used for the mutation:
 
 - remote head equals candidate: publication succeeded; continue from that exact remote candidate;
 - remote head equals expected predecessor: publication was not applied; retain recovery and diagnose the exact capability failure before another attempt;
