@@ -58,6 +58,12 @@ class RepoFixture:
     def push_url(self) -> str:
         return str(self.remote)
 
+    def new_bare_remote(self, name: str) -> Path:
+        target = self.root / name
+        target.mkdir()
+        git(target, "init", "--bare", "-q")
+        return target
+
     def close(self) -> None:
         self.temp.cleanup()
 
@@ -88,7 +94,8 @@ class PublicationIntegrityTests(unittest.TestCase):
         self.assertTrue(bundle.is_file())
         self.assertRegex(result.recovery_sha256 or "", r"^[0-9a-f]{64}$")
         self.assertEqual(
-            publication.remote_head(self.repo.work, "origin", "agent/test"), self.repo.candidate
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
+            self.repo.candidate,
         )
         listed = git(self.repo.work, "bundle", "list-heads", str(bundle))
         self.assertIn(f"{self.repo.candidate} refs/heads/agent/test", listed)
@@ -104,7 +111,9 @@ class PublicationIntegrityTests(unittest.TestCase):
 
         with self.assertRaisesRegex(publication.PublicationError, "remote head moved"):
             self.publish()
-        self.assertEqual(publication.remote_head(self.repo.work, "origin", "agent/test"), other)
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), other
+        )
 
     def test_non_descendant_candidate_is_rejected(self) -> None:
         git(self.repo.work, "checkout", "--orphan", "agent/unrelated")
@@ -201,7 +210,8 @@ class PublicationIntegrityTests(unittest.TestCase):
                 self.publish()
 
         self.assertEqual(
-            publication.remote_head(self.repo.work, "origin", "agent/test"), self.repo.intermediate
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
+            self.repo.intermediate,
         )
 
     def test_push_capability_failure_preserves_remote_and_verified_bundle(self) -> None:
@@ -218,11 +228,53 @@ class PublicationIntegrityTests(unittest.TestCase):
                 self.publish()
 
         self.assertEqual(
-            publication.remote_head(self.repo.work, "origin", "agent/test"), self.repo.base
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), self.repo.base
         )
         self.assertTrue(bundle.is_file())
         listed = git(self.repo.work, "bundle", "list-heads", str(bundle))
         self.assertIn(f"{self.repo.candidate} refs/heads/agent/test", listed)
+
+    def test_distinct_single_push_url_uses_same_endpoint_for_push_and_readback(self) -> None:
+        push_remote = self.repo.new_bare_remote("push.git")
+        git(
+            self.repo.work,
+            "push",
+            "-q",
+            str(push_remote),
+            f"{self.repo.base}:refs/heads/agent/test",
+        )
+        git(self.repo.work, "remote", "set-url", "--push", "origin", str(push_remote))
+
+        result = publication.publish(
+            self.repo.work,
+            remote="origin",
+            expected_push_url=str(push_remote),
+            branch="agent/test",
+            expected_remote_head=self.repo.base,
+            candidate=self.repo.candidate,
+            recovery_bundle=self.repo.artifacts / "distinct-push.bundle",
+        )
+
+        self.assertEqual(result.state, "PUBLISHED")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(push_remote), "agent/test"),
+            self.repo.candidate,
+        )
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), self.repo.base
+        )
+
+    def test_multiple_push_urls_fail_closed_before_mutation(self) -> None:
+        extra = self.repo.new_bare_remote("extra.git")
+        git(self.repo.work, "remote", "set-url", "--add", "--push", "origin", self.repo.push_url)
+        git(self.repo.work, "remote", "set-url", "--add", "--push", "origin", str(extra))
+
+        with self.assertRaisesRegex(publication.PublicationError, "exactly one configured push URL"):
+            self.publish()
+
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), self.repo.base
+        )
 
     def test_push_url_mismatch_fails_closed(self) -> None:
         with self.assertRaisesRegex(publication.PublicationError, "approved publication target"):
