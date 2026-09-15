@@ -14,6 +14,7 @@ from urllib.parse import urlsplit
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 URL_REWRITE_RE = r"^url\..*\.(insteadof|pushinsteadof)$"
+EXECUTABLE_FILTER_RE = r"^filter\..*\.(clean|process)$"
 
 
 class PublicationError(RuntimeError):
@@ -82,6 +83,18 @@ def _reject_url_rewrites(cwd: Path) -> None:
     if result.stdout:
         raise PublicationError(
             "Git URL rewrite rules are not permitted for exact-candidate publication"
+        )
+
+
+def _reject_executable_filters(cwd: Path) -> None:
+    result = _run_git(cwd, "config", "--null", "--get-regexp", EXECUTABLE_FILTER_RE, check=False)
+    if result.returncode == 1 and not result.stdout:
+        return
+    if result.returncode != 0:
+        raise PublicationError("unable to verify effective Git clean/process filter configuration")
+    if result.stdout:
+        raise PublicationError(
+            "executable Git clean/process filters are not permitted for exact-candidate publication"
         )
 
 
@@ -189,10 +202,10 @@ def _reject_hidden_index_entries(cwd: Path, hooks_dir: str) -> None:
 
 
 def _require_clean_worktree(cwd: Path) -> None:
-    # Git status can execute core.fsmonitor and can refresh/write the index,
-    # which in turn can invoke post-index-change. Suppress optional index writes,
-    # disable fsmonitor, and point hooksPath at a fresh trusted empty directory so
-    # the clean probe cannot execute repository-controlled code or side-publish.
+    # Git status may execute configured clean/process filters while converting
+    # worktree content for comparison. Reject those executable config surfaces
+    # before the probe, then suppress optional index writes, fsmonitor and hooks.
+    _reject_executable_filters(cwd)
     with tempfile.TemporaryDirectory(prefix="oteryn-publication-no-hooks-") as hooks_dir:
         _reject_hidden_index_entries(cwd, hooks_dir)
         status = _run_git(
