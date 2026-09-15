@@ -108,8 +108,9 @@ def _credential_free_url(value: str, label: str) -> str:
     if "::" in value:
         raise PublicationError(f"{label} must not use explicit Git remote-helper syntax")
     if "://" in value:
+        scheme = value.split("://", 1)[0]
         parsed = urlsplit(value)
-        if parsed.scheme.lower() not in NATIVE_PUSH_URL_SCHEMES:
+        if scheme not in NATIVE_PUSH_URL_SCHEMES:
             raise PublicationError(f"{label} must use a supported native Git push URL scheme")
         if parsed.username is not None or parsed.password is not None:
             raise PublicationError(f"{label} must not embed credentials")

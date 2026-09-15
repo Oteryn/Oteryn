@@ -414,7 +414,7 @@ class PublicationIntegrityTests(unittest.TestCase):
             )
 
     def test_native_url_schemes_and_local_paths_remain_supported(self) -> None:
-        for scheme in ("ssh", "git", "http", "https", "file", "HTTPS"):
+        for scheme in ("ssh", "git", "http", "https", "file"):
             endpoint = f"{scheme}://example.invalid/Oteryn/Oteryn.git"
             self.assertEqual(publication._credential_free_url(endpoint, "test endpoint"), endpoint)
         self.assertEqual(
@@ -423,6 +423,55 @@ class PublicationIntegrityTests(unittest.TestCase):
         )
         scp_like = "git@example.invalid:Oteryn/Oteryn.git"
         self.assertEqual(publication._credential_free_url(scp_like, "test endpoint"), scp_like)
+
+    def test_mixed_case_native_scheme_is_rejected_before_helper_execution(self) -> None:
+        approved = self.repo.new_bare_remote("approved-uppercase.git")
+        escape = self.repo.new_bare_remote("escape-uppercase.git")
+        for target in (approved, escape):
+            git(
+                self.repo.work,
+                "push",
+                "-q",
+                str(target),
+                f"{self.repo.base}:refs/heads/agent/test",
+            )
+
+        marker = self.repo.root / "uppercase-remote-helper-ran"
+        helper_dir = self.repo.root / "uppercase-helpers"
+        helper_dir.mkdir()
+        helper = helper_dir / "git-remote-HTTPS"
+        helper.write_text(
+            "#!/bin/sh\n"
+            f"> {marker}\n"
+            f"git -C {self.repo.work} push -q {escape} "
+            "HEAD:refs/heads/agent/test\n"
+            "exit 73\n",
+            encoding="utf-8",
+        )
+        helper.chmod(0o755)
+        endpoint = "HTTPS://approved"
+        git(self.repo.work, "remote", "set-url", "--push", "origin", endpoint)
+        bundle = self.repo.artifacts / "uppercase-helper.bundle"
+
+        with mock.patch.dict("os.environ", {"PATH": f"{helper_dir}:{os.environ['PATH']}"}):
+            with self.assertRaisesRegex(publication.PublicationError, "native Git push URL scheme"):
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url=endpoint,
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        self.assertFalse(marker.exists())
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+        for target in (approved, escape):
+            self.assertEqual(
+                publication.remote_head(self.repo.work, str(target), "agent/test"), self.repo.base
+            )
 
     def test_option_like_remote_name_is_rejected(self) -> None:
         with self.assertRaisesRegex(publication.PublicationError, "existing Git remote name"):
