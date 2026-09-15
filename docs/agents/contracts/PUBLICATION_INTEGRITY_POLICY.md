@@ -23,6 +23,7 @@ Before mutation, bind and verify:
 - exact candidate commit SHA;
 - exact expected current remote branch SHA;
 - checked-out local branch/head when a local Git workspace is used;
+- all repository-wide safety scans are anchored at the actual top-level Git worktree even if the caller supplies a nested `--cwd`;
 - no tracked `skip-worktree` or `assume-unchanged` index flags that could hide local bytes from the clean-worktree probe;
 - tracked gitlinks must not have a populated/initialized submodule worktree in the publisher workspace;
 - a clean isolated worktree, so the recovery artifact contains all intended work;
@@ -40,7 +41,7 @@ A patch, prose summary, file list, diff excerpt, or test log is evidence but is 
 
 ## Publication route
 
-For a local Git candidate, the selected route is a single Git ref update of the exact candidate to the canonical task branch followed by live remote-head readback. `tools/governance/publication_integrity.py` implements the deterministic local guard and transport wrapper when a Git workspace is available.
+For a local Git candidate, the selected route is a single Git ref update of the exact candidate to the canonical task branch followed by live remote-head readback. `tools/governance/publication_integrity.py` implements the deterministic local guard and transport wrapper when a Git workspace is available. The helper first resolves any supplied working directory to `git rev-parse --show-toplevel`; a nested invocation must therefore receive the same repository-wide filter/index/gitlink checks as an invocation from the repository root.
 
 The selected remote must resolve to exactly one configured push URL and that URL must equal the approved publication target. Effective Git URL rewrite rules are rejected rather than reimplemented or partially interpreted. An endpoint string that is itself another configured remote name is rejected rather than left to Git's remote-name/URL ambiguity. Preflight readback, mutation and post-mutation readback all use the same resolved push endpoint; a distinct fetch URL is not publication evidence, multiple push URLs fail closed before mutation, and no `insteadOf`/`pushInsteadOf` chain may redirect the endpoint.
 
