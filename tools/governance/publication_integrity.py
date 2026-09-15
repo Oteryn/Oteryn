@@ -63,6 +63,14 @@ def _run_git_input(
     return completed
 
 
+def _worktree_root(cwd: Path) -> Path:
+    cwd = cwd.resolve()
+    result = _run_git(cwd, "rev-parse", "--show-toplevel", check=False)
+    if result.returncode != 0 or not result.stdout.rstrip("\r\n"):
+        raise PublicationError("publication cwd must be inside a Git worktree")
+    return Path(result.stdout.rstrip("\r\n")).resolve()
+
+
 def _sha(value: str, label: str) -> str:
     value = value.strip().lower()
     if SHA_RE.fullmatch(value) is None:
@@ -376,7 +384,7 @@ def create_recovery_bundle(
     candidate: str,
     bundle_path: Path,
 ) -> tuple[Path, str]:
-    cwd = cwd.resolve()
+    cwd = _worktree_root(cwd)
     branch = _branch(branch, cwd)
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
     candidate = _sha(candidate, "candidate")
@@ -424,7 +432,7 @@ def preflight(
     expected_remote_head: str,
     candidate: str,
 ) -> str:
-    cwd = cwd.resolve()
+    cwd = _worktree_root(cwd)
     endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
     branch = _branch(branch, cwd)
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
@@ -457,7 +465,7 @@ def publish(
     candidate: str,
     recovery_bundle: Path,
 ) -> PublicationResult:
-    cwd = cwd.resolve()
+    cwd = _worktree_root(cwd)
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
     candidate = _sha(candidate, "candidate")
     state = preflight(
