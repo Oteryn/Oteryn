@@ -85,6 +85,8 @@ jobs:
               Path('docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md'),
               Path('docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md'),
               Path('docs/agents/contracts/PERSISTENT_AUTONOMOUS_CONTINUATION_POLICY.md'),
+              Path('docs/agents/contracts/PUBLICATION_INTEGRITY_POLICY.md'),
+              Path('docs/agents/operations/RESTRICTED_PUBLISHING.md'),
               Path('docs/agents/policy/ORGANIZATION_AGENT_POLICY.md'),
               Path('docs/agents/policy/PROMPTING_STANDARD.md'),
               Path('docs/agents/policy/PROMPT_EVAL_STANDARD.md'),
@@ -104,6 +106,7 @@ jobs:
               Path('tools/governance/agent_continuation_policy.py'),
               Path('tools/governance/central_agent_policy.py'),
               Path('tools/governance/merge_queue_submission_routing.py'),
+              Path('tools/governance/publication_integrity.py'),
               Path('tools/governance/test_agent_execution_routing.py'),
               Path('tools/governance/test_integration_capability_routing.py'),
               Path('tools/governance/test_governed_merge_queue_executor.py'),
@@ -114,6 +117,7 @@ jobs:
               Path('tools/governance/test_remote_desktop_action_gate.py'),
               Path('tools/governance/test_merge_queue_workflow_contract.py'),
               Path('tools/governance/test_merge_queue_submission_routing.py'),
+              Path('tools/governance/test_publication_integrity.py'),
           ]
           missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
           if missing:
@@ -222,6 +226,7 @@ jobs:
           python3 tools/governance/test_remote_desktop_action_gate.py
           python3 tools/governance/test_merge_queue_workflow_contract.py
           python3 tools/governance/test_merge_queue_submission_routing.py
+          python3 tools/governance/test_publication_integrity.py
           python3 tools/governance/test_bounded_execution_guard.py
           python3 tools/governance/test_agent_continuation_policy.py
           python3 tools/governance/test_agent_continuation_review_repairs.py
