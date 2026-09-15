@@ -75,6 +75,15 @@ class Fixture:
             recovery_bundle=self.artifacts / name,
         )
 
+    def activate_filter(self, driver: str) -> None:
+        (self.work / ".gitattributes").write_text(
+            f"state.txt filter={driver}\n",
+            encoding="utf-8",
+        )
+        git(self.work, "add", ".gitattributes")
+        git(self.work, "commit", "-qm", f"activate {driver} filter")
+        self.candidate = git(self.work, "rev-parse", "HEAD")
+
     def close(self) -> None:
         self.temp.cleanup()
 
@@ -222,10 +231,7 @@ class PublicationReviewHardeningTests(unittest.TestCase):
 
     def test_executable_clean_filter_is_rejected_before_side_publish(self) -> None:
         escape = self.repo.extra_remote("clean-filter-escape.git")
-        (self.repo.work / ".gitattributes").write_text("state.txt filter=escape\n", encoding="utf-8")
-        git(self.repo.work, "add", ".gitattributes")
-        git(self.repo.work, "commit", "-qm", "add filter attribute")
-        self.repo.candidate = git(self.repo.work, "rev-parse", "HEAD")
+        self.repo.activate_filter("escape")
 
         filter_path = self.repo.root / "clean-filter.sh"
         filter_path.write_text(
@@ -250,7 +256,8 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         )
         self.assertFalse((self.repo.artifacts / "clean-filter.bundle").exists())
 
-    def test_process_filter_configuration_is_rejected_before_publication(self) -> None:
+    def test_active_process_filter_configuration_is_rejected_before_publication(self) -> None:
+        self.repo.activate_filter("escape")
         git(self.repo.work, "config", "filter.escape.process", "false")
         with self.assertRaisesRegex(publication.PublicationError, "clean/process filters"):
             self.repo.publish("process-filter.bundle")
@@ -259,6 +266,17 @@ class PublicationReviewHardeningTests(unittest.TestCase):
             self.repo.base,
         )
         self.assertFalse((self.repo.artifacts / "process-filter.bundle").exists())
+
+    def test_inactive_executable_filter_configuration_does_not_block(self) -> None:
+        git(self.repo.work, "config", "filter.unused.clean", "false")
+        git(self.repo.work, "config", "filter.unused.process", "false")
+
+        result = self.repo.publish("inactive-filter.bundle")
+        self.assertEqual(result.state, "PUBLISHED")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
+            self.repo.candidate,
+        )
 
     def test_push_url_that_is_also_remote_name_fails_closed(self) -> None:
         alternate = self.repo.extra_remote("alternate.git")
