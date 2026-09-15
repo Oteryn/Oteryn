@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -83,6 +84,25 @@ def _reject_url_rewrites(cwd: Path) -> None:
         )
 
 
+def _reject_history_overrides(cwd: Path) -> None:
+    if os.environ.get("GIT_REPLACE_REF_BASE"):
+        raise PublicationError("Git replacement-history overrides are not permitted for publication")
+
+    replace_refs = _run_git(cwd, "for-each-ref", "--format=%(refname)", "refs/replace/").stdout
+    if replace_refs.strip():
+        raise PublicationError("Git replacement-history overrides are not permitted for publication")
+
+    graft_result = _run_git(cwd, "rev-parse", "--git-path", "info/grafts")
+    graft_path = Path(graft_result.stdout.strip())
+    if not graft_path.is_absolute():
+        graft_path = cwd / graft_path
+    try:
+        if graft_path.is_file() and graft_path.stat().st_size > 0:
+            raise PublicationError("Git graft-history overrides are not permitted for publication")
+    except OSError as exc:
+        raise PublicationError("unable to verify Git graft-history state") from exc
+
+
 def _remote_push_endpoint(cwd: Path, value: str, expected_push_url: str) -> str:
     _reject_url_rewrites(cwd)
     value = value.strip()
@@ -102,6 +122,10 @@ def _remote_push_endpoint(cwd: Path, value: str, expected_push_url: str) -> str:
         raise PublicationError("remote must resolve to exactly one configured push URL")
     if configured[0] != expected:
         raise PublicationError("configured push URL does not match the approved publication target")
+    if expected in names:
+        raise PublicationError(
+            "approved push URL is ambiguous because it is also a configured Git remote name"
+        )
     return configured[0]
 
 
@@ -119,7 +143,16 @@ def _current_branch(cwd: Path) -> str:
 
 
 def _is_ancestor(cwd: Path, ancestor: str, descendant: str) -> bool:
-    result = _run_git(cwd, "merge-base", "--is-ancestor", ancestor, descendant, check=False)
+    _reject_history_overrides(cwd)
+    result = _run_git(
+        cwd,
+        "--no-replace-objects",
+        "merge-base",
+        "--is-ancestor",
+        ancestor,
+        descendant,
+        check=False,
+    )
     if result.returncode == 0:
         return True
     if result.returncode == 1:
@@ -291,6 +324,7 @@ def publish(
     push = _run_git(
         cwd,
         "push",
+        "--no-verify",
         "--porcelain",
         f"--force-with-lease={ref}:{expected_remote_head}",
         endpoint,
