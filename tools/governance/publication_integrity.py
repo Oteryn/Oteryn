@@ -14,7 +14,6 @@ from urllib.parse import urlsplit
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 URL_REWRITE_RE = r"^url\..*\.(insteadof|pushinsteadof)$"
-EXECUTABLE_FILTER_RE = r"^filter\..*\.(clean|process)$"
 
 
 class PublicationError(RuntimeError):
@@ -34,6 +33,26 @@ def _run_git(cwd: Path, *args: str, check: bool = True) -> subprocess.CompletedP
     completed = subprocess.run(
         ["git", *args],
         cwd=cwd,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if check and completed.returncode != 0:
+        raise PublicationError(f"git {args[0]} failed with exit code {completed.returncode}")
+    return completed
+
+
+def _run_git_input(
+    cwd: Path,
+    input_text: str,
+    *args: str,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=cwd,
+        input=input_text,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -86,16 +105,69 @@ def _reject_url_rewrites(cwd: Path) -> None:
         )
 
 
-def _reject_executable_filters(cwd: Path) -> None:
-    result = _run_git(cwd, "config", "--null", "--get-regexp", EXECUTABLE_FILTER_RE, check=False)
-    if result.returncode == 1 and not result.stdout:
-        return
-    if result.returncode != 0:
-        raise PublicationError("unable to verify effective Git clean/process filter configuration")
-    if result.stdout:
-        raise PublicationError(
-            "executable Git clean/process filters are not permitted for exact-candidate publication"
-        )
+def _active_filter_drivers(cwd: Path, hooks_dir: str) -> set[str]:
+    tracked = _run_git(
+        cwd,
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        f"core.hooksPath={hooks_dir}",
+        "ls-files",
+        "-z",
+    ).stdout
+    if not tracked:
+        return set()
+
+    attrs = _run_git_input(
+        cwd,
+        tracked,
+        "--no-optional-locks",
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        f"core.hooksPath={hooks_dir}",
+        "check-attr",
+        "-z",
+        "--stdin",
+        "filter",
+    ).stdout.split("\0")
+    if attrs and attrs[-1] == "":
+        attrs.pop()
+    if len(attrs) % 3 != 0:
+        raise PublicationError("unable to parse active Git filter attributes")
+
+    drivers: set[str] = set()
+    for index in range(0, len(attrs), 3):
+        _path, attribute, value = attrs[index : index + 3]
+        if attribute != "filter":
+            raise PublicationError("unexpected Git attribute response while checking filters")
+        if value not in {"", "unspecified", "unset"}:
+            drivers.add(value)
+    return drivers
+
+
+def _reject_active_executable_filters(cwd: Path, hooks_dir: str) -> None:
+    for driver in sorted(_active_filter_drivers(cwd, hooks_dir)):
+        for operation in ("clean", "process"):
+            result = _run_git(
+                cwd,
+                "config",
+                "--get-all",
+                f"filter.{driver}.{operation}",
+                check=False,
+            )
+            if result.returncode == 1 and not result.stdout:
+                continue
+            if result.returncode != 0:
+                raise PublicationError(
+                    f"unable to verify active Git filter configuration for {driver!r}"
+                )
+            if result.stdout:
+                raise PublicationError(
+                    "active executable Git clean/process filters are not permitted for "
+                    "exact-candidate publication"
+                )
 
 
 def _reject_history_overrides(cwd: Path) -> None:
@@ -175,10 +247,6 @@ def _is_ancestor(cwd: Path, ancestor: str, descendant: str) -> bool:
 
 
 def _reject_hidden_index_entries(cwd: Path, hooks_dir: str) -> None:
-    # `git ls-files -v` reports skip-worktree entries as `S`; with `-v`, an
-    # assume-unchanged entry uses a lowercase tag. Either flag can suppress a
-    # local tracked-file change from the normal status probe, making recovery
-    # incomplete. Fail closed on the flags themselves in the isolated workspace.
     result = _run_git(
         cwd,
         "--no-optional-locks",
@@ -202,11 +270,8 @@ def _reject_hidden_index_entries(cwd: Path, hooks_dir: str) -> None:
 
 
 def _require_clean_worktree(cwd: Path) -> None:
-    # Git status may execute configured clean/process filters while converting
-    # worktree content for comparison. Reject those executable config surfaces
-    # before the probe, then suppress optional index writes, fsmonitor and hooks.
-    _reject_executable_filters(cwd)
     with tempfile.TemporaryDirectory(prefix="oteryn-publication-no-hooks-") as hooks_dir:
+        _reject_active_executable_filters(cwd, hooks_dir)
         _reject_hidden_index_entries(cwd, hooks_dir)
         status = _run_git(
             cwd,
