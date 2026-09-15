@@ -59,6 +59,17 @@ class AuditValidationTest(unittest.TestCase):
         path=self.base/'runtime-assurance/admin-state-20260914.md'
         path.write_text(path.read_text()+'drift\n')
         self.reject()
+    def test_runtime_assurance_checkpoint_exact_bytes_pass(self):
+        self.assertEqual(audit.validate(self.path)['result'],'ACCOUNTING_VALID_NOT_SEMANTIC_PASS')
+    def test_runtime_assurance_checkpoint_readiness_append_rejected(self):
+        path=self.base/'CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md'
+        path.write_bytes(path.read_bytes()+b'\nThis adoption establishes production readiness.\n')
+        self.reject()
+    def test_runtime_assurance_checkpoint_arbitrary_byte_drift_rejected(self):
+        path=self.base/'CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md'
+        raw=bytearray(path.read_bytes()); raw[len(raw)//2] ^= 1
+        path.write_bytes(raw)
+        self.reject()
     def test_current_coverage_table_meta_drift_rejected(self):
         self.mutate_companion('| meta | 210 | 122 | 0 | 88 |','| meta | 174 | 45 | 0 | 129 |')
         self.reject()

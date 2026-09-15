@@ -61,6 +61,8 @@ AUDIT186_SEMANTIC_01_OVERLAY_SHA256 = 'd0967fd5a9c16ab81a1a00d9a71b2d0ade8ce14cb
 RUNTIME_ASSURANCE_ADMIN_BINDING = 'organization-audit-20260907/runtime-assurance/admin-state-20260914.md'
 RUNTIME_ASSURANCE_INFRA_BINDING = 'organization-audit-20260907/runtime-assurance/infra-state-20260914.md'
 RUNTIME_ASSURANCE_CHECKPOINT_BINDING = 'organization-audit-20260907/CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md'
+RUNTIME_ASSURANCE_CHECKPOINT_BLOB_SHA = '1db9d01e86a9a2f7c0cc48bb3e3cbdd9aade9ee1'
+RUNTIME_ASSURANCE_CHECKPOINT_SHA256 = '407a8e3dd0626402b02604eb22de5aff86f07c55f683c5d2033b09f85cf28319'
 RUNTIME_ASSURANCE_ADMIN_SHA256 = '17ebeba22a93c7e74ca06cacabca110a385362b75dfa2a0985bb0ba4935b4985'
 RUNTIME_ASSURANCE_INFRA_SHA256 = 'a918f4d8360bc0f15c6dd9a2cae2a923a6a2d67d17b013c09b3fa3ef280bcef9'
 RUNTIME_ASSURANCE_INDEX_SHA256 = 'd64c165d1fb9b871af1b7929b2974e26f08c73a39b1472f30c437065c2743250'
@@ -666,6 +668,19 @@ def git_blob_sha(raw: bytes) -> str:
     return hashlib.sha1(header+raw).hexdigest()
 
 
+def load_authenticated_runtime_assurance_checkpoint(base: Path) -> str:
+    """Authenticate one checkpoint snapshot, then decode those same bytes."""
+    raw = (base / 'CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md').read_bytes()
+    require(hashlib.sha256(raw).hexdigest() == RUNTIME_ASSURANCE_CHECKPOINT_SHA256,
+            'runtime assurance checkpoint digest drift')
+    require(git_blob_sha(raw) == RUNTIME_ASSURANCE_CHECKPOINT_BLOB_SHA,
+            'runtime assurance checkpoint Git blob drift')
+    try:
+        return raw.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('runtime assurance checkpoint is not UTF-8') from exc
+
+
 def read_tsv(path):
     require(path.is_file(), 'missing TSV: '+path.name)
     with path.open(encoding='utf-8', newline='') as handle:
@@ -1104,6 +1119,7 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
             'runtime assurance INFRA packet binding drift')
     require(doc.get('runtime_assurance_adoption_checkpoint')==RUNTIME_ASSURANCE_CHECKPOINT_BINDING,
             'runtime assurance checkpoint binding drift')
+    load_authenticated_runtime_assurance_checkpoint(base)
     require(hashlib.sha256((base/'runtime-assurance/admin-state-20260914.md').read_bytes()).hexdigest()==RUNTIME_ASSURANCE_ADMIN_SHA256,
             'runtime assurance ADMIN packet digest drift')
     require(hashlib.sha256((base/'runtime-assurance/infra-state-20260914.md').read_bytes()).hexdigest()==RUNTIME_ASSURANCE_INFRA_SHA256,
