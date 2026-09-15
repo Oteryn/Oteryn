@@ -381,8 +381,8 @@ def _rev_parse(cwd: Path, revision: str) -> str:
     return _sha(value, f"resolved revision {revision!r}")
 
 
-def _current_branch(cwd: Path) -> str:
-    result = _run_git(cwd, "symbolic-ref", "--quiet", "--short", "HEAD", check=False)
+def _current_branch_ref(cwd: Path) -> str:
+    result = _run_git(cwd, "symbolic-ref", "--quiet", "HEAD", check=False)
     if result.returncode != 0 or not result.stdout.strip():
         raise PublicationError("publication requires a checked-out local branch, not detached HEAD")
     return result.stdout.strip()
@@ -500,12 +500,13 @@ def remote_head(cwd: Path, endpoint: str, branch: str) -> str:
     _reject_repository_credential_helpers(cwd)
     _reject_repository_transport_commands(cwd)
     _reject_repository_alternate_refs_commands(cwd)
-    ref = f"refs/heads/{branch}"
-    result = _run_git(cwd, "ls-remote", "--heads", endpoint, ref, check=False)
+    branch = _branch(branch, cwd)
+    branch_ref = f"refs/heads/{branch}"
+    result = _run_git(cwd, "ls-remote", "--heads", endpoint, branch_ref, check=False)
     if result.returncode != 0:
         raise PublicationError("remote head readback is unavailable")
     rows = [line.split() for line in result.stdout.splitlines() if line.strip()]
-    rows = [row for row in rows if len(row) == 2 and row[1] == ref]
+    rows = [row for row in rows if len(row) == 2 and row[1] == branch_ref]
     if len(rows) != 1:
         raise PublicationError("remote branch is missing or ambiguous")
     return _sha(rows[0][0], "remote head")
@@ -545,9 +546,10 @@ def create_recovery_bundle(
     # repository-controlled command, so fence it before any recovery work.
     _reject_repository_alternate_refs_commands(cwd)
     branch = _branch(branch, cwd)
+    branch_ref = f"refs/heads/{branch}"
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
     candidate = _sha(candidate, "candidate")
-    if _rev_parse(cwd, branch) != candidate:
+    if _rev_parse(cwd, branch_ref) != candidate:
         raise PublicationError("recovery branch does not point to the exact candidate")
     if _rev_parse(cwd, expected_remote_head) != expected_remote_head:
         raise PublicationError("recovery predecessor is not available as a local commit")
@@ -563,7 +565,14 @@ def create_recovery_bundle(
     if temporary.exists():
         raise PublicationError("recovery temporary path already exists")
     try:
-        _run_git(cwd, "bundle", "create", str(temporary), branch, f"^{expected_remote_head}")
+        _run_git(
+            cwd,
+            "bundle",
+            "create",
+            str(temporary),
+            branch_ref,
+            f"^{expected_remote_head}",
+        )
         _run_git(cwd, "bundle", "verify", str(temporary))
         heads = _run_git(cwd, "bundle", "list-heads", str(temporary)).stdout.splitlines()
         advertised = {
@@ -571,8 +580,7 @@ def create_recovery_bundle(
             for line in heads
             if len(parts := line.split()) == 2 and SHA_RE.fullmatch(parts[0].lower())
         }
-        ref = f"refs/heads/{branch}"
-        if advertised.get(ref) != candidate:
+        if advertised.get(branch_ref) != candidate:
             raise PublicationError("recovery bundle does not advertise the exact candidate branch head")
         digest = hashlib.sha256(temporary.read_bytes()).hexdigest()
         temporary.replace(bundle_path)
@@ -595,10 +603,11 @@ def preflight(
     cwd = _worktree_root(cwd)
     endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
     branch = _branch(branch, cwd)
+    branch_ref = f"refs/heads/{branch}"
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
     candidate = _sha(candidate, "candidate")
 
-    if _current_branch(cwd) != branch:
+    if _current_branch_ref(cwd) != branch_ref:
         raise PublicationError("checked-out local branch does not match the authorized target branch")
     if _rev_parse(cwd, "HEAD") != candidate:
         raise PublicationError("local HEAD does not equal the exact candidate")
@@ -627,6 +636,8 @@ def publish(
 ) -> PublicationResult:
     expected_push_url = _credential_free_url(expected_push_url, "expected push URL")
     cwd = _worktree_root(cwd)
+    branch = _branch(branch, cwd)
+    branch_ref = f"refs/heads/{branch}"
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
     candidate = _sha(candidate, "candidate")
     state = preflight(
@@ -649,7 +660,6 @@ def publish(
     )
 
     endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
-    ref = f"refs/heads/{branch}"
     push = _run_git(
         cwd,
         "-c",
@@ -660,9 +670,9 @@ def publish(
         "--recurse-submodules=no",
         "--no-follow-tags",
         "--no-signed",
-        f"--force-with-lease={ref}:{expected_remote_head}",
+        f"--force-with-lease={branch_ref}:{expected_remote_head}",
         endpoint,
-        f"{candidate}:{ref}",
+        f"{candidate}:{branch_ref}",
         check=False,
     )
 

@@ -101,6 +101,54 @@ class PublicationIntegrityTests(unittest.TestCase):
         listed = git(self.repo.work, "bundle", "list-heads", str(bundle))
         self.assertIn(f"{self.repo.candidate} refs/heads/agent/test", listed)
 
+    def test_colliding_tag_cannot_override_branch_identity_bundle_or_publication(self) -> None:
+        git(self.repo.work, "tag", "agent/test", self.repo.intermediate)
+
+        self.assertEqual(
+            publication.preflight(
+                self.repo.work,
+                remote="origin",
+                expected_push_url=self.repo.push_url,
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+            ),
+            "NOT_PUBLISHED",
+        )
+
+        bundle = self.repo.artifacts / "colliding-tag.bundle"
+        result = self.publish(bundle.name)
+
+        self.assertEqual(result.state, "PUBLISHED")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"),
+            self.repo.candidate,
+        )
+        self.assertEqual(
+            git(self.repo.work, "rev-parse", "refs/tags/agent/test"), self.repo.intermediate
+        )
+        listed = git(self.repo.work, "bundle", "list-heads", str(bundle))
+        self.assertIn(f"{self.repo.candidate} refs/heads/agent/test", listed)
+        self.assertNotIn("refs/tags/agent/test", listed)
+
+    def test_colliding_tag_does_not_hide_wrong_checked_out_branch(self) -> None:
+        git(self.repo.work, "tag", "agent/test", self.repo.intermediate)
+        git(self.repo.work, "checkout", "-qb", "agent/other", self.repo.candidate)
+
+        with self.assertRaisesRegex(publication.PublicationError, "checked-out local branch"):
+            publication.preflight(
+                self.repo.work,
+                remote="origin",
+                expected_push_url=self.repo.push_url,
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+            )
+
+        self.assertEqual(
+            publication.remote_head(self.repo.work, self.repo.push_url, "agent/test"), self.repo.base
+        )
+
     def test_remote_head_drift_fails_before_publication(self) -> None:
         git(self.repo.work, "checkout", "-qb", "other", self.repo.base)
         (self.repo.work / "other.txt").write_text("other\n", encoding="utf-8")
