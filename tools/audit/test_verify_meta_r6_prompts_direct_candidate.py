@@ -33,8 +33,8 @@ class MetaR6PromptsCandidateTest(unittest.TestCase):
              mock.patch('sys.stdout', new_callable=io.StringIO) as output:
             self.assertEqual(v.main(), 0)
         result = json.loads(output.getvalue())
-        self.assertEqual(result['meta_direct_paths'], 96)
-        self.assertEqual(result['meta_unverified_paths'], 114)
+        self.assertEqual(result['meta_direct_paths'], 122)
+        self.assertEqual(result['meta_unverified_paths'], 88)
     def test_expected_candidate_parses_the_authenticated_bytes(self):
         temp, root = self.copied_evidence()
         try:

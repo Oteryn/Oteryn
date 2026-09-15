@@ -534,5 +534,139 @@
     "product_readiness_claimed": false,
     "runtime_or_provider_claimed": false,
     "audit_completion_claimed": false
+  },
+  "audit186_semantic_01_historical_direct_adoption": {
+    "state": "ADOPTED_INERT_HISTORICAL_PROVENANCE_NOT_CURRENT_TRUTH",
+    "worker_pull_request": 204,
+    "worker_head": "b7c8f6f37441b4e80ffb2214fe837105686bf979",
+    "candidate": "audit186-semantic-01-historical-candidate.json",
+    "candidate_sha256": "c160a9f7a198de30df34e2e1dd93341088488a073b8e36f9e1d538a86c5d23ae",
+    "adoption_overlay": "coverage-review-audit186-semantic-01-historical-direct-additions.tsv",
+    "adoption_overlay_sha256": "d0967fd5a9c16ab81a1a00d9a71b2d0ade8ce14cba56ffd60d8c16fd1bcf21b0",
+    "baseline_head": "1008886c0aec2db6b8588a3131a83829eff06e67",
+    "family_tree": "1609dfc49cc95b174a8efd0ccf8e342c22dd2173",
+    "path_count": 26,
+    "depth": "SCOPED_SEMANTIC_REVIEW",
+    "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+    "line_ranges": [],
+    "coverage_delta": {
+      "direct": 26,
+      "grouped": 0,
+      "unverified": -26,
+      "semantically_classified": 26
+    },
+    "canonical_counts": {
+      "source_leaves": 4361,
+      "direct": 335,
+      "grouped": 113,
+      "unverified": 3913,
+      "semantically_classified": 448
+    },
+    "meta_counts": {
+      "source_leaves": 210,
+      "direct": 122,
+      "grouped": 0,
+      "unverified": 88
+    },
+    "semantic_03_overlap": false,
+    "residual_obligations": 14,
+    "semantic_coverage_complete": false,
+    "history_revalidation_closed": false,
+    "current_truth_claimed": false,
+    "product_readiness_claimed": false,
+    "audit_completion_claimed": false,
+    "canonical_ledger_sha256": "d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b"
+  },
+  "audit186_runtime_assurance_evidence_adoption": {
+    "state": "EVIDENCE_ADOPTED_OBLIGATIONS_OPEN_UNKNOWN_BLOCKED",
+    "worker_pull_request": 205,
+    "worker_head": "58574f6057713cfb9c7f0756d5c561df949b52b1",
+    "worker_tree": "01fb0b69f25a85ebacf40a7efcbc3a43b101b798",
+    "freeze_checkpoint": "issue-186-comment-5675703518",
+    "canonical_source_head": "2f78fafbacc12723516bb7dd00376812c31385ef",
+    "canonical_source_tree": "44c64c60f9e71bde27ff86e7d19c77476cc07ade",
+    "packets": [
+      {
+        "path": "runtime-assurance/admin-state-20260914.md",
+        "blob_sha": "30b36d0ac7c824a562c098d9c51a4ec751c683ea",
+        "sha256": "17ebeba22a93c7e74ca06cacabca110a385362b75dfa2a0985bb0ba4935b4985",
+        "obligation": "ADMIN-STATE",
+        "disposition": "UNKNOWN / BLOCKED"
+      },
+      {
+        "path": "runtime-assurance/infra-state-20260914.md",
+        "blob_sha": "95d587a4b96faa45eb5dcf74c2dbcd2f39945f71",
+        "sha256": "a918f4d8360bc0f15c6dd9a2cae2a923a6a2d67d17b013c09b3fa3ef280bcef9",
+        "obligation": "INFRA-STATE",
+        "disposition": "UNKNOWN / BLOCKED"
+      }
+    ],
+    "source_observations": {
+      "meta": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+      "game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+      "platform": "84d504c98acc8134eb4c9545711010b74c987974",
+      "atlas": "0d22a8d4378e66441502482ce715e226d487248e"
+    },
+    "worker_contract_adopted": false,
+    "source_or_workflow_evidence_is_live_truth": false,
+    "admin_state_open_unknown_blocked": true,
+    "infra_state_open_unknown_blocked": true,
+    "residual_obligations_open": 14,
+    "semantic_accounting_changed": false,
+    "privacy_exclusions": [
+      "secrets",
+      "credentials",
+      "personal identifiers",
+      "raw private logs",
+      "unnecessary private infrastructure identifiers"
+    ],
+    "verifier_role_required_without_personal_identifier": true,
+    "product_or_runtime_readiness_claimed": false,
+    "production_health_or_slo_claimed": false,
+    "recovery_rpo_rto_claimed": false,
+    "provider_remediation_claimed": false,
+    "audit_completion_or_independent_score_claimed": false,
+    "canonical_ledger_sha256": "d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b"
+  },
+  "audit186_history_revalidation_evidence_adoption": {
+    "state": "ADOPTED_EVIDENCE_OBLIGATION_REMAINS_OPEN",
+    "worker_pull_request": 206,
+    "worker_head": "58a73b77b945b97011fa01ac8bda1732a8a4e6dd",
+    "issue_freeze_checkpoint": 5671120887,
+    "packet": "history-revalidation-candidate.json",
+    "packet_git_blob": "f8ded1a4a392e7378090c2cfe02585478a4bcc08",
+    "packet_sha256": "73fd0205395af9647a2ca669bcce9e60841daa69d0f390e99b21413546870bf2",
+    "canonical_admission_head": "e98943eee6f86c9ba160ea2e02683d2be8e764e4",
+    "canonical_admission_tree": "7b1c47a5101a0f20f1f0826940a2a3395fc24600",
+    "source_observation_commits": {
+      "meta": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+      "game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+      "platform": "84d504c98acc8134eb4c9545711010b74c987974",
+      "atlas": "0d22a8d4378e66441502482ce715e226d487248e"
+    },
+    "history_revalidation_open": true,
+    "game_compare_complete": false,
+    "current_truth_claimed": false,
+    "product_readiness_claimed": false,
+    "runtime_readiness_claimed": false,
+    "security_remediation_claimed": false,
+    "audit_completion_claimed": false,
+    "source_leaf_disposition_delta": 0,
+    "canonical_counts": {
+      "source_leaves": 4361,
+      "direct": 335,
+      "grouped": 113,
+      "unverified": 3913,
+      "semantically_classified": 448
+    },
+    "meta_counts": {
+      "source_leaves": 210,
+      "direct": 122,
+      "grouped": 0,
+      "unverified": 88
+    },
+    "canonical_ledger_sha256": "d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b",
+    "semantic_coverage": "PARTIAL_EXPLICIT_NOT_ALL_LINE",
+    "residual_obligations_open": 14
   }
 }

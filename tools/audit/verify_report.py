@@ -44,6 +44,7 @@ META_R5_DIRECT_ADDITIONS = 'coverage-review-meta-r5-instruction-efficiency-direc
 META_R6_DIRECT_ADDITIONS = 'coverage-review-meta-r6-prompts-direct-additions.tsv'
 META_R7_DIRECT_ADDITIONS = 'coverage-review-meta-current-main-governance-direct-additions.tsv'
 AUDIT186_SEMANTIC_03_DIRECT_ADDITIONS = 'coverage-review-audit186-semantic-03-direct-additions.tsv'
+AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS = 'coverage-review-audit186-semantic-01-historical-direct-additions.tsv'
 DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-canonical-additions.tsv'
 RECORDER_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-additions.tsv'
 ANNOUNCEMENTS_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-announcements-additions.tsv'
@@ -54,6 +55,51 @@ META_R6_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-
 META_R6_CANDIDATE_BINDING = 'organization-audit-20260907/r3-meta-r6-prompts-direct-candidate.json'
 META_R7_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-meta-current-main-governance-direct-additions.tsv'
 AUDIT186_SEMANTIC_03_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-audit186-semantic-03-direct-additions.tsv'
+AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS_BINDING = 'organization-audit-20260907/coverage-review-audit186-semantic-01-historical-direct-additions.tsv'
+AUDIT186_SEMANTIC_01_CANDIDATE_SHA256 = 'c160a9f7a198de30df34e2e1dd93341088488a073b8e36f9e1d538a86c5d23ae'
+AUDIT186_SEMANTIC_01_OVERLAY_SHA256 = 'd0967fd5a9c16ab81a1a00d9a71b2d0ade8ce14cba56ffd60d8c16fd1bcf21b0'
+RUNTIME_ASSURANCE_ADMIN_BINDING = 'organization-audit-20260907/runtime-assurance/admin-state-20260914.md'
+RUNTIME_ASSURANCE_INFRA_BINDING = 'organization-audit-20260907/runtime-assurance/infra-state-20260914.md'
+RUNTIME_ASSURANCE_CHECKPOINT_BINDING = 'organization-audit-20260907/CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md'
+RUNTIME_ASSURANCE_CHECKPOINT_BLOB_SHA = '1db9d01e86a9a2f7c0cc48bb3e3cbdd9aade9ee1'
+RUNTIME_ASSURANCE_CHECKPOINT_SHA256 = '407a8e3dd0626402b02604eb22de5aff86f07c55f683c5d2033b09f85cf28319'
+RUNTIME_ASSURANCE_ADMIN_SHA256 = '17ebeba22a93c7e74ca06cacabca110a385362b75dfa2a0985bb0ba4935b4985'
+RUNTIME_ASSURANCE_INFRA_SHA256 = 'a918f4d8360bc0f15c6dd9a2cae2a923a6a2d67d17b013c09b3fa3ef280bcef9'
+RUNTIME_ASSURANCE_INDEX_SHA256 = 'd64c165d1fb9b871af1b7929b2974e26f08c73a39b1472f30c437065c2743250'
+HISTORY_REVALIDATION_PACKET_BINDING = 'organization-audit-20260907/history-revalidation-candidate.json'
+HISTORY_REVALIDATION_CHECKPOINT_BINDING = 'organization-audit-20260907/CHECKPOINT-20260915-HISTORY-REVALIDATION-ADOPTION.md'
+HISTORY_REVALIDATION_PACKET_SHA256 = '73fd0205395af9647a2ca669bcce9e60841daa69d0f390e99b21413546870bf2'
+HISTORY_REVALIDATION_CHECKPOINT_SHA256 = 'a2eebaedde5adcaf9f6d09bbbf310b735a44e3c742a8aaa58742225f985af2bc'
+HISTORY_REVALIDATION_INDEX_SHA256 = '3d8410253bdc104e3fb1d9766ddb97a164dbe456f6c60df2ad25c41db2cef66d'
+EXPECTED_AUDIT186_SEMANTIC_01_ADOPTION = {
+    'state': 'ADOPTED_INERT_HISTORICAL_PROVENANCE_NOT_CURRENT_TRUTH',
+    'worker_pull_request': 204,
+    'worker_head': 'b7c8f6f37441b4e80ffb2214fe837105686bf979',
+    'candidate': 'audit186-semantic-01-historical-candidate.json',
+    'candidate_sha256': AUDIT186_SEMANTIC_01_CANDIDATE_SHA256,
+    'adoption_overlay': AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS,
+    'adoption_overlay_sha256': AUDIT186_SEMANTIC_01_OVERLAY_SHA256,
+    'baseline_head': '1008886c0aec2db6b8588a3131a83829eff06e67',
+    'family_tree': '1609dfc49cc95b174a8efd0ccf8e342c22dd2173',
+    'path_count': 26,
+    'depth': 'SCOPED_SEMANTIC_REVIEW',
+    'review_depth': 'FULL_FILE_HISTORICAL_PROVENANCE_REVIEW',
+    'line_ranges': [],
+    'coverage_delta': {'direct': 26, 'grouped': 0, 'unverified': -26,
+                       'semantically_classified': 26},
+    'canonical_counts': {'source_leaves': 4361, 'direct': 335, 'grouped': 113,
+                         'unverified': 3913, 'semantically_classified': 448},
+    'meta_counts': {'source_leaves': 210, 'direct': 122, 'grouped': 0,
+                    'unverified': 88},
+    'semantic_03_overlap': False,
+    'residual_obligations': 14,
+    'semantic_coverage_complete': False,
+    'history_revalidation_closed': False,
+    'current_truth_claimed': False,
+    'product_readiness_claimed': False,
+    'audit_completion_claimed': False,
+    'canonical_ledger_sha256': 'd93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b',
+}
 AUDIT186_SEMANTIC_03_CANDIDATE_SHA256 = '4f9eb30d596da45a95f8cadf37dfee4ae4bb89a2846683098021574613d9676c'
 AUDIT186_SEMANTIC_03_OVERLAY_SHA256 = '76881b1eace7559a9d84b060c82ccf9bf86ae5627e670535a7680ccb32285de5'
 VERIFICATION_RESULTS_SHA256 = '221f0fed6cc79c2fc3fcab5945d075fb98d6cdd319d746700207b7237b3181b1'
@@ -99,8 +145,8 @@ EXPECTED_SECTION_7_PARAGRAPHS = (
 )
 SECTION_1_HEADING = '## 1. Source identity and actual coverage'
 SECTION_2_HEADING = '## 2. Native evidence actually acquired and rechecked'
-EXPECTED_SECTION_1_SHA256 = 'f0b6c1bc73952275d56d8e9a675b5d25d6b4da46762bd14353442869c19d59cf'
-EXPECTED_REPORT_MARKDOWN_SHA256 = '87a20b8d4f8dc107a41672db18415391e3998b2302a25d6300736b4726bc13c8'
+EXPECTED_SECTION_1_SHA256 = '9f471de04c501b691f395c52296173a50b86cdd89b2724f501c3a36a6aebc0f8'
+EXPECTED_REPORT_MARKDOWN_SHA256 = '36f7f07108f8749d6bd12a0684a2280df8424efe51a9c1a5d434cb61259b2acc'
 CURRENT_COVERAGE_TABLE_HEADER = '| Source | Tracked leaves | DIRECT scoped | GROUPED revalidated | UNVERIFIED semantics |'
 CURRENT_R5_ADOPTION_PARAGRAPH = (
     'Exactly 25 META source files under `docs/agents/evals/r5-instruction-efficiency/**` are now separately '
@@ -128,14 +174,20 @@ CURRENT_R6_ADOPTION_PARAGRAPH = (
     'only. `META-AUD-05` remains P2 / `PARTIALLY_REPAIRED`, all 14 residual obligations remain open, and the '
     'current canonical ledger is `ff5c6621a78c14fc17802ecf01b4ef815867ccab95acce90c490973946d6279b`.'
 )
-CURRENT_R7_ADOPTION_PARAGRAPH = 'Exactly five already-DIRECT META governance rows are refreshed in place and exactly fourteen previously UNVERIFIED/new governance paths are separately adopted as DIRECT `SCOPED_SEMANTIC_REVIEW` rows through `coverage-review-meta-current-main-governance-direct-additions.tsv`, from immutable reviewed R7 candidate `r7-meta-current-main-governance-direct-candidate.json` at Git blob `6a3e98ad65f52015a43a84e39a8940f64b31dc65`. This is a +14 DIRECT transition, not +19. META alone is rebaselined to protected main `23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090` / tree `b8ebb8e50bce14a736fa65590ac121655c52fd12`; the other four pinned sources remain unchanged. The historical program record is provenance only, tests attest exercised deterministic assertions only, and source existence does not prove live executor, capability-routing, Merge Queue, provider/runtime/admin state, readiness, or completion. All 26 current leaves under `docs/evidence/repository-audit-2026-09-06/**` remain UNVERIFIED. All 14 residual obligations remain open, `META-AUD-05` remains P2 / `PARTIALLY_REPAIRED`, and the current canonical ledger is `8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94`.'
-CURRENT_SEMANTIC_03_ADOPTION_PARAGRAPH = 'Exactly one additional canonical META leaf, `docs/ci/CI_CONTRACT.md` at source cut `23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090` / blob `3c6d36cd58cd81f332382db7f2eda78261788caa`, is adopted as DIRECT `SCOPED_SEMANTIC_REVIEW` through `coverage-review-audit186-semantic-03-direct-additions.tsv` from frozen worker PR #209 head `9ad2942ba0dedb5b94e437c32b85161c6c59885a`. Its scope is the frozen CI contract’s declared META validation, gate, runner, provider-ownership and protection/integration intent; it does not attest current workflow bytes, live rulesets/protection, actual check execution, provider CI, runtime, readiness or audit completion. PR #204 is not adopted by this transition, PR #207 remains void, all 14 residual obligations remain open, and the current canonical ledger is `bf51139f97683659f752a54e643c1d342791476d64a0f78237b5c5d3ba3a310a`.'
-CURRENT_HISTORY_ANNOTATION = (
-    'The following paragraph is retained verbatim as the bounded **pre-Announcements Marketplace closeout '
-    'snapshot** required by the Marketplace durability contract. Within that paragraph, “the current revision” '
-    'and its 223-path ledger refer to that historical pre-Announcements audit state, not to the present canonical '
-    '309-path state shown above and bound below.'
-)
+CURRENT_R7_ADOPTION_PARAGRAPH = 'Exactly five already-DIRECT META governance rows are refreshed in place and exactly fourteen previously UNVERIFIED/new governance paths are separately adopted as DIRECT `SCOPED_SEMANTIC_REVIEW` rows through `coverage-review-meta-current-main-governance-direct-additions.tsv`, from immutable reviewed R7 candidate `r7-meta-current-main-governance-direct-candidate.json` at Git blob `6a3e98ad65f52015a43a84e39a8940f64b31dc65`. This is a +14 DIRECT transition, not +19. META alone is rebaselined to protected main `23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090` / tree `b8ebb8e50bce14a736fa65590ac121655c52fd12`; the other four pinned sources remain unchanged. The historical program record is provenance only, tests attest exercised deterministic assertions only, and source existence does not prove live executor, capability-routing, Merge Queue, provider/runtime/admin state, readiness, or completion. At that R7 transition, all 26 current leaves under `docs/evidence/repository-audit-2026-09-06/**` remained UNVERIFIED; the later Semantic-01 cycle below is their only adoption. All 14 residual obligations remain open, `META-AUD-05` remains P2 / `PARTIALLY_REPAIRED`, and the current canonical ledger is `8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94`.'
+CURRENT_SEMANTIC_03_ADOPTION_PARAGRAPH = ('Exactly one additional canonical META leaf, `docs/ci/CI_CONTRACT.md` at source cut '
+ '`23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090` / blob `3c6d36cd58cd81f332382db7f2eda78261788caa`, is '
+ 'adopted as DIRECT `SCOPED_SEMANTIC_REVIEW` through '
+ '`coverage-review-audit186-semantic-03-direct-additions.tsv` from frozen worker PR #209 head '
+ '`9ad2942ba0dedb5b94e437c32b85161c6c59885a`. Its scope is the frozen CI contract’s declared META '
+ 'validation, gate, runner, provider-ownership and protection/integration intent; it does not '
+ 'attest current workflow bytes, live rulesets/protection, actual check execution, provider CI, '
+ 'runtime, readiness or audit completion. PR #204 is not adopted by this Semantic-03 transition; '
+ 'it is adopted separately by the following independently reviewed historical-provenance '
+ 'transition, and PR #207 remains void, all 14 residual obligations remain open, and the current '
+ 'canonical ledger is `bf51139f97683659f752a54e643c1d342791476d64a0f78237b5c5d3ba3a310a`.')
+CURRENT_SEMANTIC_01_ADOPTION_PARAGRAPH = 'Exactly 26 historical META leaves under `docs/evidence/repository-audit-2026-09-06/**` are adopted as per-leaf DIRECT `SCOPED_SEMANTIC_REVIEW` rows through `coverage-review-audit186-semantic-01-historical-direct-additions.tsv` from immutable reviewed worker PR #204 head `b7c8f6f37441b4e80ffb2214fe837105686bf979` and candidate SHA-256 `c160a9f7a198de30df34e2e1dd93341088488a073b8e36f9e1d538a86c5d23ae`. Each complete file was reviewed strictly as inert, time-bound historical provenance. Embedded historical assertions, imperative prompt or reproduction text, labels such as current/live, CI timing payloads, reports and receipts do not become current runtime, administrative, security, product, readiness, lifecycle or authority truth. This adoption uses no GROUPED classification, has no overlap with the separate `docs/ci/CI_CONTRACT.md` Semantic-03 row, leaves all 14 residual obligations—including `SEMANTIC-COVERAGE` and `HISTORY-REVALIDATION`—open, and does not establish audit completion or an independent score. The current canonical ledger is `d93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b`.'
+CURRENT_HISTORY_ANNOTATION = 'The following paragraph is retained verbatim as the bounded **pre-Announcements Marketplace closeout snapshot** required by the Marketplace durability contract. Within that paragraph, “the current revision” and its 223-path ledger refer to that historical pre-Announcements audit state, not to the present canonical 335-path state shown above and bound below.'
 EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT = (
     '`DIRECT` is a bounded review with the stated scope, not full approval of the entire file or every '
     'dependency. R2 had 65 scoped entries; the current revision adds 158 DIRECT paths and extends some '
@@ -189,20 +241,16 @@ def write_new_file_no_symlinks(path: Path, raw: bytes) -> None:
         except OSError as exc: raise ValueError('refusing ledger overwrite or symlink') from exc
     finally: os.close(descriptor)
 SEMANTIC_COVERAGE_UNKNOWN = {'id': 'SEMANTIC-COVERAGE',
- 'missing': '3939 source leaves retain UNVERIFIED semantics; 422 of 4361 leaves are semantically '
+ 'missing': '3913 source leaves retain UNVERIFIED semantics; 448 of 4361 leaves are semantically '
             'classified',
- 'reason': 'Source bytes are available; 309 DIRECT scoped path reviews are bound (the prior 294, '
-           'with five already-DIRECT META governance rows refreshed in place and exactly fourteen '
-           'previously UNVERIFIED/new governance rows adopted through the R7 overlay; the five '
-           'refreshes are not re-counted), and 113 bounded GROUPED Platform paths remain bound. '
-           'META is rebaselined to 210 leaves at protected main '
-           '23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090; the other four source coordinates remain '
-           'pinned. The 26 historical repository-audit packet leaves remain UNVERIFIED. R7 '
-           'evidence is bounded source semantics and exercised deterministic assertions only; it '
-           'does not prove live executor/capability/Merge Queue operation, provider/runtime/admin '
-           'state, readiness, or completion. The frozen PR #209 CI-contract leaf adds one bounded '
-           'META DIRECT source review; PR #204 remains unadopted and PR #207 remains void.',
- 'effect': 'Original exhaustive completeness cannot be claimed from 422 semantically classified '
+ 'reason': 'Source bytes are available; 335 DIRECT scoped path reviews and 113 bounded GROUPED '
+           'Platform paths are bound. META has 122 DIRECT and 88 UNVERIFIED leaves. Exactly 26 '
+           'historical repository-audit packet leaves were adopted per-leaf as inert, time-bound '
+           'historical provenance; embedded current/live assertions, commands, reports and '
+           'receipts are not current truth or authority. SEMANTIC-COVERAGE and '
+           'HISTORY-REVALIDATION remain open, all 14 residual obligations remain open, and '
+           'provider/runtime/admin/security/readiness semantics remain fail-closed.',
+ 'effect': 'Original exhaustive completeness cannot be claimed from 448 semantically classified '
            'leaves out of 4361.',
  'owner_route': 'META186 plus provider audit owners',
  'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review '
@@ -226,8 +274,8 @@ EXPECTED_COVERAGE_SUMMARY = {'schema_version': 1,
  'source_leaf_total': 4361,
  'active_repository_leaf_total': 4360,
  'per_repository': {'meta': {'leaves': 210,
-                             'direct_scoped': 96,
-                             'unverified_semantics': 114,
+                             'direct_scoped': 122,
+                             'unverified_semantics': 88,
                              'grouped': 0,
                              'not_applicable': 0},
                     'game': {'leaves': 830,
@@ -250,7 +298,7 @@ EXPECTED_COVERAGE_SUMMARY = {'schema_version': 1,
                                           'unverified_semantics': 0,
                                           'grouped': 0,
                                           'not_applicable': 0}},
- 'ledger_sha256': 'bf51139f97683659f752a54e643c1d342791476d64a0f78237b5c5d3ba3a310a',
+ 'ledger_sha256': 'd93838bebb6f3690bad3d6182bbc05edd0af8acf8a98d28260e496276b95a22b',
  'identity_coverage': 'COMPLETE_FOR_PINNED_FIVE_REPOSITORIES',
  'semantic_coverage': 'PARTIAL_EXPLICIT',
  'unclassified_paths': 0,
@@ -287,41 +335,45 @@ EXPECTED_COVERAGE_SUMMARY = {'schema_version': 1,
                'attested. R7 rebaselines only META to protected main '
                '23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090 and refreshes five existing DIRECT rows '
                'in place while adopting exactly fourteen newly DIRECT current-main governance rows '
-               'through coverage-review-meta-current-main-governance-direct-additions.tsv. The 26 '
-               'historical repository-audit packet leaves remain UNVERIFIED; source existence and '
-               'deterministic tests do not prove live operational capability, provider/runtime '
+               'through coverage-review-meta-current-main-governance-direct-additions.tsv. At the '
+               'R7 transition, the 26 historical repository-audit packet leaves remained '
+               'UNVERIFIED; the later Semantic-01 adoption below supersedes that coverage state. '
+               'Source existence and deterministic tests do not prove live operational capability, provider/runtime '
                'state, readiness, or completion. The clean, frozen PR #209 one-leaf CI-contract '
                'packet is adopted exactly once through '
                'coverage-review-audit186-semantic-03-direct-additions.tsv; it records bounded '
                'source-contract semantics only and does not attest current workflows, live '
-               'protection, provider CI, runtime, readiness, or completion.',
- 'new_scoped_paths_since_r2': 244,
- 'scoped_review_paths': 309,
+               'protection, provider CI, runtime, readiness, or completion. The immutable reviewed '
+               'PR #204 26-leaf historical repository-audit packet is adopted exactly once as '
+               'per-leaf DIRECT through '
+               'coverage-review-audit186-semantic-01-historical-direct-additions.tsv; every '
+               'embedded assertion, imperative, current/live label, report and receipt remains '
+               'inert time-bound provenance rather than current authority or '
+               'runtime/admin/security/product/readiness truth.',
+ 'new_scoped_paths_since_r2': 270,
+ 'scoped_review_paths': 335,
  'grouped_revalidated_paths': 113,
- 'semantically_classified_paths': 422,
- 'unverified_semantics_total': 3939,
- 'coverage_dimension_note': 'DIRECT records bounded source review, not universal approval. The 309 '
-                            'DIRECT paths comprise the prior 308 plus exactly one canonical META '
-                            'CI-contract leaf adopted from frozen worker PR #209; META contributes '
-                            '96 DIRECT of 210 leaves. The 26 historical repository-audit packet '
-                            'leaves remain UNVERIFIED. Platform contributes 168 DIRECT and 113 '
+ 'semantically_classified_paths': 448,
+ 'unverified_semantics_total': 3913,
+ 'coverage_dimension_note': 'DIRECT records bounded source review, not universal approval. The 335 '
+                            'DIRECT paths comprise the prior 309 plus exactly 26 historical '
+                            'repository-audit packet leaves adopted per-leaf from frozen worker PR '
+                            '#204; META contributes 122 DIRECT of 210 leaves. All historical '
+                            'payload remains inert provenance and does not close SEMANTIC-COVERAGE '
+                            'or HISTORY-REVALIDATION. Platform contributes 168 DIRECT and 113 '
                             'GROUPED paths; all provider counts are unchanged.',
  'rejected_group_candidates': 1}
 EXPECTED_UNKNOWNS = [{'id': 'SEMANTIC-COVERAGE',
-  'missing': '3939 source leaves retain UNVERIFIED semantics; 422 of 4361 leaves are semantically '
+  'missing': '3913 source leaves retain UNVERIFIED semantics; 448 of 4361 leaves are semantically '
              'classified',
-  'reason': 'Source bytes are available; 309 DIRECT scoped path reviews are bound (the prior 294, '
-            'with five already-DIRECT META governance rows refreshed in place and exactly fourteen '
-            'previously UNVERIFIED/new governance rows adopted through the R7 overlay; the five '
-            'refreshes are not re-counted), and 113 bounded GROUPED Platform paths remain bound. '
-            'META is rebaselined to 210 leaves at protected main '
-            '23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090; the other four source coordinates remain '
-            'pinned. The 26 historical repository-audit packet leaves remain UNVERIFIED. R7 '
-            'evidence is bounded source semantics and exercised deterministic assertions only; it '
-            'does not prove live executor/capability/Merge Queue operation, provider/runtime/admin '
-            'state, readiness, or completion. The frozen PR #209 CI-contract leaf adds one bounded '
-            'META DIRECT source review; PR #204 remains unadopted and PR #207 remains void.',
-  'effect': 'Original exhaustive completeness cannot be claimed from 422 semantically classified '
+  'reason': 'Source bytes are available; 335 DIRECT scoped path reviews and 113 bounded GROUPED '
+            'Platform paths are bound. META has 122 DIRECT and 88 UNVERIFIED leaves. Exactly 26 '
+            'historical repository-audit packet leaves were adopted per-leaf as inert, time-bound '
+            'historical provenance; embedded current/live assertions, commands, reports and '
+            'receipts are not current truth or authority. SEMANTIC-COVERAGE and '
+            'HISTORY-REVALIDATION remain open, all 14 residual obligations remain open, and '
+            'provider/runtime/admin/security/readiness semantics remain fail-closed.',
+  'effect': 'Original exhaustive completeness cannot be claimed from 448 semantically classified '
             'leaves out of 4361.',
   'owner_route': 'META186 plus provider audit owners',
   'closure_condition': 'Import exact historical disposition ledgers with bounded validity, review '
@@ -554,13 +606,14 @@ def validate_current_coverage_section(text: str) -> None:
     remainder = '\n'.join(lines[start + len(table):]).strip()
     paragraphs = tuple(re.sub(r'\s+', ' ', part.strip())
                        for part in re.split(r'\n\s*\n', remainder) if part.strip())
-    require(len(paragraphs) >= 6, 'current coverage status slot incomplete')
+    require(len(paragraphs) >= 7, 'current coverage status slot incomplete')
     require(paragraphs[0] == CURRENT_R5_ADOPTION_PARAGRAPH, 'current R5 adoption paragraph drift')
     require(paragraphs[1] == CURRENT_R6_ADOPTION_PARAGRAPH, 'current R6 adoption paragraph drift')
     require(paragraphs[2] == CURRENT_R7_ADOPTION_PARAGRAPH, 'current R7 adoption paragraph drift')
     require(paragraphs[3] == CURRENT_SEMANTIC_03_ADOPTION_PARAGRAPH, 'current Semantic 03 adoption paragraph drift')
-    require(paragraphs[4] == CURRENT_HISTORY_ANNOTATION, 'current history annotation drift')
-    require(paragraphs[5] == EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT,
+    require(paragraphs[4] == CURRENT_SEMANTIC_01_ADOPTION_PARAGRAPH, 'current Semantic 01 adoption paragraph drift')
+    require(paragraphs[5] == CURRENT_HISTORY_ANNOTATION, 'current history annotation drift')
+    require(paragraphs[6] == EXPECTED_PRE_ANNOUNCEMENTS_MARKETPLACE_SNAPSHOT,
             'historical snapshot is missing, reordered, or drifted')
     require(section.count(CURRENT_R5_ADOPTION_PARAGRAPH) == 1,
             'current R5 adoption paragraph missing or duplicated')
@@ -618,6 +671,19 @@ def read_json(path):
 def git_blob_sha(raw: bytes) -> str:
     header=b'blob '+str(len(raw)).encode('ascii')+b'\0'
     return hashlib.sha1(header+raw).hexdigest()
+
+
+def load_authenticated_runtime_assurance_checkpoint(base: Path) -> str:
+    """Authenticate one checkpoint snapshot, then decode those same bytes."""
+    raw = (base / 'CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md').read_bytes()
+    require(hashlib.sha256(raw).hexdigest() == RUNTIME_ASSURANCE_CHECKPOINT_SHA256,
+            'runtime assurance checkpoint digest drift')
+    require(git_blob_sha(raw) == RUNTIME_ASSURANCE_CHECKPOINT_BLOB_SHA,
+            'runtime assurance checkpoint Git blob drift')
+    try:
+        return raw.decode('utf-8')
+    except UnicodeDecodeError as exc:
+        raise ValueError('runtime assurance checkpoint is not UTF-8') from exc
 
 
 def read_tsv(path):
@@ -785,6 +851,21 @@ def load_review(base: Path, doc: dict):
         expected_semantic_03={'repository':'meta','path':'docs/ci/CI_CONTRACT.md','blob_sha':'3c6d36cd58cd81f332382db7f2eda78261788caa','depth':'SCOPED_SEMANTIC_REVIEW','scope':'The full frozen leaf was reviewed as the declared META CI contract: META-only validation scope, stable meta-gate intent, GitHub-hosted runner intent, provider CI ownership boundaries, and documented protection/integration intent.','line_ranges':'[]','execution_evidence':'BOUNDED_FULL_FILE_SOURCE_REVIEW_ADOPTED_FROM_PR_209_HEAD_9ad2942ba0dedb5b94e437c32b85161c6c59885a_AFTER_CLEAN_INDEPENDENT_REVIEW; source contract semantics only; no current workflow, live ruleset/protection, check execution, provider CI, runtime, readiness, or audit-completion attestation'}
         require(semantic_03_additions[0]==expected_semantic_03,'AUDIT186 Semantic 03 canonical row drift')
         review=review+semantic_03_additions
+    semantic_01_binding=doc.get('coverage_review_audit186_semantic_01_historical_direct_additions')
+    if semantic_01_binding is not None:
+        require(semantic_01_binding==AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS_BINDING,'AUDIT186 Semantic 01 additions binding drift')
+        semantic_01_additions=read_tsv(base/AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS)
+        require(len(semantic_01_additions)==26,'AUDIT186 Semantic 01 additions must contain exactly 26 rows')
+        candidate=read_json(base/'audit186-semantic-01-historical-candidate.json')
+        expected_paths={r['path']:r for r in candidate['family']['paths']}
+        require(set(expected_paths)=={r['path'] for r in semantic_01_additions},'AUDIT186 Semantic 01 path set drift')
+        for row in semantic_01_additions:
+            source=expected_paths[row['path']]
+            require(row['repository']=='meta' and row['blob_sha']==source['blob_sha'],'AUDIT186 Semantic 01 path/blob drift')
+            require(row['depth']=='SCOPED_SEMANTIC_REVIEW' and row['scope']==source['semantic_scope'],'AUDIT186 Semantic 01 depth/scope drift')
+            require(row['line_ranges']=='[]','AUDIT186 Semantic 01 fabricated line ranges')
+            require(row['execution_evidence']==f"FULL_FILE_HISTORICAL_PROVENANCE_REVIEW_ADOPTED_FROM_PR_204_HEAD_b7c8f6f37441b4e80ffb2214fe837105686bf979; payload_role={source['payload_role']}; inert time-bound historical evidence only; no current runtime/admin/security/product/readiness/authority claim",'AUDIT186 Semantic 01 execution evidence drift')
+        review=review+semantic_01_additions
     unique(review,lambda r:(r['repository'],r['path']),'review path')
     return review
 
@@ -957,6 +1038,8 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     require(doc.get('r3_meta_r6_prompts_direct_adoption_overlay')==META_R6_DIRECT_ADDITIONS_BINDING,'META R6 adoption overlay provenance binding drift')
     require(doc.get('coverage_review_meta_current_main_governance_direct_additions')==META_R7_DIRECT_ADDITIONS_BINDING,'META R7 additions evidence binding drift')
     require(doc.get('coverage_review_audit186_semantic_03_direct_additions')==AUDIT186_SEMANTIC_03_DIRECT_ADDITIONS_BINDING,'AUDIT186 Semantic 03 additions evidence binding drift')
+    require(doc.get('coverage_review_audit186_semantic_01_historical_direct_additions')==AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS_BINDING,'AUDIT186 Semantic 01 additions evidence binding drift')
+    require(doc.get('audit186_semantic_01_historical_candidate')=='organization-audit-20260907/audit186-semantic-01-historical-candidate.json','AUDIT186 Semantic 01 candidate binding drift')
     require(doc.get('audit186_semantic_03_candidate')=='organization-audit-20260907/audit186-semantic-03-ci-contract-candidate.json','AUDIT186 Semantic 03 candidate binding drift')
     require(doc.get('r7_meta_current_main_governance_direct_candidate')=='organization-audit-20260907/r7-meta-current-main-governance-direct-candidate.json','META R7 candidate provenance binding drift')
     require(doc.get('r7_meta_current_main_governance_direct_adoption_overlay')==META_R7_DIRECT_ADDITIONS_BINDING,'META R7 adoption overlay provenance binding drift')
@@ -1033,7 +1116,39 @@ def validate(report_path: Path, inventory_dir: Path|None=None, ledger_output: Pa
     validate_workflow_inventory(base, doc, inventory_dir)
     require(hashlib.sha256((base/'audit186-semantic-03-ci-contract-candidate.json').read_bytes()).hexdigest()==AUDIT186_SEMANTIC_03_CANDIDATE_SHA256,'AUDIT186 Semantic 03 candidate digest drift')
     require(hashlib.sha256((base/AUDIT186_SEMANTIC_03_DIRECT_ADDITIONS).read_bytes()).hexdigest()==AUDIT186_SEMANTIC_03_OVERLAY_SHA256,'AUDIT186 Semantic 03 overlay digest drift')
+    require(hashlib.sha256((base/'audit186-semantic-01-historical-candidate.json').read_bytes()).hexdigest()==AUDIT186_SEMANTIC_01_CANDIDATE_SHA256,'AUDIT186 Semantic 01 candidate digest drift')
+    require(hashlib.sha256((base/AUDIT186_SEMANTIC_01_DIRECT_ADDITIONS).read_bytes()).hexdigest()==AUDIT186_SEMANTIC_01_OVERLAY_SHA256,'AUDIT186 Semantic 01 overlay digest drift')
+    require(doc.get('runtime_assurance_admin_packet')==RUNTIME_ASSURANCE_ADMIN_BINDING,
+            'runtime assurance ADMIN packet binding drift')
+    require(doc.get('runtime_assurance_infra_packet')==RUNTIME_ASSURANCE_INFRA_BINDING,
+            'runtime assurance INFRA packet binding drift')
+    require(doc.get('runtime_assurance_adoption_checkpoint')==RUNTIME_ASSURANCE_CHECKPOINT_BINDING,
+            'runtime assurance checkpoint binding drift')
+    load_authenticated_runtime_assurance_checkpoint(base)
+    require(hashlib.sha256((base/'runtime-assurance/admin-state-20260914.md').read_bytes()).hexdigest()==RUNTIME_ASSURANCE_ADMIN_SHA256,
+            'runtime assurance ADMIN packet digest drift')
+    require(hashlib.sha256((base/'runtime-assurance/infra-state-20260914.md').read_bytes()).hexdigest()==RUNTIME_ASSURANCE_INFRA_SHA256,
+            'runtime assurance INFRA packet digest drift')
     proof=read_json(base/'verification-index.json')
+    runtime_assurance=proof.get('audit186_runtime_assurance_evidence_adoption')
+    require(type(runtime_assurance) is dict and
+            hashlib.sha256(json.dumps(runtime_assurance,sort_keys=True,separators=(',',':')).encode()).hexdigest()==RUNTIME_ASSURANCE_INDEX_SHA256,
+            'runtime assurance adoption index drift')
+    require(doc.get('history_revalidation_packet')==HISTORY_REVALIDATION_PACKET_BINDING,
+            'HISTORY-REVALIDATION packet binding drift')
+    require(doc.get('history_revalidation_adoption_checkpoint')==HISTORY_REVALIDATION_CHECKPOINT_BINDING,
+            'HISTORY-REVALIDATION checkpoint binding drift')
+    require(hashlib.sha256((base/'history-revalidation-candidate.json').read_bytes()).hexdigest()==HISTORY_REVALIDATION_PACKET_SHA256,
+            'HISTORY-REVALIDATION packet digest drift')
+    require(hashlib.sha256((base/'CHECKPOINT-20260915-HISTORY-REVALIDATION-ADOPTION.md').read_bytes()).hexdigest()==HISTORY_REVALIDATION_CHECKPOINT_SHA256,
+            'HISTORY-REVALIDATION checkpoint digest drift')
+    history_adoption=proof.get('audit186_history_revalidation_evidence_adoption')
+    require(type(history_adoption) is dict and
+            hashlib.sha256(json.dumps(history_adoption,sort_keys=True,separators=(',',':')).encode()).hexdigest()==HISTORY_REVALIDATION_INDEX_SHA256,
+            'HISTORY-REVALIDATION adoption index drift')
+    require(json_exact(proof.get('audit186_semantic_01_historical_direct_adoption'),
+                       EXPECTED_AUDIT186_SEMANTIC_01_ADOPTION),
+            'AUDIT186 Semantic 01 adoption index drift')
     require(json_exact(proof.get('audit186_semantic_03_ci_contract_direct_adoption'), {'state': 'ADOPTED_BOUNDED_SOURCE_SEMANTICS_NOT_PRODUCT_PASS',
  'worker_pull_request': 209,
  'worker_head': '9ad2942ba0dedb5b94e437c32b85161c6c59885a',

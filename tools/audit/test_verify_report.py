@@ -22,8 +22,9 @@ class AuditValidationTest(unittest.TestCase):
         shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
         shutil.copy2(ROOT/'docs/evidence'/REPORT.replace('.json','.md'),self.path.with_suffix('.md'))
         self.base=self.root/EVIDENCE;self.base.mkdir()
-        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-review-meta-current-main-governance-direct-additions.tsv','coverage-review-audit186-semantic-03-direct-additions.tsv','audit186-semantic-03-ci-contract-candidate.json','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json']:
+        for name in ['finding-register.tsv','domain-matrix.tsv','unknowns.json','coverage-review.tsv','coverage-review-canonical-additions.tsv','coverage-review-meta-r4-direct-additions.tsv','coverage-review-meta-r5-instruction-efficiency-direct-additions.tsv','coverage-review-meta-r6-prompts-direct-additions.tsv','coverage-review-meta-current-main-governance-direct-additions.tsv','coverage-review-audit186-semantic-03-direct-additions.tsv','audit186-semantic-03-ci-contract-candidate.json','coverage-review-audit186-semantic-01-historical-direct-additions.tsv','audit186-semantic-01-historical-candidate.json','coverage-summary.json','coverage-groups.json','workflow-inventory.tsv','verification-index.json','CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md','history-revalidation-candidate.json','CHECKPOINT-20260915-HISTORY-REVALIDATION-ADOPTION.md']:
             shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
+        shutil.copytree(ROOT/'docs/evidence'/EVIDENCE/'runtime-assurance',self.base/'runtime-assurance')
     def mutate(self,path,func):
         data=audit.read_json(path);func(data);path.write_text(json.dumps(data))
     def reject(self):
@@ -46,15 +47,53 @@ class AuditValidationTest(unittest.TestCase):
         self.assertEqual(result['semantically_classified_paths'],direct+grouped)
         self.assertEqual(result['unverified_semantics'],summary['source_leaf_total']-direct-grouped)
         self.assertFalse(result['tree_and_ledger_verified'])
+    def test_runtime_assurance_bindings_fail_closed(self):
+        for field in ('runtime_assurance_admin_packet','runtime_assurance_infra_packet','runtime_assurance_adoption_checkpoint'):
+            with self.subTest(field=field):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
+                self.mutate(self.path,lambda d,f=field:d.update({f:'wrong'}))
+                self.reject()
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_runtime_assurance_evidence_adoption'].update(residual_obligations_open=13))
+        self.reject()
+    def test_runtime_assurance_packet_digest_drift_rejected(self):
+        path=self.base/'runtime-assurance/admin-state-20260914.md'
+        path.write_text(path.read_text()+'drift\n')
+        self.reject()
+    def test_runtime_assurance_checkpoint_exact_bytes_pass(self):
+        self.assertEqual(audit.validate(self.path)['result'],'ACCOUNTING_VALID_NOT_SEMANTIC_PASS')
+    def test_runtime_assurance_checkpoint_readiness_append_rejected(self):
+        path=self.base/'CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md'
+        path.write_bytes(path.read_bytes()+b'\nThis adoption establishes production readiness.\n')
+        self.reject()
+    def test_runtime_assurance_checkpoint_arbitrary_byte_drift_rejected(self):
+        path=self.base/'CHECKPOINT-20260915-RUNTIME-ASSURANCE-ADOPTION.md'
+        raw=bytearray(path.read_bytes()); raw[len(raw)//2] ^= 1
+        path.write_bytes(raw)
+        self.reject()
+    def test_history_revalidation_bindings_fail_closed(self):
+        for field in ('history_revalidation_packet','history_revalidation_adoption_checkpoint'):
+            with self.subTest(field=field):
+                shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
+                self.mutate(self.path,lambda d,f=field:d.update({f:'wrong'}))
+                self.reject()
+        shutil.copy2(ROOT/'docs/evidence'/REPORT,self.path)
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_history_revalidation_evidence_adoption'].update(history_revalidation_open=False))
+        self.reject()
+    def test_history_revalidation_packet_and_checkpoint_drift_rejected(self):
+        for name in ('history-revalidation-candidate.json','CHECKPOINT-20260915-HISTORY-REVALIDATION-ADOPTION.md'):
+            with self.subTest(name=name):
+                shutil.copy2(ROOT/'docs/evidence'/EVIDENCE/name,self.base/name)
+                path=self.base/name; path.write_bytes(path.read_bytes()+b' drift')
+                self.reject()
     def test_current_coverage_table_meta_drift_rejected(self):
-        self.mutate_companion('| meta | 210 | 96 | 0 | 114 |','| meta | 174 | 45 | 0 | 129 |')
+        self.mutate_companion('| meta | 210 | 122 | 0 | 88 |','| meta | 174 | 45 | 0 | 129 |')
         self.reject()
     def test_current_coverage_table_total_drift_rejected(self):
-        self.mutate_companion('| **Total** | **4361** | **309** | **113** | **3939** |',
+        self.mutate_companion('| **Total** | **4361** | **335** | **113** | **3913** |',
                               '| **Total** | **4325** | **258** | **113** | **3954** |')
         self.reject()
     def test_current_history_annotation_present_count_drift_rejected(self):
-        self.mutate_companion('present canonical 309-path state','present canonical 258-path state')
+        self.mutate_companion('present canonical 335-path state','present canonical 258-path state')
         self.reject()
     def test_current_r5_paragraph_deletion_or_mutation_rejected(self):
         for replacement in ('', audit.CURRENT_R5_ADOPTION_PARAGRAPH.replace('all 14','all 13')):
@@ -409,6 +448,18 @@ class AuditValidationTest(unittest.TestCase):
         self.assertNotIn(rejected[0]['id'],{row['id'] for row in data['groups']})
     def test_reproduction_called_pass_rejected(self):
         self.mutate(self.base/'verification-index.json',lambda d:d.update(routing_product_verdict='PASS'));self.reject()
+    def test_semantic_01_adoption_index_state_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption'].update(state='ADOPTED_PRODUCT_PASS'));self.reject()
+    def test_semantic_01_adoption_index_worker_head_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption'].update(worker_head='0'*40));self.reject()
+    def test_semantic_01_adoption_index_coverage_delta_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption']['coverage_delta'].update(direct=25));self.reject()
+    def test_semantic_01_adoption_index_ledger_digest_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption'].update(canonical_ledger_sha256='0'*64));self.reject()
+    def test_semantic_01_adoption_index_missing_key_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption'].pop('current_truth_claimed'));self.reject()
+    def test_semantic_01_adoption_index_extra_key_rejected(self):
+        self.mutate(self.base/'verification-index.json',lambda d:d['audit186_semantic_01_historical_direct_adoption'].update(current_truth_established=True));self.reject()
     def test_unbound_execution_source_rejected(self):
         self.mutate(self.base/'verification-index.json',lambda d:d['results'][0].update(source_commit='0'*40));self.reject()
     def test_missing_verification_result_rejected(self):
@@ -493,7 +544,7 @@ class AuditValidationTest(unittest.TestCase):
         self.mutate(self.base/'unknowns.json',mutate)
     def test_stale_semantic_coverage_transition_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('309 DIRECT', '258 DIRECT')
+            reason=row['reason'].replace('335 DIRECT', '258 DIRECT')
                                 .replace('3940 source leaves', '3954 source leaves')))
         self.reject()
     def test_changed_semantic_coverage_total_rejected(self):
@@ -510,11 +561,11 @@ class AuditValidationTest(unittest.TestCase):
         self.reject()
     def test_missing_recorder_provenance_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('five already-DIRECT META governance rows refreshed in place', 'META governance rows refreshed')))
+            reason=row['reason'].replace('META has 122 DIRECT and 88 UNVERIFIED leaves', 'META accounting omitted')))
         self.reject()
     def test_missing_announcements_provenance_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(
-            reason=row['reason'].replace('exactly fourteen previously UNVERIFIED/new governance rows', 'governance rows')))
+            reason=row['reason'].replace('Exactly 26 historical repository-audit packet leaves were adopted per-leaf', 'Historical packet adopted')))
         self.reject()
     def test_semantic_coverage_extra_key_rejected(self):
         self.mutate_semantic_coverage(lambda row:row.update(semantic_pass=False))
