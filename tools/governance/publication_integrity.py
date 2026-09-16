@@ -643,7 +643,7 @@ def _stable_local_remote_head(
     *,
     classify_against: tuple[str, str] | None = None,
 ) -> str | tuple[str, str]:
-    """Read a local endpoint through its effective open common Git directory."""
+    """Read a local endpoint while holding its branch update lock."""
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     git_descriptor: int | None = None
     common_descriptor: int | None = None
@@ -674,6 +674,41 @@ def _stable_local_remote_head(
 
         branch = _branch(branch, cwd)
         branch_ref = f"refs/heads/{branch}"
+
+        # Directory descriptors pin repository identity, but they do not pin
+        # mutable ref contents.  Acquire the same per-ref lock used by Git's
+        # files backend and retain it through classification.  A writer using
+        # the supported Git mutation path therefore cannot restore a previous
+        # value after the last observation but before the decision is made.
+        # Fail closed if the ref hierarchy is unavailable, symlinked, or
+        # already locked rather than sampling an inherently movable value.
+        lock_parent = common_descriptor
+        opened_parents: list[int] = []
+        lock_name = ""
+        lock_descriptor: int | None = None
+        try:
+            components = branch_ref.split("/")
+            for component in components[:-1]:
+                next_parent = os.open(component, flags, dir_fd=lock_parent)
+                opened_parents.append(next_parent)
+                lock_parent = next_parent
+            lock_name = components[-1] + ".lock"
+            lock_descriptor = os.open(
+                lock_name,
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+                dir_fd=lock_parent,
+            )
+        except OSError as exc:
+            for descriptor in reversed(opened_parents):
+                os.close(descriptor)
+            raise PublicationError(
+                "unable to acquire stable local publication branch lock"
+            ) from exc
+
         def stable_readback() -> str:
             result = _run_git(
                 cwd,
@@ -692,47 +727,37 @@ def _stable_local_remote_head(
                 raise PublicationError("remote branch is missing or ambiguous")
             return _sha(rows[0][0], "remote head")
 
-        observed = stable_readback()
-        metadata = os.fstat(git_descriptor)
-        if (metadata.st_dev, metadata.st_ino) != (
-            identity.git_directory_device,
-            identity.git_directory_inode,
-        ):
-            raise PublicationError("approved local filesystem Git directory identity changed")
-        common_metadata = os.fstat(common_descriptor)
-        if (common_metadata.st_dev, common_metadata.st_ino) != (
-            identity.common_git_directory_device,
-            identity.common_git_directory_inode,
-        ):
-            raise PublicationError("approved local filesystem common Git directory identity changed")
-        current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
-        if current != identity:
-            raise PublicationError("approved local filesystem endpoint identity changed")
-        # Stable directory handles do not freeze ref contents. Confirm the
-        # branch after the first observation and identity checks so a candidate
-        # exposed only while the initial ls-remote runs cannot prove success.
-        confirmed = stable_readback()
-        if confirmed != observed:
-            raise PublicationError("approved local filesystem branch content changed during readback")
-        current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
-        if current != identity:
-            raise PublicationError("approved local filesystem endpoint identity changed")
-        # Keep the content fence in force through the value returned for final
-        # classification. A writer that restores the predecessor as the second
-        # ls-remote returns must not supply transient success evidence.
-        final = stable_readback()
-        if final != confirmed:
-            raise PublicationError("approved local filesystem branch content changed before classification")
-        current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
-        if current != identity:
-            raise PublicationError("approved local filesystem endpoint identity changed")
-        if classify_against is None:
-            return final
-        # Compute the terminal state while the stable Git-directory handles
-        # are still held; callers must not classify a local observation after
-        # releasing the fence.
-        expected, candidate = classify_against
-        return final, classify_remote_state(final, expected, candidate)
+        try:
+            observed = stable_readback()
+            metadata = os.fstat(git_descriptor)
+            if (metadata.st_dev, metadata.st_ino) != (
+                identity.git_directory_device,
+                identity.git_directory_inode,
+            ):
+                raise PublicationError("approved local filesystem Git directory identity changed")
+            common_metadata = os.fstat(common_descriptor)
+            if (common_metadata.st_dev, common_metadata.st_ino) != (
+                identity.common_git_directory_device,
+                identity.common_git_directory_inode,
+            ):
+                raise PublicationError(
+                    "approved local filesystem common Git directory identity changed"
+                )
+            current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
+            if current != identity:
+                raise PublicationError("approved local filesystem endpoint identity changed")
+            if classify_against is None:
+                return observed
+            expected, candidate = classify_against
+            return observed, classify_remote_state(observed, expected, candidate)
+        finally:
+            assert lock_descriptor is not None
+            os.close(lock_descriptor)
+            try:
+                os.unlink(lock_name, dir_fd=lock_parent)
+            finally:
+                for descriptor in reversed(opened_parents):
+                    os.close(descriptor)
     finally:
         os.close(common_descriptor)
         os.close(git_descriptor)
