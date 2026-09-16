@@ -653,18 +653,22 @@ def _stable_local_remote_head(
     branch: str,
     *,
     classify_against: tuple[str, str] | None = None,
+    git_descriptor: int | None = None,
+    common_descriptor: int | None = None,
 ) -> str | tuple[str, str]:
     """Read a local endpoint while holding its branch update lock."""
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
-    git_descriptor: int | None = None
-    common_descriptor: int | None = None
-    try:
-        git_descriptor = os.open(identity.git_directory_path, flags)
-        common_descriptor = os.open(identity.common_git_directory_path, flags)
-    except OSError as exc:
-        if git_descriptor is not None:
-            os.close(git_descriptor)
-        raise PublicationError("unable to open a stable local publication endpoint") from exc
+    owns_descriptors = git_descriptor is None and common_descriptor is None
+    if (git_descriptor is None) != (common_descriptor is None):
+        raise PublicationError("incomplete stable local publication endpoint handles")
+    if owns_descriptors:
+        try:
+            git_descriptor = os.open(identity.git_directory_path, flags)
+            common_descriptor = os.open(identity.common_git_directory_path, flags)
+        except OSError as exc:
+            if git_descriptor is not None:
+                os.close(git_descriptor)
+            raise PublicationError("unable to open a stable local publication endpoint") from exc
     assert git_descriptor is not None and common_descriptor is not None
     try:
         metadata = os.fstat(git_descriptor)
@@ -756,7 +760,95 @@ def _stable_local_remote_head(
             rows = [row for row in rows if len(row) == 2 and row[1] == branch_ref]
             if len(rows) != 1:
                 raise PublicationError("remote branch is missing or ambiguous")
-            return _sha(rows[0][0], "remote head")
+            ls_remote_head = _sha(rows[0][0], "remote head")
+
+            # Do not re-resolve the ref from the common-directory pathname.
+            # The already-open parent descriptors are the authority for loose
+            # storage.  When no loose ref exists, pin packed-refs itself and
+            # read it through that descriptor.  This prevents a parent
+            # directory rename/replacement/restoration around ls-remote from
+            # supplying evidence from a replacement loose ref.
+            ref_descriptor: int | None = None
+            try:
+                ref_descriptor = os.open(
+                    components[-1],
+                    os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                    dir_fd=lock_parent,
+                )
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                raise PublicationError(
+                    "unable to read pinned local publication branch ref"
+                ) from exc
+
+            if ref_descriptor is not None:
+                try:
+                    metadata = os.fstat(ref_descriptor)
+                    if not stat.S_ISREG(metadata.st_mode):
+                        raise PublicationError(
+                            "local publication branch ref storage is not a regular file"
+                        )
+                    with os.fdopen(os.dup(ref_descriptor), "rb") as ref_file:
+                        value = ref_file.readline(256)
+                    if value.startswith(b"ref:"):
+                        raise PublicationError(
+                            "symbolic local publication target branches are not supported"
+                        )
+                    pinned_head = _sha(value.decode("ascii").strip(), "remote head")
+                except (UnicodeDecodeError, OSError) as exc:
+                    raise PublicationError(
+                        "unable to read pinned local publication branch ref"
+                    ) from exc
+                finally:
+                    os.close(ref_descriptor)
+            else:
+                packed_descriptor: int | None = None
+                try:
+                    packed_descriptor = os.open(
+                        "packed-refs",
+                        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                        dir_fd=common_descriptor,
+                    )
+                    packed_metadata = os.fstat(packed_descriptor)
+                    if not stat.S_ISREG(packed_metadata.st_mode):
+                        raise PublicationError("packed-refs storage is not a regular file")
+                    with os.fdopen(os.dup(packed_descriptor), "r", encoding="ascii") as packed:
+                        matches = [
+                            line.split(" ", 1)[0]
+                            for line in packed
+                            if not line.startswith(("#", "^"))
+                            and line.rstrip("\n").endswith(f" {branch_ref}")
+                        ]
+                    if len(matches) != 1:
+                        raise PublicationError("remote branch is missing or ambiguous")
+                    pinned_head = _sha(matches[0], "remote head")
+
+                    verification = os.open(
+                        "packed-refs",
+                        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                        dir_fd=common_descriptor,
+                    )
+                    try:
+                        verify_metadata = os.fstat(verification)
+                        if (verify_metadata.st_dev, verify_metadata.st_ino) != (
+                            packed_metadata.st_dev,
+                            packed_metadata.st_ino,
+                        ):
+                            raise PublicationError("packed-refs storage changed during readback")
+                    finally:
+                        os.close(verification)
+                except FileNotFoundError as exc:
+                    raise PublicationError("remote branch is missing or ambiguous") from exc
+                except (UnicodeDecodeError, OSError) as exc:
+                    raise PublicationError("unable to read pinned packed-refs storage") from exc
+                finally:
+                    if packed_descriptor is not None:
+                        os.close(packed_descriptor)
+
+            if pinned_head != ls_remote_head:
+                raise PublicationError("local publication branch changed during readback")
+            return pinned_head
 
         def verify_ref_hierarchy() -> None:
             """Prove the named lock still belongs to the bound ref hierarchy."""
@@ -848,8 +940,9 @@ def _stable_local_remote_head(
                 for descriptor in reversed(opened_parents):
                     os.close(descriptor)
     finally:
-        os.close(common_descriptor)
-        os.close(git_descriptor)
+        if owns_descriptors:
+            os.close(common_descriptor)
+            os.close(git_descriptor)
 
 
 def classify_remote_state(remote: str, expected: str, candidate: str) -> str:
@@ -1014,23 +1107,66 @@ def publish(
 
     endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
     endpoint_identity = _filesystem_endpoint_identity(cwd, endpoint)
-    push = _run_git(
-        cwd,
-        "-c",
-        "push.pushOption=",
-        "push",
-        "--no-verify",
-        "--porcelain",
-        "--recurse-submodules=no",
-        "--no-follow-tags",
-        "--no-signed",
-        f"--force-with-lease={branch_ref}:{expected_remote_head}",
-        endpoint,
-        f"{candidate}:{branch_ref}",
-        check=False,
-    )
-
+    git_descriptor: int | None = None
+    common_descriptor: int | None = None
     try:
+        push_endpoint = endpoint
+        push_pass_fds: tuple[int, ...] = ()
+        if endpoint_identity is not None:
+            flags = (
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+            )
+            try:
+                git_descriptor = os.open(endpoint_identity.git_directory_path, flags)
+                common_descriptor = os.open(
+                    endpoint_identity.common_git_directory_path, flags
+                )
+            except OSError as exc:
+                if git_descriptor is not None:
+                    os.close(git_descriptor)
+                    git_descriptor = None
+                raise PublicationError(
+                    "unable to pin local publication endpoint through mutation"
+                ) from exc
+            assert git_descriptor is not None and common_descriptor is not None
+            git_metadata = os.fstat(git_descriptor)
+            common_metadata = os.fstat(common_descriptor)
+            if (git_metadata.st_dev, git_metadata.st_ino) != (
+                endpoint_identity.git_directory_device,
+                endpoint_identity.git_directory_inode,
+            ) or (common_metadata.st_dev, common_metadata.st_ino) != (
+                endpoint_identity.common_git_directory_device,
+                endpoint_identity.common_git_directory_inode,
+            ):
+                raise PublicationError(
+                    "approved local filesystem endpoint identity changed before publication"
+                )
+            push_endpoint = f"/proc/self/fd/{git_descriptor}"
+            if not Path(push_endpoint).exists():
+                raise PublicationError(
+                    "stable local filesystem endpoint handles are unavailable"
+                )
+            push_pass_fds = (git_descriptor, common_descriptor)
+
+        push = _run_git(
+            cwd,
+            "-c",
+            "push.pushOption=",
+            "push",
+            "--no-verify",
+            "--porcelain",
+            "--recurse-submodules=no",
+            "--no-follow-tags",
+            "--no-signed",
+            f"--force-with-lease={branch_ref}:{expected_remote_head}",
+            push_endpoint,
+            f"{candidate}:{branch_ref}",
+            check=False,
+            pass_fds=push_pass_fds,
+        )
+
         readback_endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
         if readback_endpoint != endpoint:
             raise PublicationError("approved push endpoint changed during publication")
@@ -1046,6 +1182,8 @@ def publish(
                 endpoint_identity,
                 branch,
                 classify_against=(expected_remote_head, candidate),
+                git_descriptor=git_descriptor,
+                common_descriptor=common_descriptor,
             )
             assert isinstance(stable, tuple)
             live, final_state = stable
@@ -1053,6 +1191,11 @@ def publish(
         raise PublicationError(
             f"ambiguous publication outcome; remote readback unavailable; verified recovery bundle={bundle}"
         ) from exc
+    finally:
+        if common_descriptor is not None:
+            os.close(common_descriptor)
+        if git_descriptor is not None:
+            os.close(git_descriptor)
 
     if final_state == "PUBLISHED":
         return PublicationResult(

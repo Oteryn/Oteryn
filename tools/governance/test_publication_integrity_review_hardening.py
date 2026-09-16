@@ -1002,6 +1002,99 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         self.assertFalse(bundle.exists())
         self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
 
+    def test_packed_only_ref_hierarchy_swap_cannot_supply_success_evidence(self) -> None:
+        approved = self.repo.root / "packed-hierarchy-race.git"
+        git(self.repo.root, "clone", "-q", "--bare", str(self.repo.remote), str(approved))
+        git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
+        git(approved, "pack-refs", "--all", "--prune")
+        git(self.repo.work, "remote", "set-url", "origin", str(approved))
+        real_run_git = publication._run_git
+        swapped = False
+
+        def swap_parent_only_during_ls_remote(cwd: Path, *args: str, **kwargs):
+            nonlocal swapped
+            if not swapped and args and args[0] == "ls-remote" and "/proc/self/fd/" in args[-2]:
+                swapped = True
+                heads = approved / "refs" / "heads"
+                original = approved / "refs" / "heads.original"
+                heads.rename(original)
+                replacement = heads / "agent"
+                replacement.mkdir(parents=True)
+                (replacement / "test").write_text(self.repo.candidate + "\n", encoding="ascii")
+                try:
+                    return real_run_git(cwd, *args, **kwargs)
+                finally:
+                    for child in replacement.iterdir():
+                        child.unlink()
+                    replacement.rmdir()
+                    heads.rmdir()
+                    original.rename(heads)
+            return real_run_git(cwd, *args, **kwargs)
+
+        with mock.patch.object(
+            publication, "_run_git", side_effect=swap_parent_only_during_ls_remote
+        ):
+            with self.assertRaisesRegex(
+                publication.PublicationError,
+                "local publication branch changed during readback",
+            ):
+                publication.preflight(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url=str(approved),
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                )
+
+        self.assertTrue(swapped)
+        self.assertEqual(git(approved, "rev-parse", "refs/heads/agent/test"), self.repo.base)
+
+    def test_local_endpoint_swap_during_push_cannot_redirect_mutation(self) -> None:
+        approved = self._prepare_literal_approved_endpoint()
+        escape = self.repo.extra_remote("push-endpoint-escape.git")
+        git(
+            self.repo.work,
+            "push",
+            "-q",
+            str(escape),
+            f"{self.repo.base}:refs/heads/agent/test",
+        )
+        moved = self.repo.work / "approved.original"
+        bundle = self.repo.artifacts / "push-endpoint-race.bundle"
+        real_run_git = publication._run_git
+        swapped = False
+
+        def swap_endpoint_only_during_push(cwd: Path, *args: str, **kwargs):
+            nonlocal swapped
+            if not swapped and "push" in args:
+                swapped = True
+                approved.rename(moved)
+                approved.symlink_to(escape, target_is_directory=True)
+                try:
+                    return real_run_git(cwd, *args, **kwargs)
+                finally:
+                    approved.unlink()
+                    moved.rename(approved)
+            return real_run_git(cwd, *args, **kwargs)
+
+        with mock.patch.object(publication, "_run_git", side_effect=swap_endpoint_only_during_push):
+            result = publication.publish(
+                self.repo.work,
+                remote="origin",
+                expected_push_url="approved",
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+                recovery_bundle=bundle,
+            )
+
+        self.assertTrue(swapped)
+        self.assertEqual(result.state, "PUBLISHED")
+        self.assertEqual(git(approved, "rev-parse", "refs/heads/agent/test"), self.repo.candidate)
+        self.assertEqual(git(escape, "rev-parse", "refs/heads/agent/test"), self.repo.base)
+        self.assertTrue(bundle.exists())
+
     def test_final_post_push_restoration_cannot_precede_classification(self) -> None:
         approved = self._prepare_literal_approved_endpoint()
         git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
