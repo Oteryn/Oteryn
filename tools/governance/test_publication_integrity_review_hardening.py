@@ -758,7 +758,10 @@ class PublicationReviewHardeningTests(unittest.TestCase):
             return real_run_git(cwd, *args, **kwargs)
 
         with mock.patch.object(publication, "_run_git", side_effect=replace_commondir_at_readback):
-            with self.assertRaisesRegex(publication.PublicationError, "ambiguous publication outcome"):
+            with self.assertRaisesRegex(
+                publication.PublicationError,
+                "linked-worktree local publication targets are not supported",
+            ):
                 publication.publish(
                     self.repo.work,
                     remote="origin",
@@ -769,14 +772,14 @@ class PublicationReviewHardeningTests(unittest.TestCase):
                     recovery_bundle=bundle,
                 )
 
-        self.assertTrue(replaced)
+        self.assertFalse(replaced)
         self.assertEqual(
             publication.remote_head(self.repo.work, str(common), "agent/test"), self.repo.base
         )
         self.assertEqual(
             publication.remote_head(self.repo.work, str(escape), "agent/test"), self.repo.candidate
         )
-        self.assertTrue(bundle.exists())
+        self.assertFalse(bundle.exists())
         self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
 
     def test_transient_ref_swap_during_stable_readback_is_blocked_by_ref_lock(self) -> None:
@@ -1094,6 +1097,132 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         self.assertEqual(git(approved, "rev-parse", "refs/heads/agent/test"), self.repo.candidate)
         self.assertEqual(git(escape, "rev-parse", "refs/heads/agent/test"), self.repo.base)
         self.assertTrue(bundle.exists())
+
+    def test_linked_worktree_commondir_cannot_redirect_guarded_push(self) -> None:
+        approved = self.repo.root / "linked-push"
+        git(
+            self.repo.remote,
+            "worktree",
+            "add",
+            "--detach",
+            str(approved),
+            "refs/heads/agent/test",
+        )
+        escape = self.repo.extra_remote("linked-push-escape.git")
+        git(
+            self.repo.work,
+            "push",
+            "-q",
+            str(escape),
+            f"{self.repo.base}:refs/heads/agent/test",
+        )
+        git(self.repo.work, "remote", "set-url", "origin", str(approved))
+        bundle = self.repo.artifacts / "linked-push-commondir.bundle"
+        real_run_git = publication._run_git
+        push_reached = False
+
+        def rewrite_commondir_only_during_push(cwd: Path, *args: str, **kwargs):
+            nonlocal push_reached
+            if "push" in args:
+                push_reached = True
+                gitfile = approved / ".git"
+                admin = Path(gitfile.read_text(encoding="utf-8").strip()[8:])
+                commondir = admin / "commondir"
+                original = commondir.read_text(encoding="utf-8")
+                commondir.write_text(f"{escape}\n", encoding="utf-8")
+                try:
+                    return real_run_git(cwd, *args, **kwargs)
+                finally:
+                    commondir.write_text(original, encoding="utf-8")
+            return real_run_git(cwd, *args, **kwargs)
+
+        with mock.patch.object(publication, "_run_git", side_effect=rewrite_commondir_only_during_push):
+            with self.assertRaisesRegex(
+                publication.PublicationError,
+                "linked-worktree local publication targets are not supported",
+            ):
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url=str(approved),
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        self.assertFalse(push_reached)
+        self.assertEqual(
+            git(self.repo.remote, "rev-parse", "refs/heads/agent/test"), self.repo.base
+        )
+        self.assertEqual(git(escape, "rev-parse", "refs/heads/agent/test"), self.repo.base)
+        self.assertFalse(bundle.exists())
+
+    def test_packed_refs_remains_pinned_through_classification(self) -> None:
+        approved = self.repo.root / "packed-classification.git"
+        git(self.repo.root, "clone", "-q", "--bare", str(self.repo.remote), str(approved))
+        git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
+        git(approved, "pack-refs", "--all", "--prune")
+        git(self.repo.work, "remote", "set-url", "origin", str(approved))
+        packed = approved / "packed-refs"
+        predecessor_storage = packed.with_name("packed-refs.predecessor")
+        real_run_git = publication._run_git
+        real_classify = publication.classify_remote_state
+        replacement_installed = False
+
+        def candidate_storage_during_readback(cwd: Path, *args: str, **kwargs):
+            nonlocal replacement_installed
+            if (
+                not replacement_installed
+                and args
+                and args[0] == "ls-remote"
+                and "/proc/self/fd/" in args[-2]
+            ):
+                replacement_installed = True
+                packed.rename(predecessor_storage)
+                packed.write_text(
+                    f"# pack-refs with: peeled fully-peeled sorted\n"
+                    f"{self.repo.candidate} refs/heads/agent/test\n",
+                    encoding="ascii",
+                )
+            return real_run_git(cwd, *args, **kwargs)
+
+        def restore_storage_at_classification(remote: str, expected: str, candidate: str) -> str:
+            packed.unlink()
+            predecessor_storage.rename(packed)
+            return real_classify(remote, expected, candidate)
+
+        try:
+            with (
+                mock.patch.object(
+                    publication, "_run_git", side_effect=candidate_storage_during_readback
+                ),
+                mock.patch.object(
+                    publication,
+                    "classify_remote_state",
+                    side_effect=restore_storage_at_classification,
+                ),
+            ):
+                with self.assertRaisesRegex(
+                    publication.PublicationError,
+                    "packed-refs storage changed during classification",
+                ):
+                    publication.preflight(
+                        self.repo.work,
+                        remote="origin",
+                        expected_push_url=str(approved),
+                        branch="agent/test",
+                        expected_remote_head=self.repo.base,
+                        candidate=self.repo.candidate,
+                    )
+        finally:
+            if predecessor_storage.exists():
+                if packed.exists():
+                    packed.unlink()
+                predecessor_storage.rename(packed)
+
+        self.assertTrue(replacement_installed)
+        self.assertEqual(git(approved, "rev-parse", "refs/heads/agent/test"), self.repo.base)
 
     def test_final_post_push_restoration_cannot_precede_classification(self) -> None:
         approved = self._prepare_literal_approved_endpoint()

@@ -670,6 +670,28 @@ def _stable_local_remote_head(
                 os.close(git_descriptor)
             raise PublicationError("unable to open a stable local publication endpoint") from exc
     assert git_descriptor is not None and common_descriptor is not None
+    pinned_packed_descriptor: int | None = None
+    pinned_packed_identity: tuple[int, int] | None = None
+
+    def verify_pinned_packed_storage() -> None:
+        """Keep the exact packed-ref object authoritative through classification."""
+        if pinned_packed_descriptor is None or pinned_packed_identity is None:
+            return
+        metadata = os.fstat(pinned_packed_descriptor)
+        if (metadata.st_dev, metadata.st_ino) != pinned_packed_identity:
+            raise PublicationError("packed-refs storage changed during classification")
+        verification = os.open(
+            "packed-refs",
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=common_descriptor,
+        )
+        try:
+            verify_metadata = os.fstat(verification)
+            if (verify_metadata.st_dev, verify_metadata.st_ino) != pinned_packed_identity:
+                raise PublicationError("packed-refs storage changed during classification")
+        finally:
+            os.close(verification)
+
     try:
         metadata = os.fstat(git_descriptor)
         if (metadata.st_dev, metadata.st_ino) != (
@@ -745,6 +767,7 @@ def _stable_local_remote_head(
             ) from exc
 
         def stable_readback() -> str:
+            nonlocal pinned_packed_descriptor, pinned_packed_identity
             result = _run_git(
                 cwd,
                 "ls-remote",
@@ -803,17 +826,19 @@ def _stable_local_remote_head(
                 finally:
                     os.close(ref_descriptor)
             else:
-                packed_descriptor: int | None = None
                 try:
-                    packed_descriptor = os.open(
+                    pinned_packed_descriptor = os.open(
                         "packed-refs",
                         os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
                         dir_fd=common_descriptor,
                     )
-                    packed_metadata = os.fstat(packed_descriptor)
+                    packed_metadata = os.fstat(pinned_packed_descriptor)
                     if not stat.S_ISREG(packed_metadata.st_mode):
                         raise PublicationError("packed-refs storage is not a regular file")
-                    with os.fdopen(os.dup(packed_descriptor), "r", encoding="ascii") as packed:
+                    pinned_packed_identity = (packed_metadata.st_dev, packed_metadata.st_ino)
+                    with os.fdopen(
+                        os.dup(pinned_packed_descriptor), "r", encoding="ascii"
+                    ) as packed:
                         matches = [
                             line.split(" ", 1)[0]
                             for line in packed
@@ -824,27 +849,11 @@ def _stable_local_remote_head(
                         raise PublicationError("remote branch is missing or ambiguous")
                     pinned_head = _sha(matches[0], "remote head")
 
-                    verification = os.open(
-                        "packed-refs",
-                        os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
-                        dir_fd=common_descriptor,
-                    )
-                    try:
-                        verify_metadata = os.fstat(verification)
-                        if (verify_metadata.st_dev, verify_metadata.st_ino) != (
-                            packed_metadata.st_dev,
-                            packed_metadata.st_ino,
-                        ):
-                            raise PublicationError("packed-refs storage changed during readback")
-                    finally:
-                        os.close(verification)
+                    verify_pinned_packed_storage()
                 except FileNotFoundError as exc:
                     raise PublicationError("remote branch is missing or ambiguous") from exc
                 except (UnicodeDecodeError, OSError) as exc:
                     raise PublicationError("unable to read pinned packed-refs storage") from exc
-                finally:
-                    if packed_descriptor is not None:
-                        os.close(packed_descriptor)
 
             if pinned_head != ls_remote_head:
                 raise PublicationError("local publication branch changed during readback")
@@ -928,10 +937,19 @@ def _stable_local_remote_head(
                 raise PublicationError("approved local filesystem endpoint identity changed")
             verify_ref_hierarchy()
             if classify_against is None:
+                verify_pinned_packed_storage()
                 return observed
             expected, candidate = classify_against
-            return observed, classify_remote_state(observed, expected, candidate)
+            verify_pinned_packed_storage()
+            state = classify_remote_state(observed, expected, candidate)
+            # Classification callbacks and concurrent filesystem actors must
+            # not be able to restore predecessor storage after the last check
+            # but before success evidence leaves this protected boundary.
+            verify_pinned_packed_storage()
+            return observed, state
         finally:
+            if pinned_packed_descriptor is not None:
+                os.close(pinned_packed_descriptor)
             assert lock_descriptor is not None
             os.close(lock_descriptor)
             try:
@@ -1086,6 +1104,16 @@ def publish(
     branch_ref = f"refs/heads/{branch}"
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
     candidate = _sha(candidate, "candidate")
+    initial_endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
+    initial_identity = _filesystem_endpoint_identity(cwd, initial_endpoint)
+    if initial_identity is not None and initial_identity.commondir_path is not None:
+        # A descriptor for the per-worktree administrative directory does not
+        # bind receive-pack's subsequent read of its mutable commondir file.
+        # Until mutation can be expressed against an immutable common-dir
+        # binding, linked-worktree local publication targets fail closed.
+        raise PublicationError(
+            "linked-worktree local publication targets are not supported for mutation"
+        )
     state = preflight(
         cwd,
         remote=remote,
