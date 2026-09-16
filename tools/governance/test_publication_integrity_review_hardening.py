@@ -634,6 +634,73 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         self.assertEqual(packed.stat().st_ino, original_inode)
         self.assertEqual(git(approved, "rev-parse", "refs/heads/agent/test"), self.repo.base)
 
+    def test_packed_selection_revalidates_loose_ref_absence_through_classification(
+        self,
+    ) -> None:
+        approved = self.repo.root / "packed-shadowed.git"
+        git(self.repo.root, "clone", "-q", "--bare", str(self.repo.remote), str(approved))
+        git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
+        branch_ref = "refs/heads/agent/test"
+        git(approved, "update-ref", branch_ref, self.repo.candidate)
+        git(approved, "pack-refs", "--all", "--prune")
+        git(self.repo.work, "remote", "set-url", "origin", str(approved))
+
+        loose_ref = approved / "refs" / "heads" / "agent" / "test"
+        loose_ref.parent.mkdir(parents=True, exist_ok=True)
+        loose_ref.write_text(f"{self.repo.base}\n", encoding="ascii")
+        hidden_loose_ref = loose_ref.with_name("test.hidden")
+        bundle = self.repo.artifacts / "packed-shadowed.bundle"
+        self.assertEqual(git(approved, "rev-parse", branch_ref), self.repo.base)
+
+        real_run_git = publication._run_git
+        real_classify = publication.classify_remote_state
+        loose_hidden = False
+
+        def hide_loose_ref_for_packed_observation(cwd: Path, *args: str, **kwargs):
+            nonlocal loose_hidden
+            if (
+                not loose_hidden
+                and args
+                and args[0] == "ls-remote"
+                and "/proc/self/fd/" in args[-2]
+            ):
+                loose_ref.rename(hidden_loose_ref)
+                loose_hidden = True
+            return real_run_git(cwd, *args, **kwargs)
+
+        def restore_loose_ref(remote: str, expected: str, candidate: str) -> str:
+            hidden_loose_ref.rename(loose_ref)
+            return real_classify(remote, expected, candidate)
+
+        with (
+            mock.patch.object(
+                publication, "_run_git", side_effect=hide_loose_ref_for_packed_observation
+            ),
+            mock.patch.object(
+                publication, "classify_remote_state", side_effect=restore_loose_ref
+            ),
+        ):
+            with self.assertRaisesRegex(
+                publication.PublicationError,
+                "loose-ref absence changed during classification",
+            ):
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url=str(approved),
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        self.assertTrue(loose_hidden)
+        self.assertTrue(loose_ref.is_file())
+        self.assertFalse(hidden_loose_ref.exists())
+        self.assertEqual(git(approved, "rev-parse", branch_ref), self.repo.base)
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
     def test_legacy_remotes_alias_cannot_redirect_approved_endpoint(self) -> None:
         approved = self._prepare_literal_approved_endpoint()
         escape = self.repo.extra_remote("legacy-remotes-escape.git")

@@ -676,6 +676,7 @@ def _stable_local_remote_head(
     pinned_loose_descriptor: int | None = None
     pinned_loose_identity: tuple[int, int] | None = None
     pinned_loose_contents: bytes | None = None
+    pinned_loose_absence = False
 
     def _read_descriptor(descriptor: int, label: str) -> bytes:
         try:
@@ -739,6 +740,28 @@ def _stable_local_remote_head(
                 raise PublicationError("packed-refs storage changed during classification")
         finally:
             os.close(verification)
+
+    def verify_pinned_loose_absence() -> None:
+        """Keep packed-only classification conditional on the loose ref staying absent."""
+        if not pinned_loose_absence:
+            return
+        verification: int | None = None
+        try:
+            verification = os.open(
+                components[-1],
+                os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=lock_parent,
+            )
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise PublicationError(
+                "unable to revalidate loose-ref absence during classification"
+            ) from exc
+        finally:
+            if verification is not None:
+                os.close(verification)
+        raise PublicationError("loose-ref absence changed during classification")
 
     try:
         metadata = os.fstat(git_descriptor)
@@ -817,6 +840,7 @@ def _stable_local_remote_head(
         def stable_readback() -> str:
             nonlocal pinned_loose_contents, pinned_loose_descriptor, pinned_loose_identity
             nonlocal pinned_packed_contents, pinned_packed_descriptor, pinned_packed_identity
+            nonlocal pinned_loose_absence
             result = _run_git(
                 cwd,
                 "ls-remote",
@@ -882,6 +906,11 @@ def _stable_local_remote_head(
                     if ref_descriptor is not None:
                         os.close(ref_descriptor)
             else:
+                # The packed value is authoritative only while no loose ref
+                # shadows it.  Record that absence against the already-open
+                # no-follow parent hierarchy and retain it as classification
+                # evidence just like the packed file's identity and bytes.
+                pinned_loose_absence = True
                 try:
                     pinned_packed_descriptor = os.open(
                         "packed-refs",
@@ -911,6 +940,7 @@ def _stable_local_remote_head(
                     pinned_head = _sha(matches[0], "remote head")
 
                     verify_pinned_packed_storage()
+                    verify_pinned_loose_absence()
                 except FileNotFoundError as exc:
                     raise PublicationError("remote branch is missing or ambiguous") from exc
                 except (UnicodeDecodeError, OSError) as exc:
@@ -919,6 +949,7 @@ def _stable_local_remote_head(
             if pinned_head != ls_remote_head:
                 raise PublicationError("local publication branch changed during readback")
             verify_pinned_loose_storage()
+            verify_pinned_loose_absence()
             return pinned_head
 
         def verify_ref_hierarchy() -> None:
@@ -1000,16 +1031,19 @@ def _stable_local_remote_head(
             verify_ref_hierarchy()
             if classify_against is None:
                 verify_pinned_loose_storage()
+                verify_pinned_loose_absence()
                 verify_pinned_packed_storage()
                 return observed
             expected, candidate = classify_against
             verify_pinned_loose_storage()
+            verify_pinned_loose_absence()
             verify_pinned_packed_storage()
             state = classify_remote_state(observed, expected, candidate)
             # Classification callbacks and concurrent filesystem actors must
             # not be able to restore predecessor storage after the last check
             # but before success evidence leaves this protected boundary.
             verify_pinned_loose_storage()
+            verify_pinned_loose_absence()
             verify_pinned_packed_storage()
             return observed, state
         finally:
