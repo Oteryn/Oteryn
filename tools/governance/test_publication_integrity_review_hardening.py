@@ -720,6 +720,53 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         self.assertTrue(bundle.exists())
         self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
 
+    def test_transient_ref_swap_during_stable_readback_is_ambiguous(self) -> None:
+        approved = self._prepare_literal_approved_endpoint()
+        hook = approved / "hooks" / "pre-receive"
+        hook.write_text("#!/bin/sh\nexit 73\n", encoding="utf-8")
+        hook.chmod(0o755)
+
+        # Seed the candidate object without advancing the approved branch.
+        git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
+        bundle = self.repo.artifacts / "transient-ref-readback.bundle"
+        real_run_git = publication._run_git
+        swapped = False
+
+        def transient_ref_swap(cwd: Path, *args: str, **kwargs):
+            nonlocal swapped
+            stable_readback = (
+                args
+                and args[0] == "ls-remote"
+                and any(value.startswith("/proc/self/fd/") for value in args)
+            )
+            if stable_readback and not swapped:
+                git(approved, "update-ref", "refs/heads/agent/test", self.repo.candidate)
+                try:
+                    return real_run_git(cwd, *args, **kwargs)
+                finally:
+                    git(approved, "update-ref", "refs/heads/agent/test", self.repo.base)
+                    swapped = True
+            return real_run_git(cwd, *args, **kwargs)
+
+        with mock.patch.object(publication, "_run_git", side_effect=transient_ref_swap):
+            with self.assertRaisesRegex(publication.PublicationError, "ambiguous publication outcome"):
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url="approved",
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        self.assertTrue(swapped)
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(approved), "agent/test"), self.repo.base
+        )
+        self.assertTrue(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

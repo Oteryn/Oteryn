@@ -672,17 +672,25 @@ def _stable_local_remote_head(
 
         branch = _branch(branch, cwd)
         branch_ref = f"refs/heads/{branch}"
-        result = _run_git(
-            cwd,
-            "ls-remote",
-            "--heads",
-            proc_endpoint,
-            branch_ref,
-            check=False,
-            pass_fds=(git_descriptor, common_descriptor),
-        )
-        if result.returncode != 0:
-            raise PublicationError("remote head readback is unavailable")
+        def stable_readback() -> str:
+            result = _run_git(
+                cwd,
+                "ls-remote",
+                "--heads",
+                proc_endpoint,
+                branch_ref,
+                check=False,
+                pass_fds=(git_descriptor, common_descriptor),
+            )
+            if result.returncode != 0:
+                raise PublicationError("remote head readback is unavailable")
+            rows = [line.split() for line in result.stdout.splitlines() if line.strip()]
+            rows = [row for row in rows if len(row) == 2 and row[1] == branch_ref]
+            if len(rows) != 1:
+                raise PublicationError("remote branch is missing or ambiguous")
+            return _sha(rows[0][0], "remote head")
+
+        observed = stable_readback()
         metadata = os.fstat(git_descriptor)
         if (metadata.st_dev, metadata.st_ino) != (
             identity.git_directory_device,
@@ -698,11 +706,16 @@ def _stable_local_remote_head(
         current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
         if current != identity:
             raise PublicationError("approved local filesystem endpoint identity changed")
-        rows = [line.split() for line in result.stdout.splitlines() if line.strip()]
-        rows = [row for row in rows if len(row) == 2 and row[1] == branch_ref]
-        if len(rows) != 1:
-            raise PublicationError("remote branch is missing or ambiguous")
-        return _sha(rows[0][0], "remote head")
+        # Stable directory handles do not freeze ref contents. Confirm the
+        # branch after the first observation and identity checks so a candidate
+        # exposed only while the initial ls-remote runs cannot prove success.
+        confirmed = stable_readback()
+        if confirmed != observed:
+            raise PublicationError("approved local filesystem branch content changed during readback")
+        current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
+        if current != identity:
+            raise PublicationError("approved local filesystem endpoint identity changed")
+        return confirmed
     finally:
         os.close(common_descriptor)
         os.close(git_descriptor)
