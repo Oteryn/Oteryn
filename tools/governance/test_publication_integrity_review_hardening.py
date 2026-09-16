@@ -550,6 +550,53 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         self.assertFalse(bundle.exists())
         self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
 
+    def test_file_url_query_and_fragment_cannot_rebind_local_evidence(self) -> None:
+        for delimiter, suffix in (("?", "route"), ("#", "fragment")):
+            with self.subTest(delimiter=delimiter):
+                literal = self.repo.extra_remote(f"literal-{suffix}.git{delimiter}{suffix}")
+                stripped = self.repo.extra_remote(f"literal-{suffix}.git")
+                git(
+                    self.repo.work,
+                    "push",
+                    "-q",
+                    str(literal),
+                    f"{self.repo.base}:refs/heads/agent/test",
+                )
+                git(
+                    self.repo.work,
+                    "push",
+                    "-q",
+                    str(stripped),
+                    f"{self.repo.candidate}:refs/heads/agent/test",
+                )
+                endpoint = f"file://{literal}"
+                git(self.repo.work, "remote", "set-url", "--push", "origin", endpoint)
+                bundle = self.repo.artifacts / f"file-{suffix}.bundle"
+
+                with self.assertRaisesRegex(
+                    publication.PublicationError, "query or fragment delimiters"
+                ):
+                    publication.publish(
+                        self.repo.work,
+                        remote="origin",
+                        expected_push_url=endpoint,
+                        branch="agent/test",
+                        expected_remote_head=self.repo.base,
+                        candidate=self.repo.candidate,
+                        recovery_bundle=bundle,
+                    )
+
+                self.assertEqual(
+                    publication.remote_head(self.repo.work, str(literal), "agent/test"),
+                    self.repo.base,
+                )
+                self.assertEqual(
+                    publication.remote_head(self.repo.work, str(stripped), "agent/test"),
+                    self.repo.candidate,
+                )
+                self.assertFalse(bundle.exists())
+                self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
     def test_readback_path_replacement_during_ls_remote_is_ambiguous(self) -> None:
         approved = self._prepare_literal_approved_endpoint()
         escape = self.repo.extra_remote("readback-boundary-escape.git")
@@ -834,7 +881,12 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         approved = self._prepare_literal_approved_endpoint()
         git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
         git(approved, "update-ref", "refs/heads/underlying", self.repo.candidate)
-        git(approved, "symbolic-ref", "refs/heads/agent/test", "refs/heads/underlying")
+        symbolic_ref = approved / "refs" / "heads" / "agent" / "test"
+        symbolic_ref.write_bytes(b"ref:\trefs/heads/underlying\n")
+        self.assertEqual(
+            git(approved, "symbolic-ref", "refs/heads/agent/test"),
+            "refs/heads/underlying",
+        )
         bundle = self.repo.artifacts / "symbolic-target.bundle"
         real_open = publication.os.open
         referent_move_returncode: int | None = None

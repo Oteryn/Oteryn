@@ -135,8 +135,17 @@ def _credential_free_url(value: str, label: str) -> str:
             raise PublicationError(f"{label} must use a supported native Git push URL scheme")
         if parsed.username is not None or parsed.password is not None:
             raise PublicationError(f"{label} must not embed credentials")
-        if scheme == "file" and parsed.netloc not in ("", "localhost"):
-            raise PublicationError(f"{label} must not use an unsupported file URL authority")
+        if scheme == "file":
+            if parsed.netloc not in ("", "localhost"):
+                raise PublicationError(f"{label} must not use an unsupported file URL authority")
+            # Git treats literal query/fragment delimiters in file URLs as
+            # filesystem-path bytes, whereas urllib parsing separates them.
+            # Reject the ambiguous spelling rather than binding and reading a
+            # different local repository from the one Git would use.
+            if parsed.query or parsed.fragment or "?" in value or "#" in value:
+                raise PublicationError(
+                    f"{label} must not use query or fragment delimiters in a file URL"
+                )
     return value
 
 
@@ -752,7 +761,11 @@ def _stable_local_remote_head(
                         raise PublicationError(
                             "local publication branch ref storage is not a regular file"
                         )
-                    if os.read(ref_descriptor, 5) == b"ref: ":
+                    # Git accepts whitespace other than a single space after
+                    # the symbolic-ref header (for example ``ref:\t...``).
+                    # Reject the syntax marker itself before accepting local
+                    # evidence because the named lock does not cover referents.
+                    if os.read(ref_descriptor, 4) == b"ref:":
                         raise PublicationError(
                             "symbolic local publication target branches are not supported"
                         )
