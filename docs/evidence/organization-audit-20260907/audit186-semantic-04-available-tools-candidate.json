@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "status": "DIRECT_CANDIDATE_ONLY_NOT_ADOPTED",
+  "adoption_performed": false,
+  "coverage_adopted": false,
+  "authority": {
+    "programme": "Oteryn/Oteryn#203@82bc113797ecdc70d79aee628d339136b816e15d",
+    "governing_issue": "Oteryn/Oteryn#186",
+    "canonical_audit": "Oteryn/Oteryn#185@2d877271afa8f177983f3c6147472372adca0ed1",
+    "worker_pull_request": "Oteryn/Oteryn#211",
+    "handoff_target": "AUDIT186-LEAD"
+  },
+  "canonical_membership": {
+    "report_path": "docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json",
+    "report_blob_sha": "def469a4392e1202f7dc79dbb73bfb6f801d21cd",
+    "report_sha256": "3f6f6c0e4b7bffac9e240b3e9ccb1ee080be181aff6b29e2d7347107b3313b64",
+    "population": {
+      "meta": 210,
+      "game": 830,
+      "platform": 2165,
+      "atlas": 1155,
+      "migration_archive": 1,
+      "total": 4361
+    },
+    "canonical_ledger_sha256": "8520e472698d3592fcc95d5b093a631d9ae936256affcbf2d1418fa8b7448f94",
+    "canonical_disposition_before_projection": "UNVERIFIED"
+  },
+  "source_coordinate": {
+    "repository_key": "meta",
+    "repository": "Oteryn/Oteryn",
+    "commit_sha": "23b21e9b1b2d4b6c3a5cac3d4c7a18747804c090",
+    "tree_sha": "b8ebb8e50bce14a736fa65590ac121655c52fd12",
+    "leaf_count": 210
+  },
+  "family": {
+    "id": "META-AVAILABLE-TOOLS-SINGLE-LEAF",
+    "coherence": "The standalone META available-tools guide is one indivisible documentation leaf and therefore the smallest non-empty coherent family.",
+    "path_count": 1,
+    "proposed_disposition": "DIRECT",
+    "grouped_equivalence": {
+      "proposed": false,
+      "result": "NOT_APPLICABLE_SINGLE_LEAF_DIRECT_REVIEW"
+    },
+    "paths": [
+      {
+        "path": "docs/agents/AVAILABLE_TOOLS.md",
+        "blob_sha": "2759c93d1e97e4c405c3fbab08b2dbbf0708c7c7",
+        "sha256": "00c746e8b2375b3ce03b477802d93018404af32764f048b41521551c9cbd0473",
+        "bytes": 1055,
+        "canonical_inventory_member": true,
+        "canonical_population_member": true,
+        "canonical_disposition": "UNVERIFIED",
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_SOURCE_SEMANTIC_REVIEW",
+        "semantic_scope": "The full frozen leaf was reviewed as a conditional guide to agent tool categories, repository-fact verification, coordination boundaries, and the rule that tool presence does not expand task authority.",
+        "limitations": "This source review attests only what the frozen guide declares. It does not prove any tool is currently installed, authenticated, authorized, reachable, or suitable; current GitHub/provider state; Notion consistency; host-local need; runtime/product readiness; or organization-audit completion."
+      }
+    ]
+  },
+  "excluded_scope": {
+    "pr204_frozen_path_count": 26,
+    "pr204_frozen_path_set_sha256": "c773577917c9b8b722fdbe65459a624dcb08975f34ec0e8db2956e4551b4936e",
+    "pr207_rejected_paths": [
+      "docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.md",
+      "docs/evidence/OTERYN-ORGANIZATION-COMPREHENSIVE-AUDIT-20260907.json"
+    ],
+    "source_rebaseline_performed": false,
+    "pr209_accepted_paths": [
+      "docs/ci/CI_CONTRACT.md"
+    ],
+    "pr209_projection_included": false
+  },
+  "projection_if_adopted": {
+    "label": "PROJECTION_ONLY",
+    "separate_from_pr204": true,
+    "separate_from_pr209": true,
+    "pr207_projection_included": false,
+    "delta": {
+      "direct": 1,
+      "grouped": 0,
+      "unverified": -1,
+      "semantically_classified": 1
+    },
+    "result_without_prior_projections": {
+      "source_leaves": 4361,
+      "direct": 309,
+      "grouped": 113,
+      "unverified": 3939,
+      "semantically_classified": 422
+    },
+    "conditional_result_after_pr204_and_pr209_adoption": {
+      "source_leaves": 4361,
+      "direct": 336,
+      "grouped": 113,
+      "unverified": 3912,
+      "semantically_classified": 449
+    }
+  },
+  "claims": {
+    "current_tool_availability": false,
+    "current_authentication_or_authorization": false,
+    "current_repository_or_provider_truth": false,
+    "host_exception_need": false,
+    "product_readiness": false,
+    "organization_audit_completion": false,
+    "provider_mutation": false
+  },
+  "deliberately_unverified": [
+    "Current availability, authentication, authorization, reachability, configuration, or suitability of GitHub, optional skills, Notion, Synology, or host-local tools.",
+    "Current GitHub or provider-owned repository facts, Notion consistency, host-only execution need, runtime behavior, product readiness, and release compatibility.",
+    "Any semantics outside the single frozen docs/agents/AVAILABLE_TOOLS.md leaf."
+  ],
+  "recheck_triggers": [
+    "The canonical audit head, canonical report blob, source coordinate, source tree or selected leaf blob changes.",
+    "Any canonical DIRECT/GROUPED disposition surface changes before adoption.",
+    "PR #204’s frozen path set or disposition, PR #207’s rejected/void disposition, or PR #209’s accepted path set or disposition changes.",
+    "The proposed scope is used to assert current tool availability, authentication, authorization, host exception need, repository/provider truth, runtime behavior, or product readiness.",
+    "Any adoption or canonical accounting mutation is proposed from this worker branch."
+  ]
+}
