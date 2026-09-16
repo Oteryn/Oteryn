@@ -640,7 +640,9 @@ def _stable_local_remote_head(
     cwd: Path,
     identity: FilesystemEndpointIdentity,
     branch: str,
-) -> str:
+    *,
+    classify_against: tuple[str, str] | None = None,
+) -> str | tuple[str, str]:
     """Read a local endpoint through its effective open common Git directory."""
     flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
     git_descriptor: int | None = None
@@ -715,7 +717,22 @@ def _stable_local_remote_head(
         current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
         if current != identity:
             raise PublicationError("approved local filesystem endpoint identity changed")
-        return confirmed
+        # Keep the content fence in force through the value returned for final
+        # classification. A writer that restores the predecessor as the second
+        # ls-remote returns must not supply transient success evidence.
+        final = stable_readback()
+        if final != confirmed:
+            raise PublicationError("approved local filesystem branch content changed before classification")
+        current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
+        if current != identity:
+            raise PublicationError("approved local filesystem endpoint identity changed")
+        if classify_against is None:
+            return final
+        # Compute the terminal state while the stable Git-directory handles
+        # are still held; callers must not classify a local observation after
+        # releasing the fence.
+        expected, candidate = classify_against
+        return final, classify_remote_state(final, expected, candidate)
     finally:
         os.close(common_descriptor)
         os.close(git_descriptor)
@@ -826,8 +843,21 @@ def preflight(
     if not _is_ancestor(cwd, expected_remote_head, candidate):
         raise PublicationError("candidate is not a fast-forward descendant of the expected remote head")
 
-    live = remote_head(cwd, endpoint, branch)
-    state = classify_remote_state(live, expected_remote_head, candidate)
+    endpoint_identity = _filesystem_endpoint_identity(cwd, endpoint)
+    if endpoint_identity is None:
+        live = remote_head(cwd, endpoint, branch)
+        state = classify_remote_state(live, expected_remote_head, candidate)
+    else:
+        # Local preflight evidence must meet the same identity and content
+        # stability standard as post-push reconciliation.
+        stable = _stable_local_remote_head(
+            cwd,
+            endpoint_identity,
+            branch,
+            classify_against=(expected_remote_head, candidate),
+        )
+        assert isinstance(stable, tuple)
+        live, state = stable
     if state == "REMOTE_HEAD_DRIFT":
         raise PublicationError("remote head moved away from the expected publication fence")
     return state
@@ -895,14 +925,21 @@ def publish(
             raise PublicationError("approved local filesystem endpoint identity changed during publication")
         if endpoint_identity is None:
             live = remote_head(cwd, readback_endpoint, branch)
+            final_state = classify_remote_state(live, expected_remote_head, candidate)
         else:
-            live = _stable_local_remote_head(cwd, endpoint_identity, branch)
+            stable = _stable_local_remote_head(
+                cwd,
+                endpoint_identity,
+                branch,
+                classify_against=(expected_remote_head, candidate),
+            )
+            assert isinstance(stable, tuple)
+            live, final_state = stable
     except PublicationError as exc:
         raise PublicationError(
             f"ambiguous publication outcome; remote readback unavailable; verified recovery bundle={bundle}"
         ) from exc
 
-    final_state = classify_remote_state(live, expected_remote_head, candidate)
     if final_state == "PUBLISHED":
         return PublicationResult(
             state="PUBLISHED",

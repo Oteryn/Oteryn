@@ -567,11 +567,15 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         bundle = self.repo.artifacts / "readback-boundary.bundle"
         real_run_git = publication._run_git
         replaced = False
+        push_seen = False
 
         def replace_at_readback(cwd: Path, *args: str, **kwargs):
-            nonlocal replaced
+            nonlocal replaced, push_seen
+            if "push" in args:
+                push_seen = True
             if (
-                not replaced
+                push_seen
+                and not replaced
                 and args
                 and args[0] == "ls-remote"
                 and any(value.startswith("/proc/self/fd/") for value in args)
@@ -621,11 +625,15 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         bundle = self.repo.artifacts / "git-directory-boundary.bundle"
         real_run_git = publication._run_git
         replaced = False
+        push_seen = False
 
         def replace_git_directory_at_readback(cwd: Path, *args: str, **kwargs):
-            nonlocal replaced
+            nonlocal replaced, push_seen
+            if "push" in args:
+                push_seen = True
             if (
-                not replaced
+                push_seen
+                and not replaced
                 and args
                 and args[0] == "ls-remote"
                 and any(value.startswith("/proc/self/fd/") for value in args)
@@ -685,11 +693,15 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         bundle = self.repo.artifacts / "linked-worktree-commondir.bundle"
         real_run_git = publication._run_git
         replaced = False
+        push_seen = False
 
         def replace_commondir_at_readback(cwd: Path, *args: str, **kwargs):
-            nonlocal replaced
+            nonlocal replaced, push_seen
+            if "push" in args:
+                push_seen = True
             if (
-                not replaced
+                push_seen
+                and not replaced
                 and args
                 and args[0] == "ls-remote"
                 and any(value.startswith("/proc/self/fd/") for value in args)
@@ -731,11 +743,15 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         bundle = self.repo.artifacts / "transient-ref-readback.bundle"
         real_run_git = publication._run_git
         swapped = False
+        push_seen = False
 
         def transient_ref_swap(cwd: Path, *args: str, **kwargs):
-            nonlocal swapped
+            nonlocal swapped, push_seen
+            if "push" in args:
+                push_seen = True
             stable_readback = (
-                args
+                push_seen
+                and args
                 and args[0] == "ls-remote"
                 and any(value.startswith("/proc/self/fd/") for value in args)
             )
@@ -761,6 +777,100 @@ class PublicationReviewHardeningTests(unittest.TestCase):
                 )
 
         self.assertTrue(swapped)
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(approved), "agent/test"), self.repo.base
+        )
+        self.assertTrue(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
+    def test_transient_candidate_during_local_preflight_is_not_already_published(self) -> None:
+        approved = self._prepare_literal_approved_endpoint()
+        git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
+        bundle = self.repo.artifacts / "preflight-transient-candidate.bundle"
+        real_run_git = publication._run_git
+        exposed = False
+
+        def transient_preflight_candidate(cwd: Path, *args: str, **kwargs):
+            nonlocal exposed
+            stable_readback = (
+                args
+                and args[0] == "ls-remote"
+                and any(value.startswith("/proc/self/fd/") for value in args)
+            )
+            if stable_readback and not exposed:
+                git(approved, "update-ref", "refs/heads/agent/test", self.repo.candidate)
+                try:
+                    return real_run_git(cwd, *args, **kwargs)
+                finally:
+                    git(approved, "update-ref", "refs/heads/agent/test", self.repo.base)
+                    exposed = True
+            return real_run_git(cwd, *args, **kwargs)
+
+        with mock.patch.object(publication, "_run_git", side_effect=transient_preflight_candidate):
+            with self.assertRaises(publication.PublicationError):
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url="approved",
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        self.assertTrue(exposed)
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(approved), "agent/test"), self.repo.base
+        )
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
+    def test_candidate_restored_after_second_post_push_read_is_not_published(self) -> None:
+        approved = self._prepare_literal_approved_endpoint()
+        hook = approved / "hooks" / "pre-receive"
+        hook.write_text("#!/bin/sh\nexit 73\n", encoding="utf-8")
+        hook.chmod(0o755)
+        git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
+        bundle = self.repo.artifacts / "post-push-final-classification.bundle"
+        real_run_git = publication._run_git
+        push_seen = False
+        post_push_reads = 0
+
+        def restore_after_second_post_push_read(cwd: Path, *args: str, **kwargs):
+            nonlocal push_seen, post_push_reads
+            if "push" in args:
+                push_seen = True
+            stable_readback = (
+                push_seen
+                and args
+                and args[0] == "ls-remote"
+                and any(value.startswith("/proc/self/fd/") for value in args)
+            )
+            if not stable_readback:
+                return real_run_git(cwd, *args, **kwargs)
+            post_push_reads += 1
+            if post_push_reads == 1:
+                git(approved, "update-ref", "refs/heads/agent/test", self.repo.candidate)
+            result = real_run_git(cwd, *args, **kwargs)
+            if post_push_reads == 2:
+                git(approved, "update-ref", "refs/heads/agent/test", self.repo.base)
+            return result
+
+        with mock.patch.object(
+            publication, "_run_git", side_effect=restore_after_second_post_push_read
+        ):
+            with self.assertRaisesRegex(publication.PublicationError, "ambiguous publication outcome"):
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url="approved",
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        self.assertEqual(post_push_reads, 3)
         self.assertEqual(
             publication.remote_head(self.repo.work, str(approved), "agent/test"), self.repo.base
         )
