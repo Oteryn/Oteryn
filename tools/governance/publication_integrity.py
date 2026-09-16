@@ -672,14 +672,33 @@ def _stable_local_remote_head(
     assert git_descriptor is not None and common_descriptor is not None
     pinned_packed_descriptor: int | None = None
     pinned_packed_identity: tuple[int, int] | None = None
+    pinned_packed_contents: bytes | None = None
 
     def verify_pinned_packed_storage() -> None:
-        """Keep the exact packed-ref object authoritative through classification."""
-        if pinned_packed_descriptor is None or pinned_packed_identity is None:
+        """Keep the exact packed-ref object and contents authoritative."""
+        if (
+            pinned_packed_descriptor is None
+            or pinned_packed_identity is None
+            or pinned_packed_contents is None
+        ):
             return
         metadata = os.fstat(pinned_packed_descriptor)
         if (metadata.st_dev, metadata.st_ino) != pinned_packed_identity:
             raise PublicationError("packed-refs storage changed during classification")
+        try:
+            os.lseek(pinned_packed_descriptor, 0, os.SEEK_SET)
+            current_contents = b""
+            while True:
+                chunk = os.read(pinned_packed_descriptor, 65536)
+                if not chunk:
+                    break
+                current_contents += chunk
+        except OSError as exc:
+            raise PublicationError(
+                "unable to revalidate pinned packed-refs contents"
+            ) from exc
+        if current_contents != pinned_packed_contents:
+            raise PublicationError("packed-refs contents changed during classification")
         verification = os.open(
             "packed-refs",
             os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
@@ -767,7 +786,7 @@ def _stable_local_remote_head(
             ) from exc
 
         def stable_readback() -> str:
-            nonlocal pinned_packed_descriptor, pinned_packed_identity
+            nonlocal pinned_packed_contents, pinned_packed_descriptor, pinned_packed_identity
             result = _run_git(
                 cwd,
                 "ls-remote",
@@ -836,15 +855,20 @@ def _stable_local_remote_head(
                     if not stat.S_ISREG(packed_metadata.st_mode):
                         raise PublicationError("packed-refs storage is not a regular file")
                     pinned_packed_identity = (packed_metadata.st_dev, packed_metadata.st_ino)
-                    with os.fdopen(
-                        os.dup(pinned_packed_descriptor), "r", encoding="ascii"
-                    ) as packed:
-                        matches = [
-                            line.split(" ", 1)[0]
-                            for line in packed
-                            if not line.startswith(("#", "^"))
-                            and line.rstrip("\n").endswith(f" {branch_ref}")
-                        ]
+                    with os.fdopen(os.dup(pinned_packed_descriptor), "rb") as packed:
+                        pinned_packed_contents = packed.read()
+                    try:
+                        packed_lines = pinned_packed_contents.decode("ascii").splitlines()
+                    except UnicodeDecodeError as exc:
+                        raise PublicationError(
+                            "unable to read pinned packed-refs storage"
+                        ) from exc
+                    matches = [
+                        line.split(" ", 1)[0]
+                        for line in packed_lines
+                        if not line.startswith(("#", "^"))
+                        and line.endswith(f" {branch_ref}")
+                    ]
                     if len(matches) != 1:
                         raise PublicationError("remote branch is missing or ambiguous")
                     pinned_head = _sha(matches[0], "remote head")
@@ -1135,6 +1159,14 @@ def publish(
 
     endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
     endpoint_identity = _filesystem_endpoint_identity(cwd, endpoint)
+    if endpoint_identity is not None and endpoint_identity.commondir_path is not None:
+        raise PublicationError(
+            "linked-worktree local publication targets are not supported for mutation"
+        )
+    if endpoint != initial_endpoint or endpoint_identity != initial_identity:
+        raise PublicationError(
+            "approved local filesystem endpoint identity changed before publication"
+        )
     git_descriptor: int | None = None
     common_descriptor: int | None = None
     try:
