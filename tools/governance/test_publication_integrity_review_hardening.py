@@ -929,6 +929,79 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         self.assertFalse(bundle.exists())
         self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
 
+    def test_packed_only_nested_branch_creates_safe_lock_hierarchy(self) -> None:
+        approved = self.repo.root / "packed-approved.git"
+        git(self.repo.root, "clone", "-q", "--bare", str(self.repo.remote), str(approved))
+        git(approved, "pack-refs", "--all", "--prune")
+        nested_parent = approved / "refs" / "heads" / "agent"
+        self.assertFalse(nested_parent.exists())
+        self.assertEqual(
+            git(approved, "rev-parse", "refs/heads/agent/test"), self.repo.base
+        )
+        git(self.repo.work, "remote", "set-url", "origin", str(approved))
+
+        state = publication.preflight(
+            self.repo.work,
+            remote="origin",
+            expected_push_url=str(approved),
+            branch="agent/test",
+            expected_remote_head=self.repo.base,
+            candidate=self.repo.candidate,
+        )
+        self.assertEqual(state, "NOT_PUBLISHED")
+        self.assertTrue(nested_parent.is_dir())
+
+        bundle = self.repo.artifacts / "packed-only.bundle"
+        result = publication.publish(
+            self.repo.work,
+            remote="origin",
+            expected_push_url=str(approved),
+            branch="agent/test",
+            expected_remote_head=self.repo.base,
+            candidate=self.repo.candidate,
+            recovery_bundle=bundle,
+        )
+        self.assertEqual(result.state, "PUBLISHED")
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(approved), "agent/test"),
+            self.repo.candidate,
+        )
+        self.assertTrue(bundle.exists())
+
+    def test_packed_only_branch_rejects_symlinked_lock_hierarchy(self) -> None:
+        approved = self.repo.root / "packed-symlink-approved.git"
+        git(self.repo.root, "clone", "-q", "--bare", str(self.repo.remote), str(approved))
+        git(approved, "pack-refs", "--all", "--prune")
+        heads = approved / "refs" / "heads"
+        heads.mkdir(parents=True, exist_ok=True)
+        redirected = self.repo.root / "redirected-ref-hierarchy"
+        redirected.mkdir()
+        (heads / "agent").symlink_to(redirected, target_is_directory=True)
+        git(self.repo.work, "remote", "set-url", "origin", str(approved))
+        bundle = self.repo.artifacts / "packed-symlink.bundle"
+
+        with self.assertRaisesRegex(
+            publication.PublicationError,
+            "unable to acquire stable local publication branch lock",
+        ):
+            publication.publish(
+                self.repo.work,
+                remote="origin",
+                expected_push_url=str(approved),
+                branch="agent/test",
+                expected_remote_head=self.repo.base,
+                candidate=self.repo.candidate,
+                recovery_bundle=bundle,
+            )
+
+        self.assertFalse((redirected / "test.lock").exists())
+        self.assertEqual(
+            publication.remote_head(self.repo.work, str(approved), "agent/test"),
+            self.repo.base,
+        )
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
     def test_final_post_push_restoration_cannot_precede_classification(self) -> None:
         approved = self._prepare_literal_approved_endpoint()
         git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)

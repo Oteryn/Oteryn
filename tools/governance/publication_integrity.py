@@ -695,13 +695,33 @@ def _stable_local_remote_head(
         # already locked rather than sampling an inherently movable value.
         lock_parent = common_descriptor
         opened_parents: list[int] = []
+        opened_parent_identities: list[tuple[int, int]] = []
         lock_name = ""
         lock_descriptor: int | None = None
         try:
             components = branch_ref.split("/")
             for component in components[:-1]:
-                next_parent = os.open(component, flags, dir_fd=lock_parent)
+                try:
+                    next_parent = os.open(component, flags, dir_fd=lock_parent)
+                except FileNotFoundError:
+                    # A packed-only nested branch need not have a corresponding
+                    # loose-ref directory hierarchy.  Create each missing
+                    # component relative to the already-open, verified parent,
+                    # then open it without following symlinks.  This mirrors
+                    # Git's loose-ref layout without trusting a path resolved
+                    # outside the bound common Git directory.
+                    try:
+                        os.mkdir(component, 0o777, dir_fd=lock_parent)
+                    except FileExistsError:
+                        # Another process may have created the component.  The
+                        # no-follow open below still decides whether it is safe.
+                        pass
+                    next_parent = os.open(component, flags, dir_fd=lock_parent)
                 opened_parents.append(next_parent)
+                parent_metadata = os.fstat(next_parent)
+                opened_parent_identities.append(
+                    (parent_metadata.st_dev, parent_metadata.st_ino)
+                )
                 lock_parent = next_parent
             lock_name = components[-1] + ".lock"
             lock_descriptor = os.open(
@@ -737,6 +757,30 @@ def _stable_local_remote_head(
             if len(rows) != 1:
                 raise PublicationError("remote branch is missing or ambiguous")
             return _sha(rows[0][0], "remote head")
+
+        def verify_ref_hierarchy() -> None:
+            """Prove the named lock still belongs to the bound ref hierarchy."""
+            parent = common_descriptor
+            verification_descriptors: list[int] = []
+            try:
+                for component, expected_identity in zip(
+                    components[:-1], opened_parent_identities, strict=True
+                ):
+                    descriptor = os.open(component, flags, dir_fd=parent)
+                    verification_descriptors.append(descriptor)
+                    metadata = os.fstat(descriptor)
+                    if (metadata.st_dev, metadata.st_ino) != expected_identity:
+                        raise PublicationError(
+                            "local publication branch ref hierarchy changed"
+                        )
+                    parent = descriptor
+            except OSError as exc:
+                raise PublicationError(
+                    "unable to verify local publication branch ref hierarchy"
+                ) from exc
+            finally:
+                for descriptor in reversed(verification_descriptors):
+                    os.close(descriptor)
 
         try:
             # A symbolic branch delegates its value to another ref. The named
@@ -790,6 +834,7 @@ def _stable_local_remote_head(
             current = _filesystem_endpoint_identity(cwd, identity.resolved_path)
             if current != identity:
                 raise PublicationError("approved local filesystem endpoint identity changed")
+            verify_ref_hierarchy()
             if classify_against is None:
                 return observed
             expected, candidate = classify_against
