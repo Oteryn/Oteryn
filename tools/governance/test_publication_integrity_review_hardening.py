@@ -465,6 +465,113 @@ class PublicationReviewHardeningTests(unittest.TestCase):
         self.assertEqual(git(escape, "rev-parse", "refs/heads/agent/test"), self.repo.base)
         self.assertTrue(bundle.exists())
 
+    def test_preflight_rejects_replacement_endpoint_candidate_evidence(self) -> None:
+        approved = self.repo.remote
+        original = self.repo.root / "preflight-approved-original.git"
+        replacement = self.repo.root / "preflight-replacement.git"
+        git(self.repo.root, "clone", "-q", "--bare", str(approved), str(replacement))
+        git(
+            self.repo.work,
+            "push",
+            "-q",
+            str(replacement),
+            f"{self.repo.candidate}:refs/heads/agent/test",
+        )
+        bundle = self.repo.artifacts / "preflight-endpoint-swap.bundle"
+        real_endpoint = publication._remote_push_endpoint
+        endpoint_resolutions = 0
+        swapped = False
+
+        def swap_only_for_preflight(*args, **kwargs):
+            nonlocal endpoint_resolutions, swapped
+            endpoint_resolutions += 1
+            if endpoint_resolutions == 2:
+                approved.rename(original)
+                replacement.rename(approved)
+                swapped = True
+            return real_endpoint(*args, **kwargs)
+
+        try:
+            with mock.patch.object(
+                publication, "_remote_push_endpoint", side_effect=swap_only_for_preflight
+            ):
+                with self.assertRaisesRegex(
+                    publication.PublicationError,
+                    "endpoint identity changed before preflight readback",
+                ):
+                    self.repo.publish("preflight-endpoint-swap.bundle")
+        finally:
+            if swapped:
+                approved.rename(replacement)
+                original.rename(approved)
+
+        self.assertTrue(swapped)
+        self.assertEqual(git(approved, "rev-parse", "refs/heads/agent/test"), self.repo.base)
+        self.assertEqual(
+            git(replacement, "rev-parse", "refs/heads/agent/test"), self.repo.candidate
+        )
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
+    def test_loose_ref_in_place_restore_during_classification_is_rejected(self) -> None:
+        approved = self.repo.root / "loose-in-place.git"
+        git(self.repo.root, "clone", "-q", "--bare", str(self.repo.remote), str(approved))
+        git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
+        git(self.repo.work, "remote", "set-url", "origin", str(approved))
+        loose_ref = approved / "refs" / "heads" / "agent" / "test"
+        loose_ref.parent.mkdir(parents=True, exist_ok=True)
+        loose_ref.write_text(f"{self.repo.base}\n", encoding="ascii")
+        self.assertTrue(loose_ref.is_file())
+        predecessor_contents = loose_ref.read_bytes()
+        candidate_contents = f"{self.repo.candidate}\n".encode("ascii")
+        original_inode = loose_ref.stat().st_ino
+        real_run_git = publication._run_git
+        real_classify = publication.classify_remote_state
+        candidate_exposed = False
+
+        def expose_candidate_in_place(cwd: Path, *args: str, **kwargs):
+            nonlocal candidate_exposed
+            if (
+                not candidate_exposed
+                and args
+                and args[0] == "ls-remote"
+                and "/proc/self/fd/" in args[-2]
+            ):
+                candidate_exposed = True
+                loose_ref.write_bytes(candidate_contents)
+                self.assertEqual(loose_ref.stat().st_ino, original_inode)
+            return real_run_git(cwd, *args, **kwargs)
+
+        def restore_predecessor_in_place(remote: str, expected: str, candidate: str) -> str:
+            loose_ref.write_bytes(predecessor_contents)
+            self.assertEqual(loose_ref.stat().st_ino, original_inode)
+            return real_classify(remote, expected, candidate)
+
+        with (
+            mock.patch.object(publication, "_run_git", side_effect=expose_candidate_in_place),
+            mock.patch.object(
+                publication,
+                "classify_remote_state",
+                side_effect=restore_predecessor_in_place,
+            ),
+        ):
+            with self.assertRaisesRegex(
+                publication.PublicationError,
+                "loose-ref contents changed during classification",
+            ):
+                publication.preflight(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url=str(approved),
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                )
+
+        self.assertTrue(candidate_exposed)
+        self.assertEqual(loose_ref.stat().st_ino, original_inode)
+        self.assertEqual(git(approved, "rev-parse", "refs/heads/agent/test"), self.repo.base)
+
     def test_packed_refs_in_place_restore_during_classification_is_rejected(self) -> None:
         approved = self.repo.root / "packed-in-place.git"
         git(self.repo.root, "clone", "-q", "--bare", str(self.repo.remote), str(approved))

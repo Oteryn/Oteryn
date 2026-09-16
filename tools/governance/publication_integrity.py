@@ -673,6 +673,46 @@ def _stable_local_remote_head(
     pinned_packed_descriptor: int | None = None
     pinned_packed_identity: tuple[int, int] | None = None
     pinned_packed_contents: bytes | None = None
+    pinned_loose_descriptor: int | None = None
+    pinned_loose_identity: tuple[int, int] | None = None
+    pinned_loose_contents: bytes | None = None
+
+    def _read_descriptor(descriptor: int, label: str) -> bytes:
+        try:
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            contents = b""
+            while True:
+                chunk = os.read(descriptor, 65536)
+                if not chunk:
+                    return contents
+                contents += chunk
+        except OSError as exc:
+            raise PublicationError(f"unable to revalidate pinned {label} contents") from exc
+
+    def verify_pinned_loose_storage() -> None:
+        """Keep the exact loose-ref object and contents authoritative."""
+        if (
+            pinned_loose_descriptor is None
+            or pinned_loose_identity is None
+            or pinned_loose_contents is None
+        ):
+            return
+        metadata = os.fstat(pinned_loose_descriptor)
+        if (metadata.st_dev, metadata.st_ino) != pinned_loose_identity:
+            raise PublicationError("loose-ref storage changed during classification")
+        if _read_descriptor(pinned_loose_descriptor, "loose-ref") != pinned_loose_contents:
+            raise PublicationError("loose-ref contents changed during classification")
+        verification = os.open(
+            components[-1],
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=lock_parent,
+        )
+        try:
+            verify_metadata = os.fstat(verification)
+            if (verify_metadata.st_dev, verify_metadata.st_ino) != pinned_loose_identity:
+                raise PublicationError("loose-ref storage changed during classification")
+        finally:
+            os.close(verification)
 
     def verify_pinned_packed_storage() -> None:
         """Keep the exact packed-ref object and contents authoritative."""
@@ -685,18 +725,7 @@ def _stable_local_remote_head(
         metadata = os.fstat(pinned_packed_descriptor)
         if (metadata.st_dev, metadata.st_ino) != pinned_packed_identity:
             raise PublicationError("packed-refs storage changed during classification")
-        try:
-            os.lseek(pinned_packed_descriptor, 0, os.SEEK_SET)
-            current_contents = b""
-            while True:
-                chunk = os.read(pinned_packed_descriptor, 65536)
-                if not chunk:
-                    break
-                current_contents += chunk
-        except OSError as exc:
-            raise PublicationError(
-                "unable to revalidate pinned packed-refs contents"
-            ) from exc
+        current_contents = _read_descriptor(pinned_packed_descriptor, "packed-refs")
         if current_contents != pinned_packed_contents:
             raise PublicationError("packed-refs contents changed during classification")
         verification = os.open(
@@ -786,6 +815,7 @@ def _stable_local_remote_head(
             ) from exc
 
         def stable_readback() -> str:
+            nonlocal pinned_loose_contents, pinned_loose_descriptor, pinned_loose_identity
             nonlocal pinned_packed_contents, pinned_packed_descriptor, pinned_packed_identity
             result = _run_git(
                 cwd,
@@ -831,8 +861,14 @@ def _stable_local_remote_head(
                         raise PublicationError(
                             "local publication branch ref storage is not a regular file"
                         )
-                    with os.fdopen(os.dup(ref_descriptor), "rb") as ref_file:
-                        value = ref_file.readline(256)
+                    pinned_loose_descriptor = ref_descriptor
+                    ref_descriptor = None
+                    pinned_loose_identity = (metadata.st_dev, metadata.st_ino)
+                    pinned_loose_contents = _read_descriptor(
+                        pinned_loose_descriptor, "loose-ref"
+                    )
+                    first_line = pinned_loose_contents.splitlines()[:1]
+                    value = first_line[0] if first_line else b""
                     if value.startswith(b"ref:"):
                         raise PublicationError(
                             "symbolic local publication target branches are not supported"
@@ -843,7 +879,8 @@ def _stable_local_remote_head(
                         "unable to read pinned local publication branch ref"
                     ) from exc
                 finally:
-                    os.close(ref_descriptor)
+                    if ref_descriptor is not None:
+                        os.close(ref_descriptor)
             else:
                 try:
                     pinned_packed_descriptor = os.open(
@@ -881,6 +918,7 @@ def _stable_local_remote_head(
 
             if pinned_head != ls_remote_head:
                 raise PublicationError("local publication branch changed during readback")
+            verify_pinned_loose_storage()
             return pinned_head
 
         def verify_ref_hierarchy() -> None:
@@ -961,17 +999,22 @@ def _stable_local_remote_head(
                 raise PublicationError("approved local filesystem endpoint identity changed")
             verify_ref_hierarchy()
             if classify_against is None:
+                verify_pinned_loose_storage()
                 verify_pinned_packed_storage()
                 return observed
             expected, candidate = classify_against
+            verify_pinned_loose_storage()
             verify_pinned_packed_storage()
             state = classify_remote_state(observed, expected, candidate)
             # Classification callbacks and concurrent filesystem actors must
             # not be able to restore predecessor storage after the last check
             # but before success evidence leaves this protected boundary.
+            verify_pinned_loose_storage()
             verify_pinned_packed_storage()
             return observed, state
         finally:
+            if pinned_loose_descriptor is not None:
+                os.close(pinned_loose_descriptor)
             if pinned_packed_descriptor is not None:
                 os.close(pinned_packed_descriptor)
             assert lock_descriptor is not None
@@ -1065,7 +1108,7 @@ def create_recovery_bundle(
             temporary.unlink()
 
 
-def preflight(
+def _preflight(
     cwd: Path,
     *,
     remote: str,
@@ -1073,10 +1116,14 @@ def preflight(
     branch: str,
     expected_remote_head: str,
     candidate: str,
+    approved_endpoint: str | None = None,
+    approved_identity: FilesystemEndpointIdentity | None = None,
 ) -> str:
     expected_push_url = _credential_free_url(expected_push_url, "expected push URL")
     cwd = _worktree_root(cwd)
     endpoint = _remote_push_endpoint(cwd, remote, expected_push_url)
+    if approved_endpoint is not None and endpoint != approved_endpoint:
+        raise PublicationError("approved push endpoint changed before preflight readback")
     branch = _branch(branch, cwd)
     branch_ref = f"refs/heads/{branch}"
     expected_remote_head = _sha(expected_remote_head, "expected remote head")
@@ -1093,6 +1140,10 @@ def preflight(
         raise PublicationError("candidate is not a fast-forward descendant of the expected remote head")
 
     endpoint_identity = _filesystem_endpoint_identity(cwd, endpoint)
+    if approved_endpoint is not None and endpoint_identity != approved_identity:
+        raise PublicationError(
+            "approved local filesystem endpoint identity changed before preflight readback"
+        )
     if endpoint_identity is None:
         live = remote_head(cwd, endpoint, branch)
         state = classify_remote_state(live, expected_remote_head, candidate)
@@ -1110,6 +1161,25 @@ def preflight(
     if state == "REMOTE_HEAD_DRIFT":
         raise PublicationError("remote head moved away from the expected publication fence")
     return state
+
+
+def preflight(
+    cwd: Path,
+    *,
+    remote: str,
+    expected_push_url: str,
+    branch: str,
+    expected_remote_head: str,
+    candidate: str,
+) -> str:
+    return _preflight(
+        cwd,
+        remote=remote,
+        expected_push_url=expected_push_url,
+        branch=branch,
+        expected_remote_head=expected_remote_head,
+        candidate=candidate,
+    )
 
 
 def publish(
@@ -1138,13 +1208,15 @@ def publish(
         raise PublicationError(
             "linked-worktree local publication targets are not supported for mutation"
         )
-    state = preflight(
+    state = _preflight(
         cwd,
         remote=remote,
         expected_push_url=expected_push_url,
         branch=branch,
         expected_remote_head=expected_remote_head,
         candidate=candidate,
+        approved_endpoint=initial_endpoint,
+        approved_identity=initial_identity,
     )
     if state == "PUBLISHED":
         return PublicationResult(state="ALREADY_PUBLISHED", candidate=candidate, remote_head=candidate)
