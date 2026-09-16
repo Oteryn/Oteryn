@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "packet_id": "AUDIT186-RUNTIME-02-INFRA-STATE-20260914",
+  "obligation": "INFRA-STATE",
+  "observation_time": "2026-09-14T17:27:23Z",
+  "authority": {
+    "canonical_audit": "Oteryn/Oteryn#185@2d877271afa8f177983f3c6147472372adca0ed1",
+    "programme": "Oteryn/Oteryn#203@82bc113797ecdc70d79aee628d339136b816e15d",
+    "release_checkpoint": "Oteryn/Oteryn#186-comment-5666964258",
+    "worker_seed": "Oteryn/Oteryn#208@75ee8b09dc6caac7bfc2a5bdddf3cfbab02c462e"
+  },
+  "canonical_obligation": {
+    "source": "docs/evidence/organization-audit-20260907/unknowns.json@2d877271afa8f177983f3c6147472372adca0ed1",
+    "missing": "Private production runtime configuration",
+    "reason": "No host exception or production access used.",
+    "effect": "No infrastructure health or deployment readiness conclusion.",
+    "owner_route": "Provider operations owners",
+    "closure_condition": "Authorized read-only configuration/health snapshot with redaction and exact release."
+  },
+  "source_coordinates": {
+    "verification_state": "UNVERIFIED",
+    "claim": "These recorded values are not current-head facts: no independently revalidatable sanitized default-branch or ref observation coordinates and no immutable response identity were retained.",
+    "recorded_values": {
+      "Oteryn/Oteryn": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+      "Oteryn/Oteryn-Game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+      "Oteryn/Oteryn-Platform": "84d504c98acc8134eb4c9545711010b74c987974",
+      "Oteryn/Oteryn-Atlas": "be09b84ad96d7e67571a460b55d9546b59bc89a7"
+    }
+  },
+  "authorized_read_only_observations": {
+    "route": "Authenticated GitHub REST repository metadata only",
+    "verification_state": "UNVERIFIED",
+    "claim": "No independently revalidatable sanitized response coordinates or immutable response digests were retained for the REST reads.",
+    "unverified_fact_classes": [
+      "repository environment counts",
+      "repository deployment-record counts",
+      "repository release-record counts",
+      "environment names",
+      "latest-deployment identity, source, creation time, status, and status time"
+    ],
+    "redaction": "No secret values, environment variables, URLs, logs, host identifiers, service payloads, or private configuration were requested or retained."
+  },
+  "disposition": {
+    "source": {
+      "state": "UNKNOWN_UNVERIFIED",
+      "claim": "The canonical obligation is identified, but the recorded repository source-coordinate values are unverified because independently revalidatable default-branch or ref evidence was not retained."
+    },
+    "deployment_metadata": {
+      "state": "UNKNOWN_UNVERIFIED",
+      "claim": "REST-derived counts and latest-deployment facts are not treated as proven because independently revalidatable sanitized observation coordinates or immutable response digests were not retained."
+    },
+    "configuration_health_snapshot": {
+      "state": "UNKNOWN",
+      "claim": "No exact private-runtime route or action and no observed access blocker are durably evidenced; direct runtime configuration and health readability remains unknown."
+    },
+    "infra_state_closure": "UNKNOWN_OPEN",
+    "product_or_deployment_readiness": "NOT_ESTABLISHED"
+  },
+  "limitations": [
+    "Recorded repository source-coordinate values are explicitly unverified because no independently revalidatable sanitized default-branch or ref observation coordinates and no immutable response identity were retained.",
+    "REST-derived environment, deployment, release, and latest-deployment facts are explicitly unverified because no independently revalidatable sanitized response coordinates or immutable response digests were retained.",
+    "Unverified GitHub orchestration metadata does not establish an external deployment, an exact release, present runtime health, production health, or deployment readiness.",
+    "No provider-owner release-to-runtime attestation was retained or observed; readability is unverified because no exact private-runtime route or action was identified, inspected, or attempted.",
+    "No production, provider, administrative, DNS, database, deployment, runner, environment, secret, or host mutation was authorized or performed."
+  ],
+  "smallest_additional_observation": {
+    "needed": "One provider-operations-owner-authorized, dated, redacted read-only snapshot for each claimed production runtime, binding sanitized configuration and direct health results to an exact deployed release/source digest.",
+    "required_fields": [
+      "provider/runtime identity",
+      "observation time",
+      "exact deployed release and source digest",
+      "sanitized configuration invariants",
+      "direct health checks and results",
+      "authorized verifier identity or immutable evidence digest"
+    ],
+    "current_authorization": "Read-only observation is authorized in principle by this batch; no exact private-runtime route or action was identified, inspected, or attempted in this session.",
+    "current_readability": "UNKNOWN"
+  },
+  "recheck_trigger": "AUDIT186-LEAD receives independently revalidatable sanitized default-branch or ref observation coordinates with immutable response identity before reassessing source-coordinate truth, and receives an immutable, dated, redacted provider-owner snapshot containing every required field or identifies and separately authorizes an exact read-only runtime route and records its observed result before reassessing INFRA-STATE.",
+  "handoff": "Keep INFRA-STATE open as UNKNOWN. Recorded source-coordinate values and REST-derived deployment facts are unverified; no provider-owner release-to-runtime attestation was retained or observed, and runtime readability remains unknown because no exact private-runtime route or action was identified, inspected, or attempted. Readiness remains NOT_ESTABLISHED, and this packet proposes no canonical audit-accounting mutation."
+}
