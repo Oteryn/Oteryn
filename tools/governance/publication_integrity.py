@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import os
 import re
+import stat
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -728,6 +730,35 @@ def _stable_local_remote_head(
             return _sha(rows[0][0], "remote head")
 
         try:
+            # A symbolic branch delegates its value to another ref. The named
+            # lock above does not protect that referent, so reject symbolic
+            # publication targets while the named lock is held.
+            ref_descriptor: int | None = None
+            try:
+                ref_descriptor = os.open(
+                    components[-1],
+                    os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+                    dir_fd=lock_parent,
+                )
+            except OSError as exc:
+                if exc.errno != errno.ENOENT:
+                    raise PublicationError(
+                        "unable to verify local publication branch ref storage"
+                    ) from exc
+            if ref_descriptor is not None:
+                try:
+                    ref_metadata = os.fstat(ref_descriptor)
+                    if not stat.S_ISREG(ref_metadata.st_mode):
+                        raise PublicationError(
+                            "local publication branch ref storage is not a regular file"
+                        )
+                    if os.read(ref_descriptor, 5) == b"ref: ":
+                        raise PublicationError(
+                            "symbolic local publication target branches are not supported"
+                        )
+                finally:
+                    os.close(ref_descriptor)
+
             observed = stable_readback()
             metadata = os.fstat(git_descriptor)
             if (metadata.st_dev, metadata.st_ino) != (

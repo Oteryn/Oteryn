@@ -830,6 +830,53 @@ class PublicationReviewHardeningTests(unittest.TestCase):
             publication.remote_head(self.repo.work, str(approved), "agent/test"), self.repo.base
         )
 
+    def test_symbolic_local_target_is_rejected_while_named_lock_is_held(self) -> None:
+        approved = self._prepare_literal_approved_endpoint()
+        git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
+        git(approved, "update-ref", "refs/heads/underlying", self.repo.candidate)
+        git(approved, "symbolic-ref", "refs/heads/agent/test", "refs/heads/underlying")
+        bundle = self.repo.artifacts / "symbolic-target.bundle"
+        real_open = publication.os.open
+        referent_move_returncode: int | None = None
+
+        def move_referent_after_named_lock(path, flags, *args, **kwargs):
+            nonlocal referent_move_returncode
+            descriptor = real_open(path, flags, *args, **kwargs)
+            if path == "test.lock" and flags & publication.os.O_EXCL:
+                attempted = subprocess.run(
+                    ["git", "update-ref", "refs/heads/underlying", self.repo.base],
+                    cwd=approved,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    check=False,
+                )
+                referent_move_returncode = attempted.returncode
+            return descriptor
+
+        with mock.patch.object(publication.os, "open", side_effect=move_referent_after_named_lock):
+            with self.assertRaisesRegex(
+                publication.PublicationError,
+                "symbolic local publication target branches are not supported",
+            ):
+                publication.publish(
+                    self.repo.work,
+                    remote="origin",
+                    expected_push_url="approved",
+                    branch="agent/test",
+                    expected_remote_head=self.repo.base,
+                    candidate=self.repo.candidate,
+                    recovery_bundle=bundle,
+                )
+
+        # The named lock does not block a supported writer from moving its
+        # referent, so rejection must occur before local evidence is accepted.
+        self.assertEqual(referent_move_returncode, 0)
+        self.assertEqual(git(approved, "rev-parse", "refs/heads/underlying"), self.repo.base)
+        self.assertFalse((approved / "refs" / "heads" / "agent" / "test.lock").exists())
+        self.assertFalse(bundle.exists())
+        self.assertFalse(bundle.with_name(bundle.name + ".tmp").exists())
+
     def test_final_post_push_restoration_cannot_precede_classification(self) -> None:
         approved = self._prepare_literal_approved_endpoint()
         git(approved, "fetch", "-q", str(self.repo.work), self.repo.candidate)
