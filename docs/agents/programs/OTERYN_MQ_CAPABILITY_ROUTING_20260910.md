@@ -5,7 +5,13 @@ Control request Issue: #196
 Admission META main: `3b39e0be05aef008f1bd442821daefa898a201dd`
 Branch: `fix/194-capability-aware-mq-routing`
 PR: #195
-Status: `VALIDATING`
+Status: `HISTORICAL`
+
+> Current authority note: this file records the #195 implementation state. The
+> dedicated `TrustedCapabilityObserver` / sealed-observation provenance mechanism
+> described below is superseded by #214 after that change reaches protected META
+> `main`. #214 retains the capability preflight and all substantive direct/delegated
+> route invariants while allowing fresh typed current-session evidence directly.
 
 ## Problem
 
@@ -18,13 +24,16 @@ cannot submit the PR to Merge Queue.
 
 ## Implemented repair
 
+The following records the original #195 implementation state:
+
 1. `ecosystem/agent-execution-routing-policy.json` now contains a closed
    `integration_capability_routing` contract for protected integration.
-2. `tools/governance/integration_capability_routing.py` acquires evidence through
-   an installed trusted observer and then deterministically classifies the sealed
+2. `tools/governance/integration_capability_routing.py` acquired evidence through
+   an installed trusted observer and then deterministically classified the sealed
    observation as `NOT_REQUIRED`, `DIRECT_CAPABLE`, `DELEGATED_CAPABLE` or
-   `BLOCKED_CAPABILITY_UNAVAILABLE`. Raw mappings/JSON are diagnostic fixtures only
-   and cannot authorize worker release.
+   `BLOCKED_CAPABILITY_UNAVAILABLE`. Raw mappings/JSON were diagnostic fixtures only
+   and could not authorize worker release. This provenance wrapper is the portion
+   superseded by #214; the deterministic route checks remain.
 3. `docs/agents/policy/ORGANIZATION_AGENT_POLICY.md` requires that classification
    before releasing substantial mutating work expected to require autonomous
    protected integration.
@@ -44,13 +53,14 @@ cannot submit the PR to Merge Queue.
    repository change. Until protected integration + credential provisioning + a
    real canary are proven, the delegated route must not be advertised as
    operational.
-10. The standalone router CLI has no authoritative serialized-snapshot input. It
-    fails closed when no current-session discovery/readback observer is installed.
-11. Delegated preflight binds the trusted session's actual control-comment actor
+10. The standalone router CLI had no authoritative serialized-snapshot input. It
+    failed closed when no current-session discovery/readback observer was installed.
+    #214 retains the no-snapshot rule but removes the observer-wrapper requirement.
+11. Delegated preflight binds the current session's actual control-comment actor
     to the fine-grained credential principal; missing, malformed or mismatched
     identities block worker release while direct capability remains independent.
 12. The request carries the exact canary-qualified protected META `main` SHA. The
-    sealed capability decision retains that observer-supplied SHA for canonical
+    sealed capability decision retains that evidence-supplied SHA for canonical
     request construction; a caller-supplied current-main SHA cannot replace it.
     The executor checks out trusted `main`, fences it to the qualified SHA, and
     live-re-reads `main` immediately before mutation rather than trusting
