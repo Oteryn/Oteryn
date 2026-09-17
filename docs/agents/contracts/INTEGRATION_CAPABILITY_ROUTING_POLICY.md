@@ -16,50 +16,59 @@ required checks, Merge Queue, review policy, or provider ownership.
 ## Machine authority
 
 `ecosystem/agent-execution-routing-policy.json` owns the closed machine-readable
-capability route. `tools/governance/integration_capability_routing.py` separates
-trusted evidence acquisition from deterministic classification.
+capability route. `tools/governance/integration_capability_routing.py` validates
+typed current-session evidence and deterministically classifies it.
 
 For a substantial mutating task that is expected to require autonomous protected
 integration, capability preflight is required **before releasing the worker**.
 Do not wait until `READY_FOR_COORDINATOR_INTEGRATION`.
 
-The worker-release authority function accepts an installed trusted capability
-observer, not a `Mapping`, JSON document, or caller-created snapshot. The observer
-obtains direct evidence from its current-session tool/action discovery adapter and
-delegated evidence from its live protected-executor readback adapter, then produces
-the sealed verified-observation type consumed by the deterministic classifier. A
-task, prompt, caller string/boolean, comment, serialized fixture, or previous-session
-assertion is not capability evidence. If no trusted observer is installed or its
-acquisition fails, classification is `BLOCKED_CAPABILITY_UNAVAILABLE`.
+The worker-release authority function accepts typed `AcquiredCapabilityEvidence`
+assembled from current-session tool/action discovery and live protected-executor
+readback. A dedicated `TrustedCapabilityObserver` or sealed observation wrapper is
+not required. A `Mapping`, JSON document, operation string, timestamp, label,
+boolean, task/prompt assertion, comment, serialized fixture or previous-session
+assertion is not capability evidence and is not accepted by the classifier as a
+substitute. Missing, malformed, stale or incomplete typed evidence classifies as
+`BLOCKED_CAPABILITY_UNAVAILABLE`.
+
+This typed-evidence boundary is intentionally a scheduling/correctness boundary,
+not a cryptographic attestation boundary. It does not claim to prove how arbitrary
+same-process Python code obtained each field. The active coordinator remains
+responsible for assembling the typed value from the current session's live reads,
+and the protected executor independently revalidates all mutation-sensitive facts
+before any queue mutation. Capability classification still does not grant merge
+authority.
 
 The authoritative classification API returns a sealed capability decision. For a
 delegated route that decision retains the exact canary-qualified protected-META
-`main` SHA from the observer evidence, and canonical control-request construction
+`main` SHA from the typed evidence, and canonical control-request construction
 must consume that retained binding. A caller-provided current-main SHA cannot
 replace it. The enum-only compatibility view is diagnostic and is not sufficient
 to construct a delegated request. Direct capability has no delegated canary
 binding and remains independent of this rule.
 
-Every capable observation carries an observation timestamp and is valid only for
-the finite freshness interval in the machine policy. Future, stale, malformed
-or unsealed observations fail closed. `DELEGATED_CAPABLE` additionally
-requires a fresh protected-META `refs/heads/main` readback bound to the canonical
-executor workflow path and exact blob, the exact current protected-main commit
-SHA, credential-operational proof and retained terminal canary evidence bound to
-that same protected-main SHA. Any protected-main movement invalidates the retained
+Every capable evidence value carries an observation timestamp and is valid only
+for the finite freshness interval in the machine policy. Future, stale or malformed
+evidence fails closed. `DELEGATED_CAPABLE` additionally requires a fresh
+protected-META `refs/heads/main` readback bound to the canonical executor workflow
+path and exact blob, the exact current protected-main commit SHA,
+credential-operational proof and retained terminal canary evidence bound to that
+same protected-main SHA. Any protected-main movement invalidates the retained
 canary even when the workflow YAML blob itself is unchanged.
 
-The trusted current-session discovery adapter also obtains the actual human actor
-identity used by its control-comment operation, and the protected-executor adapter
-obtains the human principal identity of the fine-grained mutation credential.
-Delegated capability requires both identities to be present, well formed and equal.
-Caller-supplied actor strings are not evidence. This check is independent of the
-direct-native route and cannot block an otherwise verified direct capability.
+The current-session discovery evidence also carries the actual human actor identity
+used by its control-comment operation, and the protected-executor readback carries
+the human principal identity of the fine-grained mutation credential. Delegated
+capability requires both identities to be present, well formed and equal. A
+caller-supplied actor string without the corresponding live discovery/readback is
+not sufficient evidence. This check is independent of the direct-native route and
+cannot block an otherwise verified direct capability.
 
 Raw serialized snapshots may be retained as diagnostics or test fixtures, but are
 never accepted by `validate_worker_release` or interpreted as scheduling authority.
 The standalone CLI intentionally has no authoritative `--snapshot` path and fails
-closed because no current-session trusted observer is installed there.
+closed because no typed current-session capability evidence is supplied to it.
 
 ## States
 
@@ -84,9 +93,8 @@ merely to change capability state.
 
 ## Direct route
 
-`DIRECT_CAPABLE` means the trusted current-session discovery adapter observed the
-execution surface exposing the governed native
-operation selected by META:
+`DIRECT_CAPABLE` means fresh current-session discovery evidence observed the
+execution surface exposing the governed native operation selected by META:
 
 `PUT /repos/{owner}/{repo}/pulls/{pull_number}/merge-async`
 
@@ -176,7 +184,7 @@ fine-grained credential permitted by the bound organization policy.
 Credential provisioning and secret values are outside this repository change.
 Until the workflow is on protected META `main`, the fine-grained credential is
 provisioned, and a real bounded canary proves the route for the exact current
-protected-main SHA, the trusted readback adapter MUST NOT report
+protected-main SHA, current-session evidence MUST NOT report
 `meta.governed_merge_queue_executor.v1` as operational.
 
 Do not create a custom GitHub App merely for this executor and do not recreate
