@@ -224,13 +224,39 @@ def _same_valid_actor(actor: object, principal: object) -> bool:
     )
 
 
+def _string_tuple(value: object) -> bool:
+    return (
+        isinstance(value, tuple)
+        and all(isinstance(item, str) and item.strip() and item == item.strip() for item in value)
+        and len(set(value)) == len(value)
+    )
+
+
+def _capability_evidence_is_well_formed(evidence: object) -> bool:
+    return (
+        isinstance(evidence, AcquiredCapabilityEvidence)
+        and isinstance(evidence.requires_autonomous_protected_integration, bool)
+        and isinstance(evidence.observed_at_epoch_seconds, int)
+        and not isinstance(evidence.observed_at_epoch_seconds, bool)
+        and _string_tuple(evidence.available_operations)
+        and _string_tuple(evidence.operational_executor_routes)
+        and (evidence.protected_executor is None
+             or isinstance(evidence.protected_executor, ProtectedExecutorEvidence))
+        and (evidence.control_comment_actor is None
+             or isinstance(evidence.control_comment_actor, str))
+    )
+
+
 def _evidence(subject: object) -> AcquiredCapabilityEvidence | None:
+    evidence: object
     if isinstance(subject, AcquiredCapabilityEvidence):
-        return subject
-    if (isinstance(subject, VerifiedCapabilityObservation)
-            and subject._seal is _OBSERVATION_SEAL):
-        return subject.evidence
-    return None
+        evidence = subject
+    elif (isinstance(subject, VerifiedCapabilityObservation)
+          and subject._seal is _OBSERVATION_SEAL):
+        evidence = subject.evidence
+    else:
+        return None
+    return evidence if _capability_evidence_is_well_formed(evidence) else None
 
 
 def decide(subject: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
