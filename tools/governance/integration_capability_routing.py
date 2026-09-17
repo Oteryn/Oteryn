@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Trusted-observer routing for protected-integration capability.
+"""Fresh-evidence routing for protected-integration capability.
 
-Capability classification is deterministic, but worker-release authority never
-accepts serialized evidence. A trusted observer acquires live evidence and the
-module seals the resulting observation before classification.
+Capability classification is deterministic. Worker-release authority accepts
+fresh typed current-session evidence directly; the legacy observer adapter remains
+available as a compatibility acquisition helper. Serialized mappings/JSON are
+never scheduling authority.
 """
 
 from abc import ABC, abstractmethod
@@ -117,7 +118,7 @@ class AcquiredCapabilityEvidence:
 
 @dataclass(frozen=True)
 class VerifiedCapabilityObservation:
-    """Opaque observation sealed only by ``TrustedCapabilityObserver.observe``."""
+    """Legacy sealed wrapper retained for compatibility with installed adapters."""
 
     evidence: AcquiredCapabilityEvidence
     _seal: object = field(repr=False, compare=False)
@@ -137,15 +138,15 @@ class CapabilityDecision:
 
     def __post_init__(self) -> None:
         if self._seal is not _DECISION_SEAL:
-            raise ValueError("capability decisions must be produced from a verified observation")
+            raise ValueError("capability decisions must be produced by the capability classifier")
 
 
 class TrustedCapabilityObserver(ABC):
-    """Installed trust boundary for live tool discovery and executor readback."""
+    """Legacy acquisition helper; no longer required for worker-release authority."""
 
     @abstractmethod
     def acquire(self, policy: Mapping[str, object], *, now_epoch_seconds: int) -> AcquiredCapabilityEvidence:
-        """Acquire live evidence; test suites may implement an explicit fake observer."""
+        """Acquire fresh typed evidence."""
 
     def observe(self, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> VerifiedCapabilityObservation:
         now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
@@ -164,7 +165,7 @@ class ProtectedMetaExecutorObserver(Protocol):
 
 
 class CurrentSessionCapabilityObserver(TrustedCapabilityObserver):
-    """Production adapter boundary; inputs are live discovery/readback interfaces."""
+    """Compatibility adapter over live discovery/readback interfaces."""
 
     def __init__(self, *, required: bool, tools: CurrentSessionToolDiscovery,
                  executor: ProtectedMetaExecutorObserver) -> None:
@@ -221,14 +222,23 @@ def _same_valid_actor(actor: object, principal: object) -> bool:
     )
 
 
-def decide(observation: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
-    """Classify sealed evidence while retaining its delegated canary binding."""
+def _extract_typed_evidence(source: object) -> AcquiredCapabilityEvidence | None:
+    if isinstance(source, AcquiredCapabilityEvidence):
+        return source
+    if (isinstance(source, VerifiedCapabilityObservation)
+            and source._seal is _OBSERVATION_SEAL):
+        return source.evidence
+    return None
+
+
+def decide(source: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
+    """Classify fresh typed evidence while retaining the delegated canary binding."""
     errors = validate_policy(policy)
     if errors:
         raise ValueError("; ".join(errors))
-    if not isinstance(observation, VerifiedCapabilityObservation) or observation._seal is not _OBSERVATION_SEAL:
+    evidence = _extract_typed_evidence(source)
+    if evidence is None:
         return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
-    evidence = observation.evidence
     if not evidence.requires_autonomous_protected_integration:
         return CapabilityDecision(NOT_REQUIRED, None, _DECISION_SEAL)
     now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
@@ -255,15 +265,14 @@ def decide(observation: object, policy: Mapping[str, object], *, now_epoch_secon
     return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
 
 
-def classify(observation: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
-    """Compatibility classifier; delegated request construction must use ``decide``."""
-    return decide(observation, policy, now_epoch_seconds=now_epoch_seconds).state
+def classify(source: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
+    return decide(source, policy, now_epoch_seconds=now_epoch_seconds).state
 
 
 def build_delegated_request(
     decision: object, *, repository: str, pr_number: int, expected_head_sha: str
 ) -> str:
-    """Construct the canonical control request only from its sealed canary binding."""
+    """Construct the canonical request only from a classifier-produced decision."""
     if (not isinstance(decision, CapabilityDecision)
             or decision._seal is not _DECISION_SEAL
             or decision.state != DELEGATED_CAPABLE
@@ -280,35 +289,29 @@ def build_delegated_request(
             f"{decision.delegated_protected_main_sha}")
 
 
-def observe_and_classify(observer: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
-    """Production authority entry point: acquire through an installed observer."""
-    if not isinstance(observer, TrustedCapabilityObserver):
-        return BLOCKED_CAPABILITY_UNAVAILABLE
+def observe_and_decide(source: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
+    """Accept fresh typed evidence directly or acquire it through a legacy observer."""
     now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
-    try:
-        observation = observer.observe(policy, now_epoch_seconds=now)
-    except (OSError, TypeError, ValueError):
-        return BLOCKED_CAPABILITY_UNAVAILABLE
-    return classify(observation, policy, now_epoch_seconds=now)
-
-
-def observe_and_decide(observer: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
-    """Acquire a sealed decision suitable for delegated request construction."""
-    now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
-    if not isinstance(observer, TrustedCapabilityObserver):
+    if isinstance(source, AcquiredCapabilityEvidence):
+        return decide(source, policy, now_epoch_seconds=now)
+    if not isinstance(source, TrustedCapabilityObserver):
         return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
     try:
-        observation = observer.observe(policy, now_epoch_seconds=now)
+        evidence = source.acquire(policy, now_epoch_seconds=now)
     except (OSError, TypeError, ValueError):
         return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
-    return decide(observation, policy, now_epoch_seconds=now)
+    return decide(evidence, policy, now_epoch_seconds=now)
 
 
-def validate_worker_release(observer: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> list[str]:
-    decision = observe_and_decide(observer, policy, now_epoch_seconds=now_epoch_seconds)
+def observe_and_classify(source: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
+    return observe_and_decide(source, policy, now_epoch_seconds=now_epoch_seconds).state
+
+
+def validate_worker_release(source: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> list[str]:
+    decision = observe_and_decide(source, policy, now_epoch_seconds=now_epoch_seconds)
     if decision.state == BLOCKED_CAPABILITY_UNAVAILABLE:
         return ["protected integration capability unavailable before worker release: "
-                "no trusted observer proved direct native merge-async or the bounded META executor"]
+                "no fresh typed evidence proved direct native merge-async or the bounded META executor"]
     return []
 
 
@@ -333,7 +336,7 @@ def main() -> int:
         print(json.dumps({"status": "INVALID", "error": str(exc)}, sort_keys=True))
         return 1
     print(json.dumps({"status": BLOCKED_CAPABILITY_UNAVAILABLE,
-                      "reason": "no trusted capability observer is installed in this CLI"}, sort_keys=True))
+                      "reason": "no current-session typed capability evidence was supplied"}, sort_keys=True))
     return 2
 
 
