@@ -20,7 +20,7 @@ def policy() -> dict[str, object]:
 
 
 class FakeObserver(routing.TrustedCapabilityObserver):
-    """Explicit test-only observer; production callers install live adapters."""
+    """Explicit test-only observer retained for compatibility coverage."""
 
     def __init__(self, evidence: object, *, failure: Exception | None = None) -> None:
         self.evidence = evidence
@@ -55,51 +55,52 @@ def executor_evidence(**changes: object) -> object:
     return routing.ProtectedExecutorEvidence(**values)
 
 
-def state(observer: object) -> str:
-    return routing.observe_and_classify(observer, policy(), now_epoch_seconds=NOW)
+def state(subject: object) -> str:
+    return routing.observe_and_classify(subject, policy(), now_epoch_seconds=NOW)
 
 
 def test_policy_is_closed_and_targets_all_permanent_repositories() -> None:
     assert routing.validate_policy(policy()) == []
     cfg = policy()["integration_capability_routing"]
     assert cfg["schema_version"] == 2
+    assert cfg["require_preflight_before_worker_release"] is True
     assert set(cfg["allowed_target_repositories"]) == {
         "Oteryn/Oteryn", "Oteryn/Oteryn-Game", "Oteryn/Oteryn-Platform", "Oteryn/Oteryn-Atlas"
     }
 
 
-def test_non_integrating_task_is_not_blocked_when_observed() -> None:
-    observer = FakeObserver(evidence(required=False))
-    assert state(observer) == routing.NOT_REQUIRED
-    assert routing.validate_worker_release(observer, policy(), now_epoch_seconds=NOW) == []
+def test_non_integrating_task_is_not_blocked_by_typed_evidence() -> None:
+    current = evidence(required=False)
+    assert state(current) == routing.NOT_REQUIRED
+    assert routing.validate_worker_release(current, policy(), now_epoch_seconds=NOW) == []
 
 
-def test_direct_native_operation_is_preferred() -> None:
+def test_direct_native_operation_is_preferred_without_observer_wrapper() -> None:
     current = routing.AcquiredCapabilityEvidence(
         True, NOW, ("github.issue_comment.create", "github.merge_async.put_exact_head"),
         ("meta.governed_merge_queue_executor.v1",), executor_evidence()
     )
-    observer = FakeObserver(current)
-    assert state(observer) == routing.DIRECT_CAPABLE
-    assert routing.validate_worker_release(observer, policy(), now_epoch_seconds=NOW) == []
+    assert state(current) == routing.DIRECT_CAPABLE
+    assert routing.validate_worker_release(current, policy(), now_epoch_seconds=NOW) == []
 
 
-def test_verified_delegated_executor_prevents_late_worker_block() -> None:
+def test_verified_delegated_executor_prevents_late_worker_block_without_observer_wrapper() -> None:
     current = routing.AcquiredCapabilityEvidence(
         True, NOW, ("github.issue_comment.create",),
         ("meta.governed_merge_queue_executor.v1",), executor_evidence(), "maintainer-user"
     )
-    assert state(FakeObserver(current)) == routing.DELEGATED_CAPABLE
+    assert state(current) == routing.DELEGATED_CAPABLE
+    assert routing.validate_worker_release(current, policy(), now_epoch_seconds=NOW) == []
 
 
-def test_delegated_request_retains_sealed_canary_sha() -> None:
+def test_delegated_request_retains_sealed_canary_sha_from_direct_evidence() -> None:
     canary_x = PROTECTED_MAIN_SHA
     current_main_y = "a" * 40
     current = routing.AcquiredCapabilityEvidence(
         True, NOW, ("github.issue_comment.create",),
         ("meta.governed_merge_queue_executor.v1",), executor_evidence(), "maintainer-user"
     )
-    decision = routing.observe_and_decide(FakeObserver(current), policy(), now_epoch_seconds=NOW)
+    decision = routing.observe_and_decide(current, policy(), now_epoch_seconds=NOW)
     request = routing.build_delegated_request(
         decision, repository="Oteryn/Oteryn-Game", pr_number=528,
         expected_head_sha=current_main_y,
@@ -133,9 +134,8 @@ def test_unverified_delegated_executor_is_not_capability() -> None:
     current = routing.AcquiredCapabilityEvidence(
         True, NOW, ("github.issue_comment.create",), ("meta.governed_merge_queue_executor.v1",)
     )
-    observer = FakeObserver(current)
-    assert state(observer) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
-    assert "before worker release" in routing.validate_worker_release(observer, policy(), now_epoch_seconds=NOW)[0]
+    assert state(current) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+    assert "before worker release" in routing.validate_worker_release(current, policy(), now_epoch_seconds=NOW)[0]
 
 
 def test_magic_dictionary_cannot_authorize_direct_worker_release() -> None:
@@ -174,12 +174,24 @@ def test_magic_dictionary_cannot_authorize_delegated_worker_release() -> None:
     assert routing.validate_worker_release(forged, policy(), now_epoch_seconds=NOW)
 
 
+def test_malformed_typed_evidence_fails_closed() -> None:
+    malformed = (
+        routing.AcquiredCapabilityEvidence(True, NOW, ["github.merge_async.put_exact_head"], ()),
+        routing.AcquiredCapabilityEvidence(1, NOW, ("github.merge_async.put_exact_head",), ()),
+        routing.AcquiredCapabilityEvidence(True, NOW, ("github.merge_async.put_exact_head", "github.merge_async.put_exact_head"), ()),
+        routing.AcquiredCapabilityEvidence(True, NOW, (" github.merge_async.put_exact_head",), ()),
+    )
+    for current in malformed:
+        assert state(current) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+        assert routing.validate_worker_release(current, policy(), now_epoch_seconds=NOW)
+
+
 def test_stale_future_and_failed_observations_fail_closed() -> None:
     for observed in (NOW - 301, NOW + 1, True):
         current = routing.AcquiredCapabilityEvidence(
             True, observed, ("github.merge_async.put_exact_head",), ()
         )
-        assert state(FakeObserver(current)) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+        assert state(current) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
     assert state(FakeObserver(None)) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
     assert state(FakeObserver(None, failure=OSError("unavailable"))) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
 
@@ -198,7 +210,7 @@ def test_delegated_route_rejects_invalid_executor_readback() -> None:
             ("meta.governed_merge_queue_executor.v1",), executor_evidence(**changes),
             "maintainer-user",
         )
-        assert state(FakeObserver(current)) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+        assert state(current) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
 
 
 def test_delegated_canary_is_invalidated_by_any_protected_main_change() -> None:
@@ -208,7 +220,7 @@ def test_delegated_canary_is_invalidated_by_any_protected_main_change() -> None:
         executor_evidence(protected_main_sha="a" * 40, canary_protected_main_sha="b" * 40),
         "maintainer-user",
     )
-    assert state(FakeObserver(current)) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+    assert state(current) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
 
 
 def test_executor_workflow_rejects_github_reruns() -> None:
@@ -226,14 +238,14 @@ def test_delegated_route_requires_control_actor_to_match_credential_principal() 
             ("meta.governed_merge_queue_executor.v1",),
             executor_evidence(credential_principal=principal), actor,
         )
-        assert state(FakeObserver(current)) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
+        assert state(current) == routing.BLOCKED_CAPABILITY_UNAVAILABLE
 
 
 def test_direct_route_is_independent_of_delegated_actor_identity() -> None:
     current = routing.AcquiredCapabilityEvidence(
         True, NOW, ("github.merge_async.put_exact_head",), (), None, None
     )
-    assert state(FakeObserver(current)) == routing.DIRECT_CAPABLE
+    assert state(current) == routing.DIRECT_CAPABLE
 
 
 def test_policy_binds_current_executor_workflow_blob() -> None:
@@ -244,7 +256,7 @@ def test_policy_binds_current_executor_workflow_blob() -> None:
     assert hashlib.sha1(header + workflow).hexdigest() == cfg["workflow_blob_sha"]
 
 
-def test_current_session_adapter_acquires_instead_of_accepting_serialized_input() -> None:
+def test_current_session_adapter_remains_compatible() -> None:
     class Tools:
         def discover_operations(self) -> tuple[int, tuple[str, ...], str]:
             return NOW, ("github.merge_async.put_exact_head",), "maintainer-user"
@@ -278,7 +290,7 @@ def test_malformed_policy_cannot_authorize_a_route() -> None:
         mutate(candidate["integration_capability_routing"])
         assert routing.validate_policy(candidate)
         try:
-            routing.observe_and_classify(FakeObserver(evidence()), candidate, now_epoch_seconds=NOW)
+            routing.observe_and_classify(evidence(), candidate, now_epoch_seconds=NOW)
         except ValueError:
             pass
         else:
