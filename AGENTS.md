@@ -23,10 +23,12 @@ Load the relevant procedure when performing its operation:
 - Protected-integration scheduling: before releasing a mutating worker expected to
   require autonomous protected integration, apply
   `docs/agents/contracts/INTEGRATION_CAPABILITY_ROUTING_POLICY.md` through
-  `tools/governance/integration_capability_routing.py` using an installed trusted
-  observer, never caller-created dictionaries or JSON. Only `DIRECT_CAPABLE` or
-  verified `DELEGATED_CAPABLE` permits that worker release; capability is not merge
-  authority. Without a trusted observer, fail closed.
+  `tools/governance/integration_capability_routing.py` using fresh typed
+  current-session capability evidence; an installed trusted observer remains an
+  optional compatibility adapter, not a required wrapper. Never use caller-created
+  dictionaries or JSON as authority. Only `DIRECT_CAPABLE` or verified
+  `DELEGATED_CAPABLE` permits that worker release; capability is not merge authority.
+  Without valid fresh typed evidence, fail closed.
 - Retry/freeze decisions: `docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md`.
   Productive work has no generic elapsed-time stop.
 - Session/context/wait transitions:
