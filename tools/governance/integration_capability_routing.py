@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Trusted-observer routing for protected-integration capability.
+"""Capability routing for protected-integration worker release.
 
-Capability classification is deterministic, but worker-release authority never
-accepts serialized evidence. A trusted observer acquires live evidence and the
-module seals the resulting observation before classification.
+Capability classification is deterministic. Production callers may provide fresh,
+typed current-session evidence directly, while the legacy trusted-observer adapter
+remains supported for hosts that can install it. Raw mappings and serialized
+snapshots are never accepted as worker-release authority.
 """
 
 from abc import ABC, abstractmethod
@@ -107,6 +108,8 @@ class ProtectedExecutorEvidence:
 
 @dataclass(frozen=True)
 class AcquiredCapabilityEvidence:
+    """Typed current-session evidence; raw serialized snapshots are not authority."""
+
     requires_autonomous_protected_integration: bool
     observed_at_epoch_seconds: int
     available_operations: tuple[str, ...]
@@ -117,7 +120,7 @@ class AcquiredCapabilityEvidence:
 
 @dataclass(frozen=True)
 class VerifiedCapabilityObservation:
-    """Opaque observation sealed only by ``TrustedCapabilityObserver.observe``."""
+    """Compatibility wrapper sealed only by ``TrustedCapabilityObserver.observe``."""
 
     evidence: AcquiredCapabilityEvidence
     _seal: object = field(repr=False, compare=False)
@@ -137,11 +140,11 @@ class CapabilityDecision:
 
     def __post_init__(self) -> None:
         if self._seal is not _DECISION_SEAL:
-            raise ValueError("capability decisions must be produced from a verified observation")
+            raise ValueError("capability decisions must be produced from validated capability evidence")
 
 
 class TrustedCapabilityObserver(ABC):
-    """Installed trust boundary for live tool discovery and executor readback."""
+    """Compatibility adapter for hosts that install live discovery/readback hooks."""
 
     @abstractmethod
     def acquire(self, policy: Mapping[str, object], *, now_epoch_seconds: int) -> AcquiredCapabilityEvidence:
@@ -164,7 +167,7 @@ class ProtectedMetaExecutorObserver(Protocol):
 
 
 class CurrentSessionCapabilityObserver(TrustedCapabilityObserver):
-    """Production adapter boundary; inputs are live discovery/readback interfaces."""
+    """Optional production adapter boundary over live discovery/readback interfaces."""
 
     def __init__(self, *, required: bool, tools: CurrentSessionToolDiscovery,
                  executor: ProtectedMetaExecutorObserver) -> None:
@@ -221,14 +224,49 @@ def _same_valid_actor(actor: object, principal: object) -> bool:
     )
 
 
-def decide(observation: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
-    """Classify sealed evidence while retaining its delegated canary binding."""
+def _string_tuple(value: object) -> bool:
+    return (
+        isinstance(value, tuple)
+        and all(isinstance(item, str) and item.strip() and item == item.strip() for item in value)
+        and len(set(value)) == len(value)
+    )
+
+
+def _capability_evidence_is_well_formed(evidence: object) -> bool:
+    return (
+        isinstance(evidence, AcquiredCapabilityEvidence)
+        and isinstance(evidence.requires_autonomous_protected_integration, bool)
+        and isinstance(evidence.observed_at_epoch_seconds, int)
+        and not isinstance(evidence.observed_at_epoch_seconds, bool)
+        and _string_tuple(evidence.available_operations)
+        and _string_tuple(evidence.operational_executor_routes)
+        and (evidence.protected_executor is None
+             or isinstance(evidence.protected_executor, ProtectedExecutorEvidence))
+        and (evidence.control_comment_actor is None
+             or isinstance(evidence.control_comment_actor, str))
+    )
+
+
+def _evidence(subject: object) -> AcquiredCapabilityEvidence | None:
+    evidence: object
+    if isinstance(subject, AcquiredCapabilityEvidence):
+        evidence = subject
+    elif (isinstance(subject, VerifiedCapabilityObservation)
+          and subject._seal is _OBSERVATION_SEAL):
+        evidence = subject.evidence
+    else:
+        return None
+    return evidence if _capability_evidence_is_well_formed(evidence) else None
+
+
+def decide(subject: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
+    """Classify fresh typed evidence while retaining its delegated canary binding."""
     errors = validate_policy(policy)
     if errors:
         raise ValueError("; ".join(errors))
-    if not isinstance(observation, VerifiedCapabilityObservation) or observation._seal is not _OBSERVATION_SEAL:
+    evidence = _evidence(subject)
+    if evidence is None:
         return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
-    evidence = observation.evidence
     if not evidence.requires_autonomous_protected_integration:
         return CapabilityDecision(NOT_REQUIRED, None, _DECISION_SEAL)
     now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
@@ -255,9 +293,9 @@ def decide(observation: object, policy: Mapping[str, object], *, now_epoch_secon
     return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
 
 
-def classify(observation: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
+def classify(subject: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
     """Compatibility classifier; delegated request construction must use ``decide``."""
-    return decide(observation, policy, now_epoch_seconds=now_epoch_seconds).state
+    return decide(subject, policy, now_epoch_seconds=now_epoch_seconds).state
 
 
 def build_delegated_request(
@@ -280,35 +318,30 @@ def build_delegated_request(
             f"{decision.delegated_protected_main_sha}")
 
 
-def observe_and_classify(observer: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
-    """Production authority entry point: acquire through an installed observer."""
-    if not isinstance(observer, TrustedCapabilityObserver):
-        return BLOCKED_CAPABILITY_UNAVAILABLE
-    now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
-    try:
-        observation = observer.observe(policy, now_epoch_seconds=now)
-    except (OSError, TypeError, ValueError):
-        return BLOCKED_CAPABILITY_UNAVAILABLE
-    return classify(observation, policy, now_epoch_seconds=now)
+def observe_and_classify(subject: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> str:
+    """Classify typed evidence directly or acquire it through a compatible observer."""
+    return observe_and_decide(subject, policy, now_epoch_seconds=now_epoch_seconds).state
 
 
-def observe_and_decide(observer: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
-    """Acquire a sealed decision suitable for delegated request construction."""
+def observe_and_decide(subject: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> CapabilityDecision:
+    """Return a sealed decision from typed evidence or a compatible observer."""
     now = int(time.time()) if now_epoch_seconds is None else now_epoch_seconds
-    if not isinstance(observer, TrustedCapabilityObserver):
+    if isinstance(subject, AcquiredCapabilityEvidence):
+        return decide(subject, policy, now_epoch_seconds=now)
+    if not isinstance(subject, TrustedCapabilityObserver):
         return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
     try:
-        observation = observer.observe(policy, now_epoch_seconds=now)
+        observation = subject.observe(policy, now_epoch_seconds=now)
     except (OSError, TypeError, ValueError):
         return CapabilityDecision(BLOCKED_CAPABILITY_UNAVAILABLE, None, _DECISION_SEAL)
     return decide(observation, policy, now_epoch_seconds=now)
 
 
-def validate_worker_release(observer: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> list[str]:
-    decision = observe_and_decide(observer, policy, now_epoch_seconds=now_epoch_seconds)
+def validate_worker_release(subject: object, policy: Mapping[str, object], *, now_epoch_seconds: int | None = None) -> list[str]:
+    decision = observe_and_decide(subject, policy, now_epoch_seconds=now_epoch_seconds)
     if decision.state == BLOCKED_CAPABILITY_UNAVAILABLE:
         return ["protected integration capability unavailable before worker release: "
-                "no trusted observer proved direct native merge-async or the bounded META executor"]
+                "no fresh typed evidence proved direct native merge-async or the bounded META executor"]
     return []
 
 
@@ -333,7 +366,7 @@ def main() -> int:
         print(json.dumps({"status": "INVALID", "error": str(exc)}, sort_keys=True))
         return 1
     print(json.dumps({"status": BLOCKED_CAPABILITY_UNAVAILABLE,
-                      "reason": "no trusted capability observer is installed in this CLI"}, sort_keys=True))
+                      "reason": "no current-session typed capability evidence was supplied"}, sort_keys=True))
     return 2
 
 
