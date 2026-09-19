@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "candidate_id": "PLATFORM-GAMEAUTH-HISTORICAL-DIRECT-CARRYFORWARD",
+  "repository": "Oteryn/Oteryn-Platform",
+  "state": "QUALIFIED_ADOPTED_AS_GROUPED",
+  "path_prefix": "app/GameAuth/",
+  "expected_count": 27,
+  "historical_evidence": {
+    "repository": "Oteryn/Oteryn-Platform",
+    "publication_commit": "3fe7df5330deb9ed38cc17ae1710f0cb4159019b",
+    "publication_tree": "c6ac8cb7cbff069d7ac7303b3472d992da254774",
+    "coverage_rules_path": "docs/testing/OTERYN_PLATFORM_REPOSITORY_AUDIT_2026-09-06-CONTINUATION.md",
+    "coverage_rules_blob": "34361414339a5ca57ec5cd13e332ad196aa9e35f",
+    "audited_main_sha": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+    "audited_main_tree": "0f320dd073bc2619307314e380017526d27e5ddb",
+    "exact_statement": "**FACT.** All 27 files in the inspected `app/GameAuth/**` batch were read directly.",
+    "pattern": "app/GameAuth/**",
+    "count": 27,
+    "basis": "historical direct read of every app/GameAuth leaf"
+  },
+  "current_revalidation": {
+    "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+    "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+    "current_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+    "gameauth_tree": "e115d2dfea7d6bcdf3fa13dbd81fec21f0f482ca",
+    "changed_paths_under_group_prefix": 0,
+    "historical_to_current_compare_status": "ahead",
+    "current_blobs": {
+      "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+      "config/game-auth.php": "a36d4c56e2c2bc9c715157948efc9421ff4cae24",
+      "config/auth.php": "38712b618171bb16fb3247fb797ae5e076fff0af",
+      "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7",
+      "routes/api.php": "ba7916913c581d88a23cb19a70060d857606f644",
+      "routes/internal.php": "5fa537392a6f7400f56f8c2b6f55571dad2ebe90",
+      "tests/Feature/GameAuth/EnsureGameWorldCommandTest.php": "7a6a4b88a271f8636a2bf5d3295161a70c162594",
+      "tests/Feature/GameAuth/GameAuthRevocationTest.php": "1f7b948056cbd6756fea101b29e1f7d777a0d984",
+      "tests/Feature/GameAuth/GameLoginContextApiTest.php": "dd8a9dc4988d6fe6d65206fa0d5c9031d048b913",
+      "tests/Feature/GameAuth/GameLoginTicketApiTest.php": "266a5f9d71202e8a3769ad339b9636550468100b",
+      "tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php": "1fdf519959d61086f2c32e2415761a4a53369ab4",
+      "tests/Feature/GameAuth/GameLoginTicketRedeemApiTest.php": "f991a70e8c62ffd713d9e7da08c3a746c61c9202",
+      "tests/Feature/GameAuth/NativeProtocolIdentityMigrationTest.php": "e06e7c7d2e38cf1a2b58ac489da1f76dad61623a",
+      "tests/Feature/GameAuth/OAuth/NativeOAuthClientManagerTest.php": "a8e169d2a451540c4ed84448fad6144142c3838d",
+      "tests/Feature/GameAuth/OAuth/NativeOAuthGrantPolicyTest.php": "1f8b493c33c279766ea3a913d886db0b2dc9f36e",
+      "tests/Feature/GameAuth/OAuth/NativeOAuthPkceTest.php": "2ed9100bc9d5a0a3c5a5efa470300f1b3a1cb610",
+      "tests/Feature/GameAuth/OAuth/NativeOAuthRevocationGenerationTest.php": "b79b3b60ab258c369ce36334d5093b018c41d0a2",
+      "tests/Feature/GameAuth/OAuth/PublicClientPkcePolicyTest.php": "781b9e82e69c8330bac3e1009648413b797bbed8",
+      "tests/Feature/GameAuth/WorldRegistryTest.php": "e57a5ab73aa74ef07ad3a6b280c6a7b14f5626fd",
+      "tests/Unit/Http/Middleware/PreventSensitiveGameAuthResponseCachingTest.php": "5409ea3c38d9151301732ce67e9e00afb9d5140b",
+      "composer.json": "6bfd2d8018fb40ce4df9aef11ab715b5210d508d",
+      "composer.lock": "9de0c6c04944b771ccd0072ea08f72dc90fff123",
+      "phpunit.xml": "5ee5e6c596a08b758922fdc30ba650f5301d7a34"
+    },
+    "required_checks": [
+      "historical audit publication commit/tree and evidence blob match exactly",
+      "historical evidence contains the exact all-27 direct-read statement exactly once",
+      "historical and frozen current app trees are byte-identical",
+      "historical and frozen current app/GameAuth trees contain exactly the same 27 regular-file leaves and blob identities",
+      "all named frozen-current dependent config/route/test/toolchain blobs match exactly",
+      "focused frozen-current GameAuth tests pass as a prerequisite to GROUPED adoption"
+    ],
+    "focused_test_files": [
+      "tests/Feature/GameAuth/EnsureGameWorldCommandTest.php",
+      "tests/Feature/GameAuth/GameAuthRevocationTest.php",
+      "tests/Feature/GameAuth/GameLoginContextApiTest.php",
+      "tests/Feature/GameAuth/GameLoginTicketApiTest.php",
+      "tests/Feature/GameAuth/GameLoginTicketLifecycleTest.php",
+      "tests/Feature/GameAuth/GameLoginTicketRedeemApiTest.php",
+      "tests/Feature/GameAuth/NativeProtocolIdentityMigrationTest.php",
+      "tests/Feature/GameAuth/OAuth/NativeOAuthClientManagerTest.php",
+      "tests/Feature/GameAuth/OAuth/NativeOAuthGrantPolicyTest.php",
+      "tests/Feature/GameAuth/OAuth/NativeOAuthPkceTest.php",
+      "tests/Feature/GameAuth/OAuth/NativeOAuthRevocationGenerationTest.php",
+      "tests/Feature/GameAuth/OAuth/PublicClientPkcePolicyTest.php",
+      "tests/Feature/GameAuth/WorldRegistryTest.php",
+      "tests/Unit/Http/Middleware/PreventSensitiveGameAuthResponseCachingTest.php"
+    ],
+    "existing_concurrency_evidence": {
+      "source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "r3_native_artifact_id": 10035749457,
+      "qualification": "separate exact-source MariaDB concurrency evidence; not replaced by the focused SQLite/default-environment test set"
+    }
+  },
+  "coverage_adopted": true,
+  "limitations": "Adopted only as bounded GROUPED carry-forward. Exact byte identity and focused qualification do not establish production security, later-current-main status, provider remediation, full Identity/session correctness, real-world Gateway connectivity, or organization-wide audit completion.",
+  "qualification": {
+    "qualification_head": "261c3838cd4806ef29bd9e0e1808049be4bdf809",
+    "workflow_run": 34225490543,
+    "job": 102058467962,
+    "verifier_unit_tests": 5,
+    "verifier_unit_result": "PASS",
+    "focused_current_tests": {
+      "test_files": 14,
+      "cases": 61,
+      "assertions": 565,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "php": "8.5.10",
+    "composer_validate": "PASS",
+    "tracked_source_clean_after_execution": true,
+    "existing_exact_source_concurrency_artifact": 10035749457,
+    "outcome": "ADOPTED_GROUPED_CARRY_FORWARD",
+    "post_adoption_revalidation": {
+      "audit_head": "34c037154d1861ab0f1995ce4dc3ee9a36ebbb65",
+      "workflow_run": 34227110039,
+      "job": 102063808556,
+      "result": "PASS",
+      "canonical_group_state": "GAMEAUTH_GROUPED_ADOPTION_REVALIDATED_NOT_PRODUCT_PASS",
+      "focused_current_tests": {
+        "cases": 61,
+        "assertions": 565,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "meta_ci_run": 34227109946,
+      "meta_ci_result": "SUCCESS"
+    }
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-08T14:05:00+02:00",
+  "audit_pr": 185,
+  "governing_issue": 186,
+  "checkpoint_kind": "SEMANTIC_CONTINUATION_NO_COVERAGE_PROMOTION",
+  "meta_parent_head": "d72356adccf5600dc2fc2a075f215a6b071a21df",
+  "canonical_coverage_before_this_checkpoint": {
+    "source_leaves": 4325,
+    "direct": 202,
+    "grouped": 0,
+    "unverified": 4123,
+    "coverage_counts_changed_by_this_checkpoint": false
+  },
+  "review_hardening_state": {
+    "stable_head_reviewed": "d72356adccf5600dc2fc2a075f215a6b071a21df",
+    "independent_exact_head_review": "COMPLETED_NO_NEW_P0_P1_P2",
+    "historical_review_threads_total": 15,
+    "historical_review_threads_resolved": 15,
+    "canonical_meta_ci_run": 34221394267,
+    "canonical_meta_ci_conclusion": "success",
+    "temporary_review4_qualification_run": 34221312057,
+    "temporary_review4_qualification_conclusion": "success",
+    "temporary_workflow_retired_before_stable_head": true,
+    "provider_findings_closed_by_thread_resolution": false
+  },
+  "platform": {
+    "repository": "Oteryn/Oteryn-Platform",
+    "frozen_source_commit": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "frozen_source_tree": "ffdf2a286d3a39f2344cf2ff53b28e4ef7369a8e",
+    "historical_direct_read_generation": "3b2ea1c7392187d5d22488673073dc8f8305a374",
+    "routes_current_direct_review": {
+      "tree_sha": "424f8bae6f7b9de1726f7c62c606b3b0baa15b23",
+      "regular_file_count": 19,
+      "all_19_files_read_on_frozen_source": true,
+      "historical_report_claimed_count": 21,
+      "historical_count_disposition": "REJECTED_FAIL_CLOSED_COUNT_MISMATCH",
+      "new_material_route_level_p1_p2_found": false,
+      "scope_limitation": "Direct read of route declarations and middleware composition only; this is not a blanket approval of every controller, model-binding policy, authorization implementation, CSRF stack, production configuration or runtime behavior.",
+      "files": [
+        "routes/api.php",
+        "routes/console.php",
+        "routes/internal.php",
+        "routes/localization.php",
+        "routes/modules/announcements.php",
+        "routes/modules/character-profile-preferences.php",
+        "routes/modules/downloads.php",
+        "routes/modules/editorial-media.php",
+        "routes/modules/events.php",
+        "routes/modules/game-catalog.php",
+        "routes/modules/homepage-templates.php",
+        "routes/modules/marketplace.php",
+        "routes/modules/payments.php",
+        "routes/modules/player-companion.php",
+        "routes/modules/public-game-statistics.php",
+        "routes/modules/public-portal.php",
+        "routes/modules/support.php",
+        "routes/modules/wiki.php",
+        "routes/web.php"
+      ],
+      "bounded_observations": [
+        "internal Game Auth redemption/login-context routes require the gateway service credential and bounded throttles",
+        "Game Auth ticket issuance uses the API auth guard, a dedicated throttle and sensitive-response no-cache middleware",
+        "privileged admin route families sampled in this batch consistently require authentication, confirmed MFA and scoped permissions",
+        "account-side state-changing Marketplace, support, profile and related routes are behind authentication and use bounded throttles on abuse-prone mutations",
+        "test payment/reconciliation mutations observed in route declarations are disabled in production",
+        "no new material route-level P1/P2 was established by this bounded direct read"
+      ]
+    },
+    "gameauth_history_reconciliation_candidate": {
+      "status": "CANDIDATE_ONLY_NOT_COUNTED",
+      "historical_evidence_statement": "The prior Platform audit records all 27 files in app/GameAuth/** as directly read on the audited generation.",
+      "historical_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+      "frozen_app_tree": "12f0d06940192719373733ce95fe2171b616b8d3",
+      "app_tree_byte_identity": true,
+      "gameauth_tree": "e115d2dfea7d6bcdf3fa13dbd81fec21f0f482ca",
+      "gameauth_regular_file_count": 27,
+      "dependent_current_reads": {
+        "bootstrap/app.php": "daeaa5b91245ab73a9490662cad040e5b5949ce3",
+        "config/game-auth.php": "a36d4c56e2c2bc9c715157948efc9421ff4cae24",
+        "config/auth.php": "38712b618171bb16fb3247fb797ae5e076fff0af",
+        "config/database.php": "135b780e081eabfba40b123499bdc3536fc6f6e7"
+      },
+      "current_spot_checks": {
+        "app/GameAuth/OAuth/RequirePublicClientPkceS256.php": "6ec3995d87d8ec3acba1338bd2a5f6137a98363c",
+        "app/GameAuth/Tickets/IssueGameLoginTicket.php": "79c3e00b3dd665f8aa05eb9a7670fbf55a682c2a",
+        "app/GameAuth/Tickets/RedeemGameLoginTicket.php": "9e6d2b1aa3b84f34093e3798a39f8728d4dce0af"
+      },
+      "promotion_blocker": "Do not count this family as DIRECT or GROUPED carry-forward until a committed fail-closed verifier proves the exact 27-path/blob set, historical evidence coordinate, dependent contract validity and any required current tests/consumers without contradicting existing Platform findings such as H02/F01/F02/F16.",
+      "semantic_carry_forward_adopted": false
+    }
+  },
+  "next_action": "Continue Platform semantic reconciliation from this checkpoint. Build a fail-closed GameAuth history-reconciliation verifier or keep the 27 leaves UNVERIFIED; then proceed through other explicitly documented historical direct-read batches. Do not alter provider runtime or promote coverage without exact evidence."
+}

@@ -1,0 +1,387 @@
+{
+  "schema_version": 1,
+  "status": "DIRECT_CANDIDATE_ONLY_NOT_ADOPTED",
+  "adoption_performed": false,
+  "coverage_adopted": false,
+  "authority": {
+    "programme": "Oteryn/Oteryn#203@82bc113797ecdc70d79aee628d339136b816e15d",
+    "release_checkpoint": "Oteryn/Oteryn#186-comment-5666964258:AUDIT186_PARALLEL_RELEASE_READY",
+    "worker_pull_request": "Oteryn/Oteryn#204"
+  },
+  "source_coordinates": {
+    "repository": "Oteryn/Oteryn",
+    "baseline_head": "1008886c0aec2db6b8588a3131a83829eff06e67",
+    "baseline_tree": "9f32fb6a2debb09483bab478e1ec2d5a05cbf9db",
+    "family_tree": "1609dfc49cc95b174a8efd0ccf8e342c22dd2173",
+    "release_observed_current_heads": {
+      "meta": "d9419b05eb98c81279297563c11fc90e4fe708ac",
+      "game": "775a09091743af395ecb8f1e440cb9c286bc0dd2",
+      "platform": "84d504c98acc8134eb4c9545711010b74c987974",
+      "atlas": "0d22a8d4378e66441502482ce715e226d487248e"
+    },
+    "historical_provider_source_cuts": {
+      "game": "4d6139083179b8fd8c5d0497b2abf8c2545de599",
+      "platform": "de917b3477a1de0667531380de3660e8b2ab59aa",
+      "atlas": "f00815858bb5b031c502ad19fb96a05ff66b4d84"
+    }
+  },
+  "family": {
+    "prefix": "docs/evidence/repository-audit-2026-09-06/",
+    "path_count": 26,
+    "paths": [
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/AUDIT-PROMPT-ORIGINAL.md",
+        "blob_sha": "5c9b3f6582d20640fcba6b43f2590cbacc729dd8",
+        "sha256": "c51a6d60dddb1d2bd13fe3329723703f651b09d690522b757402988b0c569c1d",
+        "bytes": 30571,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "preserved_original_prompt_non_dispatchable"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/CHANGELOG-R3.md",
+        "blob_sha": "d58e9df114ff39debcd8aed6370f8f2ebb889869",
+        "sha256": "08610afea299a7a43e9c089e5482d87361e59aa039cca6996fd045f19687ccea",
+        "bytes": 2887,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_revision_changelog"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/COVERAGE-LEDGER.md",
+        "blob_sha": "f8a5c9a8f899bc4432bb9bc0cbec7c045aad05f3",
+        "sha256": "181123856a3b214ebee7a034e585c3e69a9392451443042802932da0aa1ad4e8",
+        "bytes": 18056,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_source_coverage_ledger"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/OTERYN-REPOSITORY-AUDIT-COMPLETED-R2-20260906.md",
+        "blob_sha": "5824287d48b7f6e92e80d0a19168578663fe541c",
+        "sha256": "15cf3b2f5a8a3fce1cf0d0a6ded4c0f51758d433ca49e9eb47a24b3a520dfae0",
+        "bytes": 48915,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_audit_report"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/OTERYN-REPOSITORY-AUDIT-R4-CURRENT-MAIN-DELTA-CLOSEOUT-20260907.md",
+        "blob_sha": "31016a7b8aa4252885e5a08f8b909b6ce2beb4ba",
+        "sha256": "2c7e6bad09327ba4adfe2bfac1409437b23f48858e0a3e42d4f08aac1b7997f3",
+        "bytes": 7064,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_delta_closeout"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/PROMPT-COMPLIANCE-MATRIX.md",
+        "blob_sha": "033906f955191fa27553210212c37b066d04a78f",
+        "sha256": "15530efb479b68e9e1f05571ce55c2c8d5d3252a7466fd54c5bfa5163b5f3510",
+        "bytes": 11222,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_prompt_reconciliation"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/PUBLICATION-RECEIPT.json",
+        "blob_sha": "1bbc5f9f4c615da3cf7c0967a28d0efad548ba05",
+        "sha256": "5f7d09eba0826d45e4f3ecdaa7a6c2e29043cd4991b0f4a4a080674cc3d16fe5",
+        "bytes": 1490,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_publication_receipt"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/README.md",
+        "blob_sha": "8012644488aab4a356a380c3f410caaddce7c2b6",
+        "sha256": "dbaf04e72389bd62195754721f4dd355ad21bb2f331636c3fe51876cf3f28a11",
+        "bytes": 3841,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_package_boundary_and_map"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/REPRODUCE.md",
+        "blob_sha": "9c52ec38fd461bf373bd1ca405a171c62319e76a",
+        "sha256": "ee91a92c13aa74798f64b59714088d172fa89c2a8d391317f4f480b927205288",
+        "bytes": 8526,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "non_dispatchable_historical_reproduction_recipe"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/SHA256SUMS",
+        "blob_sha": "3fe5af361f7ec855b649f43b9fdce06a2d5054d5",
+        "sha256": "7ad6c9478bfe2e38a753f394d48afd64d1ad7b7a34fa1d44510550786e632b1e",
+        "bytes": 2418,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_digest_manifest_with_recorded_mismatch"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/VERIFICATION-SUMMARY.md",
+        "blob_sha": "d7b6f2c7b537bede540a28d4f07418e6428ab933",
+        "sha256": "8fdd76ca2c1eb64a6087fd02375a70aa807b98cdd59fd2b515b1b1f4404d276e",
+        "bytes": 4441,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_verification_summary"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/ci-meta-times-1.csv",
+        "blob_sha": "28e111f93a3c33707877aa03fbb5d267e36c76cd",
+        "sha256": "8f9b8987f5a593c0e4c138fc0988dcfff0ad50fd0d0646c7ab4e5f7398cedcc6",
+        "bytes": 5259,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_ci_timing_partition"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/ci-meta-times-2.csv",
+        "blob_sha": "64323fed60950166c27e7fd5b1d1401a21944fee",
+        "sha256": "e64362f3b7fc7fe8861e6c742397f46a31491414c3fb0d1990d003ec8a21cd57",
+        "bytes": 5259,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_ci_timing_partition"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/ci-meta-times-3.csv",
+        "blob_sha": "80d4d5e6a8802e97bf65438f80fb54421b5cd36b",
+        "sha256": "c5384d789dc551f5b8523dc7d392b776218f81d25ddfc10b798218bf40c1fdfe",
+        "bytes": 5259,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_ci_timing_partition"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/ci-recalculation.json",
+        "blob_sha": "b083b94f30ab0d1de5c628c9a654f036ee7b0d41",
+        "sha256": "09ecac4b437104d45583dbdcdb22bef54abadec0f108ddce4639f5c9713b6429",
+        "bytes": 1526,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_ci_recalculation"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/ci-run-index.json",
+        "blob_sha": "d7bc05f25694ef9e71914f5fa0166079f5885a49",
+        "sha256": "d9d5672f9facd90bca765c88d060b7532f80ca68834d1a06b462696e2e327553",
+        "bytes": 14101,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_ci_run_index"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/coverage-reconciliation.json",
+        "blob_sha": "098c1224a376c1e5eb419a06f43e3bc2f94603d8",
+        "sha256": "8f04fabab50b4ad504ef4d94ccd655b54276becc898b1de2275bdf6918eb3d66",
+        "bytes": 1104,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_coverage_reconciliation"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/current-work.json",
+        "blob_sha": "727f0c76406bced0b61c2da540ccc714a3e968b2",
+        "sha256": "917fb0113cf9ddcff566aee91c3d768467275692f7192cb09a7b62c316451314",
+        "bytes": 2712,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_work_state_snapshot"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/external-references.json",
+        "blob_sha": "7ccaeadf5fc6472fbedf604a2ad785531d533e6f",
+        "sha256": "3252f5cb05c03552fc4e8519300b23545ed19623c06b93cb30fb9a501310c31c",
+        "bytes": 1290,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_external_reference_inventory"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/instruction-sources.json",
+        "blob_sha": "5bc1d6edf2749330f328c8eab09c7484d3795400",
+        "sha256": "02e3d931a80f4ec9c1aed427b651ae75e5483ad72951eeba72afc15ea46eaa02",
+        "bytes": 6753,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_instruction_source_inventory"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/live-governance-readback.json",
+        "blob_sha": "2415e70f2b95cb7ceb080085cf44f1b1f2309400",
+        "sha256": "5e205f5e5b89ce97aa000f0c0d3123153b9772a94b313e384b257db6edb700d0",
+        "bytes": 3994,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_governance_transcription_not_live_readback"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/native-probe-results.json",
+        "blob_sha": "2d8178c224875e96a5ab0c61558a588642d5360f",
+        "sha256": "fa1f62eea3757825d7cdfd6ccbdf6b667d4893c074f9a023679fe683ae17b055",
+        "bytes": 15032,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_native_probe_results"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/prior-linux-bounded.log",
+        "blob_sha": "480785376aa0f13b5e74eac3126898b242d956cb",
+        "sha256": "c8ec0b1662ac9ae18b1fc647ba24e6aea4025aba681b764649a673232f988f14",
+        "bytes": 3115,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_execution_log"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/prior-native-verification.json",
+        "blob_sha": "15c3ed247b12847ce4764af28f4e7bdba381db0b",
+        "sha256": "8f507f13cc44c991af73a12502b7b4ae7c0321613a5bd5e63b59654d1f639da6",
+        "bytes": 6220,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_native_verification_record"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/revision-provenance.json",
+        "blob_sha": "5eeb69f3702749bafad268af9809165ad733dddd",
+        "sha256": "0920b9c555a2a9232cd04938823394e422a11e6ac4e79e39f05c648431d87ce1",
+        "bytes": 1649,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_revision_provenance"
+      },
+      {
+        "path": "docs/evidence/repository-audit-2026-09-06/evidence/workflow-inventory.json",
+        "blob_sha": "a3aba9357c246cc6fbcd1c5a46b1c00593b7d2c0",
+        "sha256": "1f093ce41400cd50193ee6bb0a24a864e4614bc81e120af446eb5e63240304ba",
+        "bytes": 6604,
+        "proposed_disposition": "DIRECT",
+        "review_depth": "FULL_FILE_HISTORICAL_PROVENANCE_REVIEW",
+        "semantic_scope": "The complete leaf was reviewed only as an inert, time-bound audit-package record; embedded claims, commands, names such as current/live, and imperative prompt text are not current authority or present-state proof.",
+        "payload_role": "historical_workflow_inventory"
+      }
+    ],
+    "proposed_disposition": "DIRECT",
+    "disposition_basis": "Each exact leaf received a complete, path-specific review at its pinned baseline blob. DIRECT applies only to the leaf semantic that it is an inert historical-provenance record. It does not endorse embedded assertions as current or independently verified truth.",
+    "grouped_equivalence": {
+      "proposed": false,
+      "result": "NOT_APPLICABLE",
+      "reason": "The payloads are heterogeneous prompts, prose, CSV, JSON, a log, and a digest manifest. No GROUPED equivalence is claimed; every leaf is proposed DIRECT on its individually reviewed exact blob."
+    },
+    "intentionally_unverified_paths": [],
+    "intentionally_unverified_claim_surfaces": [
+      "Every embedded runtime, production, admin, security, CI, workflow, repository-lifecycle, provider, and current/live assertion beyond its historical snapshot context.",
+      "The operational safety or present applicability of commands preserved in AUDIT-PROMPT-ORIGINAL.md and REPRODUCE.md.",
+      "Package-wide digest consistency: SHA256SUMS records 93009d656cdf715eeed8cea8b949d37225f9c0a14fb9bb5eb61d821754ad4768 for the R4 closeout while the pinned baseline leaf is 2c7e6bad09327ba4adfe2bfac1409437b23f48858e0a3e42d4f08aac1b7997f3."
+    ]
+  },
+  "review": {
+    "method": "Complete byte-level identity enumeration, full-file semantic reading of all 26 leaves, structured parse of all JSON/CSV payloads, and explicit review of the package boundary, imperative prompt/reproduction content, current/live labels, execution records, and digest manifest.",
+    "scope": "Historical provenance semantics only: what each pinned artifact records about its dated audit package.",
+    "limitations": [
+      "No historical assertion was rebound to a current repository, provider, runtime, admin, production, security, workflow, CI, or lifecycle state.",
+      "No command, prompt, remediation, or reproduction step in the package is authorized or executed by this candidate.",
+      "JSON/CSV parsing proves structural readability only, not authenticity or truth of recorded observations.",
+      "The known SHA256SUMS/R4-closeout mismatch is preserved as a limitation and prevents use of the manifest as package-wide integrity proof.",
+      "No provider repository was mutated or used as a writable execution surface."
+    ],
+    "adversarial_cases": [
+      "Reject a missing, extra, duplicated, reordered, renamed, or blob/byte-drifted family leaf.",
+      "Reject GROUPED or any disposition other than per-leaf DIRECT.",
+      "Reject current/live truth, dispatchability, readiness, completion, authority, adoption, or provider-write claims.",
+      "Reject projection totals that do not move exactly 26 META leaves from UNVERIFIED to DIRECT.",
+      "Reject a repaired or ignored SHA256SUMS mismatch unless a new exact candidate and semantic review are produced.",
+      "Reject mutation of canonical accounting surfaces relative to the released baseline."
+    ]
+  },
+  "projection_if_adopted": {
+    "label": "PROJECTION_ONLY",
+    "delta": {
+      "direct": 26,
+      "grouped": 0,
+      "unverified": -26,
+      "semantically_classified": 26
+    },
+    "result": {
+      "source_leaves": 4361,
+      "direct": 335,
+      "grouped": 113,
+      "unverified": 3913,
+      "semantically_classified": 448,
+      "meta": {
+        "leaves": 210,
+        "direct": 122,
+        "grouped": 0,
+        "unverified": 88
+      }
+    }
+  },
+  "recheck_triggers": [
+    "Any family path, byte content, Git blob identity, family tree, or baseline coordinate changes.",
+    "Canonical adoption is attempted, canonical audit accounting advances, or the PR #185 baseline changes in a way that intersects this family or its semantics.",
+    "Any embedded assertion is proposed as current runtime/admin/product/security/CI/workflow/lifecycle truth rather than historical provenance.",
+    "Any historical provider/source coordinate is rebound to a later provider head.",
+    "The SHA256SUMS mismatch is repaired, waived, or used as an integrity assertion.",
+    "The package is moved or referenced from an active instruction/dispatch surface."
+  ],
+  "claims": {
+    "current_runtime_truth": false,
+    "current_admin_truth": false,
+    "current_product_truth": false,
+    "live_operational_capability": false,
+    "product_readiness": false,
+    "organization_audit_completion": false,
+    "package_wide_digest_integrity": false,
+    "provider_mutation": false
+  },
+  "canonical_accounting_before_candidate": {
+    "source_leaves": 4361,
+    "direct": 309,
+    "grouped": 113,
+    "unverified": 3939,
+    "semantically_classified": 422,
+    "meta": {
+      "leaves": 210,
+      "direct": 96,
+      "grouped": 0,
+      "unverified": 114
+    }
+  },
+  "canonical_overlap_guard": {
+    "later_semantic_03_overlay_paths": [
+      "meta\tdocs/ci/CI_CONTRACT.md"
+    ],
+    "candidate_historical_family_overlap": [],
+    "candidate_historical_paths_current_disposition": "UNVERIFIED",
+    "candidate_historical_paths_current_unverified_count": 26
+  }
+}
