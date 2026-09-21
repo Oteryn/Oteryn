@@ -772,6 +772,19 @@ def test_review_genuinely_incomplete_negative_directives_keep_soft_wraps() -> No
 
 
 
+def test_publication_policy_allows_only_atomic_api_successor_route() -> None:
+    organization = (REPO_ROOT / "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md").read_text(encoding="utf-8")
+    publication = (REPO_ROOT / "docs/agents/contracts/PUBLICATION_INTEGRITY_POLICY.md").read_text(encoding="utf-8")
+    for text in (organization, publication):
+        assert "API-native" in text
+        assert "force=false" in text or "non-force ref mutation" in text
+        assert "expected remote predecessor" in text
+    assert "exactly one successor commit" in publication
+    assert "complete changed-file set" in publication
+    assert "must not replay the candidate as a sequence of per-file Contents API commits" in publication
+    assert "must not claim that the successor preserves the local candidate commit SHA" in publication
+
+
 def main() -> int:
     failures: list[tuple[str, Exception]] = []
     for name, test in sorted(globals().items()):

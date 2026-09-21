@@ -10,7 +10,7 @@ It is not a merge authority, does not replace repository CI/review/Merge Queue, 
 
 ## Exact-candidate invariant
 
-Once a material local commit is selected as the publication candidate, publication must preserve that exact commit identity. The publication operation must not reconstruct the candidate from files, patches, prose, test output, or manually assembled Git objects.
+Once a material local commit is selected for normal Git publication, that route must preserve the exact commit identity. An explicitly owner-authorized API-native route does not claim SHA preservation: it creates one new successor candidate over the exact expected remote predecessor from a complete, reviewable tree. The local candidate remains evidence/recovery input until the API successor has live head/tree/diff readback, and the successor requires its own validation and review.
 
 Before mutation, bind and verify:
 
@@ -61,9 +61,11 @@ The clean-worktree probe enumerates tracked paths and resolves attributes with `
 
 The guarded push applies `-c push.pushOption=` at command scope and uses `--no-verify`, `--recurse-submodules=no`, `--no-follow-tags` and `--no-signed`. Clearing `push.pushOption` prevents repository, worktree, global, or system configuration from silently transmitting server-specific push options such as deployment instructions. The remaining fences ensure repository-local `pre-push` hooks cannot run, configured recursive-submodule publication cannot widen the operation to another repository, `push.followTags=true` cannot add tag refs, and `push.gpgSign` cannot invoke a repository-configured `gpg.program` or add signed-push side effects. The only intended ref update is the exact candidate to the canonical task branch guarded by the expected-old-value lease.
 
-If the normal Git publication path is unavailable, do not use ad-hoc Git Data API blob/tree/commit/ref construction, per-file Contents API reconstruction, reset, rebase, non-fast-forward push, or manual ref replacement to synthesize a remote substitute for the existing candidate. Preserve the candidate/recovery artifact and classify the lane as blocked by the exact observed publication capability failure. If required candidate objects are missing locally, hydrate them only through a separately authorized trusted preparation step before entering publication; the publication helper itself must not lazily fetch them.
+If the normal Git publication path is unavailable, an explicitly owner-authorized API-native successor route may be used instead of blocking solely on local Git transport. The route must bind the exact repository, allocated task branch and expected remote predecessor; build one complete tree from that predecessor; create exactly one successor commit; update only that branch with a non-force ref mutation; and immediately read back the remote head, tree and complete changed-file set. The expected predecessor must still be the live branch head at mutation time. A mismatch or third SHA fails closed.
 
-This restriction is candidate-specific. It does not prohibit an independently authorized API-native edit whose intended operation is itself the API write and which is not pretending to publish an already-prepared local commit.
+The API-native route must not replay the candidate as a sequence of per-file Contents API commits, must not use reset, rebase, force, non-fast-forward ref replacement or protected-branch bypass, and must not claim that the successor preserves the local candidate commit SHA. The local candidate or other verified source evidence remains retained until readback succeeds. After publication, the API successor becomes the only candidate eligible for subsequent validation/review, and all task-required exact-head checks must run again on it.
+
+This route is still candidate-specific: an independently authorized API-native edit remains valid when the intended operation is itself the API write, while an unauthorized or unverifiable reconstruction remains blocked.
 
 ## Ambiguous outcomes
 
