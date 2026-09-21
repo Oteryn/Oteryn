@@ -95,6 +95,7 @@ def test_publication_policy_allows_only_atomic_api_native_candidate_route() -> N
         assert marker.casefold() in combined.casefold(), marker
     assert "Git-refs `force=false` is only an ancestry check" in publication
     assert "Precondition failure must leave the branch unchanged" in restricted
+    assert "perform only a non-force (`force=false`) update" not in combined
 
 
 def test_meta_bundle_rejects_empty_forbidden_section_lists() -> None:
