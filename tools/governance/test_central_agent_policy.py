@@ -100,6 +100,8 @@ def test_publication_policy_allows_only_atomic_api_native_candidate_route() -> N
     assert "Precondition failure must leave the branch unchanged" in restricted
     assert "when neither guarded Git nor an authorized atomic expected-head API candidate-creation primitive is available" in rollout
     assert "API-native route is accepted only as a new candidate" in rollout
+    assert "one server-side mutation fences the exact expected branch head" in rollout
+    assert "creates one complete successor commit" in rollout
     assert "ancestry-only `force=false` ref updates" in rollout
     assert "raw Git Data object/ref assembly" in rollout
     assert "sequential per-file API writes remain rejected" in rollout
