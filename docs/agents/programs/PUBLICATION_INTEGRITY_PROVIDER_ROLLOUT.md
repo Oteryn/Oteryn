@@ -23,7 +23,7 @@ Each provider adoption must:
 - update `docs/agents/META_AGENT_POLICY_BINDING.json` to the exact protected META authority commit while preserving the central policy identity/version contract;
 - re-read the provider bootstrap and remove or narrow any publication wording that conflicts with the new central contract, without duplicating the full META procedure;
 - verify the provider's policy-consumption validator against the exact bound META revision;
-- execute one representative behavior check proving that a prepared local candidate whose normal Git publication path is unavailable is preserved/reported blocked rather than reconstructed through raw Git Data or per-file API writes;
+- execute representative behavior checks proving both boundaries: a prepared local candidate is preserved/reported blocked when neither guarded Git nor an authorized atomic expected-head API candidate-creation primitive is available, while an API-native route is accepted only as a new candidate when one server-side mutation fences the exact expected branch head and creates one complete successor commit; ancestry-only `force=false` ref updates, raw Git Data object/ref assembly and sequential per-file API writes remain rejected;
 - preserve repository-specific Merge Queue, review, CI and production boundaries.
 
 ## Task-branch protection follow-up

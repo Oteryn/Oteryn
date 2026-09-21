@@ -73,21 +73,28 @@ def test_meta_bundle_is_complete_and_self_consistent() -> None:
 def test_publication_policy_allows_only_atomic_api_native_candidate_route() -> None:
     organization = (REPO_ROOT / "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md").read_text(encoding="utf-8")
     publication = (REPO_ROOT / "docs/agents/contracts/PUBLICATION_INTEGRITY_POLICY.md").read_text(encoding="utf-8")
+    restricted = (REPO_ROOT / "docs/agents/operations/RESTRICTED_PUBLISHING.md").read_text(encoding="utf-8")
+    rollout = (REPO_ROOT / "docs/agents/programs/PUBLICATION_INTEGRITY_PROVIDER_ROLLOUT.md").read_text(encoding="utf-8")
+    combined = "\n".join((organization, publication, restricted, rollout))
     for marker in (
-        "repository-native API candidate",
-        "exactly one successor commit",
-        "force=false",
+        "server-side atomic expected-head",
+        "createCommitOnBranch",
+        "expectedHeadOid",
         "new candidate",
-        "Sequential per-file Contents API commits",
+        "complete bounded task delta",
+        "Candidate-specific validation/review evidence",
     ):
-        assert marker in organization or marker in publication, marker
+        assert marker.casefold() in combined.casefold(), marker
     for marker in (
-        "create one successor commit with exactly that parent",
-        "require the branch to still equal the expected predecessor",
-        "live readback to equal the new commit",
-        "must not emit sequential Contents API commits",
+        "force=false",
+        "ancestry-only",
+        "low-level Git Data",
+        "sequential per-file",
+        "preserve/report",
     ):
-        assert marker in publication, marker
+        assert marker.casefold() in combined.casefold(), marker
+    assert "Git-refs `force=false` is only an ancestry check" in publication
+    assert "Precondition failure must leave the branch unchanged" in restricted
 
 
 def test_meta_bundle_rejects_empty_forbidden_section_lists() -> None:
