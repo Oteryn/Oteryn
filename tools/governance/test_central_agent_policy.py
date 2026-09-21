@@ -102,6 +102,7 @@ def test_publication_policy_allows_only_atomic_api_native_candidate_route() -> N
     assert "API-native route is accepted only as a new candidate" in rollout
     assert "one server-side mutation fences the exact expected branch head" in rollout
     assert "creates one complete successor commit" in rollout
+    assert "one server-side mutation fences the exact expected branch head and creates one complete successor commit" in rollout
     assert "ancestry-only `force=false` ref updates" in rollout
     assert "raw Git Data object/ref assembly" in rollout
     assert "sequential per-file API writes remain rejected" in rollout
