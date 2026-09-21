@@ -6,7 +6,7 @@ Status: active contract after reviewed integration to protected META `main` and 
 
 This contract governs publication of a material candidate to its allocated canonical task branch, whether the candidate is an already-prepared local Git commit or an independently selected repository-native API commit. It prevents a transport, credential or route failure from silently changing candidate identity, rewriting branch history, publishing adjacent repositories/refs, or destroying the only recoverable copy of useful work.
 
-It is not a merge authority, does not replace repository CI/review/Merge Queue, and does not globally forbid repository-native API writes for operations that are not publishing an existing material local candidate.
+It is not a merge authority and does not replace repository CI, independent review or Merge Queue. Repository-native API writes remain independently authorized operations; this contract additionally governs the atomic API-native candidate-publication route defined below.
 
 ## Exact-candidate invariant
 
