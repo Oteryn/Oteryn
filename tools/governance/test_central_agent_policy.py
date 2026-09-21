@@ -94,7 +94,16 @@ def test_publication_policy_allows_only_atomic_api_native_candidate_route() -> N
     ):
         assert marker.casefold() in combined.casefold(), marker
     assert "Git-refs `force=false` is only an ancestry check" in publication
+    assert "For an API-native candidate route, before mutation bind and verify" in publication
+    assert "For the local Git candidate route only, before mutation bind and verify" in publication
+    assert "no pre-mutation candidate SHA, local Git object inventory, push target, worktree" in publication
     assert "Precondition failure must leave the branch unchanged" in restricted
+    assert "when neither guarded Git nor an authorized atomic expected-head API candidate-creation primitive is available" in rollout
+    assert "API-native route is accepted only as a new candidate" in rollout
+    assert "ancestry-only `force=false` ref updates" in rollout
+    assert "raw Git Data object/ref assembly" in rollout
+    assert "sequential per-file API writes remain rejected" in rollout
+    assert "prepared local candidate whose normal Git publication path is unavailable is preserved/reported blocked rather than reconstructed" not in rollout
     assert "perform only a non-force (`force=false`) update" not in combined
 
 
