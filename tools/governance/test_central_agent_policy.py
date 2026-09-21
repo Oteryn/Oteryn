@@ -70,6 +70,26 @@ def test_meta_bundle_is_complete_and_self_consistent() -> None:
     assert central.validate_meta_bundle(REPO_ROOT, policy) == []
 
 
+def test_publication_policy_allows_only_atomic_api_native_candidate_route() -> None:
+    organization = (REPO_ROOT / "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md").read_text(encoding="utf-8")
+    publication = (REPO_ROOT / "docs/agents/contracts/PUBLICATION_INTEGRITY_POLICY.md").read_text(encoding="utf-8")
+    for marker in (
+        "repository-native API candidate",
+        "exactly one successor commit",
+        "force=false",
+        "new candidate",
+        "Sequential per-file Contents API commits",
+    ):
+        assert marker in organization or marker in publication, marker
+    for marker in (
+        "create one successor commit with exactly that parent",
+        "require the branch to still equal the expected predecessor",
+        "live readback to equal the new commit",
+        "must not emit sequential Contents API commits",
+    ):
+        assert marker in publication, marker
+
+
 def test_meta_bundle_rejects_empty_forbidden_section_lists() -> None:
     policy = central.load_policy(REPO_ROOT)
     for key in ("forbidden_provider_sections", "forbidden_task_prompt_sections"):
