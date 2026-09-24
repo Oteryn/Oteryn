@@ -399,12 +399,14 @@ def test_task_prompt_must_defer_protected_integration_capability_routing() -> No
 Repair the allocated task and deliver through protected Merge Queue.
 
 ACCEPTANCE
-Resolve protected integration through the current bound META capability router; use a delegated route when the direct route is unavailable and report BLOCKED_CAPABILITY_UNAVAILABLE only when neither route is proven.
+Resolve protected integration through the current bound META capability router; use a delegated route when the direct route is unavailable and report BLOCKED_CAPABILITY_UNAVAILABLE only when neither direct nor delegated capability is proven.
 """
     for text in (
         allowed,
+        "If the direct operation is unavailable, use delegated execution. If the delegated route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the direct operation is unavailable, use delegated execution; record BLOCKED_CAPABILITY_UNAVAILABLE only when neither direct nor delegated capability is proven.",
         "Repair the merge-async receipt persistence bug without changing integration routing.",
+        "Repair tests for clients that call merge-async; do not change integration routing.",
         "Document the merge_action parser and its invalid-input tests.",
         'Verify that the task prompt never uses merge_action="merge_queue".',
         "Test that the validator rejects merge_action set to direct_merge.",
@@ -424,14 +426,17 @@ Resolve protected integration through the current bound META capability router; 
         "Submit with merge_action set to direct_merge.",
         "Set merge_action to merge_queue before submission.",
         "Use github.merge_async.put_exact_head for protected integration.",
+        "Call merge-async to integrate this PR.",
         "If the native operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If merge-async is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If github.merge_async.put_exact_head is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
-        "If the direct capability is unavailable, mark BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct capability cannot be proven, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct capability is not proven, mark BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the native operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE and do not use delegated execution.",
         "If the direct route is unavailable, do not use delegated execution. Record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the direct route is unavailable, do not use delegated execution. Note the failed probe in the handoff. Record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE. Separately, check the delegated executor's audit logs.",
         "Do not merge directly and instead invoke merge-async with the exact SHA.",
         'Do not bypass Merge Queue and submit with merge_action="merge_queue".',
     )
