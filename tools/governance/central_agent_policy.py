@@ -568,6 +568,8 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         rf"(?:is|=|:)\s*\b{primitive}\b"
         rf"|\b{primitive}\b[^.!?;]{{0,100}}\b(?:is|remains)\s+(?:the\s+)?"
         rf"(?:selected|required|only)\s+(?:route|operation|primitive)\b"
+        rf"|\b{primitive}\b[^.!?;]{{0,100}}\b(?:must|shall|should|will)\s+"
+        rf"be\s+(?:used|invoked|called|executed)\b"
         rf")",
         re.IGNORECASE,
     )
@@ -673,6 +675,11 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
                 active_direct_loss.append(statement)
 
         if "blocked_capability_unavailable" not in statement.casefold():
+            continue
+        if (
+            _is_audit_or_negative(statement)
+            or inert_audit_reference.search(statement) is not None
+        ):
             continue
         if not active_direct_loss:
             continue
