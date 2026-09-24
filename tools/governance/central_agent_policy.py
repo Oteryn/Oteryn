@@ -539,25 +539,7 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     for marker in ("`", "**", "__", "*", "_"):
         for token in ("merge-async", "github.merge_async.put_exact_head", "merge_action"):
             scan_text = scan_text.replace(f"{marker}{token}{marker}", token)
-    coordinated_route_override = re.compile(
-        r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,180}"
-        r"\b(?:update|set|configure|assign|require|submit|invoke|use|route|integrate|"
-        r"enqueue|send|call|execute|run)\b[^.!?;]{0,180}"
-        r"(?:\bmerge_action\b|\bmerge-async\b|\bgithub\.merge_async\.put_exact_head\b)",
-        re.IGNORECASE,
-    )
-    if coordinated_route_override.search(scan_text) is not None:
-        return True
-    if re.search(
-        r"\b(?:then|but|instead)\s+(?:update|set|configure|assign)\b"
-        r"[^.!?;]{0,180}\bmerge_action\b",
-        scan_text,
-        re.IGNORECASE,
-    ) is not None:
-        return True
-
-    statements = _statements(scan_text)
-    affirmative_after_negative = re.compile(
+    statements = _statements(scan_text)    affirmative_after_negative = re.compile(
         r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,160}"
         r"\b(?:submit|invoke|use|route|integrate|enqueue|send|call)\b",
         re.IGNORECASE,
@@ -579,8 +561,9 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         rf"{directive_subject}(?:call|invoke|use|submit|enqueue|send|execute|run)\s+"
         rf"(?:(?:the|exact|native|REST|exact-head|selected|required)\s+){{0,5}}"
         rf"(?:operation\s+)?\b{primitive}\b"
-        rf"|{directive_subject}(?:integrate|route)\b[^.!?;]{{0,80}}"
-        rf"\b(?:through|via|using)\b[^.!?;]{{0,60}}\b{primitive}\b"
+        rf"|{directive_subject}(?:integrate|route)\b[^.!?;]{{0,100}}"
+        rf"\b(?:through|via|using|by\s+(?:calling|invoking|using|executing|running))\b"
+        rf"[^.!?;]{{0,60}}\b{primitive}\b"
         rf"|\b(?:selected|required|only)\s+(?:route|operation|primitive)\s+"
         rf"(?:is|=|:)\s*\b{primitive}\b"
         rf"|\b{primitive}\b[^.!?;]{{0,100}}\b(?:is|remains)\s+(?:the\s+)?"
@@ -628,6 +611,10 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         rf"[^.!?;]{{0,120}}\b(?:be\s+)?{loss}\b"
         rf"|\bshould\b[^.!?;]{{0,80}}\b{primitive}\b"
         rf"[^.!?;]{{0,120}}\b(?:be\s+)?{loss}\b"
+        rf"|\bno\s+(?:direct|native)\b[^.!?;]{{0,120}}"
+        rf"\b(?:route|capability|operation|primitive)?\b[^.!?;]{{0,80}}"
+        rf"\b(?:available|proven|usable|operational|capable)\b"
+        rf"|\babsence\s+of\s+(?:(?:the\s+)?(?:direct|native)\b|{primitive}\b)"
         rf")",
         re.IGNORECASE,
     )
@@ -673,17 +660,7 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         r"enqueue|send|call|execute|run)\b",
         re.IGNORECASE,
     )
-    coordinated_route_assignment = re.compile(
-        r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,180}"
-        r"\b(?:update|set|configure|assign|require|submit|invoke|use|route|integrate|"
-        r"enqueue|send|call|execute|run)\b[^.!?;]{0,180}"
-        r"(?:\bmerge_action\b|\bmerge-async\b|\bgithub\.merge_async\.put_exact_head\b)",
-        re.IGNORECASE,
-    )
-
     for statement in statements:
-        if coordinated_route_assignment.search(statement) is not None:
-            return True
         merge_match = merge_action_selection.search(statement)
         native_match = native_selection_re.search(statement)
         route_matches = [match for match in (merge_match, native_match) if match is not None]
