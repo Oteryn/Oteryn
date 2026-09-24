@@ -570,6 +570,12 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         rf"(?:selected|required|only)\s+(?:route|operation|primitive)\b"
         rf"|\b{primitive}\b[^.!?;]{{0,100}}\b(?:must|shall|should|will)\s+"
         rf"be\s+(?:used|invoked|called|executed)\b"
+        rf"|^(?:[-*+]\s+|\d+[.)]\s+)?"
+        rf"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?"
+        rf"require\b[^.!?;]{{0,160}}\bto\s+"
+        rf"(?:use|invoke|call|execute|run|submit|enqueue)\s+"
+        rf"(?:(?:the|exact|native|REST|exact-head|selected|required)\s+){{0,5}}"
+        rf"(?:operation\s+)?\b{primitive}\b"
         rf")",
         re.IGNORECASE,
     )
@@ -644,18 +650,31 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         re.IGNORECASE,
     )
 
+    operative_clause_before_route = re.compile(
+        r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,180}"
+        r"\b(?:update|set|configure|assign|require|submit|invoke|use|route|integrate|"
+        r"enqueue|send|call|execute|run)\b",
+        re.IGNORECASE,
+    )
+
     for statement in statements:
-        selects_route = (
-            merge_action_selection.search(statement) is not None
-            or native_selection_re.search(statement) is not None
-        )
-        if not selects_route:
+        merge_match = merge_action_selection.search(statement)
+        native_match = native_selection_re.search(statement)
+        route_matches = [match for match in (merge_match, native_match) if match is not None]
+        if not route_matches:
             continue
+        route_match = min(route_matches, key=lambda match: match.start())
         inert = (
             _is_audit_or_negative(statement)
             or inert_audit_reference.search(statement) is not None
         )
-        if not inert or affirmative_after_negative.search(statement):
+        if not inert:
+            return True
+        prefix = statement[:route_match.start()]
+        if (
+            affirmative_after_negative.search(statement)
+            or operative_clause_before_route.search(prefix) is not None
+        ):
             return True
 
     active_direct_loss: list[str] = []
@@ -685,11 +704,23 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
             continue
 
         context = " ".join(active_direct_loss)
+        disjunctive_loss = re.search(
+            r"\b(?:either\s+)?(?:direct|native)\b[^.!?;]{0,180}\bor\b"
+            r"[^.!?;]{0,180}\bdelegated\b"
+            r"|\b(?:either\s+)?delegated\b[^.!?;]{0,180}\bor\b"
+            r"[^.!?;]{0,180}\b(?:direct|native)\b",
+            context,
+            re.IGNORECASE,
+        ) is not None
         delegated_exhausted = (
             delegated_loss_condition.search(context) is not None
             or neither_condition.search(context) is not None
         )
-        if delegated_negative_re.search(context) is not None or not delegated_exhausted:
+        if (
+            disjunctive_loss
+            or delegated_negative_re.search(context) is not None
+            or not delegated_exhausted
+        ):
             return True
         active_direct_loss = []
     return False
