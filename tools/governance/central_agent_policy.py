@@ -537,7 +537,7 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     """
     scan_text = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", text)
     for marker in ("`", "**", "__", "*", "_"):
-        for token in ("merge-async", "github.merge_async.put_exact_head"):
+        for token in ("merge-async", "github.merge_async.put_exact_head", "merge_action"):
             scan_text = scan_text.replace(f"{marker}{token}{marker}", token)
     statements = _statements(scan_text)
     affirmative_after_negative = re.compile(
@@ -548,11 +548,14 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     primitive = r"(?:merge-async|github\.merge_async\.put_exact_head)"
     directive_subject = (
         r"(?:^(?:[-*+]\s+|\d+[.)]\s+)?"
+        r"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?"
         r"|\b(?:(?:the\s+)?(?:worker|agent|coordinator)|you|"
         r"(?:protected\s+)?integration|(?:protected\s+)?merge\s+queue\s+integration|"
         r"(?:merge\s+queue\s+)?submission)\s+"
         r"(?:must|shall|should|may|can)\s+"
-        r"|\b(?:and|but|then|instead|however|yet)\s+)"
+        r"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?"
+        r"|\b(?:and|but|then|instead|however|yet)\s+"
+        r"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?)"
     )
     native_selection_re = re.compile(
         rf"(?:"
@@ -633,9 +636,9 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     )
     inert_audit_reference = re.compile(
         r"^(?:[-*+]\s+|\d+[.)]\s+)?"
-        r"(?:verify|check|audit|inspect|test|assert|document|repair)\b"
-        r".{0,280}\b(?:prompt|validator|parser|documentation|rule|test|contract|client|receipt|bug)\b"
-        r".{0,280}\b(?:never|not|without|forbid\w*|reject\w*|invalid|disallow\w*|repair|test|document)\b",
+        r"(?:verify|check|audit|inspect|test|assert|document|repair|fix|update|ensure)\b"
+        r".{0,320}\b(?:prompt|validator|parser|documentation|rule|test|contract|client|receipt|bug)\b"
+        r".{0,320}\b(?:never|not|without|forbid\w*|reject\w*|invalid|disallow\w*|repair|test|document|fix|update)\b",
         re.IGNORECASE,
     )
 
@@ -658,14 +661,13 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         if direct_loss_condition.search(statement):
             active_direct_loss = [statement]
         elif active_direct_loss:
-            # A new unrelated conditional starts a new semantic branch and ends
-            # the prior direct-loss context. Ordinary handoff/evidence sentences
-            # do not, so punctuation or filler cannot evade the blocker check.
-            if (
-                re.search(r"\b(?:if|when|unless)\b", statement, re.IGNORECASE)
-                and "delegated" not in statement.casefold()
-                and "blocked_capability_unavailable" not in statement.casefold()
-            ):
+            direct_recovery = re.search(
+                r"\b(?:direct|native)\b[^.!?;]{0,120}"
+                r"\b(?:is|remains|becomes)\s+(?:available|proven|usable|operational|capable)\b",
+                statement,
+                re.IGNORECASE,
+            )
+            if direct_recovery is not None:
                 active_direct_loss = []
             else:
                 active_direct_loss.append(statement)
