@@ -575,7 +575,7 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         re.IGNORECASE,
     )
     delegated_loss_condition = re.compile(
-        rf"\b(?:if|when|until)\b[^.!?;]{{0,260}}\bdelegated\b[^.!?;]{{0,160}}\b{loss}\b",
+        rf"\b(?:if|when|until)\b(?:(?!\b(?:if|when|unless|until)\b)[^.!?;]){{0,120}}\bdelegated\b[^.!?;]{{0,160}}\b{loss}\b",
         re.IGNORECASE,
     )
     neither_condition = re.compile(
