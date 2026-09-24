@@ -528,6 +528,30 @@ def _remote_tool_grant(text: str, *, copied: bool) -> bool:
     return False
 
 
+def _task_prompt_forks_integration_routing(text: str) -> bool:
+    """Reject reusable prompt prose that re-selects the organization MQ primitive.
+
+    Task prompts may require protected integration and evidence, but the active
+    organization capability router owns direct-vs-delegated execution selection.
+    """
+    for statement in _statements(text):
+        if _is_audit_or_negative(statement):
+            continue
+        folded = statement.casefold()
+        if "merge-async" in folded or "github.merge_async.put_exact_head" in folded:
+            return True
+        if re.search(r"merge_action\s*=\s*[\"']?merge_queue", statement, re.IGNORECASE):
+            return True
+        if "blocked_capability_unavailable" in folded and "delegated" not in folded and (
+            "native operation" in folded
+            or "native exact-head" in folded
+            or "direct primitive" in folded
+            or "direct operation" in folded
+        ):
+            return True
+    return False
+
+
 def _allowed_providers(policy: dict[str, Any] | None) -> tuple[str, ...]:
     if policy is None:
         return ALLOWED_PROVIDERS
@@ -618,6 +642,8 @@ def validate_task_prompt_text(
         errors.append("task prompt must not embed global execution-routing policy")
     if _parallel_directive(active):
         errors.append("parallel-first execution wording is forbidden")
+    if _task_prompt_forks_integration_routing(active):
+        errors.append("task prompt must defer protected-integration capability routing to bound META policy")
     return errors
 
 
