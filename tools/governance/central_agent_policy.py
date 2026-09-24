@@ -531,24 +531,25 @@ def _remote_tool_grant(text: str, *, copied: bool) -> bool:
 def _task_prompt_forks_integration_routing(text: str) -> bool:
     """Reject prompt-local protected-integration route selection.
 
-    Task prompts may name integration components for repair/audit work, but they
-    may not select the organization Merge Queue primitive or turn loss of only
-    the direct route into a terminal capability blocker.
+    Component/audit references remain legal. For blockers, retain the active
+    direct-route-loss condition across intervening ordinary statements and
+    require explicit delegated-route exhaustion before capability-unavailable.
     """
     statements = _statements(text)
-    operative_body = " ".join(_operative_markdown(text).split())
     affirmative_after_negative = re.compile(
         r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,160}"
-        r"\b(?:submit|invoke|use|route|integrate|call|enqueue|send)\b",
+        r"\b(?:submit|invoke|use|route|integrate|enqueue|send|call)\b",
         re.IGNORECASE,
     )
-    routing_verb = re.compile(
-        r"\b(?:submit|invoke|use|route|integrate|call|enqueue|send)\b|"
-        r"\bPUT\s+/repos/",
-        re.IGNORECASE,
-    )
-    route_copula = re.compile(
-        r"\b(?:route|operation|primitive)\b[^.!?;]{0,80}\b(?:is|=|:)\s*",
+    primitive = r"(?:merge-async|github\.merge_async\.put_exact_head)"
+    native_selection_re = re.compile(
+        rf"(?:"
+        rf"\b(?:submit|invoke|use|route|integrate|enqueue|send)\b[^.!?;]{{0,160}}\b{primitive}\b"
+        rf"|^(?:[-*+]\s+|\d+[.)]\s+)?(?:call|invoke|use|submit|enqueue)\b[^.!?;]{{0,120}}\b{primitive}\b"
+        rf"|\b(?:must|shall|always)\s+call\b[^.!?;]{{0,120}}\b{primitive}\b"
+        rf"|\b(?:selected|required|only)\s+(?:route|operation|primitive)\s+(?:is|=|:)\s*\b{primitive}\b"
+        rf"|\b{primitive}\b[^.!?;]{{0,100}}\b(?:is|remains)\s+(?:the\s+)?(?:selected|required|only)\s+(?:route|operation|primitive)\b"
+        rf")",
         re.IGNORECASE,
     )
     merge_action_selection = re.compile(
@@ -560,43 +561,45 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         """,
         re.IGNORECASE | re.VERBOSE,
     )
+    loss = (
+        r"(?:unavailable|missing|absent|not\s+available|"
+        r"cannot\s+be\s+proven|can't\s+be\s+proven|"
+        r"is\s+not\s+proven|not\s+proven|unproven)"
+    )
     direct_loss_condition = re.compile(
-        r"\b(?:if|when)\b.{0,320}(?:"
-        r"\b(?:direct|native)\b.{0,160}\b(?:unavailable|missing|absent|not\s+available)\b"
-        r"|\b(?:merge-async|github\.merge_async\.put_exact_head)\b.{0,120}"
-        r"\b(?:unavailable|missing|absent|not\s+available)\b"
-        r")",
+        rf"\b(?:if|when)\b[^.!?;]{{0,360}}(?:"
+        rf"\b(?:direct|native)\b[^.!?;]{{0,180}}\b{loss}\b"
+        rf"|\b{primitive}\b[^.!?;]{{0,140}}\b{loss}\b"
+        rf")",
+        re.IGNORECASE,
+    )
+    delegated_loss_condition = re.compile(
+        rf"\b(?:if|when|unless)\b[^.!?;]{{0,260}}\bdelegated\b[^.!?;]{{0,160}}\b{loss}\b",
+        re.IGNORECASE,
+    )
+    neither_condition = re.compile(
+        r"\bneither\b[^.!?;]{0,140}\bdirect\b[^.!?;]{0,160}\bdelegated\b"
+        r"[^.!?;]{0,180}\b(?:proven|available|capable|operational)\b",
         re.IGNORECASE,
     )
     delegated_negative_re = re.compile(
-        r"\b(?:do\s+not|never|must\s+not|cannot|can't)\b.{0,180}\bdelegated\b",
-        re.IGNORECASE,
-    )
-    delegated_affirmative_re = re.compile(
-        r"\b(?:use|try|resolve|route|fallback|fall\s+back|prove|check)\b.{0,180}\bdelegated\b"
-        r"|\bDELEGATED_CAPABLE\b",
+        r"\b(?:do\s+not|never|must\s+not|cannot|can't)\b[^.!?;]{0,180}\bdelegated\b",
         re.IGNORECASE,
     )
     inert_audit_reference = re.compile(
         r"^(?:[-*+]\s+|\d+[.)]\s+)?"
-        r"(?:verify|check|audit|inspect|test|assert)\b"
-        r".{0,240}\b(?:prompt|validator|parser|documentation|rule|test|contract)\b"
-        r".{0,240}\b(?:never|not|without|forbid\w*|reject\w*|invalid|disallow\w*)\b",
+        r"(?:verify|check|audit|inspect|test|assert|document|repair)\b"
+        r".{0,280}\b(?:prompt|validator|parser|documentation|rule|test|contract|client|receipt|bug)\b"
+        r".{0,280}\b(?:never|not|without|forbid\w*|reject\w*|invalid|disallow\w*|repair|test|document)\b",
         re.IGNORECASE,
     )
 
     for statement in statements:
-        folded = statement.casefold()
-        mentions_native_primitive = (
-            "merge-async" in folded
-            or "github.merge_async.put_exact_head" in folded
+        selects_route = (
+            merge_action_selection.search(statement) is not None
+            or native_selection_re.search(statement) is not None
         )
-        selects_merge_action = merge_action_selection.search(statement) is not None
-        selects_native_primitive = mentions_native_primitive and (
-            routing_verb.search(statement) is not None
-            or route_copula.search(statement) is not None
-        )
-        if not (selects_merge_action or selects_native_primitive):
+        if not selects_route:
             continue
         inert = (
             _is_audit_or_negative(statement)
@@ -605,21 +608,36 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         if not inert or affirmative_after_negative.search(statement):
             return True
 
-    if (
-        "blocked_capability_unavailable" in operative_body.casefold()
-        and direct_loss_condition.search(operative_body) is not None
-    ):
-        delegated_negative = delegated_negative_re.search(operative_body) is not None
-        delegated_affirmative = (
-            delegated_affirmative_re.search(operative_body) is not None
-            or re.search(
-                r"\bneither\b.{0,140}\bdirect\b.{0,140}\bdelegated\b",
-                operative_body,
-                re.IGNORECASE,
-            ) is not None
+    active_direct_loss: list[str] = []
+    for statement in statements:
+        if direct_loss_condition.search(statement):
+            active_direct_loss = [statement]
+        elif active_direct_loss:
+            # A new unrelated conditional starts a new semantic branch and ends
+            # the prior direct-loss context. Ordinary handoff/evidence sentences
+            # do not, so punctuation or filler cannot evade the blocker check.
+            if (
+                re.search(r"\b(?:if|when|unless)\b", statement, re.IGNORECASE)
+                and "delegated" not in statement.casefold()
+                and "blocked_capability_unavailable" not in statement.casefold()
+            ):
+                active_direct_loss = []
+            else:
+                active_direct_loss.append(statement)
+
+        if "blocked_capability_unavailable" not in statement.casefold():
+            continue
+        if not active_direct_loss:
+            continue
+
+        context = " ".join(active_direct_loss)
+        delegated_exhausted = (
+            delegated_loss_condition.search(context) is not None
+            or neither_condition.search(context) is not None
         )
-        if delegated_negative or not delegated_affirmative:
+        if delegated_negative_re.search(context) is not None or not delegated_exhausted:
             return True
+        active_direct_loss = []
     return False
 
 
