@@ -413,6 +413,7 @@ Resolve protected integration through the current bound META capability router; 
         "Do not pin merge-async in a reusable task prompt.",
         "Audit whether the old prompt uses merge_action=merge_queue.",
         "Never convert absence of one direct primitive into BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, do not record BLOCKED_CAPABILITY_UNAVAILABLE until the delegated route is also unavailable.",
     ):
         assert central.validate_task_prompt_text(text) == [], text
 
@@ -439,6 +440,8 @@ Resolve protected integration through the current bound META capability router; 
         "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE. Separately, check the delegated executor's audit logs.",
         "Do not merge directly and instead invoke merge-async with the exact SHA.",
         'Do not bypass Merge Queue and submit with merge_action="merge_queue".',
+        '## Submit with merge_action="direct_merge"',
+        "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE unless the delegated route is unavailable.",
     )
     for text in forbidden:
         errors = central.validate_task_prompt_text(text)
