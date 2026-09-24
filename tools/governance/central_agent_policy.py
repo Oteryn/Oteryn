@@ -540,15 +540,38 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         folded = statement.casefold()
         if "merge-async" in folded or "github.merge_async.put_exact_head" in folded:
             return True
-        if re.search(r"merge_action\s*=\s*[\"']?merge_queue", statement, re.IGNORECASE):
+        if re.search(
+            r"""(?:["']?merge_action["']?)\s*[:=]\s*(?:["']?merge_queue["']?)""",
+            statement,
+            re.IGNORECASE,
+        ):
             return True
-        if "blocked_capability_unavailable" in folded and "delegated" not in folded and (
+        direct_loss_blocker = "blocked_capability_unavailable" in folded and (
             "native operation" in folded
             or "native exact-head" in folded
             or "direct primitive" in folded
             or "direct operation" in folded
-        ):
-            return True
+        )
+        if direct_loss_blocker:
+            delegated_negative = re.search(
+                r"\b(?:do\s+not|never|must\s+not|cannot|can't)\b[^.!?;]{0,120}\bdelegated\b",
+                statement,
+                re.IGNORECASE,
+            ) is not None
+            delegated_affirmative = (
+                re.search(
+                    r"\b(?:use|try|resolve|route|fallback|fall\s+back|prove|check)\b[^.!?;]{0,120}\bdelegated\b",
+                    statement,
+                    re.IGNORECASE,
+                ) is not None
+                or (
+                    "neither" in folded
+                    and "direct" in folded
+                    and "delegated" in folded
+                )
+            )
+            if delegated_negative or not delegated_affirmative:
+                return True
     return False
 
 
