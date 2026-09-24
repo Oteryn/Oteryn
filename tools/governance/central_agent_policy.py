@@ -535,7 +535,7 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     direct-route-loss condition across intervening ordinary statements and
     require explicit delegated-route exhaustion before capability-unavailable.
     """
-    scan_text = re.sub(r"(?m)^\\s{0,3}#{1,6}\\s+", "", text)
+    scan_text = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", text)
     for marker in ("`", "**", "__", "*", "_"):
         for token in ("merge-async", "github.merge_async.put_exact_head"):
             scan_text = scan_text.replace(f"{marker}{token}{marker}", token)
