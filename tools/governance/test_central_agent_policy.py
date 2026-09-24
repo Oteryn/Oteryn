@@ -106,6 +106,9 @@ def test_publication_policy_supports_atomic_and_bounded_connector_routes() -> No
     assert "perform exactly one non-force (`force=false`) update of only that branch" in restricted
     assert "fresh single-writer allocation and immediate predecessor/candidate live readbacks" in rollout
     assert "sequential per-file API writes" in rollout
+    assert "otherwise the bounded connector-compatible Git Data route above may be used" in restricted
+    assert "If neither authorized API mode is available" in restricted
+    assert "Credential compatibility does not broaden either API route" in restricted
     assert "perform only a non-force (`force=false`) update" not in combined
 
 def test_meta_bundle_rejects_empty_forbidden_section_lists() -> None:
