@@ -401,6 +401,97 @@ and docs/governance/AI_REVIEW_POLICY.md as local task controllers.
     assert "task prompt must not embed global execution-routing policy" in errors
 
 
+
+def test_task_prompt_must_defer_protected_integration_capability_routing() -> None:
+    allowed = """ROLE / OUTCOME
+Repair the allocated task and deliver through protected Merge Queue.
+
+ACCEPTANCE
+Resolve protected integration through the current bound META capability router; use a delegated route when the direct route is unavailable and report BLOCKED_CAPABILITY_UNAVAILABLE only when neither direct nor delegated capability is proven.
+"""
+    for text in (
+        allowed,
+        "If the direct operation is unavailable, use delegated execution. If the delegated route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, collect diagnostics. The direct route is available again. Record BLOCKED_CAPABILITY_UNAVAILABLE only if the delegated route is also unavailable.",
+        "If both the direct and delegated routes are unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "Should the direct route be unavailable, use delegated execution. Should the delegated route be unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct operation is unavailable, use delegated execution. When the delegated executor cannot be used, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct operation is unavailable, use delegated execution; record BLOCKED_CAPABILITY_UNAVAILABLE only when neither direct nor delegated capability is proven.",
+        "Repair the merge-async receipt persistence bug without changing integration routing.",
+        "Repair tests for clients that call merge-async; do not change integration routing.",
+        "Use pytest to repair the merge-async receipt persistence bug.",
+        "Document the merge_action parser and its invalid-input tests.",
+        "Fix the bug where merge_action is ignored by the parser.",
+        'Fix the parser so it rejects merge_action="default".',
+        "Test that the validator rejects direct-only blocker wording: If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        'Update the validator so it rejects **merge_action** = "direct_merge".',
+        'Verify that the task prompt never uses merge_action="merge_queue".',
+        "Test that the validator rejects merge_action set to direct_merge.",
+        "Do not pin merge-async in a reusable task prompt.",
+        "Audit whether the old prompt uses merge_action=merge_queue.",
+        "Never convert absence of one direct primitive into BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, do not record BLOCKED_CAPABILITY_UNAVAILABLE until the delegated route is also unavailable.",
+    ):
+        assert central.validate_task_prompt_text(text) == [], text
+
+    forbidden = (
+        "Integrate only through REST merge-async with the exact qualified SHA.",
+        "The selected route is merge-async.",
+        'Submit with merge_action="merge_queue" and then wait for merge_group.',
+        'Submit with merge_action="default" and then wait for merge_group.',
+        'Submit with {"merge_action": "direct_merge"} and then wait for merge_group.',
+        "Submit with 'merge_action': 'merge_queue' and then wait for merge_group.",
+        "Submit with merge_action set to direct_merge.",
+        "Set merge_action to merge_queue before submission.",
+        "Set merge_action as merge_queue before submission.",
+        "merge_action must be merge_queue.",
+        "merge_action should be direct_merge.",
+        "Use github.merge_async.put_exact_head for protected integration.",
+        "Call merge-async to integrate this PR.",
+        "The worker must call merge-async to integrate this PR.",
+        "Protected integration must use merge-async.",
+        "Always use merge-async for protected integration.",
+        "For protected integration, merge-async must be used.",
+        "Require the worker to use merge-async for protected integration.",
+        "For protected integration, merge-async should be invoked.",
+        'Always submit with `merge_action` = "merge_queue".',
+        'The coordinator must explicitly submit with **merge_action** = "merge_queue".',
+        "Merge Queue submission shall execute merge-async.",
+        "The coordinator should execute merge-async to integrate this PR.",
+        "Execute merge-async to integrate this PR.",
+        "Run merge-async to integrate this PR.",
+        "Use `merge-async` for protected integration.",
+        "Execute **merge-async** to integrate this PR.",
+        "Run *merge-async* to integrate this PR.",
+        "If the native operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If merge-async is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If merge-async fails, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If merge-async cannot be used, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If github.merge_async.put_exact_head is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "Should the direct route be unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If no direct route is available, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If no native capability is proven, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct capability cannot be proven, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct capability is not proven, mark BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the native operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE and do not use delegated execution.",
+        "If the direct route is unavailable, do not use delegated execution. Record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, do not use delegated execution. Note the failed probe in the handoff. Record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, do not use delegated execution. If audit logging is enabled, retain the logs. Record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE. Separately, check the delegated executor's audit logs.",
+        "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE when delegated documentation is missing.",
+        "Do not merge directly and instead invoke merge-async with the exact SHA.",
+        'Do not bypass Merge Queue and submit with merge_action="merge_queue".',
+        '## Submit with merge_action="direct_merge"',
+        "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE unless the delegated route is unavailable.",
+        "If either the direct or delegated route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If delegated or direct capability is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        'Fix the parser bug, then update its submission configuration: merge_action="direct_merge".',
+    )
+    for text in forbidden:
+        errors = central.validate_task_prompt_text(text)
+        assert "task prompt must defer protected-integration capability routing to bound META policy" in errors, text
+
 def test_binding_paths_must_match_central_policy() -> None:
     policy = central.load_policy(REPO_ROOT)
     malformed = copy.deepcopy(valid_binding())
