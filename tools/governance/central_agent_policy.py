@@ -539,6 +539,16 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     for marker in ("`", "**", "__", "*", "_"):
         for token in ("merge-async", "github.merge_async.put_exact_head", "merge_action"):
             scan_text = scan_text.replace(f"{marker}{token}{marker}", token)
+    coordinated_route_override = re.compile(
+        r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,180}"
+        r"\b(?:update|set|configure|assign|require|submit|invoke|use|route|integrate|"
+        r"enqueue|send|call|execute|run)\b[^.!?;]{0,180}"
+        r"(?:\bmerge_action\b|\bmerge-async\b|\bgithub\.merge_async\.put_exact_head\b)",
+        re.IGNORECASE,
+    )
+    if coordinated_route_override.search(scan_text) is not None:
+        return True
+
     statements = _statements(scan_text)
     affirmative_after_negative = re.compile(
         r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,160}"
