@@ -548,6 +548,13 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     )
     if coordinated_route_override.search(scan_text) is not None:
         return True
+    if re.search(
+        r"\b(?:then|but|instead)\s+(?:update|set|configure|assign)\b"
+        r"[^.!?;]{0,180}\bmerge_action\b",
+        scan_text,
+        re.IGNORECASE,
+    ) is not None:
+        return True
 
     statements = _statements(scan_text)
     affirmative_after_negative = re.compile(
