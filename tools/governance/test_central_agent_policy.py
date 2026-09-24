@@ -70,45 +70,52 @@ def test_meta_bundle_is_complete_and_self_consistent() -> None:
     assert central.validate_meta_bundle(REPO_ROOT, policy) == []
 
 
-def test_publication_policy_allows_only_atomic_api_native_candidate_route() -> None:
+def test_publication_policy_supports_atomic_and_bounded_connector_routes() -> None:
     organization = (REPO_ROOT / "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md").read_text(encoding="utf-8")
     publication = (REPO_ROOT / "docs/agents/contracts/PUBLICATION_INTEGRITY_POLICY.md").read_text(encoding="utf-8")
     restricted = (REPO_ROOT / "docs/agents/operations/RESTRICTED_PUBLISHING.md").read_text(encoding="utf-8")
     rollout = (REPO_ROOT / "docs/agents/programs/PUBLICATION_INTEGRITY_PROVIDER_ROLLOUT.md").read_text(encoding="utf-8")
     combined = "\n".join((organization, publication, restricted, rollout))
     for marker in (
-        "server-side atomic expected-head",
+        "atomic expected-head",
         "createCommitOnBranch",
         "expectedHeadOid",
+        "connector-compatible Git Data",
+        "single-writer",
+        "exactly one successor commit",
+        "non-force (`force=false`)",
+        "residual race",
         "new candidate",
-        "complete bounded task delta",
-        "Candidate-specific validation/review evidence",
+        "complete bounded",
     ):
         assert marker.casefold() in combined.casefold(), marker
     for marker in (
-        "force=false",
-        "ancestry-only",
-        "low-level Git Data",
         "sequential per-file",
-        "preserve/report",
+        "multiple candidate commits",
+        "protected `main`",
+        "Merge Queue refs",
+        "third SHA",
+        "force/ref replacement",
     ):
         assert marker.casefold() in combined.casefold(), marker
-    assert "Git-refs `force=false` is only an ancestry check" in publication
+    assert "GitHub Git-refs `force=false` proves only ancestry, not an atomic expected-head compare-and-swap" in publication
     assert "For an API-native candidate route, before mutation bind and verify" in publication
+    assert "connector-compatible Git Data mode" in publication
     assert "For the local Git candidate route only, before mutation bind and verify" in publication
-    assert "no pre-mutation candidate SHA, local Git object inventory, push target, worktree" in publication
-    assert "Precondition failure must leave the branch unchanged" in restricted
-    assert "when neither guarded Git nor an authorized atomic expected-head API candidate-creation primitive is available" in rollout
-    assert "API-native route is accepted only as a new candidate" in rollout
-    assert "one server-side mutation fences the exact expected branch head" in rollout
-    assert "creates one complete successor commit" in rollout
-    assert "one server-side mutation fences the exact expected branch head and creates one complete successor commit" in rollout
-    assert "ancestry-only `force=false` ref updates" in rollout
-    assert "raw Git Data object/ref assembly" in rollout
-    assert "sequential per-file API writes remain rejected" in rollout
-    assert "prepared local candidate whose normal Git publication path is unavailable is preserved/reported blocked rather than reconstructed" not in rollout
+    assert "create exactly one Git Data commit whose sole parent is that predecessor" in restricted
+    assert "perform exactly one non-force (`force=false`) update of only that branch" in restricted
+    assert "exactly one new Git Data candidate commit whose sole parent is the freshly read expected predecessor" in rollout
+    assert "whose tree contains the complete bounded task delta" in rollout
+    assert "followed by exactly one non-force (`force=false`) update of that task branch" in rollout
+    assert "fresh single-writer allocation and immediate predecessor/candidate live readbacks" in rollout
+    assert "protected `main`, Merge Queue refs, shared or uncertain branches" in rollout
+    assert "pre-readback drift, failed or timed-out mutation, third-SHA outcomes" in rollout
+    assert "sequential per-file API writes, multiple candidate commits, force/ref replacement" in rollout
+    assert "partial or mixed reconstruction remain rejected or fail closed" in rollout
+    assert "otherwise the bounded connector-compatible Git Data route above may be used" in restricted
+    assert "If neither authorized API mode is available" in restricted
+    assert "Credential compatibility does not broaden either API route" in restricted
     assert "perform only a non-force (`force=false`) update" not in combined
-
 
 def test_meta_bundle_rejects_empty_forbidden_section_lists() -> None:
     policy = central.load_policy(REPO_ROOT)
