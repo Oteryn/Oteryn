@@ -546,17 +546,21 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         re.IGNORECASE,
     )
     primitive = r"(?:merge-async|github\.merge_async\.put_exact_head)"
+    directive_subject = (
+        r"(?:^(?:[-*+]\s+|\d+[.)]\s+)?"
+        r"|\b(?:the\s+)?(?:worker|agent|coordinator|you)\s+"
+        r"(?:must|shall|should|may|can)\s+"
+        r"|\b(?:and|but|then|instead|however|yet)\s+)"
+    )
     native_selection_re = re.compile(
         rf"(?:"
-        rf"\b(?:submit|invoke|use|enqueue|send|execute|run)\b\s+"
+        rf"{directive_subject}(?:call|invoke|use|submit|enqueue|send|execute|run)\s+"
         rf"(?:(?:the|exact|native|REST|exact-head|selected|required)\s+){{0,5}}"
         rf"(?:operation\s+)?\b{primitive}\b"
-        rf"|^(?:[-*+]\s+|\d+[.)]\s+)?call\s+"
-        rf"(?:(?:the|exact|native|REST|exact-head|selected|required)\s+){{0,5}}"
-        rf"(?:operation\s+)?\b{primitive}\b"
-        rf"|\b(?:integrate|route)\b[^.!?;]{{0,80}}\b(?:through|via|using)\b"
-        rf"[^.!?;]{{0,60}}\b{primitive}\b"
-        rf"|\b(?:selected|required|only)\s+(?:route|operation|primitive)\s+(?:is|=|:)\s*\b{primitive}\b"
+        rf"|{directive_subject}(?:integrate|route)\b[^.!?;]{{0,80}}"
+        rf"\b(?:through|via|using)\b[^.!?;]{{0,60}}\b{primitive}\b"
+        rf"|\b(?:selected|required|only)\s+(?:route|operation|primitive)\s+"
+        rf"(?:is|=|:)\s*\b{primitive}\b"
         rf"|\b{primitive}\b[^.!?;]{{0,100}}\b(?:is|remains)\s+(?:the\s+)?"
         rf"(?:selected|required|only)\s+(?:route|operation|primitive)\b"
         rf")",
@@ -565,12 +569,16 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     merge_action_selection = re.compile(
         r"""(?:["']?merge_action["']?)\s*(?:
             [:=]\s*(?:["']?[^\s,;}]+["']?)
-            |(?:is\s+)?set\s+to\s+(?:["']?[^\s,;}]+["']?)
+            |(?:is\s+)?set\s+(?:to|as)\s+(?:["']?[^\s,;}]+["']?)
+            |(?:must|shall|should|will)\s+be\s+(?:["']?[^\s,;}]+["']?)
+            |is\s+(?:["']?[^\s,;}]+["']?)
         )
-        |\bset\s+(?:the\s+)?["']?merge_action["']?\s+to\s+(?:["']?[^\s,;}]+["']?)
+        |\bset\s+(?:the\s+)?["']?merge_action["']?\s+(?:to|as)\s+
+            (?:["']?[^\s,;}]+["']?)
         """,
         re.IGNORECASE | re.VERBOSE,
     )
+
     loss = (
         r"(?:unavailable|missing|absent|not\s+available|"
         r"cannot\s+be\s+proven|can't\s+be\s+proven|"
@@ -587,10 +595,16 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         rf")",
         re.IGNORECASE,
     )
+    delegated_target = r"delegated\s+(?:route|capability|executor|operation|execution|integration)"
     delegated_loss_condition = re.compile(
-        rf"\b(?:if|when|until)\b(?:(?!\b(?:if|when|unless|until)\b)[^.!?;]){{0,120}}\bdelegated\b[^.!?;]{{0,160}}\b{loss}\b",
+        rf"\b(?:if|when|until)\b(?:(?!\b(?:if|when|unless|until)\b)[^.!?;]){{0,180}}(?:"
+        rf"\b{delegated_target}\b[^.!?;]{{0,120}}\b{loss}\b"
+        rf"|\bno\s+{delegated_target}\b[^.!?;]{{0,120}}"
+        rf"\b(?:is\s+)?(?:available|proven|usable)\b"
+        rf")",
         re.IGNORECASE,
     )
+
     neither_condition = re.compile(
         r"\bneither\b[^.!?;]{0,140}\bdirect\b[^.!?;]{0,160}\bdelegated\b"
         r"[^.!?;]{0,180}\b(?:proven|available|capable|operational)\b",
