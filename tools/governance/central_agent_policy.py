@@ -529,41 +529,54 @@ def _remote_tool_grant(text: str, *, copied: bool) -> bool:
 
 
 def _task_prompt_forks_integration_routing(text: str) -> bool:
-    """Reject reusable prompt prose that re-selects the organization MQ primitive.
+    """Reject task-prompt prose that re-selects organization MQ execution routing.
 
-    Task prompts may require protected integration and evidence, but the active
-    organization capability router owns direct-vs-delegated execution selection.
+    Pure audit/negative references remain allowed, but a negative prefix cannot hide
+    a later affirmative routing clause in the same statement.
     """
+    affirmative_after_negative = re.compile(
+        r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,120}"
+        r"\b(?:submit|invoke|use|route|integrate|call)\b",
+        re.IGNORECASE,
+    )
+    merge_action_assignment = re.compile(
+        r"""(?:["']?merge_action["']?)\s*[:=]\s*(?:["']?[^\s,;}]+["']?)""",
+        re.IGNORECASE,
+    )
+    direct_loss_condition = re.compile(
+        r"\b(?:if|when)\b[^.!?;]{0,180}\b(?:direct|native)\b[^.!?;]{0,100}\bunavailable\b",
+        re.IGNORECASE,
+    )
+    delegated_negative_re = re.compile(
+        r"\b(?:do\s+not|never|must\s+not|cannot|can't)\b[^.!?;]{0,120}\bdelegated\b",
+        re.IGNORECASE,
+    )
+    delegated_affirmative_re = re.compile(
+        r"\b(?:use|try|resolve|route|fallback|fall\s+back|prove|check)\b[^.!?;]{0,120}\bdelegated\b",
+        re.IGNORECASE,
+    )
+
     for statement in _statements(text):
-        if _is_audit_or_negative(statement):
-            continue
         folded = statement.casefold()
-        if "merge-async" in folded or "github.merge_async.put_exact_head" in folded:
-            return True
-        if re.search(
-            r"""(?:["']?merge_action["']?)\s*[:=]\s*(?:["']?merge_queue["']?)""",
-            statement,
-            re.IGNORECASE,
-        ):
-            return True
-        direct_loss_blocker = "blocked_capability_unavailable" in folded and (
-            "native operation" in folded
-            or "native exact-head" in folded
-            or "direct primitive" in folded
-            or "direct operation" in folded
+        has_native_primitive = (
+            "merge-async" in folded
+            or "github.merge_async.put_exact_head" in folded
+            or merge_action_assignment.search(statement) is not None
+        )
+        if has_native_primitive:
+            if not _is_audit_or_negative(statement) or affirmative_after_negative.search(statement):
+                return True
+
+        direct_loss_blocker = (
+            "blocked_capability_unavailable" in folded
+            and direct_loss_condition.search(statement) is not None
         )
         if direct_loss_blocker:
-            delegated_negative = re.search(
-                r"\b(?:do\s+not|never|must\s+not|cannot|can't)\b[^.!?;]{0,120}\bdelegated\b",
-                statement,
-                re.IGNORECASE,
-            ) is not None
+            if _is_audit_or_negative(statement) and not affirmative_after_negative.search(statement):
+                continue
+            delegated_negative = delegated_negative_re.search(statement) is not None
             delegated_affirmative = (
-                re.search(
-                    r"\b(?:use|try|resolve|route|fallback|fall\s+back|prove|check)\b[^.!?;]{0,120}\bdelegated\b",
-                    statement,
-                    re.IGNORECASE,
-                ) is not None
+                delegated_affirmative_re.search(statement) is not None
                 or (
                     "neither" in folded
                     and "direct" in folded
