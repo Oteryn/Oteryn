@@ -415,6 +415,7 @@ Resolve protected integration through the current bound META capability router; 
         "Document the merge_action parser and its invalid-input tests.",
         "Fix the bug where merge_action is ignored by the parser.",
         'Fix the parser so it rejects merge_action="default".',
+        'Fix the parser bug, then update its submission configuration: merge_action="direct_merge".',
         "Test that the validator rejects direct-only blocker wording: If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         'Update the validator so it rejects **merge_action** = "direct_merge".',
         'Verify that the task prompt never uses merge_action="merge_queue".',
@@ -444,6 +445,7 @@ Resolve protected integration through the current bound META capability router; 
         "Protected integration must use merge-async.",
         "Always use merge-async for protected integration.",
         "For protected integration, merge-async must be used.",
+        "Require the worker to use merge-async for protected integration.",
         "For protected integration, merge-async should be invoked.",
         'Always submit with `merge_action` = "merge_queue".',
         'The coordinator must explicitly submit with **merge_action** = "merge_queue".',
@@ -475,6 +477,8 @@ Resolve protected integration through the current bound META capability router; 
         'Do not bypass Merge Queue and submit with merge_action="merge_queue".',
         '## Submit with merge_action="direct_merge"',
         "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE unless the delegated route is unavailable.",
+        "If either the direct or delegated route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If delegated or direct capability is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
     )
     for text in forbidden:
         errors = central.validate_task_prompt_text(text)
