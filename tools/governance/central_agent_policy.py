@@ -549,6 +549,8 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     directive_subject = (
         r"(?:^(?:[-*+]\s+|\d+[.)]\s+)?"
         r"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?"
+        r"|\b(?:for|during)\s+(?:protected\s+)?(?:merge\s+queue\s+)?integration\s*,\s*"
+        r"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?"
         r"|\b(?:(?:the\s+)?(?:worker|agent|coordinator)|you|"
         r"(?:protected\s+)?integration|(?:protected\s+)?merge\s+queue\s+integration|"
         r"(?:merge\s+queue\s+)?submission)\s+"
@@ -616,13 +618,16 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         rf"\b(?:route|capability|operation|primitive)?\b[^.!?;]{{0,80}}"
         rf"\b(?:available|proven|usable|operational|capable)\b"
         rf"|\babsence\s+of\s+(?:(?:the\s+)?(?:direct|native)\b|{primitive}\b)"
+        rf"|\b{primitive}\b[^.!?;]{{0,120}}\b(?:is|remains|became|becomes)\s+{loss}\b"
+        rf"|\b(?:direct|native)\s+(?:route|capability|operation|primitive)\b"
+        rf"[^.!?;]{{0,120}}\b(?:is|remains|became|becomes)\s+{loss}\b"
         rf")",
         re.IGNORECASE,
     )
     delegated_target = r"delegated\s+(?:routes?|capabilit(?:y|ies)|executors?|operations?|executions?|integrations?)"
     delegated_loss_condition = re.compile(
         rf"(?:"
-        rf"\b(?:if|when|until)\b(?:(?!\b(?:if|when|unless|until)\b)[^.!?;]){{0,180}}(?:"
+        rf"\b(?:if|when|until|after|once)\b(?:(?!\b(?:if|when|unless|until|after|once)\b)[^.!?;]){{0,180}}(?:"
         rf"\b{delegated_target}\b[^.!?;]{{0,120}}\b{loss}\b"
         rf"|\bno\s+{delegated_target}\b[^.!?;]{{0,120}}"
         rf"\b(?:is\s+)?(?:available|proven|usable)\b"
