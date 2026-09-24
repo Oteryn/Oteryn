@@ -529,62 +529,85 @@ def _remote_tool_grant(text: str, *, copied: bool) -> bool:
 
 
 def _task_prompt_forks_integration_routing(text: str) -> bool:
-    """Reject task-prompt prose that re-selects organization MQ execution routing.
+    """Reject prompt-local protected-integration route selection.
 
-    Pure audit/negative references remain allowed, but a negative prefix cannot hide
-    a later affirmative routing clause in the same statement.
+    Pure audit/component references and pure prohibitions remain allowed. The check
+    also correlates a direct-route-loss condition with a blocker in the immediately
+    following statement so punctuation cannot recreate the old false blocker.
     """
+    statements = _statements(text)
     affirmative_after_negative = re.compile(
-        r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,120}"
-        r"\b(?:submit|invoke|use|route|integrate|call)\b",
+        r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,160}"
+        r"\b(?:submit|invoke|use|route|integrate|call|enqueue|send)\b",
         re.IGNORECASE,
     )
-    merge_action_assignment = re.compile(
-        r"""(?:["']?merge_action["']?)\s*[:=]\s*(?:["']?[^\s,;}]+["']?)""",
+    routing_verb = re.compile(
+        r"\b(?:submit|invoke|use|route|integrate|call|enqueue|send)\b|"
+        r"\bPUT\s+/repos/",
         re.IGNORECASE,
+    )
+    route_copula = re.compile(
+        r"\b(?:route|operation|primitive)\b[^.!?;]{0,80}\b(?:is|=|:)\s*",
+        re.IGNORECASE,
+    )
+    merge_action_selection = re.compile(
+        r"""(?:["']?merge_action["']?)\s*(?:
+            [: =]\s*(?:["']?[^\s,;}]+["']?)
+            |(?:is\s+)?set\s+to\s+(?:["']?[^\s,;}]+["']?)
+        )
+        |\bset\s+(?:the\s+)?["']?merge_action["']?\s+to\s+(?:["']?[^\s,;}]+["']?)
+        """,
+        re.IGNORECASE | re.VERBOSE,
     )
     direct_loss_condition = re.compile(
-        r"\b(?:if|when)\b[^.!?;]{0,180}\b(?:direct|native)\b[^.!?;]{0,100}\bunavailable\b",
+        r"\b(?:if|when)\b.{0,240}\b(?:direct|native)\b.{0,140}"
+        r"\b(?:unavailable|missing|absent|not\s+available)\b",
         re.IGNORECASE,
     )
     delegated_negative_re = re.compile(
-        r"\b(?:do\s+not|never|must\s+not|cannot|can't)\b[^.!?;]{0,120}\bdelegated\b",
+        r"\b(?:do\s+not|never|must\s+not|cannot|can't)\b.{0,140}\bdelegated\b",
         re.IGNORECASE,
     )
     delegated_affirmative_re = re.compile(
-        r"\b(?:use|try|resolve|route|fallback|fall\s+back|prove|check)\b[^.!?;]{0,120}\bdelegated\b",
+        r"\b(?:use|try|resolve|route|fallback|fall\s+back|prove|check)\b.{0,140}\bdelegated\b"
+        r"|\bDELEGATED_CAPABLE\b",
         re.IGNORECASE,
     )
 
-    for statement in _statements(text):
+    for statement in statements:
         folded = statement.casefold()
-        has_native_primitive = (
+        mentions_native_primitive = (
             "merge-async" in folded
             or "github.merge_async.put_exact_head" in folded
-            or merge_action_assignment.search(statement) is not None
         )
-        if has_native_primitive:
+        selects_merge_action = merge_action_selection.search(statement) is not None
+        selects_native_primitive = mentions_native_primitive and (
+            routing_verb.search(statement) is not None
+            or route_copula.search(statement) is not None
+        )
+        if selects_merge_action or selects_native_primitive:
             if not _is_audit_or_negative(statement) or affirmative_after_negative.search(statement):
                 return True
 
-        direct_loss_blocker = (
-            "blocked_capability_unavailable" in folded
-            and direct_loss_condition.search(statement) is not None
+    for index, statement in enumerate(statements):
+        if "blocked_capability_unavailable" not in statement.casefold():
+            continue
+        window = statement
+        if index > 0:
+            window = statements[index - 1] + " " + statement
+        if direct_loss_condition.search(window) is None:
+            continue
+        delegated_negative = delegated_negative_re.search(window) is not None
+        delegated_affirmative = (
+            delegated_affirmative_re.search(window) is not None
+            or re.search(
+                r"\bneither\b.{0,100}\bdirect\b.{0,100}\bdelegated\b",
+                window,
+                re.IGNORECASE,
+            ) is not None
         )
-        if direct_loss_blocker:
-            if _is_audit_or_negative(statement) and not affirmative_after_negative.search(statement):
-                continue
-            delegated_negative = delegated_negative_re.search(statement) is not None
-            delegated_affirmative = (
-                delegated_affirmative_re.search(statement) is not None
-                or (
-                    "neither" in folded
-                    and "direct" in folded
-                    and "delegated" in folded
-                )
-            )
-            if delegated_negative or not delegated_affirmative:
-                return True
+        if delegated_negative or not delegated_affirmative:
+            return True
     return False
 
 
