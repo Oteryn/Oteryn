@@ -528,6 +528,213 @@ def _remote_tool_grant(text: str, *, copied: bool) -> bool:
     return False
 
 
+def _task_prompt_forks_integration_routing(text: str) -> bool:
+    """Reject prompt-local protected-integration route selection.
+
+    Component/audit references remain legal. For blockers, retain the active
+    direct-route-loss condition across intervening ordinary statements and
+    require explicit delegated-route exhaustion before capability-unavailable.
+    """
+    scan_text = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", text)
+    for marker in ("`", "**", "__", "*", "_"):
+        for token in ("merge-async", "github.merge_async.put_exact_head", "merge_action"):
+            scan_text = scan_text.replace(f"{marker}{token}{marker}", token)
+    statements = _statements(scan_text)
+    affirmative_after_negative = re.compile(
+        r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,160}"
+        r"\b(?:submit|invoke|use|route|integrate|enqueue|send|call)\b",
+        re.IGNORECASE,
+    )
+    primitive = r"(?:merge-async|github\.merge_async\.put_exact_head)"
+    directive_subject = (
+        r"(?:^(?:[-*+]\s+|\d+[.)]\s+)?"
+        r"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?"
+        r"|\b(?:for|during)\s+(?:protected\s+)?(?:merge\s+queue\s+)?integration\s*,\s*"
+        r"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?"
+        r"|\b(?:(?:the\s+)?(?:worker|agent|coordinator)|you|"
+        r"(?:protected\s+)?integration|(?:protected\s+)?merge\s+queue\s+integration|"
+        r"(?:merge\s+queue\s+)?submission)\s+"
+        r"(?:must|shall|should|may|can)\s+"
+        r"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?"
+        r"|\b(?:and|but|then|instead|however|yet)\s+"
+        r"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?)"
+    )
+    native_selection_re = re.compile(
+        rf"(?:"
+        rf"{directive_subject}(?:call|invoke|use|submit|enqueue|send|execute|run)\s+"
+        rf"(?:(?:the|exact|native|REST|exact-head|selected|required)\s+){{0,5}}"
+        rf"(?:operation\s+)?\b{primitive}\b"
+        rf"|{directive_subject}(?:integrate|route)\b[^.!?;]{{0,100}}"
+        rf"\b(?:through|via|using|by\s+(?:calling|invoking|using|executing|running))\b"
+        rf"[^.!?;]{{0,60}}\b{primitive}\b"
+        rf"|\b(?:selected|required|only)\s+(?:route|operation|primitive)\s+"
+        rf"(?:is|=|:)\s*\b{primitive}\b"
+        rf"|\b{primitive}\b[^.!?;]{{0,100}}\b(?:is|remains)\s+(?:the\s+)?"
+        rf"(?:selected|required|only)\s+(?:route|operation|primitive)\b"
+        rf"|\b{primitive}\b[^.!?;]{{0,100}}\b(?:must|shall|should|will)\s+"
+        rf"be\s+(?:used|invoked|called|executed)\b"
+        rf"|^(?:[-*+]\s+|\d+[.)]\s+)?"
+        rf"(?:(?:always|only|explicitly|strictly|exclusively|directly)\s+)?"
+        rf"require\b[^.!?;]{{0,160}}\bto\s+"
+        rf"(?:use|invoke|call|execute|run|submit|enqueue)\s+"
+        rf"(?:(?:the|exact|native|REST|exact-head|selected|required)\s+){{0,5}}"
+        rf"(?:operation\s+)?\b{primitive}\b"
+        rf")",
+        re.IGNORECASE,
+    )
+    merge_action_selection = re.compile(
+        r"""(?:["']?merge_action["']?)\s*(?:
+            [:=]\s*(?:["']?[^\s,;}]+["']?)
+            |(?:is\s+)?set\s+(?:to|as)\s+(?:["']?[^\s,;}]+["']?)
+            |(?:must|shall|should|will)\s+be\s+(?:["']?[^\s,;}]+["']?)
+            |is\s+(?:["']?(?:merge_queue|direct_merge|default|merge|queue)["']?)
+        )
+        |\bset\s+(?:the\s+)?["']?merge_action["']?\s+(?:to|as)\s+
+            (?:["']?[^\s,;}]+["']?)
+        """,
+        re.IGNORECASE | re.VERBOSE,
+    )
+
+    loss = (
+        r"(?:unavailable|missing|absent|not\s+available|"
+        r"cannot\s+be\s+proven|can't\s+be\s+proven|"
+        r"is\s+not\s+proven|not\s+proven|unproven|"
+        r"fails?|failed|errors?|errored|denied|rejected|"
+        r"cannot\s+be\s+used|can't\s+be\s+used|not\s+usable|unusable)"
+    )
+    direct_loss_condition = re.compile(
+        rf"(?:"
+        rf"\b(?:if|when)\b[^.!?;]{{0,360}}(?:"
+        rf"\b(?:direct|native)\b[^.!?;]{{0,180}}\b{loss}\b"
+        rf"|\b{primitive}\b[^.!?;]{{0,140}}\b{loss}\b"
+        rf"|\bno\s+(?:direct|native)\b[^.!?;]{{0,180}}"
+        rf"\b(?:is\s+)?(?:available|proven|usable)\b"
+        rf")"
+        rf"|\bshould\b[^.!?;]{{0,80}}\b(?:direct|native)\b"
+        rf"[^.!?;]{{0,120}}\b(?:be\s+)?{loss}\b"
+        rf"|\bshould\b[^.!?;]{{0,80}}\b{primitive}\b"
+        rf"[^.!?;]{{0,120}}\b(?:be\s+)?{loss}\b"
+        rf"|\bno\s+(?:direct|native)\b[^.!?;]{{0,120}}"
+        rf"\b(?:route|capability|operation|primitive)?\b[^.!?;]{{0,80}}"
+        rf"\b(?:available|proven|usable|operational|capable)\b"
+        rf"|\babsence\s+of\s+(?:(?:the\s+)?(?:direct|native)\b|{primitive}\b)"
+        rf"|\b{primitive}\b[^.!?;]{{0,120}}\b(?:is|remains|became|becomes)\s+{loss}\b"
+        rf"|\b(?:direct|native)\s+(?:route|capability|operation|primitive)\b"
+        rf"[^.!?;]{{0,120}}\b(?:is|remains|became|becomes)\s+{loss}\b"
+        rf")",
+        re.IGNORECASE,
+    )
+    delegated_target = r"delegated\s+(?:routes?|capabilit(?:y|ies)|executors?|operations?|executions?|integrations?)"
+    delegated_loss_condition = re.compile(
+        rf"(?:"
+        rf"\b(?:if|when|until|after|once)\b(?:(?!\b(?:if|when|unless|until|after|once)\b)[^.!?;]){{0,180}}(?:"
+        rf"\b{delegated_target}\b[^.!?;]{{0,120}}\b{loss}\b"
+        rf"|\bno\s+{delegated_target}\b[^.!?;]{{0,120}}"
+        rf"\b(?:is\s+)?(?:available|proven|usable)\b"
+        rf")"
+        rf"|\bshould\b[^.!?;]{{0,100}}\b{delegated_target}\b"
+        rf"[^.!?;]{{0,120}}\b(?:be\s+)?{loss}\b"
+        rf")",
+        re.IGNORECASE,
+    )
+
+    neither_condition = re.compile(
+        r"\bneither\b[^.!?;]{0,140}\bdirect\b[^.!?;]{0,160}\bdelegated\b"
+        r"[^.!?;]{0,180}\b(?:proven|available|capable|operational)\b",
+        re.IGNORECASE,
+    )
+    delegated_negative_re = re.compile(
+        r"(?:"
+        r"\b(?:do\s+not|never|must\s+not|cannot|can't)\s+"
+        r"(?:use|route|invoke|call|try|fallback|fall\s+back)\b[^.!?;]{0,160}\bdelegated\b"
+        r"|\bdelegated\b[^.!?;]{0,120}"
+        r"\b(?:must\s+not|cannot|can't|is\s+forbidden\s+to)\b[^.!?;]{0,80}\b(?:use|run|execute)\b"
+        r")",
+        re.IGNORECASE,
+    )
+    inert_audit_reference = re.compile(
+        r"^(?:[-*+]\s+|\d+[.)]\s+)?"
+        r"(?:verify|check|audit|inspect|test|assert|document|repair|fix|update|ensure)\b"
+        r".{0,320}\b(?:prompt|validator|parser|documentation|rule|test|contract|client|receipt|bug)\b"
+        r".{0,320}\b(?:never|not|without|forbid\w*|reject\w*|invalid|disallow\w*|repair|test|document|fix|update)\b",
+        re.IGNORECASE,
+    )
+
+    operative_clause_before_route = re.compile(
+        r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,180}"
+        r"\b(?:update|set|configure|assign|require|submit|invoke|use|route|integrate|"
+        r"enqueue|send|call|execute|run)\b",
+        re.IGNORECASE,
+    )
+    for statement in statements:
+        merge_match = merge_action_selection.search(statement)
+        native_match = native_selection_re.search(statement)
+        route_matches = [match for match in (merge_match, native_match) if match is not None]
+        if not route_matches:
+            continue
+        route_match = min(route_matches, key=lambda match: match.start())
+        inert = (
+            _is_audit_or_negative(statement)
+            or inert_audit_reference.search(statement) is not None
+        )
+        if not inert:
+            return True
+        prefix = statement[:route_match.start()]
+        if (
+            affirmative_after_negative.search(statement)
+            or operative_clause_before_route.search(prefix) is not None
+        ):
+            return True
+
+    active_direct_loss: list[str] = []
+    for statement in statements:
+        if direct_loss_condition.search(statement):
+            active_direct_loss = [statement]
+        elif active_direct_loss:
+            direct_recovery = re.search(
+                r"\b(?:direct|native)\b[^.!?;]{0,120}"
+                r"\b(?:is|remains|becomes)\s+(?:available|proven|usable|operational|capable)\b",
+                statement,
+                re.IGNORECASE,
+            )
+            if direct_recovery is not None:
+                active_direct_loss = []
+            else:
+                active_direct_loss.append(statement)
+
+        if "blocked_capability_unavailable" not in statement.casefold():
+            continue
+        if (
+            _is_audit_or_negative(statement)
+            or inert_audit_reference.search(statement) is not None
+        ):
+            continue
+        if not active_direct_loss:
+            continue
+
+        context = " ".join(active_direct_loss)
+        disjunctive_loss = re.search(
+            r"\b(?:either\s+)?(?:direct|native)\b[^.!?;]{0,180}\bor\b"
+            r"[^.!?;]{0,180}\bdelegated\b"
+            r"|\b(?:either\s+)?delegated\b[^.!?;]{0,180}\bor\b"
+            r"[^.!?;]{0,180}\b(?:direct|native)\b",
+            context,
+            re.IGNORECASE,
+        ) is not None
+        delegated_exhausted = (
+            delegated_loss_condition.search(context) is not None
+            or neither_condition.search(context) is not None
+        )
+        if (
+            disjunctive_loss
+            or delegated_negative_re.search(context) is not None
+            or not delegated_exhausted
+        ):
+            return True
+        active_direct_loss = []
+    return False
+
+
 def _allowed_providers(policy: dict[str, Any] | None) -> tuple[str, ...]:
     if policy is None:
         return ALLOWED_PROVIDERS
@@ -618,6 +825,8 @@ def validate_task_prompt_text(
         errors.append("task prompt must not embed global execution-routing policy")
     if _parallel_directive(active):
         errors.append("parallel-first execution wording is forbidden")
+    if _task_prompt_forks_integration_routing(active):
+        errors.append("task prompt must defer protected-integration capability routing to bound META policy")
     return errors
 
 
