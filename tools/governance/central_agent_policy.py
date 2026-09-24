@@ -573,7 +573,7 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
             [:=]\s*(?:["']?[^\s,;}]+["']?)
             |(?:is\s+)?set\s+(?:to|as)\s+(?:["']?[^\s,;}]+["']?)
             |(?:must|shall|should|will)\s+be\s+(?:["']?[^\s,;}]+["']?)
-            |is\s+(?:["']?[^\s,;}]+["']?)
+            |is\s+(?:["']?(?:merge_queue|direct_merge|default|merge|queue)["']?)
         )
         |\bset\s+(?:the\s+)?["']?merge_action["']?\s+(?:to|as)\s+
             (?:["']?[^\s,;}]+["']?)
@@ -589,20 +589,30 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         r"cannot\s+be\s+used|can't\s+be\s+used|not\s+usable|unusable)"
     )
     direct_loss_condition = re.compile(
+        rf"(?:"
         rf"\b(?:if|when)\b[^.!?;]{{0,360}}(?:"
         rf"\b(?:direct|native)\b[^.!?;]{{0,180}}\b{loss}\b"
         rf"|\b{primitive}\b[^.!?;]{{0,140}}\b{loss}\b"
         rf"|\bno\s+(?:direct|native)\b[^.!?;]{{0,180}}"
         rf"\b(?:is\s+)?(?:available|proven|usable)\b"
+        rf")"
+        rf"|\bshould\b[^.!?;]{{0,80}}\b(?:direct|native)\b"
+        rf"[^.!?;]{{0,120}}\b(?:be\s+)?{loss}\b"
+        rf"|\bshould\b[^.!?;]{{0,80}}\b{primitive}\b"
+        rf"[^.!?;]{{0,120}}\b(?:be\s+)?{loss}\b"
         rf")",
         re.IGNORECASE,
     )
     delegated_target = r"delegated\s+(?:routes?|capabilit(?:y|ies)|executors?|operations?|executions?|integrations?)"
     delegated_loss_condition = re.compile(
+        rf"(?:"
         rf"\b(?:if|when|until)\b(?:(?!\b(?:if|when|unless|until)\b)[^.!?;]){{0,180}}(?:"
         rf"\b{delegated_target}\b[^.!?;]{{0,120}}\b{loss}\b"
         rf"|\bno\s+{delegated_target}\b[^.!?;]{{0,120}}"
         rf"\b(?:is\s+)?(?:available|proven|usable)\b"
+        rf")"
+        rf"|\bshould\b[^.!?;]{{0,100}}\b{delegated_target}\b"
+        rf"[^.!?;]{{0,120}}\b(?:be\s+)?{loss}\b"
         rf")",
         re.IGNORECASE,
     )
