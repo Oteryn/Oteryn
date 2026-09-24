@@ -104,8 +104,14 @@ def test_publication_policy_supports_atomic_and_bounded_connector_routes() -> No
     assert "For the local Git candidate route only, before mutation bind and verify" in publication
     assert "create exactly one Git Data commit whose sole parent is that predecessor" in restricted
     assert "perform exactly one non-force (`force=false`) update of only that branch" in restricted
+    assert "exactly one new Git Data candidate commit whose sole parent is the freshly read expected predecessor" in rollout
+    assert "whose tree contains the complete bounded task delta" in rollout
+    assert "followed by exactly one non-force (`force=false`) update of that task branch" in rollout
     assert "fresh single-writer allocation and immediate predecessor/candidate live readbacks" in rollout
-    assert "sequential per-file API writes" in rollout
+    assert "protected `main`, Merge Queue refs, shared or uncertain branches" in rollout
+    assert "pre-readback drift, failed or timed-out mutation, third-SHA outcomes" in rollout
+    assert "sequential per-file API writes, multiple candidate commits, force/ref replacement" in rollout
+    assert "partial or mixed reconstruction remain rejected or fail closed" in rollout
     assert "otherwise the bounded connector-compatible Git Data route above may be used" in restricted
     assert "If neither authorized API mode is available" in restricted
     assert "Credential compatibility does not broaden either API route" in restricted
