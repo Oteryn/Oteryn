@@ -545,11 +545,14 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     primitive = r"(?:merge-async|github\.merge_async\.put_exact_head)"
     native_selection_re = re.compile(
         rf"(?:"
-        rf"\b(?:submit|invoke|use|route|integrate|enqueue|send)\b[^.!?;]{{0,160}}\b{primitive}\b"
-        rf"|^(?:[-*+]\s+|\d+[.)]\s+)?(?:call|invoke|use|submit|enqueue)\b[^.!?;]{{0,120}}\b{primitive}\b"
-        rf"|\b(?:must|shall|always)\s+call\b[^.!?;]{{0,120}}\b{primitive}\b"
+        rf"\b(?:submit|invoke|use|enqueue|send|execute|run|call)\b\s+"
+        rf"(?:(?:the|exact|native|REST|exact-head|selected|required)\s+){{0,5}}"
+        rf"(?:operation\s+)?\b{primitive}\b"
+        rf"|\b(?:integrate|route)\b[^.!?;]{{0,80}}\b(?:through|via|using)\b"
+        rf"[^.!?;]{{0,60}}\b{primitive}\b"
         rf"|\b(?:selected|required|only)\s+(?:route|operation|primitive)\s+(?:is|=|:)\s*\b{primitive}\b"
-        rf"|\b{primitive}\b[^.!?;]{{0,100}}\b(?:is|remains)\s+(?:the\s+)?(?:selected|required|only)\s+(?:route|operation|primitive)\b"
+        rf"|\b{primitive}\b[^.!?;]{{0,100}}\b(?:is|remains)\s+(?:the\s+)?"
+        rf"(?:selected|required|only)\s+(?:route|operation|primitive)\b"
         rf")",
         re.IGNORECASE,
     )
@@ -565,7 +568,9 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     loss = (
         r"(?:unavailable|missing|absent|not\s+available|"
         r"cannot\s+be\s+proven|can't\s+be\s+proven|"
-        r"is\s+not\s+proven|not\s+proven|unproven)"
+        r"is\s+not\s+proven|not\s+proven|unproven|"
+        r"fails?|failed|errors?|errored|denied|rejected|"
+        r"cannot\s+be\s+used|can't\s+be\s+used|not\s+usable|unusable)"
     )
     direct_loss_condition = re.compile(
         rf"\b(?:if|when)\b[^.!?;]{{0,360}}(?:"
