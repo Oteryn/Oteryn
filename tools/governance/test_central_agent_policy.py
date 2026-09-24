@@ -402,13 +402,19 @@ ACCEPTANCE
 Resolve protected integration through the current bound META capability router; use a delegated route when the direct route is unavailable and report BLOCKED_CAPABILITY_UNAVAILABLE only when neither route is proven.
 """
     assert central.validate_task_prompt_text(allowed) == []
+    assert central.validate_task_prompt_text(
+        "If the direct operation is unavailable, use delegated execution; record BLOCKED_CAPABILITY_UNAVAILABLE only when neither direct nor delegated capability is proven."
+    ) == []
 
     forbidden = (
         "Integrate only through REST merge-async with the exact qualified SHA.",
         'Submit with merge_action="merge_queue" and then wait for merge_group.',
+        'Submit with {"merge_action": "merge_queue"} and then wait for merge_group.',
+        "Submit with 'merge_action': 'merge_queue' and then wait for merge_group.",
         "Use github.merge_async.put_exact_head for protected integration.",
         "If the native operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the native exact-head Merge Queue operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the native operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE and do not use delegated execution.",
     )
     for text in forbidden:
         errors = central.validate_task_prompt_text(text)
