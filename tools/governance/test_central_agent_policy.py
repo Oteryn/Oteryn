@@ -409,12 +409,17 @@ Resolve protected integration through the current bound META capability router; 
     forbidden = (
         "Integrate only through REST merge-async with the exact qualified SHA.",
         'Submit with merge_action="merge_queue" and then wait for merge_group.',
-        'Submit with {"merge_action": "merge_queue"} and then wait for merge_group.',
+        'Submit with merge_action="default" and then wait for merge_group.',
+        'Submit with {"merge_action": "direct_merge"} and then wait for merge_group.',
         "Submit with 'merge_action': 'merge_queue' and then wait for merge_group.",
         "Use github.merge_async.put_exact_head for protected integration.",
         "If the native operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the native exact-head Merge Queue operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct capability is unavailable, mark BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the native operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE and do not use delegated execution.",
+        "Do not merge directly and instead invoke merge-async with the exact SHA.",
+        'Do not bypass Merge Queue and submit with merge_action="merge_queue".',
     )
     for text in forbidden:
         errors = central.validate_task_prompt_text(text)
