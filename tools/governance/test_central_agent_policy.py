@@ -394,6 +394,34 @@ and docs/governance/AI_REVIEW_POLICY.md as local task controllers.
     assert "task prompt must not embed global execution-routing policy" in errors
 
 
+def test_task_prompt_must_defer_protected_integration_capability_routing() -> None:
+    allowed = """ROLE / OUTCOME
+Repair the allocated task and deliver through protected Merge Queue.
+
+ACCEPTANCE
+Resolve protected integration through the current bound META capability router; use a delegated route when the direct route is unavailable and report BLOCKED_CAPABILITY_UNAVAILABLE only when neither route is proven.
+"""
+    assert central.validate_task_prompt_text(allowed) == []
+
+    forbidden = (
+        "Integrate only through REST merge-async with the exact qualified SHA.",
+        'Submit with merge_action="merge_queue" and then wait for merge_group.',
+        "Use github.merge_async.put_exact_head for protected integration.",
+        "If the native operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the native exact-head Merge Queue operation is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+    )
+    for text in forbidden:
+        errors = central.validate_task_prompt_text(text)
+        assert "task prompt must defer protected-integration capability routing to bound META policy" in errors, text
+
+    for text in (
+        "Do not pin merge-async in a reusable task prompt.",
+        "Audit whether the old prompt uses merge_action=merge_queue.",
+        "Never convert absence of one direct primitive into BLOCKED_CAPABILITY_UNAVAILABLE.",
+    ):
+        assert central.validate_task_prompt_text(text) == [], text
+
+
 def test_binding_paths_must_match_central_policy() -> None:
     policy = central.load_policy(REPO_ROOT)
     malformed = copy.deepcopy(valid_binding())
