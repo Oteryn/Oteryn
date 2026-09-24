@@ -404,6 +404,7 @@ Resolve protected integration through the current bound META capability router; 
     for text in (
         allowed,
         "If the direct operation is unavailable, use delegated execution. If the delegated route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If both the direct and delegated routes are unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the direct operation is unavailable, use delegated execution. When the delegated executor cannot be used, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the direct operation is unavailable, use delegated execution; record BLOCKED_CAPABILITY_UNAVAILABLE only when neither direct nor delegated capability is proven.",
         "Repair the merge-async receipt persistence bug without changing integration routing.",
@@ -434,6 +435,8 @@ Resolve protected integration through the current bound META capability router; 
         "Use github.merge_async.put_exact_head for protected integration.",
         "Call merge-async to integrate this PR.",
         "The worker must call merge-async to integrate this PR.",
+        "Protected integration must use merge-async.",
+        "Merge Queue submission shall execute merge-async.",
         "The coordinator should execute merge-async to integrate this PR.",
         "Execute merge-async to integrate this PR.",
         "Run merge-async to integrate this PR.",
