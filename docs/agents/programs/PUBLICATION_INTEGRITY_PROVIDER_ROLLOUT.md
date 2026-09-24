@@ -1,18 +1,18 @@
 # Publication Integrity Provider Rollout
 
-Status: PREPARED / NOT ACTIVE until PR #213 is integrated to protected META `main`.
+Status: ACTIVE CONTRACT; this revision requires protected META integration and exact provider rebinding before provider use.
 
 Governing META Issue: #212.
 
 ## Activation gate
 
-No provider mutation is authorized by this document. Activation requires all of:
+No provider mutation is authorized by this document alone. A new publication-policy revision becomes active for a provider only after all of:
 
-1. PR #213 integrated through the governed META Merge Queue path;
-2. successful real `merge_group` `meta-gate` for that integration candidate;
-3. protected META `main` readback proving the publication-integrity contract is present;
-4. the exact protected META commit selected as the new provider `authority_commit`;
-5. a separately authorized provider task/branch/PR for each repository.
+1. the revision is integrated through the governed META Merge Queue path;
+2. the real `merge_group` `meta-gate` succeeds for that integration candidate;
+3. protected META `main` readback proves the revision is present;
+4. that exact protected META commit is selected as the provider's new `authority_commit`;
+5. a separately authorized provider task/branch/PR performs and validates the rebind.
 
 ## Rollout order
 
@@ -23,7 +23,7 @@ Each provider adoption must:
 - update `docs/agents/META_AGENT_POLICY_BINDING.json` to the exact protected META authority commit while preserving the central policy identity/version contract;
 - re-read the provider bootstrap and remove or narrow any publication wording that conflicts with the new central contract, without duplicating the full META procedure;
 - verify the provider's policy-consumption validator against the exact bound META revision;
-- execute representative behavior checks proving both boundaries: a prepared local candidate is preserved/reported blocked when neither guarded Git nor an authorized atomic expected-head API candidate-creation primitive is available, while an API-native route is accepted only as a new candidate when one server-side mutation fences the exact expected branch head and creates one complete successor commit; ancestry-only `force=false` ref updates, raw Git Data object/ref assembly and sequential per-file API writes remain rejected;
+- execute representative behavior checks proving all publication boundaries: guarded local Git preserves exact candidate identity; preferred API-native publication accepts an atomic expected-head one-commit mutation; connector-compatible publication accepts exactly one new Git Data candidate commit plus one non-force (`force=false`) task-branch update only with fresh single-writer allocation and immediate predecessor/candidate live readbacks; protected/shared/uncertain branches, pre-readback drift, third-SHA outcomes, sequential per-file API writes, multiple candidate commits and force/ref replacement remain rejected;
 - preserve repository-specific Merge Queue, review, CI and production boundaries.
 
 ## Task-branch protection follow-up
