@@ -412,6 +412,8 @@ Resolve protected integration through the current bound META capability router; 
     for text in (
         allowed,
         "If the direct operation is unavailable, use delegated execution. If the delegated route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, use delegated execution. After confirming the delegated route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "If the direct route is unavailable, use delegated execution. Once the delegated capability is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the direct route is unavailable, collect diagnostics. The direct route is available again. Record BLOCKED_CAPABILITY_UNAVAILABLE only if the delegated route is also unavailable.",
         "If both the direct and delegated routes are unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "Should the direct route be unavailable, use delegated execution. Should the delegated route be unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
@@ -439,6 +441,7 @@ Resolve protected integration through the current bound META capability router; 
     forbidden = (
         "Integrate only through REST merge-async with the exact qualified SHA.",
         "Integrate this PR by calling merge-async with the exact SHA.",
+        "For protected integration, invoke merge-async with the exact SHA.",
         "The selected route is merge-async.",
         'Submit with merge_action="merge_queue" and then wait for merge_group.',
         'Submit with merge_action="default" and then wait for merge_group.',
@@ -476,6 +479,8 @@ Resolve protected integration through the current bound META capability router; 
         "If no direct route is available, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "No direct route available: record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "Absence of merge-async means BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "Merge-async is unavailable, so record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "Direct route is unavailable: record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If no native capability is proven, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the direct capability cannot be proven, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the direct capability is not proven, mark BLOCKED_CAPABILITY_UNAVAILABLE.",
