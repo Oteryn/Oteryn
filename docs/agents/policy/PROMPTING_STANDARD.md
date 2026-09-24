@@ -23,6 +23,8 @@ A remote META binding identifies a version, not automatic instruction delivery. 
 
 Aliases provide discovery, not authority. Refresh changing lifecycle facts rather than treating a pasted SHA/status as current truth. Do not ask the owner for a fact that an authorized read can resolve. State safe, reversible assumptions; never assume permission, destructive intent or waived acceptance.
 
+Protected-integration capability selection belongs to the bound organization routing policy, not to reusable task prompts. A prompt may require protected Merge Queue integration and exact-candidate evidence, but it must not pin a native operation such as `merge-async`, restate `merge_action`, or convert absence of one direct primitive into `BLOCKED_CAPABILITY_UNAVAILABLE`. The active control plane must resolve the current bound direct/delegated capability routes before declaring integration capability unavailable.
+
 ## Execution guidance
 
 Give direct instructions and a concrete success target. Prescribe a sequence only when ordering protects correctness/safety or evaluation demonstrates a need. Avoid generic expert praise, routine requests for exposed chain-of-thought, and examples that add no useful distinction.
