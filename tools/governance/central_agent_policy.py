@@ -535,7 +535,10 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     direct-route-loss condition across intervening ordinary statements and
     require explicit delegated-route exhaustion before capability-unavailable.
     """
-    scan_text = re.sub(r"(?m)^\s{0,3}#{1,6}\s+", "", text)
+    scan_text = re.sub(r"(?m)^\\s{0,3}#{1,6}\\s+", "", text)
+    for marker in ("`", "**", "__", "*", "_"):
+        for token in ("merge-async", "github.merge_async.put_exact_head"):
+            scan_text = scan_text.replace(f"{marker}{token}{marker}", token)
     statements = _statements(scan_text)
     affirmative_after_negative = re.compile(
         r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,160}"
@@ -579,6 +582,8 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         rf"\b(?:if|when)\b[^.!?;]{{0,360}}(?:"
         rf"\b(?:direct|native)\b[^.!?;]{{0,180}}\b{loss}\b"
         rf"|\b{primitive}\b[^.!?;]{{0,140}}\b{loss}\b"
+        rf"|\bno\s+(?:direct|native)\b[^.!?;]{{0,180}}"
+        rf"\b(?:is\s+)?(?:available|proven|usable)\b"
         rf")",
         re.IGNORECASE,
     )
