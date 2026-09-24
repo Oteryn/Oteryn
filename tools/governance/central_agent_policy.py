@@ -552,7 +552,7 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     )
     merge_action_selection = re.compile(
         r"""(?:["']?merge_action["']?)\s*(?:
-            [: =]\s*(?:["']?[^\s,;}]+["']?)
+            [:=]\s*(?:["']?[^\s,;}]+["']?)
             |(?:is\s+)?set\s+to\s+(?:["']?[^\s,;}]+["']?)
         )
         |\bset\s+(?:the\s+)?["']?merge_action["']?\s+to\s+(?:["']?[^\s,;}]+["']?)
