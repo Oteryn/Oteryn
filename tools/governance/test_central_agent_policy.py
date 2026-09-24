@@ -423,6 +423,8 @@ Resolve protected integration through the current bound META capability router; 
         "Document the merge_action parser and its invalid-input tests.",
         "Fix the bug where merge_action is ignored by the parser.",
         'Fix the parser so it rejects merge_action="default".',
+        "Fix the parser and update its tests for merge_action invalid input.",
+        "Audit the old prompt and update documentation describing merge_action.",
         "Test that the validator rejects direct-only blocker wording: If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         'Update the validator so it rejects **merge_action** = "direct_merge".',
         'Verify that the task prompt never uses merge_action="merge_queue".',
@@ -436,6 +438,7 @@ Resolve protected integration through the current bound META capability router; 
 
     forbidden = (
         "Integrate only through REST merge-async with the exact qualified SHA.",
+        "Integrate this PR by calling merge-async with the exact SHA.",
         "The selected route is merge-async.",
         'Submit with merge_action="merge_queue" and then wait for merge_group.',
         'Submit with merge_action="default" and then wait for merge_group.',
@@ -471,6 +474,8 @@ Resolve protected integration through the current bound META capability router; 
         "If the direct route is unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "Should the direct route be unavailable, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If no direct route is available, record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "No direct route available: record BLOCKED_CAPABILITY_UNAVAILABLE.",
+        "Absence of merge-async means BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If no native capability is proven, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the direct capability cannot be proven, record BLOCKED_CAPABILITY_UNAVAILABLE.",
         "If the direct capability is not proven, mark BLOCKED_CAPABILITY_UNAVAILABLE.",
