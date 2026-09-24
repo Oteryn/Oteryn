@@ -531,11 +531,12 @@ def _remote_tool_grant(text: str, *, copied: bool) -> bool:
 def _task_prompt_forks_integration_routing(text: str) -> bool:
     """Reject prompt-local protected-integration route selection.
 
-    Pure audit/component references and pure prohibitions remain allowed. The check
-    also correlates a direct-route-loss condition with a blocker in the immediately
-    following statement so punctuation cannot recreate the old false blocker.
+    Task prompts may name integration components for repair/audit work, but they
+    may not select the organization Merge Queue primitive or turn loss of only
+    the direct route into a terminal capability blocker.
     """
     statements = _statements(text)
+    operative_body = " ".join(_operative_markdown(text).split())
     affirmative_after_negative = re.compile(
         r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,160}"
         r"\b(?:submit|invoke|use|route|integrate|call|enqueue|send)\b",
@@ -560,17 +561,27 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         re.IGNORECASE | re.VERBOSE,
     )
     direct_loss_condition = re.compile(
-        r"\b(?:if|when)\b.{0,240}\b(?:direct|native)\b.{0,140}"
-        r"\b(?:unavailable|missing|absent|not\s+available)\b",
+        r"\b(?:if|when)\b.{0,320}(?:"
+        r"\b(?:direct|native)\b.{0,160}\b(?:unavailable|missing|absent|not\s+available)\b"
+        r"|\b(?:merge-async|github\.merge_async\.put_exact_head)\b.{0,120}"
+        r"\b(?:unavailable|missing|absent|not\s+available)\b"
+        r")",
         re.IGNORECASE,
     )
     delegated_negative_re = re.compile(
-        r"\b(?:do\s+not|never|must\s+not|cannot|can't)\b.{0,140}\bdelegated\b",
+        r"\b(?:do\s+not|never|must\s+not|cannot|can't)\b.{0,180}\bdelegated\b",
         re.IGNORECASE,
     )
     delegated_affirmative_re = re.compile(
-        r"\b(?:use|try|resolve|route|fallback|fall\s+back|prove|check)\b.{0,140}\bdelegated\b"
+        r"\b(?:use|try|resolve|route|fallback|fall\s+back|prove|check)\b.{0,180}\bdelegated\b"
         r"|\bDELEGATED_CAPABLE\b",
+        re.IGNORECASE,
+    )
+    inert_audit_reference = re.compile(
+        r"^(?:[-*+]\s+|\d+[.)]\s+)?"
+        r"(?:verify|check|audit|inspect|test|assert)\b"
+        r".{0,240}\b(?:prompt|validator|parser|documentation|rule|test|contract)\b"
+        r".{0,240}\b(?:never|not|without|forbid\w*|reject\w*|invalid|disallow\w*)\b",
         re.IGNORECASE,
     )
 
@@ -585,24 +596,25 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
             routing_verb.search(statement) is not None
             or route_copula.search(statement) is not None
         )
-        if selects_merge_action or selects_native_primitive:
-            if not _is_audit_or_negative(statement) or affirmative_after_negative.search(statement):
-                return True
+        if not (selects_merge_action or selects_native_primitive):
+            continue
+        inert = (
+            _is_audit_or_negative(statement)
+            or inert_audit_reference.search(statement) is not None
+        )
+        if not inert or affirmative_after_negative.search(statement):
+            return True
 
-    for index, statement in enumerate(statements):
-        if "blocked_capability_unavailable" not in statement.casefold():
-            continue
-        window = statement
-        if index > 0:
-            window = statements[index - 1] + " " + statement
-        if direct_loss_condition.search(window) is None:
-            continue
-        delegated_negative = delegated_negative_re.search(window) is not None
+    if (
+        "blocked_capability_unavailable" in operative_body.casefold()
+        and direct_loss_condition.search(operative_body) is not None
+    ):
+        delegated_negative = delegated_negative_re.search(operative_body) is not None
         delegated_affirmative = (
-            delegated_affirmative_re.search(window) is not None
+            delegated_affirmative_re.search(operative_body) is not None
             or re.search(
-                r"\bneither\b.{0,100}\bdirect\b.{0,100}\bdelegated\b",
-                window,
+                r"\bneither\b.{0,140}\bdirect\b.{0,140}\bdelegated\b",
+                operative_body,
                 re.IGNORECASE,
             ) is not None
         )
