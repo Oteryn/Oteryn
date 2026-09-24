@@ -545,7 +545,7 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     primitive = r"(?:merge-async|github\.merge_async\.put_exact_head)"
     native_selection_re = re.compile(
         rf"(?:"
-        rf"\b(?:submit|invoke|use|enqueue|send|execute|run|call)\b\s+"
+        rf"\b(?:submit|invoke|use|enqueue|send|execute|run)\b\s+"
         rf"(?:(?:the|exact|native|REST|exact-head|selected|required)\s+){{0,5}}"
         rf"(?:operation\s+)?\b{primitive}\b"
         rf"|\b(?:integrate|route)\b[^.!?;]{{0,80}}\b(?:through|via|using)\b"
