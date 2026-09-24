@@ -548,7 +548,9 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     primitive = r"(?:merge-async|github\.merge_async\.put_exact_head)"
     directive_subject = (
         r"(?:^(?:[-*+]\s+|\d+[.)]\s+)?"
-        r"|\b(?:the\s+)?(?:worker|agent|coordinator|you)\s+"
+        r"|\b(?:(?:the\s+)?(?:worker|agent|coordinator)|you|"
+        r"(?:protected\s+)?integration|(?:protected\s+)?merge\s+queue\s+integration|"
+        r"(?:merge\s+queue\s+)?submission)\s+"
         r"(?:must|shall|should|may|can)\s+"
         r"|\b(?:and|but|then|instead|however|yet)\s+)"
     )
@@ -595,7 +597,7 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         rf")",
         re.IGNORECASE,
     )
-    delegated_target = r"delegated\s+(?:route|capability|executor|operation|execution|integration)"
+    delegated_target = r"delegated\s+(?:routes?|capabilit(?:y|ies)|executors?|operations?|executions?|integrations?)"
     delegated_loss_condition = re.compile(
         rf"\b(?:if|when|until)\b(?:(?!\b(?:if|when|unless|until)\b)[^.!?;]){{0,180}}(?:"
         rf"\b{delegated_target}\b[^.!?;]{{0,120}}\b{loss}\b"
