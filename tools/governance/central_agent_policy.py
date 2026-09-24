@@ -656,8 +656,17 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         r"enqueue|send|call|execute|run)\b",
         re.IGNORECASE,
     )
+    coordinated_route_assignment = re.compile(
+        r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,180}"
+        r"\b(?:update|set|configure|assign|require|submit|invoke|use|route|integrate|"
+        r"enqueue|send|call|execute|run)\b[^.!?;]{0,180}"
+        r"(?:\bmerge_action\b|\bmerge-async\b|\bgithub\.merge_async\.put_exact_head\b)",
+        re.IGNORECASE,
+    )
 
     for statement in statements:
+        if coordinated_route_assignment.search(statement) is not None:
+            return True
         merge_match = merge_action_selection.search(statement)
         native_match = native_selection_re.search(statement)
         route_matches = [match for match in (merge_match, native_match) if match is not None]
