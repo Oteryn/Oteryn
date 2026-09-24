@@ -535,7 +535,8 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
     direct-route-loss condition across intervening ordinary statements and
     require explicit delegated-route exhaustion before capability-unavailable.
     """
-    statements = _statements(text)
+    scan_text = re.sub(r"(?m)^\\s{0,3}#{1,6}\\s+", "", text)
+    statements = _statements(scan_text)
     affirmative_after_negative = re.compile(
         r"\b(?:and|but|then|instead|however|yet)\b[^.!?;]{0,160}"
         r"\b(?:submit|invoke|use|route|integrate|enqueue|send|call)\b",
@@ -583,7 +584,12 @@ def _task_prompt_forks_integration_routing(text: str) -> bool:
         re.IGNORECASE,
     )
     delegated_negative_re = re.compile(
-        r"\b(?:do\s+not|never|must\s+not|cannot|can't)\b[^.!?;]{0,180}\bdelegated\b",
+        r"(?:"
+        r"\b(?:do\s+not|never|must\s+not|cannot|can't)\s+"
+        r"(?:use|route|invoke|call|try|fallback|fall\s+back)\b[^.!?;]{0,160}\bdelegated\b"
+        r"|\bdelegated\b[^.!?;]{0,120}"
+        r"\b(?:must\s+not|cannot|can't|is\s+forbidden\s+to)\b[^.!?;]{0,80}\b(?:use|run|execute)\b"
+        r")",
         re.IGNORECASE,
     )
     inert_audit_reference = re.compile(
