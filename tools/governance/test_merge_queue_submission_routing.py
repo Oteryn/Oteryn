@@ -304,7 +304,7 @@ def test_policy_declares_app_free_auth_and_terminal_proof() -> None:
     ):
         assert marker in text, marker
     policy_json = json.loads(POLICY_JSON.read_text(encoding="utf-8"))
-    assert policy_json["policy_version"] == "3.1.0"
+    assert policy_json["policy_version"] == "3.1.1"
 
 
 def main() -> int:
