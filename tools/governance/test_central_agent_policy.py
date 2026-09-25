@@ -920,6 +920,41 @@ def test_review_genuinely_incomplete_negative_directives_keep_soft_wraps() -> No
 
 
 
+
+def test_pr_metadata_contract_preserves_machine_safety_and_ready_state() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    contract = policy["pr_metadata_conventions"]
+    assert contract["enforcement"] == (
+        "advisory_only_unless_bound_to_explicit_machine_release_security_or_safety_semantic_invariant"
+    )
+    assert contract["hard_fail_identity_checks"] == [
+        "pull_request_open",
+        "pull_request_ready_non_draft",
+        "exact_head_sha",
+        "same_repository_head",
+        "base_main",
+    ]
+
+
+def test_provider_binding_rejects_resolved_metadata_contract_drift_without_local_policy() -> None:
+    for mutation in ("missing", "weakened"):
+        resolved = resolved_authority()
+        resolved_policy = resolved["policy"]
+        assert isinstance(resolved_policy, dict)
+        if mutation == "missing":
+            resolved_policy.pop("pr_metadata_conventions")
+        else:
+            resolved_policy["pr_metadata_conventions"] = {
+                "presentation_checks": [],
+                "enforcement": "advisory_only",
+                "validation_heading_match": "anything",
+                "hard_fail_identity_checks": ["pull_request_open"],
+            }
+        resolver = mock.Mock(return_value=resolved)
+        errors = central.validate_provider_binding(valid_binding(), authority_resolver=resolver)
+        assert "resolved META pr_metadata_conventions does not match the canonical contract" in errors
+
+
 def main() -> int:
     failures: list[tuple[str, Exception]] = []
     for name, test in sorted(globals().items()):

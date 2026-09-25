@@ -53,10 +53,11 @@ EXPECTED_PR_METADATA_CONVENTIONS = {
         "scope_heading",
         "validation_heading",
     ],
-    "enforcement": "advisory_only_unless_bound_to_explicit_release_or_security_semantic_invariant",
+    "enforcement": "advisory_only_unless_bound_to_explicit_machine_release_security_or_safety_semantic_invariant",
     "validation_heading_match": "semantic_contains_validation",
     "hard_fail_identity_checks": [
         "pull_request_open",
+        "pull_request_ready_non_draft",
         "exact_head_sha",
         "same_repository_head",
         "base_main",
@@ -288,6 +289,8 @@ def _validate_resolved_authority(
             errors.append("resolved META policy_version does not match provider binding")
         if resolved_policy.get("authority_repository") != binding.get("authority_repository"):
             errors.append("resolved META authority repository does not match provider binding")
+        if resolved_policy.get("pr_metadata_conventions") != EXPECTED_PR_METADATA_CONVENTIONS:
+            errors.append("resolved META pr_metadata_conventions does not match the canonical contract")
         if resolved_policy.get("canonical_human_surfaces") != actual_paths:
             errors.append("resolved META canonical paths do not match provider binding")
         if expected_policy is not None and resolved_policy != expected_policy:
