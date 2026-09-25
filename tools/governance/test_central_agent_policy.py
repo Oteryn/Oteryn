@@ -927,6 +927,7 @@ def test_pr_metadata_contract_preserves_machine_safety_and_ready_state() -> None
     assert contract["enforcement"] == (
         "advisory_only_unless_bound_to_explicit_machine_release_security_or_safety_semantic_invariant"
     )
+    assert contract["validation_heading_match"] == "semantic_validation_token"
     assert contract["hard_fail_identity_checks"] == [
         "pull_request_open",
         "pull_request_ready_non_draft",

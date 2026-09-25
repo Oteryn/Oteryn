@@ -54,7 +54,7 @@ EXPECTED_PR_METADATA_CONVENTIONS = {
         "validation_heading",
     ],
     "enforcement": "advisory_only_unless_bound_to_explicit_machine_release_security_or_safety_semantic_invariant",
-    "validation_heading_match": "semantic_contains_validation",
+    "validation_heading_match": "semantic_validation_token",
     "hard_fail_identity_checks": [
         "pull_request_open",
         "pull_request_ready_non_draft",
