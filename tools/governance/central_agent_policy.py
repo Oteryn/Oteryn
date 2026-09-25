@@ -91,8 +91,17 @@ def validate_meta_bundle(root: Path, policy: dict[str, Any]) -> list[str]:
                 errors.append(f"missing or empty central human policy surface: {relative}")
                 continue
             try:
-                if not path.read_text(encoding="utf-8").strip():
+                text = path.read_text(encoding="utf-8")
+                if not text.strip():
                     errors.append(f"missing or empty central human policy surface: {relative}")
+                    continue
+                expected_marker = (
+                    f"Policy version: \`{POLICY_VERSION}\`"
+                    if name == "organization_policy"
+                    else f"Policy: \`{POLICY_ID}@{POLICY_VERSION}\`"
+                )
+                if expected_marker not in text:
+                    errors.append(f"central human policy surface version drift: {relative}")
             except (OSError, UnicodeError):
                 errors.append(f"missing or unreadable central human policy surface: {relative}")
 
