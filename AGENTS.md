@@ -123,3 +123,16 @@ when warranted by documentation/metadata scope, never as a substitute for requir
 Accepted `docs/architecture/adr/0001-ecosystem-topology-authority.md` records META topology authority. Historical bootstrap/handover conditions are not a pending transition on current `main`.
 
 Product repositories retain authority over their own implementation, provider schemas and runtime behavior. A META ADR can coordinate boundaries and sequencing but does not silently transfer those product responsibilities.
+
+## Jira programme coordination
+
+Oteryn programme coordination is mirrored in Jira project `KAN` at `https://oteryn.atlassian.net`; `KAN-23` is the programme overview. When an Atlassian/Jira connector is available in the current session, use it as a bounded programme-coordination surface.
+
+- After the normal GitHub preflight for a substantial start or resume, resolve an **existing mapped Jira Story** for the current workstream. Prefer a native GitHub source link on the Jira item; otherwise require an exact repository/workstream label match. Do not map work by a similar title alone.
+- Read only the mapped Story, its parent Epic, priority, status, fixVersion/milestone and readiness labels needed for the current decision. Do not bulk-load unrelated Jira history.
+- **GitHub remains repository lifecycle and technical source of truth** for repository identity, Issues/tasks, branches, PRs, exact SHAs, checks, review, Merge Queue and integration. Repository contracts/task records remain implementation authority. Jira is the programme roadmap/readiness/milestone view and never grants repository, merge, production, secret or cross-repository mutation authority.
+- Ordinary repository workers may update only their already-mapped programme Story after a verified material state transition. Broad Jira restructuring, new programme Epics/Versions, cross-workstream reprioritization and edits to `KAN-23` belong to the programme coordinator unless the owner explicitly delegates them.
+- Use the established programme state convention: queued/blocked/stalled work stays `Do zrobienia` with the matching `readiness-queued`, `readiness-blocked` or `readiness-stalled` label; active work is `W toku` with `readiness-active`; completed work is `Gotowe` with `readiness-complete` only after the Story's full acceptance is verified. Use `W trakcie weryfikacji` when implementation is complete but required review/qualification is still pending.
+- Fresh-read both Jira and the linked GitHub state before a Jira mutation. Do not spam comments or rewrite unchanged fields. A closed individual GitHub Issue/PR does not make an aggregate Jira Story complete while another linked acceptance source remains open.
+- If the Jira connector is unavailable, the mapping is absent, or Jira write capability is unavailable, continue otherwise-authorized repository work. Record Jira synchronization as pending/unknown rather than inventing a mapping, creating duplicate programme items, or treating Jira availability as an implementation blocker.
+
