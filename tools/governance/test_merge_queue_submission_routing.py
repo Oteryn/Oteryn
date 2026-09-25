@@ -293,7 +293,7 @@ def test_no_generic_auto_merge_direct_merge_or_ambiguous_cleanup_route_exists() 
 def test_policy_declares_app_free_auth_and_terminal_proof() -> None:
     text = POLICY.read_text(encoding="utf-8")
     for marker in (
-        "Policy version: `3.1.0`",
+        "Policy version: `3.1.1`",
         "merge_action=\"merge_queue\"",
         "does **not** require or authorize creating a dedicated custom GitHub App",
         "fine-grained personal access token",
