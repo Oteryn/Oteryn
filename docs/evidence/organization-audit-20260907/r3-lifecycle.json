@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "observation_date_utc": "2026-09-08",
+  "source_snapshot_rebased": false,
+  "observation_method": "Native GitHub connector metadata; issue/PR bodies are not authoritative over state/merged/head fields",
+  "records": [
+    {
+      "repository": "Oteryn/Oteryn-Game",
+      "kind": "pull_request",
+      "number": 361,
+      "state": "closed",
+      "merged": true,
+      "head_sha": "444dddd6f5da6db934781b30615c23867b0381cf",
+      "merge_sha": "3825e9c82ff388923f73548a807718807012f53f",
+      "merged_at": "2026-09-07T22:39:46Z",
+      "effect": "Old candidate allegation is not automatically current; final repair is not independently runtime-requalified by this audit."
+    },
+    {
+      "repository": "Oteryn/Oteryn-Platform",
+      "kind": "pull_request",
+      "number": 1270,
+      "state": "closed",
+      "merged": false,
+      "head_sha": "c2edd9f98fdad7496c79c6c2534251549ce577c7",
+      "closed_at": "2026-09-07T09:15:22Z",
+      "supersession_comment_id": 5568321947,
+      "successor_pr": 1304,
+      "effect": "Closed without merge; do not resurrect the superseded policy controller. Issue1267 status not inferred."
+    },
+    {
+      "repository": "Oteryn/Oteryn-Platform",
+      "kind": "pull_request",
+      "number": 1304,
+      "state": "closed",
+      "merged": true,
+      "head_sha": "e8c0e5ea1d2d9faa469ca1b053698427ecdce692",
+      "merge_sha": "907546f193e91b0bed2f5f077ab5b874771929ef",
+      "merged_at": "2026-09-07T09:57:44Z",
+      "effect": "Successor integration verified; finite provider evaluations are not agent-cost telemetry."
+    },
+    {
+      "repository": "Oteryn/Oteryn-Atlas",
+      "kind": "issue",
+      "number": 376,
+      "state": "closed",
+      "state_reason": "completed",
+      "closed_at": "2026-09-07T22:54:20Z",
+      "effect": "Lifecycle completion, not workflow restoration or fresh product acceptance."
+    }
+  ],
+  "prior_drift_observations": {
+    "observation_window_utc": "2026-09-08T05:53:00Z/2026-09-08T06:33:00Z",
+    "claim": "Historical readback, not current branch heads at delivery",
+    "platform": "519f610b9e02641283cc4322c80b74a9462edb11",
+    "game": "8ec8fedd23e7cd6b0acb3c0848baf4f7b629919f",
+    "atlas": "6a4172d518dd85b6447d6a4785eb0f87fc6c8a46"
+  },
+  "revalidation_policy": "Later source, configuration, dependency, consumer or authority changes require scoped revalidation; unchanged blob alone is not enough for a system-level proof."
+}

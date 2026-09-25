@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "id": "meta-r4-direct-candidate-20260910",
+  "repository": "meta",
+  "disposition": "DIRECT_CANDIDATE_ONLY_NOT_ADOPTED",
+  "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+  "candidate_path_count": 25,
+  "coverage_adopted": false,
+  "source": {
+    "repository": "Oteryn/Oteryn",
+    "commit_sha": "1a01c5b3e08666a82245b1cac78da3736c65e785",
+    "tree_sha": "f084e824ec5e14d5909c9750d906d91d51425fd5"
+  },
+  "paths": [
+    {
+      "path": ".github/CODEOWNERS",
+      "blob_sha": "fb196173cfaf4a9025bdde9a94b81cd6955e545c",
+      "semantic_note": "Ownership routing declarations only; repository enforcement and current review state are excluded."
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "blob_sha": "67c0ad495996dc5a395c20e6b3da04834a2534b5",
+      "semantic_note": "Pull-request evidence prompts and lifecycle fields only; completion is not established."
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "blob_sha": "25a8155ca03dae4f899ee478fcca2db4bbef0bb0",
+      "semantic_note": "Contributor workflow, test, review, and Merge Queue declarations only."
+    },
+    {
+      "path": "README.md",
+      "blob_sha": "db2a360d430a85a1c3ba6f1979393860b468af6e",
+      "semantic_note": "META repository purpose, authority boundaries, topology references, and validation commands only."
+    },
+    {
+      "path": "SECURITY.md",
+      "blob_sha": "cd792844feb00ec52df0c4fe277868b7570f764d",
+      "semantic_note": "Security reporting and disclosure process declarations only; no live security state is inferred."
+    },
+    {
+      "path": "docs/agents/BRANCH_LIFECYCLE_POLICY.json",
+      "blob_sha": "e20c51e4c3735dcaa13263a931c10f57877e8e49",
+      "semantic_note": "Machine-readable terminal branch lifecycle rules and required evidence fields only."
+    },
+    {
+      "path": "docs/agents/contracts/BOUNDED_AUTONOMOUS_EXECUTION_POLICY.md",
+      "blob_sha": "90aaec728d0bf3f3e7e3a18b44cd61c063ba0085",
+      "semantic_note": "Bounded execution, retry, freeze, escalation, and evidence semantics only."
+    },
+    {
+      "path": "docs/agents/contracts/SYNOLOGY_MCP_EXECUTION_POLICY.md",
+      "blob_sha": "9d2aace04a01b18f05924845c41ff9dfb7e67293",
+      "semantic_note": "Default-deny Synology execution authorization and exact-call gating only; no host access is proven."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-ORGANIZATION-MERGE-QUEUE-ANTI-LOOP-ROLLOUT.md",
+      "blob_sha": "9b552a8e6c6dcb4a51d361e79fd2507de36d29f3",
+      "semantic_note": "RETIRED provenance-only rollout prompt; never dispatchable current authority."
+    },
+    {
+      "path": "docs/agents/prompts/OTERYN-SOLO-MAINTAINER-GOVERNANCE-V2-ROLLOUT.md",
+      "blob_sha": "82de8fef1da3ee4ba8981b4154f90ee87e2f2c13",
+      "semantic_note": "RETIRED provenance-only rollout prompt; never dispatchable current authority."
+    },
+    {
+      "path": "docs/architecture/adr/0001-ecosystem-topology-authority.md",
+      "blob_sha": "af73483755975eb947618ae6fe7123407baa0d9a",
+      "semantic_note": "Accepted META topology authority and provider ownership boundaries only."
+    },
+    {
+      "path": "docs/architecture/adr/0002-organization-governance-operating-model.md",
+      "blob_sha": "53ad1361395dc67974c89744a22b2df631f0d61a",
+      "semantic_note": "Accepted organization governance operating model and bounded authority only."
+    },
+    {
+      "path": "docs/architecture/adr/0003-terminal-source-branch-lifecycle.md",
+      "blob_sha": "626ad68f1b3ea5d636a1179df9c599fb702e66a0",
+      "semantic_note": "Accepted terminal source-branch disposition and evidence semantics only."
+    },
+    {
+      "path": "docs/architecture/adr/0004-parallel-agent-git-concurrency.md",
+      "blob_sha": "9026d1c23ecbdb7e5c6f311a4c9b0ec0dc7cc1fd",
+      "semantic_note": "Accepted parallel-work and operative-looking merge-up guidance; ambiguity with later MQ authority reconfirms META-AUD-05."
+    },
+    {
+      "path": "docs/architecture/adr/0005-solo-maintainer-governance-v2-simplification-reset.md",
+      "blob_sha": "fee4ea0586a24c018f0755cc8f8d8ad8a42a86b1",
+      "semantic_note": "Accepted later Merge Queue freshness model; does not explicitly declare ADR 0004 wholly superseded."
+    },
+    {
+      "path": "docs/evidence/OTERYN-ORG-AUDIT-v3.10-LIVE-CLOSEOUT-20260821.md",
+      "blob_sha": "028edeba98af75fb51efd182dbf23497598fd8bf",
+      "semantic_note": "Historical closeout snapshot only; not current LIVE admin, runtime, security, or enforcement proof."
+    },
+    {
+      "path": "docs/evidence/OTERYN-ORG-AUDIT-v3.9-REMEDIATION-CLOSEOUT-20260824.md",
+      "blob_sha": "55c30d54ff4176307e05e377e34c983b249df4e3",
+      "semantic_note": "Historical remediation closeout snapshot only; not current LIVE proof."
+    },
+    {
+      "path": "docs/recovery/organization-recovery-contract.md",
+      "blob_sha": "829fcadd8367cbb727f1305b7fa84783e002d6ca",
+      "semantic_note": "Recovery roles, evidence, and exercise contract only; no current recovery qualification is inferred."
+    },
+    {
+      "path": "docs/superpowers/specs/2026-09-01-solo-maintainer-governance-v2-simplification-reset-design.md",
+      "blob_sha": "09158d761b240b158665e6c62b0131a3e5e088d1",
+      "semantic_note": "Design/evidence material only; never active dispatch authority."
+    },
+    {
+      "path": "docs/testing/ECOSYSTEM_TEST_STRATEGY.md",
+      "blob_sha": "0fe784e5c71f7d268dc36e28ff1f33b9b570a528",
+      "semantic_note": "Cross-repository test layers, ownership, and evidence expectations only; no runtime result is inferred."
+    },
+    {
+      "path": "ecosystem/bounded-autonomous-execution-policy.json",
+      "blob_sha": "ff4904f0d7f6529dea90a03373848d7700c2a437",
+      "semantic_note": "Machine-readable bounded execution vocabulary and thresholds only."
+    },
+    {
+      "path": "ecosystem/governance-desired-state.json",
+      "blob_sha": "049a3fff02451fdbc8ec75dd6bc017466911bb94",
+      "semantic_note": "Target/desired governance state only; never proof of live enforcement."
+    },
+    {
+      "path": "ecosystem/repositories.json",
+      "blob_sha": "16b41287e33d6e3848b45ce0da262f90f12b81d9",
+      "semantic_note": "Repository coordinates, ownership, and migration-state declarations at the source cut only."
+    },
+    {
+      "path": "tools/governance/bounded_execution_guard.py",
+      "blob_sha": "72163019fd48d9314bdf20dab047925763ef0198",
+      "semantic_note": "Deterministic bounded-execution decision logic at the source cut; not universal runtime proof."
+    },
+    {
+      "path": "tools/governance/remote_desktop_call_gate.py",
+      "blob_sha": "fc04113eb0cbe04d761b66c557438f512420182b",
+      "semantic_note": "Deterministic exact-call Remote Desktop gate logic at the source cut; not proof of authorization or execution."
+    }
+  ],
+  "historical_r4_provenance": {
+    "role": "CORROBORATING_PROVENANCE_NOT_SOURCE_IDENTITY_OR_LIVE_TRUTH",
+    "audited_source_commit": "d0d5a54c5f06db9423d14b17e7f8eadefd15c6fb",
+    "audited_source_tree": "1d723da118fb72ad7dd6b39e3e39a3d4284d18a8",
+    "publication_pr": 153,
+    "publication_merge_commit": "6496ed7f96f80d3dc2e64529c3a09a18c99215fb",
+    "coverage_ledger_path": "docs/evidence/repository-audit-2026-09-06/COVERAGE-LEDGER.md",
+    "coverage_ledger_publication_blob": "f8a5c9a8f899bc4432bb9bc0cbec7c045aad05f3",
+    "closeout_path": "docs/evidence/repository-audit-2026-09-06/OTERYN-REPOSITORY-AUDIT-R4-CURRENT-MAIN-DELTA-CLOSEOUT-20260907.md",
+    "closeout_publication_blob": "31016a7b8aa4252885e5a08f8b909b6ce2beb4ba"
+  },
+  "reconfirmed_finding": {
+    "id": "META-AUD-05",
+    "severity": "P2",
+    "status": "PARTIALLY_REPAIRED",
+    "title": "Historical authority and merge-up conflict",
+    "disposition": "RECONFIRMED_EXISTING_NOT_NEW_NOT_CLOSED_NOT_DOWNGRADED_NOT_WAIVED",
+    "evidence": [
+      "ADR 0004 retains operative-looking final-integration merge-up instructions when main advanced.",
+      "ADR 0005 and the canonical execution-access contract assign freshness to Merge Queue merge_group qualification and reject merge-up solely for upstream advance.",
+      "ADR 0004 points to central agent contracts for normative procedure, narrowing practical impact, but no explicit source statement declares ADR 0004 wholly superseded."
+    ],
+    "adr_0004_repaired_by_candidate": false
+  },
+  "temporal_authority": {
+    "retired_prompts_dispatchable": false,
+    "superpowers_material_dispatchable": false,
+    "historical_closeouts_are_current_live_proof": false,
+    "recovery_contract_is_current_live_qualification": false,
+    "desired_state_is_live_enforcement_proof": false,
+    "mutable_github_admin_provider_runtime_state_reviewed": false
+  },
+  "canonical_accounting_unchanged": {
+    "source_rows": 4325,
+    "direct_paths": 233,
+    "grouped_paths": 113,
+    "unverified_paths": 3979,
+    "semantically_classified_paths": 346,
+    "candidate_paths_currently_unverified": 25,
+    "ledger_sha256": "73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9"
+  },
+  "limitations": [
+    "This is candidate/proof evidence only; it does not adopt coverage or promise future adoption.",
+    "The review establishes bounded source-file semantics only, not readiness, audit completion, independent 10/10, production or admin state, provider remediation, or live enforcement.",
+    "Historical and desired-state documents remain bounded by their temporal roles; mutable LIVE facts require separate current evidence."
+  ]
+}

@@ -1,0 +1,363 @@
+{
+  "schema_version": 1,
+  "source_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
+  "php_baseline": {
+    "tests": 618,
+    "assertions": 5194,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 4,
+    "executed": 614
+  },
+  "php_empty_env_control": {
+    "tests": 618,
+    "assertions": 5194,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 4,
+    "executed": 614
+  },
+  "separate_concurrency": {
+    "tests": 4,
+    "assertions": 63,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "executed": 4
+  },
+  "distinct_php_identities_across_profiles": 618,
+  "php_coverage": {
+    "files": 491,
+    "loc": 40187,
+    "ncloc": 37847,
+    "classes": 440,
+    "methods": 1559,
+    "coveredmethods": 863,
+    "conditionals": 0,
+    "coveredconditionals": 0,
+    "statements": 17674,
+    "coveredstatements": 14414,
+    "elements": 19233,
+    "coveredelements": 15277
+  },
+  "php_statement_percent": 81.55,
+  "php_branch_coverage": "NOT_MEASURED",
+  "composer_advisories_at_execution": 0,
+  "gateway": {
+    "passed_test_events": 115,
+    "top_level": 56,
+    "nested": 59,
+    "packages_passed": 7,
+    "failures": 0,
+    "skips": 0
+  },
+  "gateway_coverage": {
+    "statements": 602,
+    "covered_statements": 484,
+    "percent": 80.4
+  },
+  "ui_reassessment": {
+    "verdict": "PASS_SCOPED_PUBLIC_FIXTURE",
+    "cases": 48,
+    "mode": "OFFLINE_REASSESSMENT_NOT_NEW_BROWSER_EXECUTION",
+    "missing_editorial_text_checked": true,
+    "errors": [],
+    "limitations": "Anonymous English fixture only; keyboard sequence is observational. No authenticated journey, complete accessibility, production, native game or independent visual acceptance."
+  },
+  "ui_cases": 48,
+  "ui_expected_404_cases": 8,
+  "ci": {
+    "runs": 84,
+    "jobs": 418,
+    "unique_event_candidates": 77,
+    "run_conclusions": {
+      "success": 50,
+      "cancelled": 7,
+      "failure": 27
+    },
+    "strata": [
+      {
+        "repository": "Oteryn/Oteryn",
+        "workflow": "ci.yml",
+        "runs": 12,
+        "jobs": 12,
+        "run_conclusions": {
+          "success": 10,
+          "cancelled": 2
+        },
+        "observed_job_seconds": 136.0,
+        "job_time_unknown": 0,
+        "skipped_jobs": 0,
+        "wall_observations": 12,
+        "median_wall_seconds": 14.0
+      },
+      {
+        "repository": "Oteryn/Oteryn-Platform",
+        "workflow": "ci.yml",
+        "runs": 12,
+        "jobs": 60,
+        "run_conclusions": {
+          "failure": 12
+        },
+        "observed_job_seconds": 177.0,
+        "job_time_unknown": 2,
+        "skipped_jobs": 24,
+        "wall_observations": 12,
+        "median_wall_seconds": 22.0
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "workflow": "merge-gate.yml",
+        "runs": 12,
+        "jobs": 144,
+        "run_conclusions": {
+          "success": 4,
+          "cancelled": 3,
+          "failure": 5
+        },
+        "observed_job_seconds": 7573.0,
+        "job_time_unknown": 5,
+        "skipped_jobs": 12,
+        "wall_observations": 12,
+        "median_wall_seconds": 513.5
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "workflow": "merge-group-gate.yml",
+        "runs": 12,
+        "jobs": 108,
+        "run_conclusions": {
+          "success": 12
+        },
+        "observed_job_seconds": 10971.0,
+        "job_time_unknown": 0,
+        "skipped_jobs": 0,
+        "wall_observations": 12,
+        "median_wall_seconds": 498.5
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "workflow": "rust.yml",
+        "runs": 12,
+        "jobs": 72,
+        "run_conclusions": {
+          "success": 12
+        },
+        "observed_job_seconds": 4273.0,
+        "job_time_unknown": 9,
+        "skipped_jobs": 22,
+        "wall_observations": 12,
+        "median_wall_seconds": 45.0
+      },
+      {
+        "repository": "Oteryn/Oteryn-Atlas",
+        "workflow": "merge-group-gate.yml",
+        "runs": 12,
+        "jobs": 12,
+        "run_conclusions": {
+          "success": 12
+        },
+        "observed_job_seconds": 90.0,
+        "job_time_unknown": 0,
+        "skipped_jobs": 0,
+        "wall_observations": 12,
+        "median_wall_seconds": 11.0
+      },
+      {
+        "repository": "Oteryn/Oteryn-Atlas",
+        "workflow": "merge-authority-audit.yml",
+        "runs": 12,
+        "jobs": 10,
+        "run_conclusions": {
+          "failure": 10,
+          "cancelled": 2
+        },
+        "observed_job_seconds": 75.0,
+        "job_time_unknown": 0,
+        "skipped_jobs": 0,
+        "wall_observations": 10,
+        "median_wall_seconds": 11.5
+      }
+    ],
+    "anomalies": [
+      {
+        "repository": "Oteryn/Oteryn-Platform",
+        "run": 34170140927,
+        "job": 101888758034,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T23:28:20Z",
+        "completed_at": "2026-09-07T23:28:19Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Platform",
+        "run": 34170140927,
+        "job": 101888758159,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T23:28:20Z",
+        "completed_at": "2026-09-07T23:28:19Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34192622354,
+        "job": 101953761755,
+        "conclusion": "skipped",
+        "started_at": "2026-09-08T05:58:06Z",
+        "completed_at": "2026-09-08T05:58:05Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34192622354,
+        "job": 101953761901,
+        "conclusion": "skipped",
+        "started_at": "2026-09-08T05:58:06Z",
+        "completed_at": "2026-09-08T05:58:05Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34192622354,
+        "job": 101953762120,
+        "conclusion": "skipped",
+        "started_at": "2026-09-08T05:58:06Z",
+        "completed_at": "2026-09-08T05:58:05Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34192622354,
+        "job": 101953762839,
+        "conclusion": "skipped",
+        "started_at": "2026-09-08T05:58:06Z",
+        "completed_at": "2026-09-08T05:58:05Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34192593034,
+        "job": 101953596613,
+        "conclusion": "skipped",
+        "started_at": "2026-09-08T05:57:14Z",
+        "completed_at": "2026-09-08T05:57:13Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34167428008,
+        "job": 101881195121,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T22:40:05Z",
+        "completed_at": "2026-09-07T22:40:04Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34166902586,
+        "job": 101879686793,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T22:30:49Z",
+        "completed_at": "2026-09-07T22:30:48Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34166902586,
+        "job": 101879686800,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T22:30:49Z",
+        "completed_at": "2026-09-07T22:30:48Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34164528277,
+        "job": 101872884657,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T21:50:07Z",
+        "completed_at": "2026-09-07T21:50:06Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34164528277,
+        "job": 101872884718,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T21:50:07Z",
+        "completed_at": "2026-09-07T21:50:06Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34164528277,
+        "job": 101872885036,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T21:50:07Z",
+        "completed_at": "2026-09-07T21:50:06Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34164183347,
+        "job": 101871900066,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T21:44:15Z",
+        "completed_at": "2026-09-07T21:44:14Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34164183347,
+        "job": 101871900339,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T21:44:15Z",
+        "completed_at": "2026-09-07T21:44:14Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      },
+      {
+        "repository": "Oteryn/Oteryn-Game",
+        "run": 34164183347,
+        "job": 101871900607,
+        "conclusion": "skipped",
+        "started_at": "2026-09-07T21:44:15Z",
+        "completed_at": "2026-09-07T21:44:14Z",
+        "anomalies": [
+          "execution: negative interval"
+        ]
+      }
+    ],
+    "limitations": "Newest 12 completed runs per selected workflow; opportunistic, not random. Latest attempt only. Unknown times are not zero. Delays include dependencies. Not all candidate workflows, billed usage, monetary cost, pure queue time, cache yield, token cost or product pass."
+  },
+  "limitations": "Across-profile identity closure is not one all-green full integration run. Browser anonymous English fixture only. No production, full accessibility, native Game/Rust, deployment, DR or independent semantic qualification."
+}

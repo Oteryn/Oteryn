@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "id": "platform-routes-direct-existing-revalidation-20260910",
+  "repository": "platform",
+  "disposition": "DIRECT_EXISTING_REVALIDATION_ONLY",
+  "coverage_delta": 0,
+  "already_canonical_direct": true,
+  "re_adoption_permitted": false,
+  "review_method": "FRESH_FULL_FILE_DIRECT_READ",
+  "source": {
+    "repository": "Oteryn/Oteryn-Platform",
+    "commit_sha": "de917b3477a1de0667531380de3660e8b2ab59aa",
+    "routes_tree_sha": "424f8bae6f7b9de1726f7c62c606b3b0baa15b23",
+    "regular_file_count": 19,
+    "top_level_file_count": 5,
+    "module_file_count": 14
+  },
+  "paths": [
+    {
+      "path": "routes/api.php",
+      "blob_sha": "ba7916913c581d88a23cb19a70060d857606f644"
+    },
+    {
+      "path": "routes/console.php",
+      "blob_sha": "c5dc5d63ef514d094b1a6019fc41f764883fb265"
+    },
+    {
+      "path": "routes/internal.php",
+      "blob_sha": "5fa537392a6f7400f56f8c2b6f55571dad2ebe90"
+    },
+    {
+      "path": "routes/localization.php",
+      "blob_sha": "31d474687f8279ef160abd6e1db27753b3a5b99e"
+    },
+    {
+      "path": "routes/web.php",
+      "blob_sha": "339e7573b2bc04c7bdd9183cd739c099448d8421"
+    },
+    {
+      "path": "routes/modules/announcements.php",
+      "blob_sha": "452bb9ee7b70b03951ab7c2476dd10e437549c2b"
+    },
+    {
+      "path": "routes/modules/character-profile-preferences.php",
+      "blob_sha": "cc0ab9c2cfdc574b2924e6554bbfd65f23571840"
+    },
+    {
+      "path": "routes/modules/downloads.php",
+      "blob_sha": "62be2bd4f86e45a6273c15508791db9c6530a61f"
+    },
+    {
+      "path": "routes/modules/editorial-media.php",
+      "blob_sha": "77d3997723b3881329cfc439268bff98335c9a68"
+    },
+    {
+      "path": "routes/modules/events.php",
+      "blob_sha": "31fd0e8ed50b41f99bedc639d562a9fe2cba47f1"
+    },
+    {
+      "path": "routes/modules/game-catalog.php",
+      "blob_sha": "bc29adb9c5ebca9fda1a53c663a35b542a3470b9"
+    },
+    {
+      "path": "routes/modules/homepage-templates.php",
+      "blob_sha": "bea4353cb2ad2198f17d4840c4eac337a70da94f"
+    },
+    {
+      "path": "routes/modules/marketplace.php",
+      "blob_sha": "6ead81fecf5d99eb231413bea98d8bf097fa05b5"
+    },
+    {
+      "path": "routes/modules/payments.php",
+      "blob_sha": "77690386865ea9095c427f96ee7a8e6b863f176a"
+    },
+    {
+      "path": "routes/modules/player-companion.php",
+      "blob_sha": "797be13e358bf363a9161951551f0c5949d9cd6f"
+    },
+    {
+      "path": "routes/modules/public-game-statistics.php",
+      "blob_sha": "a49899694f117acd0a4eba958053dcbccb860754"
+    },
+    {
+      "path": "routes/modules/public-portal.php",
+      "blob_sha": "74b581fb449b77fc3985e46b1734f1913b422cc8"
+    },
+    {
+      "path": "routes/modules/support.php",
+      "blob_sha": "cacd43464ab0126d4caef0c1a13da1aacdc90122"
+    },
+    {
+      "path": "routes/modules/wiki.php",
+      "blob_sha": "f4a16ac017fd075b54904455bc8b6f05af304053"
+    }
+  ],
+  "semantic_boundary": {
+    "included": [
+      "route methods",
+      "route URIs",
+      "route names",
+      "route middleware",
+      "permission middleware declarations",
+      "MFA middleware declarations",
+      "throttle declarations",
+      "route constraints",
+      "environment gates",
+      "module inclusion declarations",
+      "console command declarations",
+      "console schedule declarations"
+    ],
+    "excluded": [
+      "controller and service internals",
+      "framework-global middleware behavior",
+      "production reachability",
+      "data authorization internals",
+      "UI and product readiness"
+    ]
+  },
+  "rejected_history": {
+    "claim": "The old Platform audit prose claimed 21 route files.",
+    "claimed_count": 21,
+    "actual_count": 19,
+    "status": "REJECTED_COUNT_MISMATCH",
+    "accepted_as_evidence": false,
+    "used_for_revalidation": false
+  },
+  "review_result": {
+    "material_new_findings": [],
+    "finding_severities_reviewed": [
+      "P0",
+      "P1",
+      "P2"
+    ],
+    "statement": "The fresh direct review of all 19 immutable route files found no new material P0, P1, or P2 within the bounded route-declaration scope.",
+    "existing_provider_findings_closed": false
+  },
+  "canonical_accounting_unchanged": {
+    "source_rows": 4325,
+    "direct_paths": 233,
+    "grouped_paths": 113,
+    "unverified_paths": 3979,
+    "semantically_classified_paths": 346,
+    "ledger_sha256": "73c458b8e1b2a6a5cf02bedbefec8fe3a11d4f883413ef65f6d8dd56952338f9"
+  },
+  "limitations": [
+    "This revalidation hardens existing DIRECT evidence only; it is not an adoption, coverage promotion, readiness, completion, or provider-remediation claim.",
+    "These 19 paths are already canonical DIRECT rows, coverage_delta is zero, re-adoption is prohibited, and no separate adoption phase exists for them.",
+    "Existing provider findings remain open and are not closed by an absence of new findings in this bounded declaration review."
+  ]
+}
