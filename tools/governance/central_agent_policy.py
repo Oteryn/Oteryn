@@ -38,11 +38,32 @@ EXPECTED_POLICY_KEYS = {
     "provider_binding_schema",
     "forbidden_provider_sections",
     "forbidden_task_prompt_sections",
+    "pr_metadata_conventions",
 }
 EXPECTED_SURFACES = {
     "organization_policy": "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md",
     "prompting_standard": "docs/agents/policy/PROMPTING_STANDARD.md",
     "prompt_eval_standard": "docs/agents/policy/PROMPT_EVAL_STANDARD.md",
+}
+EXPECTED_PR_METADATA_CONVENTIONS = {
+    "presentation_checks": [
+        "title_length",
+        "conventional_title_grammar",
+        "summary_heading",
+        "scope_heading",
+        "validation_heading",
+    ],
+    "enforcement": "advisory_only_unless_bound_to_explicit_machine_release_security_or_safety_semantic_invariant",
+    "validation_heading_match": "semantic_validation_token",
+    "hard_fail_identity_checks": [
+        "pull_request_open",
+        "pull_request_ready_non_draft",
+        "target_repository",
+        "pull_request_number",
+        "exact_head_sha",
+        "same_repository_head",
+        "base_main",
+    ],
 }
 EXPECTED_BINDING_KEYS = {
     "schema_version",
@@ -80,6 +101,8 @@ def validate_meta_bundle(root: Path, policy: dict[str, Any]) -> list[str]:
         errors.append(f"organization policy_version must be {POLICY_VERSION}")
     if policy.get("authority_repository") != AUTHORITY_REPOSITORY:
         errors.append(f"organization authority_repository must be {AUTHORITY_REPOSITORY}")
+    if policy.get("pr_metadata_conventions") != EXPECTED_PR_METADATA_CONVENTIONS:
+        errors.append("pr_metadata_conventions must match the canonical advisory-vs-safety contract")
 
     surfaces = policy.get("canonical_human_surfaces")
     if surfaces != EXPECTED_SURFACES:
@@ -268,6 +291,8 @@ def _validate_resolved_authority(
             errors.append("resolved META policy_version does not match provider binding")
         if resolved_policy.get("authority_repository") != binding.get("authority_repository"):
             errors.append("resolved META authority repository does not match provider binding")
+        if resolved_policy.get("pr_metadata_conventions") != EXPECTED_PR_METADATA_CONVENTIONS:
+            errors.append("resolved META pr_metadata_conventions does not match the canonical contract")
         if resolved_policy.get("canonical_human_surfaces") != actual_paths:
             errors.append("resolved META canonical paths do not match provider binding")
         if expected_policy is not None and resolved_policy != expected_policy:
