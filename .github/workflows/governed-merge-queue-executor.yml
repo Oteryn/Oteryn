@@ -75,13 +75,13 @@ jobs:
       - name: Verify checked-out protected META main
         if: ${{ steps.parse.outputs.allowed == 'true' }}
         env:
-          QUALIFIED_PROTECTED_MAIN_SHA: ${{ steps.parse.outputs.protected_main_sha }}
+          META_EVENT_SHA: ${{ github.sha }}
         shell: bash
         run: |
           set -euo pipefail
           checked_out_main="$(git rev-parse HEAD)"
-          if [[ "$checked_out_main" != "$QUALIFIED_PROTECTED_MAIN_SHA" ]]; then
-            echo "BLOCKED_STALE_STATE: protected META main moved after canary qualification" >&2
+          if [[ "$checked_out_main" != "$META_EVENT_SHA" ]]; then
+            echo "BLOCKED_STALE_STATE: protected META main moved after control request event" >&2
             exit 1
           fi
 
@@ -96,7 +96,7 @@ jobs:
           REQUEST_COMMENT_ID: ${{ github.event.comment.id }}
           OTERYN_MQ_EVENT_ACTOR: ${{ github.event.comment.user.login }}
           OTERYN_MQ_EVENT_ASSOCIATION: ${{ github.event.comment.author_association }}
-          QUALIFIED_PROTECTED_MAIN_SHA: ${{ steps.parse.outputs.protected_main_sha }}
+          TARGET_PROTECTED_MAIN_SHA: ${{ steps.parse.outputs.protected_main_sha }}
         shell: bash
         run: |
           set -euo pipefail
@@ -105,4 +105,4 @@ jobs:
             --pr-number "$TARGET_PR" \
             --expected-head-sha "$TARGET_HEAD" \
             --request-comment-id "$REQUEST_COMMENT_ID" \
-            --protected-main-sha "$QUALIFIED_PROTECTED_MAIN_SHA"
+            --protected-main-sha "$TARGET_PROTECTED_MAIN_SHA"
