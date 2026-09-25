@@ -1,7 +1,7 @@
 # Oteryn Organization Agent Policy
 
 Policy ID: `OTERYN_ORGANIZATION_AGENT_POLICY`
-Policy version: `3.1.0`
+Policy version: `3.1.1`
 
 Effective after reviewed integration to protected META `main` and explicit provider adoption. The principle is **one rule, one authority**: META owns shared semantics; providers own product knowledge and implementation; prompts add only task-specific requirements.
 
@@ -43,6 +43,8 @@ Skills and plugins are subordinate execution aids. They must not weaken safety o
 ## Validation and integration
 
 Use focused checks while iterating, broader tests when affected behavior requires them, and the repository-required exact-candidate gate at integration. Do not suppress required tests to reduce cost. Reuse unchanged evidence only within its valid scope; a different integration candidate still needs its required proof. Prefer focused log excerpts while retaining full evidence outside the active context.
+
+PR presentation metadata is guidance, not merge authority. Title length, conventional-title grammar, and exact Markdown heading spelling must not hard-fail an aggregate gate unless a repository documents the concrete release/security invariant protected by that field. Semantically equivalent validation headings are acceptable. Any metadata check that is legitimately blocking must run before expensive build/test lanes so a cheap deterministic failure does not waste heavy CI.
 
 `docs/governance/AI_REVIEW_POLICY.md` owns risk-based independent review. Default external AI review is none; use the lightest applicable review, and repeat it only for a material risk-bearing change. AI review is advisory, not a new required status.
 
