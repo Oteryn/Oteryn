@@ -741,10 +741,19 @@ def test_optimization_document_wording_is_not_a_machine_schema() -> None:
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("test fixture, not live policy\n", encoding="utf-8")
-        for relative in policy["canonical_human_surfaces"].values():
+        for name, relative in policy["canonical_human_surfaces"].items():
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("# Alternative human wording\n\nNon-empty documentation, no mandatory section template.\n", encoding="utf-8")
+            marker = (
+                f"Policy version: `{central.POLICY_VERSION}`"
+                if name == "organization_policy"
+                else f"Policy: `{central.POLICY_ID}@{central.POLICY_VERSION}`"
+            )
+            path.write_text(
+                f"# Alternative human wording\n\n{marker}\n\n"
+                "Non-empty documentation, no mandatory section template.\n",
+                encoding="utf-8",
+            )
         assert central.validate_meta_bundle(root, policy) == []
         for relative in policy["canonical_human_surfaces"].values():
             (root / relative).write_text(" \n\t\n", encoding="utf-8")
