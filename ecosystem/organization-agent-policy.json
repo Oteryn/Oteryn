@@ -76,6 +76,8 @@
     "hard_fail_identity_checks": [
       "pull_request_open",
       "pull_request_ready_non_draft",
+      "target_repository",
+      "pull_request_number",
       "exact_head_sha",
       "same_repository_head",
       "base_main"

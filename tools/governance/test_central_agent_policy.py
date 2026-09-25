@@ -931,6 +931,8 @@ def test_pr_metadata_contract_preserves_machine_safety_and_ready_state() -> None
     assert contract["hard_fail_identity_checks"] == [
         "pull_request_open",
         "pull_request_ready_non_draft",
+        "target_repository",
+        "pull_request_number",
         "exact_head_sha",
         "same_repository_head",
         "base_main",
