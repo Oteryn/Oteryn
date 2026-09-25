@@ -70,6 +70,29 @@ def test_meta_bundle_is_complete_and_self_consistent() -> None:
     assert central.validate_meta_bundle(REPO_ROOT, policy) == []
 
 
+def test_meta_bundle_rejects_prompt_standard_version_drift() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    for relative in (
+        "docs/agents/policy/PROMPTING_STANDARD.md",
+        "docs/agents/policy/PROMPT_EVAL_STANDARD.md",
+    ):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for surface in policy["canonical_human_surfaces"].values():
+                target = root / surface
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source = (REPO_ROOT / surface).read_text(encoding="utf-8")
+                if surface == relative:
+                    source = source.replace("@3.1.1", "@3.1.0")
+                target.write_text(source, encoding="utf-8")
+            for machine in policy["machine_authorities"]:
+                target = root / machine
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("fixture\n", encoding="utf-8")
+            errors = central.validate_meta_bundle(root, policy)
+            assert f"central human policy surface version drift: {relative}" in errors
+
+
 def test_publication_policy_supports_atomic_and_bounded_connector_routes() -> None:
     organization = (REPO_ROOT / "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md").read_text(encoding="utf-8")
     publication = (REPO_ROOT / "docs/agents/contracts/PUBLICATION_INTEGRITY_POLICY.md").read_text(encoding="utf-8")
