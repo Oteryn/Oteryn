@@ -30,7 +30,7 @@ def valid_binding() -> dict[str, object]:
     return {
         "schema_version": 1,
         "policy_id": "OTERYN_ORGANIZATION_AGENT_POLICY",
-        "policy_version": "3.1.0",
+        "policy_version": "3.1.1",
         "authority_repository": "Oteryn/Oteryn",
         "authority_commit": FULL_SHA,
         "organization_policy_path": "docs/agents/policy/ORGANIZATION_AGENT_POLICY.md",
@@ -68,6 +68,29 @@ def trusted_resolver(repository: str, commit: str) -> dict[str, object] | None:
 def test_meta_bundle_is_complete_and_self_consistent() -> None:
     policy = central.load_policy(REPO_ROOT)
     assert central.validate_meta_bundle(REPO_ROOT, policy) == []
+
+
+def test_meta_bundle_rejects_prompt_standard_version_drift() -> None:
+    policy = central.load_policy(REPO_ROOT)
+    for relative in (
+        "docs/agents/policy/PROMPTING_STANDARD.md",
+        "docs/agents/policy/PROMPT_EVAL_STANDARD.md",
+    ):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for surface in policy["canonical_human_surfaces"].values():
+                target = root / surface
+                target.parent.mkdir(parents=True, exist_ok=True)
+                source = (REPO_ROOT / surface).read_text(encoding="utf-8")
+                if surface == relative:
+                    source = source.replace("@3.1.1", "@3.1.0")
+                target.write_text(source, encoding="utf-8")
+            for machine in policy["machine_authorities"]:
+                target = root / machine
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("fixture\n", encoding="utf-8")
+            errors = central.validate_meta_bundle(root, policy)
+            assert f"central human policy surface version drift: {relative}" in errors
 
 
 def test_publication_policy_supports_atomic_and_bounded_connector_routes() -> None:
@@ -643,9 +666,33 @@ def _mock_github_resolution(*, protected: object = True, status: str = "ahead", 
         assert repository == "Oteryn/Oteryn" and commit == FULL_SHA
         if relative == str(central.POLICY_PATH):
             return json.dumps(policy)
-        return "Immutable policy fixture.\n"
+        names = {path: name for name, path in policy["canonical_human_surfaces"].items()}
+        name = names.get(relative)
+        assert name is not None
+        marker = (
+            f"Policy version: `{central.POLICY_VERSION}`"
+            if name == "organization_policy"
+            else f"Policy: `{central.POLICY_ID}@{central.POLICY_VERSION}`"
+        )
+        return f"Immutable policy fixture.\n\n{marker}\n"
 
     return read_json, read_text, seen
+
+
+def test_provider_binding_rejects_resolved_surface_version_drift() -> None:
+    for name, relative in central.EXPECTED_SURFACES.items():
+        resolved = resolved_authority()
+        marker = central._expected_surface_marker(name)
+        resolved["human_surfaces"][relative] = resolved["human_surfaces"][relative].replace(
+            marker,
+            marker.replace(central.POLICY_VERSION, "3.1.0"),
+        )
+        errors = central.validate_provider_binding(
+            valid_binding(),
+            policy=central.load_policy(REPO_ROOT),
+            authority_resolver=lambda _repository, _commit, value=resolved: value,
+        )
+        assert f"resolved META human policy surface version drift: {relative}" in errors
 
 
 def test_optimization_resolver_checks_protection_and_pins_the_ancestry_read() -> None:
@@ -718,10 +765,19 @@ def test_optimization_document_wording_is_not_a_machine_schema() -> None:
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("test fixture, not live policy\n", encoding="utf-8")
-        for relative in policy["canonical_human_surfaces"].values():
+        for name, relative in policy["canonical_human_surfaces"].items():
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("# Alternative human wording\n\nNon-empty documentation, no mandatory section template.\n", encoding="utf-8")
+            marker = (
+                f"Policy version: `{central.POLICY_VERSION}`"
+                if name == "organization_policy"
+                else f"Policy: `{central.POLICY_ID}@{central.POLICY_VERSION}`"
+            )
+            path.write_text(
+                f"# Alternative human wording\n\n{marker}\n\n"
+                "Non-empty documentation, no mandatory section template.\n",
+                encoding="utf-8",
+            )
         assert central.validate_meta_bundle(root, policy) == []
         for relative in policy["canonical_human_surfaces"].values():
             (root / relative).write_text(" \n\t\n", encoding="utf-8")

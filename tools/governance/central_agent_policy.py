@@ -13,7 +13,7 @@ import urllib.request
 
 POLICY_PATH = Path("ecosystem/organization-agent-policy.json")
 POLICY_ID = "OTERYN_ORGANIZATION_AGENT_POLICY"
-POLICY_VERSION = "3.1.0"
+POLICY_VERSION = "3.1.1"
 AUTHORITY_REPOSITORY = "Oteryn/Oteryn"
 BINDING_PATH = "docs/agents/META_AGENT_POLICY_BINDING.json"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -60,6 +60,14 @@ def _is_exact_int(value: object, expected: int) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value == expected
 
 
+def _expected_surface_marker(name: str) -> str:
+    return (
+        f"Policy version: `{POLICY_VERSION}`"
+        if name == "organization_policy"
+        else f"Policy: `{POLICY_ID}@{POLICY_VERSION}`"
+    )
+
+
 def load_policy(root: Path) -> dict[str, Any]:
     path = root / POLICY_PATH
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -91,8 +99,13 @@ def validate_meta_bundle(root: Path, policy: dict[str, Any]) -> list[str]:
                 errors.append(f"missing or empty central human policy surface: {relative}")
                 continue
             try:
-                if not path.read_text(encoding="utf-8").strip():
+                text = path.read_text(encoding="utf-8")
+                if not text.strip():
                     errors.append(f"missing or empty central human policy surface: {relative}")
+                    continue
+                expected_marker = _expected_surface_marker(name)
+                if expected_marker not in text:
+                    errors.append(f"central human policy surface version drift: {relative}")
             except (OSError, UnicodeError):
                 errors.append(f"missing or unreadable central human policy surface: {relative}")
 
@@ -211,11 +224,11 @@ def resolve_meta_authority_via_github(
         if surfaces != EXPECTED_SURFACES:
             return None
         human_surfaces: dict[str, str] = {}
-        for relative in surfaces.values():
+        for name, relative in surfaces.items():
             if not isinstance(relative, str) or not relative:
                 return None
             text = _github_text_at_commit(repository, commit, relative, timeout=timeout)
-            if not text.strip():
+            if not text.strip() or _expected_surface_marker(name) not in text:
                 return None
             human_surfaces[relative] = text
         return {
@@ -279,6 +292,11 @@ def _validate_resolved_authority(
             errors.append("resolved META human policy surfaces do not match provider binding")
         elif not all(isinstance(value, str) and value.strip() for value in human_surfaces.values()):
             errors.append("resolved META human policy surfaces must be non-empty text")
+        else:
+            for name, relative in actual_paths.items():
+                value = human_surfaces.get(relative)
+                if not isinstance(value, str) or _expected_surface_marker(name) not in value:
+                    errors.append(f"resolved META human policy surface version drift: {relative}")
     return errors
 
 
